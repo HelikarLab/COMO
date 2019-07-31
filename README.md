@@ -2,6 +2,16 @@
 
 This is the home page for pipeline project.
 
+## FlowCharts
+![1](./doc/IMG_1.jpg)
+
+![2](./doc/IMG_2.jpg)
+
+![3](./doc/IMG_3.jpg)
+
+![4](./doc/IMG_4.jpg)
+
+
 ## Resources
 * https://opencobra.github.io/
 * cobrapy [doc](https://cobrapy.readthedocs.io/en/stable/), [installation](https://github.com/opencobra/cobrapy/blob/master/INSTALL.rst)
