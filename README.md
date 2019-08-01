@@ -26,3 +26,4 @@ RMAC Data
 * [R project](https://www.r-project.org/), [Installation of R, R Studio, R Commander](https://www.andrewheiss.com/blog/2012/04/17/install-r-rstudio-r-commander-windows-osx/)
 * [rpy2](https://rpy2.readthedocs.io)
 * [biopython](https://biopython.org/wiki/Packages)
+* [GEOparse](https://geoparse.readthedocs.io/)
