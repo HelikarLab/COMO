@@ -1,3 +1,5 @@
+# only need to run block 1-2
+# block 0
 #setwd("~/OneDrive - University of Nebraska-Lincoln/BIOC439_TermProject/New")
 entrez570 = read.delim(file = "gpl570entrez.csv", sep = ",")
 entrez96 = read.delim(file = "gpl96entrez.csv", sep = ",")
@@ -5,6 +7,7 @@ entrez97 = read.delim(file = "gpl97entrez.csv", sep = ",")
 entrez4685 = read.delim(file = "gpl4685entrez.csv", sep = ",")
 entrez8300 = read.delim(file = "gpl8300entrez.csv", sep = ",")
 
+# block 1
 #setwd("~/OneDrive - University of Nebraska-Lincoln/BIOC439_TermProject/New/Control/gpl570")
 library(affy)
 mydata = ReadAffy()
@@ -29,12 +32,14 @@ colnames(x) = string
 MERGE = merge(x, entrez96, by = "ID", all = TRUE)
 write.table(MERGE, file = "MERGE.csv", sep = ",")
 
+# block 2
 # organize columns and remove expression data with no entrez ID
 #NEW = read.delim(file = "MERGE.csv", sep = ",")
 NEW = read.delim(file = "MERGE.csv", sep = ",")
 entrez = NEW[,1]
 NEW = NEW[,-1]
 
+# block 3
 # calculate z-score
 NEW_z = scale(log2(NEW))
 rownames(NEW_z) = entrez
