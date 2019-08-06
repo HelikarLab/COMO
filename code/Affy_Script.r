@@ -25,9 +25,9 @@ write.table(y_entrez, file="mydata_PMA_entrez.xls", quote=F, sep="\t", col.names
 
 x = data.frame(exprs(eset))
 
-x[,35] = rownames(x)
+x[,34] = rownames(x)
 string = colnames(x)
-string[35] = "ID"
+string[34] = "ID"
 colnames(x) = string
 MERGE = merge(x, entrez96, by = "ID", all = TRUE)
 write.table(MERGE, file = "MERGE.csv", sep = ",")
@@ -50,6 +50,7 @@ boxplot_labels = colnames(NEW_z)
 boxplot = boxplot.matrix(NEW_z, use.cols = TRUE, outline = TRUE, names = boxplot_labels, main = "GSE2770 (96) Data", xlab = "Samples", ylab = "Normalized Expression Value", col=(c("purple")))
 
 # remove duplicates after sorting highest to lowest average expression
+# remove smaller z-score
 NEW_z = read.delim(file = "data_z.csv", sep = ",")
 NEW_z = NEW_z[!duplicated(NEW_z[,1]),]
 write.table(NEW_z, file = "data_z_noduplicates.csv", sep = ",", row.names = FALSE)
