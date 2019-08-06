@@ -10,11 +10,16 @@ entrez8300 = read.delim(file = "gpl8300entrez.csv", sep = ",")
 # block 1
 #setwd("~/OneDrive - University of Nebraska-Lincoln/BIOC439_TermProject/New/Control/gpl570")
 library(affy)
-mydata = ReadAffy()
-eset = mas5(mydata)
-eset_PMA <- mas5calls(mydata)
-y <- data.frame(exprs(eset), exprs(eset_PMA), assayDataElement(eset_PMA, "se.exprs"))
-y <- y[,sort(names(y))]
+readaffydir <- function(addr){
+  setwd(addr)
+  mydata = ReadAffy()
+  eset = mas5(mydata)
+  eset_PMA <- mas5calls(mydata)
+  y <- data.frame(exprs(eset), exprs(eset_PMA), assayDataElement(eset_PMA, "se.exprs"))
+  y <- y[,sort(names(y))]
+  return(y)
+}
+y = readaffydir('/Users/zhzhao/Dropbox/Helikar/pipelines/data/GSE2770_RAW/GPL8300/')
 y[,25] = rownames(y)
 string = colnames(y)
 string[25] = "ID"
@@ -30,8 +35,8 @@ string = colnames(x)
 string[34] = "ID"
 colnames(x) = string
 MERGE = merge(x, entrez96, by = "ID", all = TRUE)
-write.table(MERGE, file = "MERGE.csv", sep = ",")
-
+write.table(MERGE, file = "MERGE.csv", sep = ",") 
+# Manual processing
 # block 2
 # organize columns and remove expression data with no entrez ID
 #NEW = read.delim(file = "MERGE.csv", sep = ",")
