@@ -28,3 +28,47 @@ RMAC Data
 * [biopython](https://biopython.org/wiki/Packages)
 * Python: [GEOparse](https://geoparse.readthedocs.io/), R: [GEOquery](https://bioconductor.org/packages/release/bioc/html/GEOquery.html)
 * [R Tutorial](https://www.cyclismo.org/tutorial/R/index.html)
+
+
+## Repository Structure
+
+```bash
+├── README.md # README
+├── code # R & Matlab code
+│   ├── Affy_Script.r
+│   ├── Duplicated_cmapFiles_Sript.R
+│   ├── GEO_ID_maps.r
+│   ├── Knock_out_simulation_1.m
+│   ├── SCORE.R
+│   ├── SCORE_DOWN.R
+│   ├── SCRIPT_ExtractingFRatio_DE_genes_2.R
+│   ├── Script_CMap_FCMat_data.R
+│   ├── Script_DT.R
+│   ├── Script_EntrezWise_DrugsConMap.R
+│   ├── Script_Replicating_multiEntrezIDs.r
+│   ├── Script_merging_data.txt
+│   ├── Validation_withCMap_STAT.R
+│   └── merge_R.R
+├── data # Gene Data
+│   ├── GSE2770_RAW # Folder of RAW data of GSE2770
+│   ├── gpl570entrez.csv
+│   ├── gpl8300entrez.csv
+│   ├── gpl96entrez.csv
+│   └── gpl97entrez.csv
+├── doc # documents
+│   ├── IMG_1.jpg
+│   ├── IMG_2.jpg
+│   ├── IMG_3.jpg
+│   └── IMG_4.jpg
+├── output # Outputs & Intermediate Files
+│   └── GSE2770
+├── papers # papers
+│   ├── Methods.pdf
+│   ├── btg405.pdf
+│   └── usersguide.pdf
+└── py # Python code
+    ├── Scratch_Pad.ipynb
+    ├── Sort_CEL_Files.ipynb
+    ├── download_gsm_id_maps.py
+    └── step1_read_raw_data.py
+```
