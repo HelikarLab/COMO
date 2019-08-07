@@ -237,13 +237,13 @@ affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
 def create_entrez_table_pipeline(gse):
     '''
     create ENTREZ ID based table from gse
-    :param gse:
-    :return:
+    :param gse: gse object
+    :return: pandas dataframe for table of GSE
     '''
     celformat = get_platform_probe(gse)
     gsm_maps = get_gsm_tables(gse)
     gsm_platform = get_gsm_platform(gse)
-
+    # step 1: Ready Affy files from folders
     gsm_tables_sc500 = {}
     for key in celformat.keys():
         platformdir = os.path.join(genedir,key)
@@ -255,9 +255,7 @@ def create_entrez_table_pipeline(gse):
         outputdf['ENTREZ_GENE_ID'] = gsm_maps[key]['ENTREZ_GENE_ID']
         gsm_tables_sc500[key] = outputdf
 
-    # Read files
-    # gpl8300rawdir = '/Users/zhzhao/Dropbox/Helikar/pipelines/data/GSE2770_RAW/GPL8300/'
-    # outputdf = affyio.readaffydir(gpl8300rawdir)
+    # step 2: Drop rows without ENTREZ GENE ID, set index to ENTREZ
     for key,val in celformat.items():
         #df = pd.DataFrame([],columns=['ID','ENTREZ_GENE_ID'])
         try:
@@ -266,7 +264,7 @@ def create_entrez_table_pipeline(gse):
         except:
             pass
 
-    # Merge table to one
+    # step 3: Merge tables of platforms
     df_outer_sc500 = None
     for key,val in celformat.items():
         print('{}: {}'.format(key,gsm_tables_sc500[key].shape))
@@ -279,10 +277,9 @@ def create_entrez_table_pipeline(gse):
     print('Full: {}'.format(df_outer.shape))
     df_outer_sc500.rename(str.lower, axis='columns',inplace=True)
 
-    # Remove duplicated items, keep largest VALUE for each GSM
+    # step 4: Remove duplicated items, keep largest VALUE for each GSM
     df_clean_sc500 = pd.DataFrame([],index=df_outer_sc500.index)
     df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='first')]
-    # df_outer_sc500.rename(str.lower, axis='columns',inplace=True)
     for key,val in gsm_platform.items():
         key_low = key.lower()
         col1,col2,col3 = '{}.cel.gz'.format(key_low), '{}.cel.gz.1'.format(key_low), '{}.cel.gz.2'.format(key_low)
@@ -297,5 +294,6 @@ def create_entrez_table_pipeline(gse):
         df_clean_sc500[col2] = temp[col2]
         df_clean_sc500[col3] = temp[col3]
 
+    # step 5: save to csv file
     df_clean_sc500.to_csv(os.path.join(genedir,'{}_sc500_full_table.csv'.format(gsename)))
     return df_clean_sc500
