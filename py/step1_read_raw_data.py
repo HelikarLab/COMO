@@ -80,34 +80,36 @@ dirlist = currentdir.split('/')
 projectdir = '/'.join(dirlist[0:-1])
 datadir = os.path.join(projectdir,'data')
 outputdir = os.path.join(projectdir,'output')
-gene = 'GSE2770'
+gene = gsename
 genedir = os.path.join(datadir,gene + '_RAW')
 
-# create a folder for each platform
-for key in celformat.keys():
-    platformdir = os.path.join(genedir,key)
-    if not os.path.exists(platformdir):
-        os.makedirs(platformdir)
-        print('Path created: {}'.format(platformdir))
-    else:
-        print('Path already exist: {}'.format(platformdir))
+def organize_gse_raw_data(gsename):
+    gene = gsename
+    genedir = os.path.join(datadir, gene + '_RAW')
+    # create a folder for each platform
+    for key in celformat.keys():
+        platformdir = os.path.join(genedir,key)
+        if not os.path.exists(platformdir):
+            os.makedirs(platformdir)
+            print('Path created: {}'.format(platformdir))
+        else:
+            print('Path already exist: {}'.format(platformdir))
 
-# Move Corresponding Cel files to Folders
-#onlyfiles = [f for f in os.listdir(genedir) if os.path.isfile(os.path.join(genedir, f))]
-onlyfiles = [f for f in os.listdir(genedir) if f.endswith('.gz')]
+    # Move Corresponding Cel files to Folders
+    onlyfiles = [f for f in os.listdir(genedir) if f.endswith('.gz')]
 
-for file in onlyfiles:
-    filelist = file.split('.')
-    prefix = filelist[0]
-    if prefix in gsm_platform:
-        platform = gsm_platform[prefix]
-        platformdir = os.path.join(genedir,platform)
-        src_path = os.path.join(genedir, file)
-        dst_path = os.path.join(platformdir, file)
-        os.rename(src_path,dst_path)
-        print('Move {} to {}'.format(src_path,dst_path))
+    for file in onlyfiles:
+        filelist = file.split('.')
+        prefix = filelist[0]
+        if prefix in gsm_platform:
+            platform = gsm_platform[prefix]
+            platformdir = os.path.join(genedir,platform)
+            src_path = os.path.join(genedir, file)
+            dst_path = os.path.join(platformdir, file)
+            os.rename(src_path,dst_path)
+            print('Move {} to {}'.format(src_path,dst_path))
 
-platforms = ['GPL96','GPL97','GPL8300']
+organize_gse_raw_data(gsename)
 
 def download_gsm_id_maps(datadir, gse, platforms = ['GPL96','GPL97','GPL8300']):
     '''
@@ -134,7 +136,6 @@ def download_gsm_id_maps(datadir, gse, platforms = ['GPL96','GPL97','GPL8300']):
     maps_dict = dict(zip(platforms, maps_list))
     return maps_dict
 
-maps_dict = download_gsm_id_maps(datadir,gse,platforms)
 
 
 def get_gsm_tables(gse):
