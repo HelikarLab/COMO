@@ -310,6 +310,7 @@ class GSEproject:
 
         # step 5: save to csv file
         df_clean_sc500.to_csv(filefullpath)
+        df_clean_sc500.sort_index(inplace=True)
         print('Full table saved to:\n{}'.format(filefullpath))
         return df_clean_sc500
 
