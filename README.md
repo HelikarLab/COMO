@@ -18,6 +18,14 @@ This is the home page for pipeline project.
 Raw data
 RMAC Data
 
+## Todolist
+* Build a Python RESTful prototype
+* Implement Step 2 (when Bhanwar back)
+* ~Implement step 1 (read raw data) via Python, automate the manual operations~
+* ~1. Setup development environment for R and Python~
+
+
+
 ## Resources
 * https://opencobra.github.io/
 * cobrapy [doc](https://cobrapy.readthedocs.io/en/stable/), [installation](https://github.com/opencobra/cobrapy/blob/master/INSTALL.rst)
@@ -28,6 +36,7 @@ RMAC Data
 * [biopython](https://biopython.org/wiki/Packages)
 * Python: [GEOparse](https://geoparse.readthedocs.io/), R: [GEOquery](https://bioconductor.org/packages/release/bioc/html/GEOquery.html)
 * [R Tutorial](https://www.cyclismo.org/tutorial/R/index.html)
+* Python RESTful [Tutorial 1](https://kite.com/blog/python/flask-sqlalchemy-tutorial/), [Tutorial 2: API](https://kite.com/blog/python/flask-restful-api-tutorial/)
 
 
 ## Repository Structure
