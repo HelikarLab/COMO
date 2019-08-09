@@ -36,7 +36,7 @@ RMAC Data
 * [biopython](https://biopython.org/wiki/Packages)
 * Python: [GEOparse](https://geoparse.readthedocs.io/), R: [GEOquery](https://bioconductor.org/packages/release/bioc/html/GEOquery.html)
 * [R Tutorial](https://www.cyclismo.org/tutorial/R/index.html)
-* Python RESTful [Tutorial 1](https://kite.com/blog/python/flask-sqlalchemy-tutorial/), [Tutorial 2: API](https://kite.com/blog/python/flask-restful-api-tutorial/)
+* Python RESTful [Tutorial 1](https://kite.com/blog/python/flask-sqlalchemy-tutorial/), [Tutorial 2: API](https://kite.com/blog/python/flask-restful-api-tutorial/), [Tutorial Index](https://realpython.com/tutorials/api/)
 
 
 ## Repository Structure
