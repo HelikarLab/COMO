@@ -315,14 +315,14 @@ class GSEproject:
         print('Full table saved to:\n{}'.format(filefullpath))
         return df_clean_sc500
 
-    def calculate_z_score(self,df,saveas=None):
+    def calculate_z_score(self,df,to_csv=False):
         cols = list(df)
         result = pd.DataFrame([],index=df.index)
         for col in cols:
             if not '.gz.' in col:
                 score = np.log2(df[col])
                 result[col] = (score-score.mean())/score.std(ddof=0)
-        if not saveas is None:
+        if to_csv:
             filefullpath = os.path.join(self.genedir,'{}_data_z.csv'.format(self.gsename))
             result.to_csv(filefullpath)
         return result
