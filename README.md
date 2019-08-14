@@ -34,7 +34,7 @@ RMAC Data
 * [R project](https://www.r-project.org/), [Installation of R, R Studio, R Commander](https://www.andrewheiss.com/blog/2012/04/17/install-r-rstudio-r-commander-windows-osx/)
 * [rpy2](https://rpy2.readthedocs.io)
 * [biopython](https://biopython.org/wiki/Packages)
-* Python: [GEOparse](https://geoparse.readthedocs.io/), R: [GEOquery](https://bioconductor.org/packages/release/bioc/html/GEOquery.html)
+* Python: [GEOparse](https://geoparse.readthedocs.io/) [PDF](./doc/geoparse.pdf), R: [GEOquery](https://bioconductor.org/packages/release/bioc/html/GEOquery.html)
 * [R Tutorial](https://www.cyclismo.org/tutorial/R/index.html)
 * Python RESTful [Tutorial 1](https://kite.com/blog/python/flask-sqlalchemy-tutorial/), [Tutorial 2: API](https://kite.com/blog/python/flask-restful-api-tutorial/), [Tutorial Index](https://realpython.com/tutorials/api/), [Book: RESTful Web Services](http://restfulwebapis.org/RESTful_Web_Services/)
 * Docker: [Common components](https://www.digitalocean.com/community/tutorials/the-docker-ecosystem-an-introduction-to-common-components), [Containerization](https://www.digitalocean.com/community/tutorials/the-docker-ecosystem-an-overview-of-containerization)
