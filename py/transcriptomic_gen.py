@@ -57,14 +57,6 @@ currentdir = os.getcwd()
 dirlist = currentdir.split('/')
 projectdir = '/'.join(dirlist[0:-1])
 
-# input from user
-filename = 'GeneExpressionDataUsed.xlsx'
-sheet_name = list(range(5)) # first 5 sheets
-
-# gse2770 = GSEproject('GSE2770',projectdir)
-
-inqueryFullPath = os.path.join(projectdir, 'data', filename)
-inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_name, header=0)
 
 def lookupTranscriptomicsDB(gseXXX):
     '''
@@ -147,17 +139,6 @@ def queryTest(gse_ids, gsm_ids):
 
 
 
-for i in range(5):
-    # print(list(inqueries[i]))
-    df = inqueries[i]
-    sr = df['GSE ID'].dropna()
-    gse_ids = sr[sr.str.match('GSE')].unique()
-    sr = df['Samples'].dropna()
-    gsm_ids = sr.unique()
-    df_output = queryTest(gse_ids, gsm_ids)
-    filename = 'logicaltable_sheet_{}.csv'.format(i+1)
-    df_output.to_csv(os.path.join(projectdir,'data',filename))
-
 
 def fetchLogicalTable(gsm_ids):
     '''
@@ -229,6 +210,7 @@ def mergeLogicalTable(df_results):
                 entrez_dups.append(multi_ids)
         id_set = list(set(id_set))
         id_set.sort(key=int)
+        entrez_dups.extend(id_set)
         full_entre_id = ' /// '.join(id_set)
         print('Merged {}: {}\n'.format(dup_id,full_entre_id))
         full_entre_id_sets.append(full_entre_id)
@@ -248,3 +230,27 @@ def mergeLogicalTable(df_results):
 
     df_output = df_results.fillna(-1).groupby(level=0).max()
     return df_output
+
+
+# input from user
+filename = 'GeneExpressionDataUsed.xlsx'
+sheet_name = list(range(5)) # first 5 sheets
+
+# gse2770 = GSEproject('GSE2770',projectdir)
+
+inqueryFullPath = os.path.join(projectdir, 'data', filename)
+inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_name, header=0)
+
+for i in range(5):
+    # print(list(inqueries[i]))
+    df = inqueries[i]
+    sr = df['GSE ID'].dropna()
+    gse_ids = sr[sr.str.match('GSE')].unique()
+    sr = df['Samples'].dropna()
+    gsm_ids = sr.unique()
+    df_output = queryTest(gse_ids, gsm_ids)
+    filename = 'logicaltable_sheet_{}.csv'.format(i+1)
+    fullsavepath = os.path.join(projectdir,'data',filename)
+    df_output.to_csv(fullsavepath)
+    print('Save to {}'.format(fullsavepath))
+
