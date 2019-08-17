@@ -10,6 +10,8 @@ from rpy2.robjects import r, pandas2ri
 import rpy2.robjects as ro
 from rpy2.robjects.conversion import localconverter
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
+import urllib.request
+import tarfile
 
 # automatically convert ryp2 dataframe to Pandas dataframe
 pandas2ri.activate()
@@ -177,7 +179,7 @@ class GSEproject:
         for gsm in self.gse.gsms:
             keys.append(self.gse.gsms[gsm].name)
             for key, val in self.celformat.items():
-                r1 = re.findall(r"{}".format(val), self.gse.gsms[gsm].columns.loc['ID_REF', 'description'])
+                r1 = re.findall(r"{}".format(val), self.gse.gsms[gsm].metadata['title'][0])
                 if not r1:
                     pass
                 else:
@@ -257,10 +259,13 @@ class GSEproject:
         '''
         filefullpath = os.path.join(self.genedir, '{}_sc500_full_table.csv'.format(self.gsename))
         if fromcsv:
-            df_clean_sc500 = pd.read_csv(filefullpath)
-            return df_clean_sc500
-        else:
-            print('Create new table: {}'.format(filefullpath))
+            try:
+                df_clean_sc500 = pd.read_csv(filefullpath)
+                return df_clean_sc500
+            except:
+                self.download_raw()
+
+        print('Create new table: {}'.format(filefullpath))
         gsm_maps = get_gsm_tables(self.gse)
         # step 1: Ready Affy files from folders
         gsm_tables_sc500 = {}
@@ -314,6 +319,22 @@ class GSEproject:
         df_clean_sc500.sort_index(inplace=True)
         print('Full table saved to:\n{}'.format(filefullpath))
         return df_clean_sc500
+
+    def download_raw(self, overwrite=False):
+        # check if path created
+        if (not os.path.isdir(self.genedir)) or overwrite:
+            os.makedirs(self.genedir,exist_ok=True)
+            url = "https://www.ncbi.nlm.nih.gov/geo/download/?acc={}&format=file".format(self.gsename)
+            filefullpath = os.path.join(self.genedir,'{}_RAW.tar'.format(self.gsename))
+            print('Download Raw File: {}'.format(filefullpath))
+            urllib.request.urlretrieve(url, filefullpath)
+            tfile = tarfile.open("samples.tar.gz")
+            tfile.extractall(path=self.genedir)
+            os.remove(filefullpath)
+            print('Remove Raw File: {}'.format(filefullpath))
+            self.organize_gse_raw_data()
+        else:
+            pass
 
     def calculate_z_score(self,df,to_csv=False):
         cols = list(df)

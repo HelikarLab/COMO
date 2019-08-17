@@ -87,7 +87,11 @@ def updateTranscriptomicsDB(gseXXX):
     :return:
     '''
     # df_clean = gseXXX.get_entrez_table_pipeline()
-    df_clean = gseXXX.get_entrez_table_default() # for test so that no need to download RAW data files
+    try:
+        df_clean = gseXXX.get_entrez_table_default(fromcsv=False) # for test so that no need to download RAW data files
+    except:
+        df_clean = gseXXX.get_entrez_table_pipeline()
+
     df_clean.sort_index(inplace=True)
 
     # write to database table sample
@@ -131,6 +135,7 @@ def queryTest(gse_ids, gsm_ids):
         gseXXX = GSEproject(gse_id,projectdir)
         if lookupTranscriptomicsDB(gseXXX):
             print("{} already in database, skip over.".format(gseXXX.gsename))
+            continue
         updateTranscriptomicsDB(gseXXX)
 
     df_results = fetchLogicalTable(gsm_ids)
