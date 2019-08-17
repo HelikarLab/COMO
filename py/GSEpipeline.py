@@ -263,7 +263,7 @@ class GSEproject:
                 df_clean_sc500 = pd.read_csv(filefullpath)
                 return df_clean_sc500
             except:
-                self.download_raw()
+                self.download_raw(overwrite=True)
 
         print('Create new table: {}'.format(filefullpath))
         gsm_maps = get_gsm_tables(self.gse)
@@ -326,9 +326,12 @@ class GSEproject:
             os.makedirs(self.genedir,exist_ok=True)
             url = "https://www.ncbi.nlm.nih.gov/geo/download/?acc={}&format=file".format(self.gsename)
             filefullpath = os.path.join(self.genedir,'{}_RAW.tar'.format(self.gsename))
-            print('Download Raw File: {}'.format(filefullpath))
-            urllib.request.urlretrieve(url, filefullpath)
-            tfile = tarfile.open("samples.tar.gz")
+            if not os.path.isfile(filefullpath):
+                print('Download Raw File: {}'.format(filefullpath))
+                urllib.request.urlretrieve(url, filefullpath)
+            else:
+                print("File already exist: {}".format(filefullpath))
+            tfile = tarfile.open(filefullpath)
             tfile.extractall(path=self.genedir)
             os.remove(filefullpath)
             print('Remove Raw File: {}'.format(filefullpath))
