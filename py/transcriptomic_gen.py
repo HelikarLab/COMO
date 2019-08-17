@@ -98,21 +98,23 @@ def updateTranscriptomicsDB(gseXXX):
     df_samples = pd.DataFrame([],columns=['ENTREZ_GENE_ID','VALUE','P_VALUE','ABS_CALL','Sample'])
     df_samples.index.name = 'id'
 
+    cols_clean = list(df_clean)
     for key,val in gseXXX.gsm_platform.items():
         col_val = '{}.cel.gz'.format(key.lower())
         col_abs = '{}.cel.gz.1'.format(key.lower())
         col_p = '{}.cel.gz.2'.format(key.lower())
-        if not col_val in list(df_clean):
+        if not col_val in cols_clean:
             continue
         df_s = pd.DataFrame([])
-        df_s.index.name='id'
         df_s['ENTREZ_GENE_ID'] = df_clean['ENTREZ_GENE_ID']
         df_s['VALUE'] = df_clean[col_val]
         df_s['ABS_CALL'] = df_clean[col_abs]
         df_s['P_VALUE'] = df_clean[col_p]
         df_s['Sample'] = key.upper()
-        df_samples = pd.concat([df_samples, df_s.dropna(how='any')], ignore_index=True)
+        df_s.index.name='id'
+        df_samples = pd.concat([df_samples, df_s.dropna(how='any')], ignore_index=True, sort=True)
 
+    df_samples.index.name = 'id'
     df_samples.to_sql(con=engine,name='sample',if_exists='replace',index_label='id')
 
     # write to database table GSEinfo
