@@ -4,74 +4,16 @@ import re
 import os
 import pandas as pd
 import numpy as np
-import GEOparse
-from rpy2.robjects.packages import importr
-from rpy2.robjects import r, pandas2ri
-import rpy2.robjects as ro
-from rpy2.robjects.conversion import localconverter
-from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
+#import GEOparse
 import urllib.request
 import tarfile
-
-# automatically convert ryp2 dataframe to Pandas dataframe
-pandas2ri.activate()
-# Initialize Rpy2 for Affy package
-affy = importr("affy")
-# Define R function for read affy
-string = """
-readaffydir <- function(addr){
-    crd <- getwd()
-    setwd(addr)
-    mydata = ReadAffy()
-    setwd(crd)
-    eset = mas5(mydata)
-    eset_PMA <- mas5calls(mydata)
-    y <- data.frame(exprs(eset), exprs(eset_PMA), assayDataElement(eset_PMA, "se.exprs"))
-    y <- y[,sort(names(y))]
-    return(y)
-}
-"""
-affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
-
+from instruments import affyio
 
 # Input: Extract Gene Info from GEO DataSets
-def load_gse_soft(name='GSE2770'):
-    '''
-    Read GSE information from local soft file, otherwise read online.
-    :param name: name of gse
-    :return: gse object by GEOparse
-    '''
-    softfile = "./{}_family.soft.gz".format(name)
-
-    if os.path.isfile(softfile):
-        gse = GEOparse.get_GEO(filepath=softfile)
-    else:
-        gse = GEOparse.get_GEO(geo=name, destdir="./")
-
-    return gse
 
 # gse = load_gse_soft(gsename)
 
 # Extract Platform Information
-def get_platform_probe(gse):
-    '''
-    extract platform information
-    :param gse: gse object
-    :return: dictionary of platform name and probe
-    '''
-    keys = []
-    values = []
-    for gpl in gse.gpls:
-        keys.append(gse.gpls[gpl].name)
-        r1 = re.findall(r"\[.*?\]", gse.gpls[gpl].metadata['title'][0])
-        values.append(r1[0][4:-1])
-        print(gse.gpls[gpl].name)
-        print(gse.gpls[gpl].metadata['title'][0])
-
-    celformat = dict(zip(keys, values))
-    return celformat
-
-
 
 def download_gsm_id_maps(datadir, gse, platforms = ['GPL96','GPL97','GPL8300']):
     '''
@@ -101,16 +43,15 @@ def download_gsm_id_maps(datadir, gse, platforms = ['GPL96','GPL97','GPL8300']):
 
 
 
-def get_gsm_tables(gse):
+def get_gsm_tables(gpls):
     '''
     get gsm maps in table
     :param gse:
     :return:
     '''
-    celformat = get_platform_probe(gse)
     gsm_tables = {}
-    for key, val in celformat.items():
-        temp = gse.gpls[key].table.copy()
+    for key in gpls:
+        temp = gpls[key].table.copy()
         df = temp[['ID', 'ENTREZ_GENE_ID']]
         df.set_index('ID', inplace=True)
         # df.drop_duplicates(keep='last', inplace=True)
@@ -125,17 +66,18 @@ def get_gsm_tables(gse):
 # gsm_maps = get_gsm_tables(gse)
 
 class GSEproject:
-    def __init__(self,gsename="GSE2770",rootdir='../'):
+    def __init__(self,gsename, querytable, rootdir='../'):
         self.gsename = gsename
         ## Setup paths
+        self.querytable = querytable
         self.rootdir = rootdir
         self.datadir = os.path.join(self.rootdir,'data')
         self.outputdir = os.path.join(self.rootdir,'output')
         self.genedir = os.path.join(self.datadir,self.gsename + '_RAW')
         print('Initialize project ({}):\nRoot: {}\nRaw data: {}'.format(self.gsename, self.rootdir, self.genedir))
-        self.gse = load_gse_soft(self.gsename)
-        self.celformat = get_platform_probe(self.gse)
         self.gsm_platform = self.get_gsm_platform()
+        self.platforms = querytable['GPL ID'].unique().tolist()
+        self.download_samples()
 
     def organize_gse_raw_data(self):
         """
@@ -143,7 +85,7 @@ class GSEproject:
         :return:
         """
         # create a folder for each platform
-        for key in self.celformat.keys():
+        for key in self.platforms:
             platformdir = os.path.join(self.genedir, key)
             if not os.path.exists(platformdir):
                 os.makedirs(platformdir)
@@ -174,82 +116,10 @@ class GSEproject:
         :param gse: gse object
         :return: dictionary key: gsm, value: platform such as 'GEL96', 'GEL97', 'GEL8300'
         '''
-        keys = []
-        values = []
-        for gsm in self.gse.gsms:
-            keys.append(self.gse.gsms[gsm].name)
-            for key, val in self.celformat.items():
-                r1 = re.findall(r"{}".format(val), self.gse.gsms[gsm].metadata['title'][0])
-                if not r1:
-                    pass
-                else:
-                    values.append(key)
-
+        keys = self.querytable['Samples'].str.upper().tolist()
+        values = self.querytable['GPL ID'].str.upper().tolist()
         gsm_platform = dict(zip(keys, values))
         return gsm_platform
-
-    # create 3 tables by platform
-    def get_entrez_table_default(self, fromcsv=True):
-        '''
-        Create entrez table from online data
-        :param gse: gse object
-        :return:
-        '''
-        filefullpath = os.path.join(self.genedir, '{}_full_table.csv'.format(self.gsename))
-        if fromcsv:
-            df_outer = pd.read_csv(filefullpath)
-            return df_outer
-        else:
-            print('Create new table: {}'.format(filefullpath))
-        # step 1: initialize from ID maps
-        # celformat = get_platform_probe(gse)
-        gsm_tables = get_gsm_tables(self.gse)
-        for key,val in self.celformat.items():
-            gsm_tables[key].drop_duplicates(keep='last', inplace=True)
-
-        # gsm_platform = get_gsm_platform(gse)
-        # step 2: create tables by platform
-        for key, val in self.gsm_platform.items():
-            temp = self.gse.gsms[key].table.copy()
-            temp.rename(columns={"ID_REF": "ID"}, inplace=True)
-            temp.dropna(subset=['ID'], how='any', inplace=True)
-            temp.set_index('ID', inplace=True)
-            # col1,col2,col3 = '{}.VALUE'.format(key), '{}.ABS_CALL'.format(key), '{}.DETECTION P-VALUE'.format(key)
-            col1, col2, col3 = '{}.CEL.gz'.format(key), '{}.CEL.gz.1'.format(key), '{}.CEL.gz.2'.format(key)
-            # gsm_tables[val].loc[:,[col1,col2,col3]] = temp[['VALUE','ABS_CALL','DETECTION P-VALUE']]
-            # Sort by VALUE and drop duplicated ID
-            temp['ENTREZ_GENE_ID'] = gsm_tables[val]['ENTREZ_GENE_ID']
-            temp.sort_values(by=['ENTREZ_GENE_ID', 'VALUE'], inplace=True)
-            temp.drop_duplicates(subset=['ENTREZ_GENE_ID'], keep='last', inplace=True)
-            gsm_tables[val][col1] = temp['VALUE']
-            gsm_tables[val][col2] = temp['ABS_CALL']
-            gsm_tables[val][col3] = temp['DETECTION P-VALUE']
-
-        # step 3: drop NANs
-        for key, val in self.celformat.items():
-            # df = pd.DataFrame([],columns=['ID','ENTREZ_GENE_ID'])
-            gsm_tables[key].dropna(subset=['ENTREZ_GENE_ID'], inplace=True)
-            gsm_tables[key].set_index('ENTREZ_GENE_ID', inplace=True)
-            # gsm_tables[key].dropna(how='all',inplace=True)
-            # gsm_tables[key].drop_duplicates(keep='last',inplace=True)
-
-        # step 4: merge tables
-        df_outer = None
-        for key, val in self.celformat.items():
-            # df = pd.DataFrame([],columns=['ID','ENTREZ_GENE_ID'])
-            print('{}: {}'.format(key, gsm_tables[key].shape))
-            if df_outer is None:
-                df_outer = gsm_tables[key]
-            else:
-                df_outer = pd.merge(df_outer, gsm_tables[key], on='ENTREZ_GENE_ID', how='outer')
-
-        # step 5: save files
-        df_outer.dropna(how='all', inplace=True)
-        print('full : {}'.format(df_outer.shape))
-        df_outer.sort_index(inplace=True)
-        df_outer.to_csv(filefullpath)
-        print('Full table saved to:\n{}'.format(filefullpath))
-        return df_outer
 
     def get_entrez_table_pipeline(self, fromcsv=True):
         '''
@@ -258,18 +128,19 @@ class GSEproject:
         :return: pandas dataframe for table of GSE
         '''
         filefullpath = os.path.join(self.genedir, '{}_sc500_full_table.csv'.format(self.gsename))
-        if fromcsv:
+        if fromcsv and os.path.isfile(filefullpath):
             try:
                 df_clean_sc500 = pd.read_csv(filefullpath)
                 return df_clean_sc500
             except:
-                self.download_raw(overwrite=True)
+                print("Unable to read {}")
+                # self.download_raw(overwrite=True)
 
         print('Create new table: {}'.format(filefullpath))
         gsm_maps = get_gsm_tables(self.gse)
         # step 1: Ready Affy files from folders
         gsm_tables_sc500 = {}
-        for key in self.celformat.keys():
+        for key in self.platforms:
             platformdir = os.path.join(self.genedir, key)
             print('Affy Read Path: {}'.format(platformdir))
             if os.path.exists(platformdir):
@@ -280,13 +151,13 @@ class GSEproject:
             gsm_tables_sc500[key] = outputdf
 
         # step 2: Drop rows without ENTREZ GENE ID, set index to ENTREZ
-        for key, val in self.celformat.items():
+        for key in self.platforms:
             gsm_tables_sc500[key].dropna(subset=['ENTREZ_GENE_ID'], inplace=True)
             gsm_tables_sc500[key].set_index('ENTREZ_GENE_ID', inplace=True)
 
         # step 3: Merge tables of platforms
         df_outer_sc500 = None
-        for key, val in self.celformat.items():
+        for key in self.platforms:
             print('{}: {}'.format(key, gsm_tables_sc500[key].shape))
             if df_outer_sc500 is None:
                 df_outer_sc500 = gsm_tables_sc500[key]
@@ -338,6 +209,25 @@ class GSEproject:
             self.organize_gse_raw_data()
         else:
             pass
+
+    def download_samples(self, overwrite=False):
+        os.makedirs(self.genedir,exist_ok=True)
+        for gsm,gpl in self.gsm_platform.items():
+            platformdir = os.path.join(self.genedir,gpl)
+            os.makedirs(platformdir,exist_ok=True)
+            sample_url = "https://www.ncbi.nlm.nih.gov/geo/download/?acc={}&format=file".format(gsm)
+            filefullpath = os.path.join(self.genedir,'{}.tar'.format(gsm))
+            if (not os.path.isfile(filefullpath)) or overwrite:
+                urllib.request.urlretrieve(sample_url, filefullpath)
+                print('Retrieve Sample: {}'.format(filefullpath))
+            else:
+                print("Sample exist: {}".format(filefullpath))
+                continue
+            tfile = tarfile.open(filefullpath)
+            tfile.extractall(path=platformdir)
+            # os.remove(filefullpath) # keep to avoid re-download
+            print('Extract to: {}'.format(platformdir))
+        print('Retrieve Samples Completed.')
 
     def calculate_z_score(self,df,to_csv=False):
         cols = list(df)

@@ -11,8 +11,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, load_only
 from sqlalchemy import create_engine
 
-import GEOparse
-from GSEpipeline import *
+from GSEpipelineFast import *
 
 #create declarative_base instance
 Base = declarative_base()
@@ -30,7 +29,6 @@ class Sample(Base):
     P_VALUE = Column(Float)
     ABS_CALL = Column(String(2))
     Sample = Column(String(64))
-
 
 class IDMapps(Base):
     __tablename__ = 'id_entrez_map'
@@ -68,7 +66,7 @@ def lookupTranscriptomicsDB(gseXXX):
                      session.bind)
     gsm_list = gseXXX.gsm_platform.keys()
     gsm_db = df.Sample.tolist()
-    if set(gsm_list) == set(gsm_db):
+    if set(gsm_list).issubset(set(gsm_db)):
         return True
     else:
         return False
@@ -87,10 +85,7 @@ def updateTranscriptomicsDB(gseXXX):
     :return:
     '''
     # df_clean = gseXXX.get_entrez_table_pipeline()
-    try:
-        df_clean = gseXXX.get_entrez_table_default(fromcsv=False) # for test so that no need to download RAW data files
-    except:
-        df_clean = gseXXX.get_entrez_table_pipeline()
+    df_clean = gseXXX.get_entrez_table_pipeline()
 
     df_clean.sort_index(inplace=True)
 
@@ -127,14 +122,19 @@ def updateTranscriptomicsDB(gseXXX):
 
 
 # function to complete the inquery of a sheet
-def queryTest(gse_ids, gsm_ids):
+def queryTest(df):
+    sr = df['GSE ID']
+    gse_ids = sr[sr.str.match('GSE')].unique()
+    sr = df['Samples'].dropna()
+    gsm_ids = sr.unique()
     print('---\nStart Collecting Data for:')
     print(gse_ids)
     print(gsm_ids)
     print('---\n')
     # fetch data of each gse if it is not in the database, update database
     for gse_id in gse_ids:
-        gseXXX = GSEproject(gse_id,projectdir)
+        querytable = df[df['GSE ID']==gse_id]
+        gseXXX = GSEproject(gse_id,querytable,projectdir)
         if lookupTranscriptomicsDB(gseXXX):
             print("{} already in database, skip over.".format(gseXXX.gsename))
             continue
@@ -143,8 +143,6 @@ def queryTest(gse_ids, gsm_ids):
     df_results = fetchLogicalTable(gsm_ids)
     df_output = mergeLogicalTable(df_results)
     return df_output
-
-
 
 
 def fetchLogicalTable(gsm_ids):
@@ -250,12 +248,9 @@ inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_name, header=0)
 
 for i in range(5):
     # print(list(inqueries[i]))
-    df = inqueries[i]
-    sr = df['GSE ID'].dropna()
-    gse_ids = sr[sr.str.match('GSE')].unique()
-    sr = df['Samples'].dropna()
-    gsm_ids = sr.unique()
-    df_output = queryTest(gse_ids, gsm_ids)
+    inqueries[i].fillna(method='ffill',inplace=True)
+    df = inqueries[i].loc[:,['GSE ID','Samples','GPL ID','Instrument']]
+    df_output = queryTest(df)
     filename = 'logicaltable_sheet_{}.csv'.format(i+1)
     fullsavepath = os.path.join(projectdir,'data',filename)
     df_output.to_csv(fullsavepath)
