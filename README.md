@@ -20,7 +20,7 @@ RMAC Data
 
 ## Todolist
 * Build a Python RESTful prototype
-* Implement Step 2 (when Bhanwar back)
+* ~Implement Step 2 (when Bhanwar back)~ Have problem with agilent and one affy test in the input excel file tab 4
 * ~Implement step 1 (read raw data) via Python, automate the manual operations~
 * ~1. Setup development environment for R and Python~
 
