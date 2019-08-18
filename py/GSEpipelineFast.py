@@ -15,7 +15,7 @@ from instruments import affyio
 
 # Extract Platform Information
 
-def download_gsm_id_maps(datadir, gse, platforms = ['GPL96','GPL97','GPL8300']):
+def download_gsm_id_maps(datadir, gpls = ['GPL96','GPL97','GPL8300']):
     '''
     download ID to ENTREZ_GENE_ID maps, create a csv file for each platform, and return dictionary
     :param gse: gse object
@@ -26,11 +26,11 @@ def download_gsm_id_maps(datadir, gse, platforms = ['GPL96','GPL97','GPL8300']):
     maps_list = []
     #gene_maps = pd.DataFrame([],columns=['GPL96','GPL97','GPL8300','ENTREZ_GENE_ID'])
     #gene_maps.set_index('ENTREZ_GENE_ID',inplace=True)
-    for platform in platforms:
-        table =gse.gpls[platform].table.copy()
+    for gpl in gpls:
+        table =gse.gpls[gpl].table.copy()
         temp = table[['ID','ENTREZ_GENE_ID']]
         # Save to file
-        filefullpath = os.path.join(datadir,'{}entrez.csv'.format(platform))
+        filefullpath = os.path.join(datadir,'{}entrez.csv'.format(gpl))
         print(filefullpath)
         temp.to_csv(filefullpath, index=False)
         # Single Table
@@ -43,20 +43,6 @@ def download_gsm_id_maps(datadir, gse, platforms = ['GPL96','GPL97','GPL8300']):
 
 
 
-def get_gsm_tables(gpls):
-    '''
-    get gsm maps in table
-    :param gse:
-    :return:
-    '''
-    gsm_tables = {}
-    for key in gpls:
-        temp = gpls[key].table.copy()
-        df = temp[['ID', 'ENTREZ_GENE_ID']]
-        df.set_index('ID', inplace=True)
-        # df.drop_duplicates(keep='last', inplace=True)
-        gsm_tables[key] = df
-    return gsm_tables
 
 
 # df_outer = create_entrez_table_default(gse)
@@ -76,7 +62,9 @@ class GSEproject:
         self.genedir = os.path.join(self.datadir,self.gsename + '_RAW')
         print('Initialize project ({}):\nRoot: {}\nRaw data: {}'.format(self.gsename, self.rootdir, self.genedir))
         self.gsm_platform = self.get_gsm_platform()
-        self.platforms = querytable['GPL ID'].unique().tolist()
+        gpls = querytable['GPL ID'].unique().tolist()
+        vendors = querytable['Instrument'].unique().tolist()
+        self.platforms = dict(zip(gpls,vendors))
         self.download_samples()
 
     def organize_gse_raw_data(self):
@@ -85,7 +73,7 @@ class GSEproject:
         :return:
         """
         # create a folder for each platform
-        for key in self.platforms:
+        for key in self.platforms.keys():
             platformdir = os.path.join(self.genedir, key)
             if not os.path.exists(platformdir):
                 os.makedirs(platformdir)
@@ -108,6 +96,27 @@ class GSEproject:
                 print('Move {} to {}'.format(src_path, dst_path))
                 cnt += 1
         print('{} raw data files moved.'.format(cnt))
+
+    def get_gsm_tables(self):
+        '''
+        get gsm maps in table
+        :param gse:
+        :return:
+        '''
+        gsm_tables = {}
+        for gpl,vendor in self.platforms.items():
+            filename = '{}entrez.csv'.format(gpl.lower())
+            filepath = os.path.join(self.datadir,filename)
+            if not os.path.isfile(filepath):
+                print('Skip Unsupported Platform: {}, {}'.format(gpl, vendor))
+                # Could improve to automatic download new tables based on platform
+                continue
+            temp = pd.read_csv(filepath)
+            df = temp[['ID', 'ENTREZ_GENE_ID']]
+            df.set_index('ID', inplace=True)
+            # df.drop_duplicates(keep='last', inplace=True)
+            gsm_tables[gpl] = df
+        return gsm_tables
 
     def get_gsm_platform(self):
         '''
@@ -137,27 +146,31 @@ class GSEproject:
                 # self.download_raw(overwrite=True)
 
         print('Create new table: {}'.format(filefullpath))
-        gsm_maps = get_gsm_tables(self.gse)
+        gsm_maps = self.get_gsm_tables()
+        if not any(gsm_maps):
+            print("Not available, return empty dataframe")
+            return pd.DataFrame([])
         # step 1: Ready Affy files from folders
         gsm_tables_sc500 = {}
-        for key in self.platforms:
+        for key, vendor in self.platforms.items():
             platformdir = os.path.join(self.genedir, key)
-            print('Affy Read Path: {}'.format(platformdir))
+            print('{} Read Path: {}'.format(vendor, platformdir))
             if os.path.exists(platformdir):
                 outputdf = affyio.readaffydir(platformdir)
             else:
                 print('Path not exist: {}'.format(platformdir))
+                continue
             outputdf['ENTREZ_GENE_ID'] = gsm_maps[key]['ENTREZ_GENE_ID']
             gsm_tables_sc500[key] = outputdf
 
         # step 2: Drop rows without ENTREZ GENE ID, set index to ENTREZ
-        for key in self.platforms:
+        for key in self.platforms.keys():
             gsm_tables_sc500[key].dropna(subset=['ENTREZ_GENE_ID'], inplace=True)
             gsm_tables_sc500[key].set_index('ENTREZ_GENE_ID', inplace=True)
 
         # step 3: Merge tables of platforms
         df_outer_sc500 = None
-        for key in self.platforms:
+        for key in self.platforms.keys():
             print('{}: {}'.format(key, gsm_tables_sc500[key].shape))
             if df_outer_sc500 is None:
                 df_outer_sc500 = gsm_tables_sc500[key]

@@ -86,8 +86,11 @@ def updateTranscriptomicsDB(gseXXX):
     '''
     # df_clean = gseXXX.get_entrez_table_pipeline()
     df_clean = gseXXX.get_entrez_table_pipeline()
+    if df_clean.empty:
+        return None
 
     df_clean.sort_index(inplace=True)
+    df_clean.reset_index(inplace=True)
 
     # write to database table sample
     df_samples = pd.DataFrame([],columns=['ENTREZ_GENE_ID','VALUE','P_VALUE','ABS_CALL','Sample'])
@@ -110,7 +113,7 @@ def updateTranscriptomicsDB(gseXXX):
         df_samples = pd.concat([df_samples, df_s.dropna(how='any')], ignore_index=True, sort=True)
 
     df_samples.index.name = 'id'
-    df_samples.to_sql(con=engine,name='sample',if_exists='replace',index_label='id')
+    df_samples.to_sql(con=engine,name='sample',if_exists='append',index=False)
 
     # write to database table GSEinfo
     df_gseinfo = pd.DataFrame([],columns=['Sample','GSE','Platform'])
@@ -118,7 +121,7 @@ def updateTranscriptomicsDB(gseXXX):
     df_gseinfo['Platform'] = pd.Series(list(gseXXX.gsm_platform.values()))
     df_gseinfo['GSE'] = gseXXX.gsename
 
-    df_gseinfo.to_sql(con=engine,name='gseinfo',if_exists='replace',index=False)
+    df_gseinfo.to_sql(con=engine,name='gseinfo',if_exists='append',index=False)
 
 
 # function to complete the inquery of a sheet
@@ -205,19 +208,19 @@ def mergeLogicalTable(df_results):
     cnt = 0
     entrez_dups_list = []
     for dup_id in dups:
-        print(dup_id+':')
+        # print(dup_id+':')
         id_set = []
         entrez_dups = []
         for multi_ids in entrez_id_list:
             if dup_id in multi_ids.split(' /// '):
-                print('{}'.format(multi_ids))
+                # print('{}'.format(multi_ids))
                 id_set.extend(multi_ids.split(' /// '))
                 entrez_dups.append(multi_ids)
         id_set = list(set(id_set))
         id_set.sort(key=int)
         entrez_dups.extend(id_set)
         full_entre_id = ' /// '.join(id_set)
-        print('Merged {}: {}\n'.format(dup_id,full_entre_id))
+        # print('Merged {}: {}\n'.format(dup_id,full_entre_id))
         full_entre_id_sets.append(full_entre_id)
         entrez_dups_list.append(entrez_dups)
         cnt+=1
@@ -234,7 +237,7 @@ def mergeLogicalTable(df_results):
     df_results.set_index('ENTREZ_GENE_ID',inplace=True)
 
     df_output = df_results.fillna(-1).groupby(level=0).max()
-    return df_output
+    return df_output.replace(-1,np.nan)
 
 
 # input from user
