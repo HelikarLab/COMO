@@ -40,6 +40,8 @@ RMAC Data
 * Docker: [Common components](https://www.digitalocean.com/community/tutorials/the-docker-ecosystem-an-introduction-to-common-components), [Containerization](https://www.digitalocean.com/community/tutorials/the-docker-ecosystem-an-overview-of-containerization)
 * Google Cloud Platform, Bigquery [Public Datasets](https://www.reddit.com/r/bigquery/wiki/datasets)
 * Biomart: ENTREZ ID search, [mygene](https://mygene.info/)
+* limma [R package](http://bioconductor.org/packages/release/bioc/html/limma.html), [AgiMicroRNA](https://bioconductor.org/packages/release/bioc/html/AgiMicroRna.html), [Analyzing Agilent MicroArray Data in R](https://support.bioconductor.org/p/96655/)
+* Bioconductor Tutorials: [Courses and Materials](http://master.bioconductor.org/help/course-materials/),
 
 
 ## Repository Structure
