@@ -1,4 +1,6 @@
 #!/usr/bin/python3
+import os
+import pandas as pd
 from rpy2.robjects.packages import importr
 from rpy2.robjects import r, pandas2ri
 import rpy2.robjects as ro
@@ -29,15 +31,50 @@ readaffydir <- function(addr){
 affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
 
 agilentstring="""
-readaiglent <- function(addr){
+readaiglent <- function(addr,targets){
     crd <- getwd()
     setwd(addr)
-    x <- read.maimages(dir(".", "txt.gz"), "agilent", green.only = TRUE)
+    # targets <- dir(".", "txt.gz")
+    x <- read.maimages(targets, "agilent", green.only = TRUE)
     setwd(crd)
     y <- backgroundCorrect(x,method="normexp") 
     y <- normalizeBetweenArrays(y,method="quantile") 
-    return y
+    yo <- c(y$genes,as.data.frame(y$E))
+    ydf <- data.frame(yo)
+    return(ydf)
 }
 """
 
 agilentio = SignatureTranslatedAnonymousPackage(agilentstring, "agilentio")
+
+def agilent_raw(datadir, gsms):
+    files = os.listdir(datadir)
+    txts = []
+    gzs = []
+    if gsms:
+        for gsm in gsms:
+            for file in files:
+                if gsm in file:
+                    gzs.append(file)
+                    txts.append(file[0:-3])
+    else:
+        for file in files:
+            gzs.append(file)
+            txts.append(file[0:-3])
+
+    targets = pd.DataFrame(gzs,columns=['FileName'],index=txts)
+    df_agilent = agilentio.readaiglent(datadir, targets)
+    return df_agilent
+
+def readagilent(datadir,gsms,scalefactor=1.1):
+    df_raw = agilent_raw(datadir,gsms)
+    df = df_raw.drop(columns=['Row', 'Col'])
+    df_negctl = df[df['ControlType'] == -1]
+    df_cutoff = scalefactor * df_negctl.drop(columns=['ControlType']).quantile(0.95, axis=0)
+    df_bool = df.loc[df['ControlType'] == 0, df_cutoff.index.tolist()].gt(df_cutoff, axis=1)
+    idx_ones = df_bool[df_bool.all(axis=1)].index
+    idx_zeros = df_bool[~df_bool.all(axis=1)].index
+    df.loc[idx_ones, 'Express'] = 1
+    df.loc[idx_zeros, 'Express'] = 0
+    df_results = df.loc[df['ControlType'] == 0, ['ProbeName','SystematicName','Express']]
+    return df_results
