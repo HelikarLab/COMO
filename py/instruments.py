@@ -11,6 +11,7 @@ from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 pandas2ri.activate()
 # Initialize Rpy2 for Affy package
 affy = importr("affy")
+limma = importr("limma")
 # Define R function for read affy
 string = """
 readaffydir <- function(addr){
@@ -26,3 +27,17 @@ readaffydir <- function(addr){
 }
 """
 affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
+
+agilentstring="""
+readaiglent <- function(addr){
+    crd <- getwd()
+    setwd(addr)
+    x <- read.maimages(dir(".", "txt.gz"), "agilent", green.only = TRUE)
+    setwd(crd)
+    y <- backgroundCorrect(x,method="normexp") 
+    y <- normalizeBetweenArrays(y,method="quantile") 
+    return y
+}
+"""
+
+agilentio = SignatureTranslatedAnonymousPackage(agilentstring, "agilentio")
