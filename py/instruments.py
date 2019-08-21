@@ -6,6 +6,7 @@ from rpy2.robjects import r, pandas2ri
 import rpy2.robjects as ro
 from rpy2.robjects.conversion import localconverter
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
+from bioservices import BioDBNet
 
 
 
@@ -78,3 +79,18 @@ def readagilent(datadir,gsms,scalefactor=1.1):
     df.loc[idx_zeros, 'Express'] = 0
     df_results = df.loc[df['ControlType'] == 0, ['ProbeName','SystematicName','Express']]
     return df_results
+
+
+def fetch_entrez_gene_id(input_values, input_db='Agilent ID'):
+    s = BioDBNet()
+    # input_db = 'Agilent ID'
+    output_db = ['Gene ID','Ensembl Gene ID']
+    # input_values = df_results.ProbeName.tolist()
+
+    df_maps = pd.DataFrame([],columns=output_db)
+    df_maps.index.name=input_db
+    for i in range(0,len(input_values),500):
+        print('retrieve {}:{}'.format(i,min(i+500,len(input_values))))
+        df_test = s.db2db(input_db, output_db, input_values[i:min(i+500,len(input_values))], 9606)
+        df_maps = pd.concat([df_maps, df_test], sort=False)
+    return df_maps

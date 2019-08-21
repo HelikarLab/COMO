@@ -7,7 +7,8 @@ import numpy as np
 #import GEOparse
 import urllib.request
 import tarfile
-from instruments import affyio
+from instruments import *
+from GSEpipeline import load_gse_soft
 
 # Input: Extract Gene Info from GEO DataSets
 
@@ -15,7 +16,7 @@ from instruments import affyio
 
 # Extract Platform Information
 
-def download_gsm_id_maps(datadir, gpls = ['GPL96','GPL97','GPL8300']):
+def download_gsm_id_maps(datadir, gse, gpls = ['GPL96','GPL97','GPL8300'],vendor='affy'):
     '''
     download ID to ENTREZ_GENE_ID maps, create a csv file for each platform, and return dictionary
     :param gse: gse object
@@ -23,23 +24,34 @@ def download_gsm_id_maps(datadir, gpls = ['GPL96','GPL97','GPL8300']):
     :param platforms: list of platforms
     :return: dictionary of maps indexed by platform
     '''
-    maps_list = []
+    # maps_list = []
     #gene_maps = pd.DataFrame([],columns=['GPL96','GPL97','GPL8300','ENTREZ_GENE_ID'])
     #gene_maps.set_index('ENTREZ_GENE_ID',inplace=True)
     for gpl in gpls:
         table =gse.gpls[gpl].table.copy()
-        temp = table[['ID','ENTREZ_GENE_ID']]
+        if vendor.lower() == 'affy':
+            temp = table[['ID','ENTREZ_GENE_ID']]
+        elif vendor.lower() == 'agilent':
+            input_values = table.loc[table['CONTROL_TYPE']=='FALSE','ID'].tolist()
+            temp = fetch_entrez_gene_id(input_values)
+            temp.drop(columns=['Ensembl Gene ID'],inplace=True)
+            temp.reset_index(inplace=True)
+            temp.rename(columns={"Agilent ID":"ID", "Gene ID":"ENTREZ_GENE_ID"}, inplace=True)
+            temp.replace(to_replace='-', value=np.nan, inplace=True)
+        else:
+            print('Unsupported Platform: {}'.format(gpl))
+            continue
         # Save to file
         filefullpath = os.path.join(datadir,'{}entrez.csv'.format(gpl))
         print(filefullpath)
         temp.to_csv(filefullpath, index=False)
         # Single Table
-        temp.dropna(axis=0,inplace=True)
-        temp.set_index('ENTREZ_GENE_ID',inplace=True)
-        maps_list.append(temp)
+        # temp.dropna(axis=0,inplace=True)
+        # temp.set_index('ENTREZ_GENE_ID',inplace=True)
+        # maps_list.append(temp)
 
-    maps_dict = dict(zip(platforms, maps_list))
-    return maps_dict
+    # maps_dict = dict(zip(platforms, maps_list))
+    # return maps_dict
 
 
 
@@ -64,7 +76,7 @@ class GSEproject:
         self.gsm_platform = self.get_gsm_platform()
         gpls = querytable['GPL ID'].unique().tolist()
         vendors = querytable['Instrument'].unique().tolist()
-        self.platforms = dict(zip(gpls,vendors))
+        self.platforms = dict(zip(gpls, vendors))
         self.download_samples()
 
     def organize_gse_raw_data(self):
@@ -108,9 +120,11 @@ class GSEproject:
             filename = '{}entrez.csv'.format(gpl.lower())
             filepath = os.path.join(self.datadir,filename)
             if not os.path.isfile(filepath):
-                print('Skip Unsupported Platform: {}, {}'.format(gpl, vendor))
                 # Could improve to automatic download new tables based on platform
-                continue
+                gse = load_gse_soft(self.gsename)
+                download_gsm_id_maps(self.datadir, gse, gpls=[gpl], vendor=vendor)
+                print('Skip Unsupported Platform: {}, {}'.format(gpl, vendor))
+                # continue
             temp = pd.read_csv(filepath)
             df = temp[['ID', 'ENTREZ_GENE_ID']]
             df.set_index('ID', inplace=True)
@@ -150,13 +164,23 @@ class GSEproject:
         if not any(gsm_maps):
             print("Not available, return empty dataframe")
             return pd.DataFrame([])
+
         # step 1: Ready Affy files from folders
         gsm_tables_sc500 = {}
         for key, vendor in self.platforms.items():
             platformdir = os.path.join(self.genedir, key)
             print('{} Read Path: {}'.format(vendor, platformdir))
             if os.path.exists(platformdir):
-                outputdf = affyio.readaffydir(platformdir)
+                if vendor.lower() == 'affy':
+                    outputdf = affyio.readaffydir(platformdir)
+                elif vendor.lower() == 'agilent':
+                    outputdf = readagilent(platformdir, list(self.gsm_platform.keys()))
+                    outputdf.rename(columns={'ProbeName':'ID'}, inplace=True)
+                    outputdf.drop(['SystematicName'],axis=1,inplace=True)
+                    outputdf.set_index('ID', inplace=True)
+                else:
+                    print("Unsupported Platform {} and Vendor {}".format(key,vendor))
+                    continue
             else:
                 print('Path not exist: {}'.format(platformdir))
                 continue
@@ -197,6 +221,10 @@ class GSEproject:
             df_clean_sc500[col1] = temp[col1]
             df_clean_sc500[col2] = temp[col2]
             df_clean_sc500[col3] = temp[col3]
+
+        if 'express' in list(df_outer_sc500):
+            df_clean_sc500 = df_outer_sc500.sort_values(by=['ENTREZ_GENE_ID', 'express'])
+            df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='last')]
 
         # step 5: save to csv file
         df_clean_sc500.to_csv(filefullpath)
