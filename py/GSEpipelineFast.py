@@ -32,7 +32,7 @@ def download_gsm_id_maps(datadir, gse, gpls = ['GPL96','GPL97','GPL8300'],vendor
         if vendor.lower() == 'affy':
             temp = table[['ID','ENTREZ_GENE_ID']]
         elif vendor.lower() == 'agilent':
-            input_values = table.loc[table['CONTROL_TYPE']=='FALSE','ID'].tolist()
+            input_values = table.loc[table['CONTROL_TYPE']=='FALSE','SPOT_ID'].tolist()
             temp = fetch_entrez_gene_id(input_values)
             temp.drop(columns=['Ensembl Gene ID'],inplace=True)
             temp.reset_index(inplace=True)
@@ -144,6 +144,18 @@ class GSEproject:
         gsm_platform = dict(zip(keys, values))
         return gsm_platform
 
+    def gsms_included_by(self, df):
+        for gsm in self.gsm_platform.keys():
+            included = False
+            gsml = gsm.lower()
+            for key in list(df):
+                if gsml == key.lower().split('.')[0]:
+                    included = True
+                    break
+            if not included:
+                return False
+        return True
+
     def get_entrez_table_pipeline(self, fromcsv=True):
         '''
         create ENTREZ ID based table from gse
@@ -154,7 +166,10 @@ class GSEproject:
         if fromcsv and os.path.isfile(filefullpath):
             try:
                 df_clean_sc500 = pd.read_csv(filefullpath)
-                return df_clean_sc500
+                if self.gsms_included_by(df_clean_sc500):
+                    return df_clean_sc500
+                else:
+                    print("Need Append GSMs")
             except:
                 print("Unable to read {}")
                 # self.download_raw(overwrite=True)
@@ -175,9 +190,6 @@ class GSEproject:
                     outputdf = affyio.readaffydir(platformdir)
                 elif vendor.lower() == 'agilent':
                     outputdf = readagilent(platformdir, list(self.gsm_platform.keys()))
-                    outputdf.rename(columns={'ProbeName':'ID'}, inplace=True)
-                    outputdf.drop(['SystematicName'],axis=1,inplace=True)
-                    outputdf.set_index('ID', inplace=True)
                 else:
                     print("Unsupported Platform {} and Vendor {}".format(key,vendor))
                     continue
@@ -204,10 +216,21 @@ class GSEproject:
         df_outer_sc500.dropna(how='all', inplace=True)
         print('Full: {}'.format(df_outer_sc500.shape))
         df_outer_sc500.rename(str.lower, axis='columns', inplace=True)
+        keys = []
+        vals = []
+        for col in list(df_outer_sc500):
+            if '.cel.gz' in col:
+                strs = col.split('.cel.gz')
+                newcol = '{}.cel.gz{}'.format(strs[0].split('_')[0], strs[-1])
+                vals.append(newcol)
+                keys.append(col)
+        df_outer_sc500.rename(columns=dict(zip(keys, vals)), inplace=True)
 
         # step 4: Remove duplicated items, keep largest VALUE for each GSM
-        df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)
-        df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='first')]
+        if not 'df_clean_sc500' in locals():
+            df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)
+            df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='first')]
+
         for key, val in self.gsm_platform.items():
             key_low = key.lower()
             col1, col2, col3 = '{}.cel.gz'.format(key_low), '{}.cel.gz.1'.format(key_low), '{}.cel.gz.2'.format(key_low)
@@ -222,9 +245,9 @@ class GSEproject:
             df_clean_sc500[col2] = temp[col2]
             df_clean_sc500[col3] = temp[col3]
 
-        if 'express' in list(df_outer_sc500):
-            df_clean_sc500 = df_outer_sc500.sort_values(by=['ENTREZ_GENE_ID', 'express'])
-            df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='last')]
+        # if 'express' in list(df_outer_sc500):
+        #     df_clean_sc500 = df_outer_sc500.sort_values(by=['ENTREZ_GENE_ID', 'express'])
+        #     df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='last')]
 
         # step 5: save to csv file
         df_clean_sc500.to_csv(filefullpath)
