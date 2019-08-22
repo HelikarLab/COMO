@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-import os
+import os, time
 import pandas as pd
 from rpy2.robjects.packages import importr
 from rpy2.robjects import r, pandas2ri
@@ -52,36 +52,50 @@ def agilent_raw(datadir, gsms):
     files = os.listdir(datadir)
     txts = []
     gzs = []
+    keys = []
     if gsms:
         for gsm in gsms:
             for file in files:
                 if gsm in file:
                     gzs.append(file)
                     txts.append(file[0:-3])
+                    keys.append(gsm)
     else:
         for file in files:
             gzs.append(file)
             txts.append(file[0:-3])
+            keys.append(file.split('_')[0])
+    cols = dict(zip(txts,keys))
 
     targets = pd.DataFrame(gzs,columns=['FileName'],index=txts)
     df_agilent = agilentio.readaiglent(datadir, targets)
-    return df_agilent
+    return df_agilent.rename(columns=cols)
 
-def readagilent(datadir,gsms,scalefactor=1.1):
+def readagilent(datadir, gsms, scalefactor=1.1, quantile=0.95):
     df_raw = agilent_raw(datadir,gsms)
     df = df_raw.drop(columns=['Row', 'Col'])
     df_negctl = df[df['ControlType'] == -1]
-    df_cutoff = scalefactor * df_negctl.drop(columns=['ControlType']).quantile(0.95, axis=0)
+    df_cutoff = scalefactor * df_negctl.drop(columns=['ControlType']).quantile(quantile, axis=0)
     df_bool = df.loc[df['ControlType'] == 0, df_cutoff.index.tolist()].gt(df_cutoff, axis=1)
     idx_ones = df_bool[df_bool.all(axis=1)].index
     idx_zeros = df_bool[~df_bool.all(axis=1)].index
     df.loc[idx_ones, 'Express'] = 1
     df.loc[idx_zeros, 'Express'] = 0
-    df_results = df.loc[df['ControlType'] == 0, ['ProbeName','SystematicName','Express']]
-    return df_results
+    df_results = df.loc[df['ControlType'] == 0, :].copy()
+    for gsm in gsms:
+        col = '{}.cel.gz.1'.format(gsm.lower())
+        df_results.loc[:, col] = 'A'
+        df_results.loc[df_bool.loc[:, gsm],col] = 'P'
+        col = '{}.cel.gz.2'.format(gsm.lower())
+        df_results.loc[:, col] = 1.0-quantile
+        col = '{}.cel.gz'.format(gsm.lower())
+        df_results.rename(columns={gsm: col}, inplace=True)
+    df_results.rename(columns={'ProbeName': 'ID'}, inplace=True)
+    df_results.set_index('ID', inplace=True)
+    return df_results.drop(['ControlType','SystematicName'],axis=1)
 
 
-def fetch_entrez_gene_id(input_values, input_db='Agilent ID'):
+def fetch_entrez_gene_id(input_values, input_db='Agilent ID',delay=30):
     s = BioDBNet()
     # input_db = 'Agilent ID'
     output_db = ['Gene ID','Ensembl Gene ID']
@@ -89,8 +103,16 @@ def fetch_entrez_gene_id(input_values, input_db='Agilent ID'):
 
     df_maps = pd.DataFrame([],columns=output_db)
     df_maps.index.name=input_db
-    for i in range(0,len(input_values),500):
+    i = 0
+    # for i in range(0,len(input_values),500):
+    while i < len(input_values):
         print('retrieve {}:{}'.format(i,min(i+500,len(input_values))))
         df_test = s.db2db(input_db, output_db, input_values[i:min(i+500,len(input_values))], 9606)
-        df_maps = pd.concat([df_maps, df_test], sort=False)
+        if isinstance(df_test, pd.DataFrame):
+            df_maps = pd.concat([df_maps, df_test], sort=False)
+        elif df_test == '414':
+            print("bioDBnet busy, try again in {} seconds".format(delay))
+            time.sleep(delay)
+            continue
+        i += 500
     return df_maps
