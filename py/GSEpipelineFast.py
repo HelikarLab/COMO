@@ -74,8 +74,9 @@ class GSEproject:
         self.genedir = os.path.join(self.datadir,self.gsename + '_RAW')
         print('Initialize project ({}):\nRoot: {}\nRaw data: {}'.format(self.gsename, self.rootdir, self.genedir))
         self.gsm_platform = self.get_gsm_platform()
-        gpls = querytable['GPL ID'].unique().tolist()
-        vendors = querytable['Instrument'].unique().tolist()
+        pairs = querytable.loc[:,['GPL ID','Instrument']].drop_duplicates()
+        gpls = pairs['GPL ID'].tolist()
+        vendors = pairs['Instrument'].tolist()
         self.platforms = dict(zip(gpls, vendors))
         self.download_samples()
 
@@ -166,6 +167,9 @@ class GSEproject:
         if fromcsv and os.path.isfile(filefullpath):
             try:
                 df_clean_sc500 = pd.read_csv(filefullpath)
+                df_clean_sc500.dropna(axis='columns', how='all', inplace=True)
+                df_clean_sc500.dropna(how='all', inplace=True)
+                df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='last')]
                 if self.gsms_included_by(df_clean_sc500):
                     return df_clean_sc500
                 else:
@@ -218,26 +222,38 @@ class GSEproject:
         df_outer_sc500.rename(str.lower, axis='columns', inplace=True)
         keys = []
         vals = []
+        gsms_loaded = []
         for col in list(df_outer_sc500):
             if '.cel.gz' in col:
                 strs = col.split('.cel.gz')
-                newcol = '{}.cel.gz{}'.format(strs[0].split('_')[0], strs[-1])
+                gsm = strs[0].split('_')[0]
+                newcol = '{}.cel.gz{}'.format(gsm, strs[-1])
                 vals.append(newcol)
                 keys.append(col)
+                gsms_loaded.append(gsm)
         df_outer_sc500.rename(columns=dict(zip(keys, vals)), inplace=True)
+        gsms_loaded = list(set(gsms_loaded).union(set(self.gsm_platform.keys())))
 
         # step 4: Remove duplicated items, keep largest VALUE for each GSM
         if not 'df_clean_sc500' in locals():
             df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)
             df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='first')]
+        else:
+            df_clean_sc500.set_index('ENTREZ_GENE_ID', inplace=True)
+            placeholder = pd.DataFrame([], columns=['placeholder'],index=df_outer_sc500.index)
+            placeholder['placeholder'] = 0
+            placeholder.index.name = 'ENTREZ_GENE_ID'
+            df_clean_sc500 = pd.merge(df_clean_sc500, placeholder, on='ENTREZ_GENE_ID', how='outer')
+            df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='last')]
 
-        for key, val in self.gsm_platform.items():
+        for key in gsms_loaded:
             key_low = key.lower()
             col1, col2, col3 = '{}.cel.gz'.format(key_low), '{}.cel.gz.1'.format(key_low), '{}.cel.gz.2'.format(key_low)
             try:
                 temp = df_outer_sc500.loc[:, [col1, col2, col3]]
             except:
-                print('{} not in df_outer_sc500'.format(key))
+                if key in list(self.gsm_platform.keys()):
+                    print('{} not in df_outer_sc500'.format(key))
                 continue
             temp.sort_values(by=['ENTREZ_GENE_ID', col1], inplace=True)
             temp = temp[~temp.index.duplicated(keep='last')]
@@ -254,8 +270,14 @@ class GSEproject:
             df_clean_sc500.set_index('ENTREZ_GENE_ID',inplace=True)
         except:
             pass
-        df_clean_sc500.to_csv(filefullpath)
+        df_clean_sc500.dropna(axis='columns', how='all', inplace=True)
+        df_clean_sc500.dropna(how='all', inplace=True)
+        try:
+            df_clean_sc500.drop(columns=['placeholder'], inplace=True)
+        except:
+            pass
         df_clean_sc500.sort_index(inplace=True)
+        df_clean_sc500.to_csv(filefullpath)
         print('Full table saved to:\n{}'.format(filefullpath))
         return df_clean_sc500
 

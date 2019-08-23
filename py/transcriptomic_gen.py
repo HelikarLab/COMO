@@ -167,6 +167,8 @@ def fetchLogicalTable(gsm_ids):
         df.loc[df[gsm] == 'A', gsm] = 0
         df.loc[df[gsm] == 'P', gsm] = 1
         df.loc[df[gsm] == 'M', gsm] = 1
+        df.sort_values(by=['ENTREZ_GENE_ID',gsm],inplace=True)
+        df = df[~df.index.duplicated(keep='last')]
 
         df_results = pd.concat([df_results, df], axis=1, sort=False)
 
@@ -249,7 +251,7 @@ sheet_name = list(range(5)) # first 5 sheets
 inqueryFullPath = os.path.join(projectdir, 'data', filename)
 inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_name, header=0)
 
-for i in range(5):
+for i in range(1,5):
     # print(list(inqueries[i]))
     inqueries[i].fillna(method='ffill',inplace=True)
     df = inqueries[i].loc[:,['GSE ID','Samples','GPL ID','Instrument']]
