@@ -42,6 +42,7 @@ RMAC Data
 * Biomart: ENTREZ ID search, [mygene](https://mygene.info/)
 * limma [R package](http://bioconductor.org/packages/release/bioc/html/limma.html), [AgiMicroRNA](https://bioconductor.org/packages/release/bioc/html/AgiMicroRna.html), [Analyzing Agilent MicroArray Data in R](https://support.bioconductor.org/p/96655/)
 * Bioconductor Tutorials: [Courses and Materials](http://master.bioconductor.org/help/course-materials/),
+* Python Package: [Bioservices](https://bioservices.readthedocs.io/en/master/)
 
 
 ## Repository Structure
@@ -50,6 +51,7 @@ RMAC Data
 ├── README.md # README
 ├── code # R & Matlab code
 │   ├── Affy_Script.r
+│   ├── Agilent\ Analysis\ and\ cutoffs.r
 │   ├── Duplicated_cmapFiles_Sript.R
 │   ├── GEO_ID_maps.r
 │   ├── Knock_out_simulation_1.m
@@ -81,8 +83,20 @@ RMAC Data
 │   ├── btg405.pdf
 │   └── usersguide.pdf
 └── py # Python code
+    ├── GSEpipeline.py # Pipeline Object based on GSEparse package
+    ├── GSEpipelineFast.py # Simplified Pipeline Object
+    ├── RESTful_GEO_Fetch.ipynb
+    ├── RESTful_Scratch_Pad.ipynb
     ├── Scratch_Pad.ipynb
     ├── Sort_CEL_Files.ipynb
-    ├── download_gsm_id_maps.py
-    └── step1_read_raw_data.py
+    ├── Test_GSEpipeline.ipynb
+    ├── templates # html templates for RESTful
+    ├── app.py # app for RESTful
+    ├── database_setup.py # database setup for RESTful
+    ├── instruments.py # affy and agilent functions
+    ├── populate.py # database operation for RESTful
+    ├── test_pipeline.py # test script of pipeline
+    ├── transcriptomic_gen.ipynb 
+    ├── transcriptomic_gen.py # Step 1 Test Script Entry
+    └── transcriptomics.db # Temporary SQLite database
 ```
