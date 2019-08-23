@@ -10,3 +10,5 @@ cutoff <- matrix(1.1*neg95,nrow(y),ncol(y),byrow=TRUE)
 isexpr <- rowSums(y$E > cutoff) >= 4    # (this number should be the replicates)
 table(isexpr) 
 y0 <- y[y$genes$ControlType==0 & isexpr,] 
+
+y1 <- y[y$genes$ControlType==0 & !isexpr,] 
