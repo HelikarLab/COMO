@@ -250,6 +250,10 @@ class GSEproject:
         #     df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='last')]
 
         # step 5: save to csv file
+        try:
+            df_clean_sc500.set_index('ENTREZ_GENE_ID',inplace=True)
+        except:
+            pass
         df_clean_sc500.to_csv(filefullpath)
         df_clean_sc500.sort_index(inplace=True)
         print('Full table saved to:\n{}'.format(filefullpath))
