@@ -239,7 +239,12 @@ def mergeLogicalTable(df_results):
     df_results.set_index('ENTREZ_GENE_ID',inplace=True)
 
     df_output = df_results.fillna(-1).groupby(level=0).max()
-    return df_output.replace(-1,np.nan)
+    df_output.replace(-1, np.nan, inplace=True)
+    posratio = df_output.sum(axis=1,skipna=True)/df_output.count(axis=1)
+    df_output['Pos'] = posratio
+    df_output['0.5'] = np.where(posratio >= 0.5, 1, 0)
+    df_output['0.9'] = np.where(posratio >= 0.9, 1, 0)
+    return df_output
 
 
 # input from user
@@ -251,7 +256,7 @@ sheet_name = list(range(5)) # first 5 sheets
 inqueryFullPath = os.path.join(projectdir, 'data', filename)
 inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_name, header=0)
 
-for i in range(1,5):
+for i in sheet_name:
     # print(list(inqueries[i]))
     inqueries[i].fillna(method='ffill',inplace=True)
     df = inqueries[i].loc[:,['GSE ID','Samples','GPL ID','Instrument']]
