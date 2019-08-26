@@ -185,16 +185,28 @@ def mergeLogicalTable(df_results):
     :return: pandas dataframe of merged table
     '''
     # step 1: get all plural ENTREZ_GENE_IDs in the input table, extract unique IDs
+    df_results.reset_index(drop=False, inplace=True)
+    df_results['ENTREZ_GENE_ID'] = df_results['ENTREZ_GENE_ID'].str.replace(" /// ", "//")
+    # df_results.set_index('ENTREZ_GENE_ID', drop=True, inplace=True)
     id_list = []
-    entrez_id_list = df_results[df_results.index.str.contains('///')].index.tolist()
+    # entrez_id_list = df_results[df_results.index.str.contains("//")].index.tolist()
+    entrez_single_id_list = df_results[~df_results['ENTREZ_GENE_ID'].str.contains("//")]['ENTREZ_GENE_ID'].tolist()
+    entrez_id_list = df_results[df_results['ENTREZ_GENE_ID'].str.contains("//")]['ENTREZ_GENE_ID'].tolist()
     for entrez_id in entrez_id_list:
-        entrez_ids = entrez_id.split(' /// ')
+        entrez_ids = entrez_id.split("//")
         id_list.extend(entrez_ids)
-
+        df_dups = pd.DataFrame([], columns=list(df_results), index=list(range(len(entrez_ids))))
+        dup_rows = []
+        for eid in entrez_ids:
+            rows = df_results.loc[df_results['ENTREZ_GENE_ID']==entrez_id].copy()
+            rows['ENTREZ_GENE_ID'] = eid
+            dup_rows.append(rows)
+        df_results = df_results.append(dup_rows,ignore_index=True)
+        df_results.drop(df_results[df_results['ENTREZ_GENE_ID']==entrez_id].index, inplace=True)
+    # df_results.set_index('ENTREZ_GENE_ID', drop=True, inplace=True)
     # print(len(id_list))
     # id_list
     # step 2: print out information about merge
-    entrez_single_id_list = df_results[~df_results.index.str.contains('///')].index.tolist()
     common_elements = list(set(entrez_single_id_list).intersection(set(id_list)))
     # information of merge
     print('{} single ENTREZ_GENE_IDs to merge'.format(len(common_elements)))
@@ -203,40 +215,66 @@ def mergeLogicalTable(df_results):
     print('entrez_id_list: {}, set: {}'.format(len(entrez_id_list),len(set(entrez_id_list))))
 
     dups = [x for x in id_list if id_list.count(x) > 1]
+    # dups = list(set(id_list))
     print('dups: {}, set: {}'.format(len(dups),len(set(dups))))
     dups = set(dups).union(common_elements)
 
     full_entre_id_sets = []
     cnt = 0
     entrez_dups_list = []
-    for dup_id in dups:
-        # print(dup_id+':')
-        id_set = []
-        entrez_dups = []
-        for multi_ids in entrez_id_list:
-            if dup_id in multi_ids.split(' /// '):
-                # print('{}'.format(multi_ids))
-                id_set.extend(multi_ids.split(' /// '))
-                entrez_dups.append(multi_ids)
-        id_set = list(set(id_set))
-        id_set.sort(key=int)
-        entrez_dups.extend(id_set)
-        full_entre_id = ' /// '.join(id_set)
-        # print('Merged {}: {}\n'.format(dup_id,full_entre_id))
-        full_entre_id_sets.append(full_entre_id)
-        entrez_dups_list.append(entrez_dups)
-        cnt+=1
+    idx_list = list(range(len(entrez_id_list)))
+    for idx1 in range(len(entrez_id_list)):
+        if not idx1 in idx_list:
+            continue
+        set1 = set(entrez_id_list[idx1].split("//"))
+        idx_list.remove(idx1)
+        toremove = []
+        for idx2 in idx_list:
+            set2 = set(entrez_id_list[idx2].split("//"))
+            intersect = set1.intersection(set2)
+            if bool(intersect):
+                set1 = set1.union(set2)
+                toremove.append(idx2)
+        for idx3 in toremove:
+            idx_list.remove(idx3)
+        sortlist = list(set1)
+        sortlist.sort(key=int)
+        new_entrez_id = " /// ".join(sortlist)
+        full_entre_id_sets.append(new_entrez_id)
+    full_entre_id_sets = list(set(full_entre_id_sets))
+
+    for full_entrez_id in full_entre_id_sets:
+        singles = full_entrez_id.split(" /// ")
+        entrez_dups_list.append(singles)
+        cnt += 1
+    # for dup_id in dups:
+    #     # print(dup_id+':')
+    #     id_set = []
+    #     entrez_dups = []
+    #     for multi_ids in entrez_id_list:
+    #         if dup_id in multi_ids.split("//"):
+    #             # print('{}'.format(multi_ids))
+    #             id_set.extend(multi_ids.split("//"))
+    #             entrez_dups.append(multi_ids)
+    #     id_set = list(set(id_set))
+    #     id_set.sort(key=int)
+    #     entrez_dups.extend(id_set)
+    #     full_entre_id = " /// ".join(id_set)
+    #     # print('Merged {}: {}\n'.format(dup_id,full_entre_id))
+    #     full_entre_id_sets.append(full_entre_id)
+    #     entrez_dups_list.append(entrez_dups)
+    #     cnt+=1
     print('{} id merged'.format(cnt))
     entrez_dups_dict = dict(zip(full_entre_id_sets,entrez_dups_list))
     # full_entre_id_sets = list(set(full_entre_id_sets))
 
-    df_results.reset_index(inplace=True)
+    # df_results.reset_index(inplace=True)
     for merged_entrez_id, entrez_dups_list in entrez_dups_dict.items():
         df_results['ENTREZ_GENE_ID'].replace(to_replace=entrez_dups_list,
                                              value=merged_entrez_id,
                                              inplace=True)
-
-    df_results.set_index('ENTREZ_GENE_ID',inplace=True)
+    # df_results.drop_duplicates(subset=['ENTREZ_GENE_ID'], keep='first', inplace=True)
+    df_results.set_index('ENTREZ_GENE_ID', inplace=True)
 
     df_output = df_results.fillna(-1).groupby(level=0).max()
     df_output.replace(-1, np.nan, inplace=True)
