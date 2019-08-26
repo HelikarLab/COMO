@@ -187,9 +187,7 @@ def mergeLogicalTable(df_results):
     # step 1: get all plural ENTREZ_GENE_IDs in the input table, extract unique IDs
     df_results.reset_index(drop=False, inplace=True)
     df_results['ENTREZ_GENE_ID'] = df_results['ENTREZ_GENE_ID'].str.replace(" /// ", "//")
-    # df_results.set_index('ENTREZ_GENE_ID', drop=True, inplace=True)
     id_list = []
-    # entrez_id_list = df_results[df_results.index.str.contains("//")].index.tolist()
     entrez_single_id_list = df_results[~df_results['ENTREZ_GENE_ID'].str.contains("//")]['ENTREZ_GENE_ID'].tolist()
     entrez_id_list = df_results[df_results['ENTREZ_GENE_ID'].str.contains("//")]['ENTREZ_GENE_ID'].tolist()
     for entrez_id in entrez_id_list:
@@ -203,9 +201,7 @@ def mergeLogicalTable(df_results):
             dup_rows.append(rows)
         df_results = df_results.append(dup_rows,ignore_index=True)
         df_results.drop(df_results[df_results['ENTREZ_GENE_ID']==entrez_id].index, inplace=True)
-    # df_results.set_index('ENTREZ_GENE_ID', drop=True, inplace=True)
-    # print(len(id_list))
-    # id_list
+
     # step 2: print out information about merge
     common_elements = list(set(entrez_single_id_list).intersection(set(id_list)))
     # information of merge
@@ -217,7 +213,6 @@ def mergeLogicalTable(df_results):
     dups = [x for x in id_list if id_list.count(x) > 1]
     # dups = list(set(id_list))
     print('dups: {}, set: {}'.format(len(dups),len(set(dups))))
-    dups = set(dups).union(common_elements)
 
     full_entre_id_sets = []
     cnt = 0
@@ -247,23 +242,7 @@ def mergeLogicalTable(df_results):
         singles = full_entrez_id.split(" /// ")
         entrez_dups_list.append(singles)
         cnt += 1
-    # for dup_id in dups:
-    #     # print(dup_id+':')
-    #     id_set = []
-    #     entrez_dups = []
-    #     for multi_ids in entrez_id_list:
-    #         if dup_id in multi_ids.split("//"):
-    #             # print('{}'.format(multi_ids))
-    #             id_set.extend(multi_ids.split("//"))
-    #             entrez_dups.append(multi_ids)
-    #     id_set = list(set(id_set))
-    #     id_set.sort(key=int)
-    #     entrez_dups.extend(id_set)
-    #     full_entre_id = " /// ".join(id_set)
-    #     # print('Merged {}: {}\n'.format(dup_id,full_entre_id))
-    #     full_entre_id_sets.append(full_entre_id)
-    #     entrez_dups_list.append(entrez_dups)
-    #     cnt+=1
+
     print('{} id merged'.format(cnt))
     entrez_dups_dict = dict(zip(full_entre_id_sets,entrez_dups_list))
     # full_entre_id_sets = list(set(full_entre_id_sets))
