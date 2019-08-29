@@ -273,7 +273,7 @@ def main(args):
 
     inqueryFullPath = os.path.join(projectdir, 'data', filename)
     inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_name, header=0)
-    
+
     for i in sheet_name:
         # print(list(inqueries[i]))
         inqueries[i].fillna(method='ffill',inplace=True)
