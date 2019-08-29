@@ -264,22 +264,25 @@ def mergeLogicalTable(df_results):
     return df_output
 
 
-# input from user
-filename = 'GeneExpressionDataUsed.xlsx'
-sheet_name = list(range(5)) # first 5 sheets
+def main(args):
+    # input from user
+    filename = 'GeneExpressionDataUsed.xlsx'
+    sheet_name = list(range(5)) # first 5 sheets
 
-# gse2770 = GSEproject('GSE2770',projectdir)
+    # gse2770 = GSEproject('GSE2770',projectdir)
 
-inqueryFullPath = os.path.join(projectdir, 'data', filename)
-inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_name, header=0)
+    inqueryFullPath = os.path.join(projectdir, 'data', filename)
+    inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_name, header=0)
+    
+    for i in sheet_name:
+        # print(list(inqueries[i]))
+        inqueries[i].fillna(method='ffill',inplace=True)
+        df = inqueries[i].loc[:,['GSE ID','Samples','GPL ID','Instrument']]
+        df_output = queryTest(df)
+        filename = 'logicaltable_sheet_{}.csv'.format(i+1)
+        fullsavepath = os.path.join(projectdir,'data',filename)
+        df_output.to_csv(fullsavepath)
+        print('Save to {}'.format(fullsavepath))
 
-for i in sheet_name:
-    # print(list(inqueries[i]))
-    inqueries[i].fillna(method='ffill',inplace=True)
-    df = inqueries[i].loc[:,['GSE ID','Samples','GPL ID','Instrument']]
-    df_output = queryTest(df)
-    filename = 'logicaltable_sheet_{}.csv'.format(i+1)
-    fullsavepath = os.path.join(projectdir,'data',filename)
-    df_output.to_csv(fullsavepath)
-    print('Save to {}'.format(fullsavepath))
-
+if __name__ == "__main__":
+   main(sys.argv[1:])
