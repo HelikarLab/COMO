@@ -91,7 +91,7 @@ def save_proteomics_tests(Proteomics, proteomics_data):
 
 
 # Read data from csv files
-def read_proteomics_tests(Proteomics):
+def load_proteomics_tests(Proteomics):
     tests = []
     datas = []
     for test in list(Proteomics):

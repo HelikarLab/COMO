@@ -10,9 +10,9 @@ from proteomics_gen import *
 
 # input parameters
 def merge_xomics(transcript_file='GeneExpressionDataUsed.xlsx', prote_file='Supplementary Data 1.xlsx'):
-    proteomics_dict = load_transcriptomics_tests(filename = transcript_file)
+    transcriptomics_dict= load_transcriptomics_tests(filename = transcript_file)
     Proteomics = load_supplementary_data(prote_file)
-    transcriptomics_dict = load_proteomics_tests(Proteomics)
+    proteomics_dict = load_proteomics_tests(Proteomics)
 
     files_dict = dict()
     keys1 = proteomics_dict.keys()
