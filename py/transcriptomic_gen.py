@@ -266,6 +266,28 @@ def mergeLogicalTable(df_results):
     return df_output
 
 
+def load_transcriptomics_tests(filename):
+    inqueryFullPath = os.path.join(projectdir, 'data', filename)
+    if not os.path.isfile(inqueryFullPath):
+        print('Error: file not found {}'.format(inqueryFullPath))
+        return None
+    xl = pd.ExcelFile(inqueryFullPath)
+    sheet_name = xl.sheet_names
+
+    tests = []
+    datas = []
+    for sheet in sheet_name:
+        # print(list(inqueries[i]))
+        filename = 'transcriptomics_{}.csv'.format(sheet)
+        fullsavepath = os.path.join(projectdir, 'data', filename)
+        data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
+        print('Read from {}'.format(fullsavepath))
+        datas.append(data)
+        tests.append(sheet)
+    transcriptomics_dict = dict(zip(tests, datas))
+    return transcriptomics_dict
+
+
 def main(args):
     # input from user
     filename = 'GeneExpressionDataUsed.xlsx'
