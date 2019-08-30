@@ -54,7 +54,7 @@ def load_gene_symbol_map(gene_symbols, filename = 'proteomics_entrez_map.csv'):
         sym2id = fetch_entrez_gene_id(gene_symbols, input_db='Gene Symbol')
         sym2id.loc[sym2id['Gene ID'] == '-', ['Gene ID']] = np.nan
         sym2id.to_csv(filepath, index_label='Gene Symbol')
-    return sym2id
+    return sym2id[~sym2id.index.duplicated()]
 
 
 def save_proteomics_tests(Proteomics, proteomics_data):
@@ -116,11 +116,13 @@ def main(argv):
                                   filename='proteomics_entrez_map.csv')
 
     # map gene symbol to ENTREZ_GENE_ID
-    proteomics_data.set_index('Gene Symbol', inplace=True)
+    proteomics_data.dropna(subset=['Gene Symbol'], inplace=True)
+    proteomics_data.drop(columns=['Majority protein IDs'], inplace=True)
+    proteomics_data = proteomics_data.groupby(['Gene Symbol']).agg('max')
+    # proteomics_data.set_index('Gene Symbol', inplace=True)
     proteomics_data['ENTREZ_GENE_ID'] = sym2id['Gene ID']
     proteomics_data.dropna(subset=['ENTREZ_GENE_ID'], inplace=True)
     proteomics_data.set_index('ENTREZ_GENE_ID', inplace=True)
-    proteomics_data.drop(columns=['Majority protein IDs'], inplace=True)
     prote_data_filepath = os.path.join(projectdir, 'data', 'proteomics_data.csv')
     if not os.path.isfile(prote_data_filepath):
         proteomics_data.to_csv(prote_data_filepath, index_label='ENTREZ_GENE_ID')
