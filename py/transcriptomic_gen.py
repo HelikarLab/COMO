@@ -145,6 +145,12 @@ def queryTest(df):
 
     df_results = fetchLogicalTable(gsm_ids)
     df_output = mergeLogicalTable(df_results)
+
+    posratio = df_output.sum(axis=1,skipna=True)/df_output.count(axis=1)
+    df_output['Pos'] = posratio
+    df_output['0.5'] = np.where(posratio >= 0.5, 1, 0)
+    df_output['0.9'] = np.where(posratio >= 0.9, 1, 0)
+
     return df_output
 
 
@@ -257,29 +263,27 @@ def mergeLogicalTable(df_results):
 
     df_output = df_results.fillna(-1).groupby(level=0).max()
     df_output.replace(-1, np.nan, inplace=True)
-    posratio = df_output.sum(axis=1,skipna=True)/df_output.count(axis=1)
-    df_output['Pos'] = posratio
-    df_output['0.5'] = np.where(posratio >= 0.5, 1, 0)
-    df_output['0.9'] = np.where(posratio >= 0.9, 1, 0)
     return df_output
 
 
 def main(args):
     # input from user
     filename = 'GeneExpressionDataUsed.xlsx'
-    sheet_name = list(range(5)) # first 5 sheets
+    # sheet_name = list(range(5)) # first 5 sheets
 
     # gse2770 = GSEproject('GSE2770',projectdir)
 
     inqueryFullPath = os.path.join(projectdir, 'data', filename)
+    xl = pd.ExcelFile(inqueryFullPath)
+    sheet_name = xl.sheet_names
     inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_name, header=0)
 
-    for i in sheet_name:
+    for sheet in sheet_name:
         # print(list(inqueries[i]))
-        inqueries[i].fillna(method='ffill',inplace=True)
-        df = inqueries[i].loc[:,['GSE ID','Samples','GPL ID','Instrument']]
+        inqueries[sheet].fillna(method='ffill',inplace=True)
+        df = inqueries[sheet].loc[:,['GSE ID','Samples','GPL ID','Instrument']]
         df_output = queryTest(df)
-        filename = 'logicaltable_sheet_{}.csv'.format(i+1)
+        filename = 'transcriptomics_{}.csv'.format(sheet)
         fullsavepath = os.path.join(projectdir,'data',filename)
         df_output.to_csv(fullsavepath)
         print('Save to {}'.format(fullsavepath))
