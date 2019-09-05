@@ -7,7 +7,7 @@ import numpy as np
 import cobra
 from cobra.flux_analysis import (single_gene_deletion, single_reaction_deletion,
                                  double_gene_deletion, double_reaction_deletion)
-
+from project import configs
 from transcriptomic_gen import *
 from proteomics_gen import *
 
@@ -101,8 +101,8 @@ def create_gene_pairs(datadir, model, geneInd2genes, fluxSolutionRatios, HasEffe
     return Gene_Pairs
 
 def main(argv):
-    print(projectdir)
-    datadir = os.path.join(projectdir,'data')
+    print(configs.rootdir)
+    datadir = os.path.join(configs.rootdir,'data')
     print(datadir)
     model, geneInd2genes, fluxSolutionRatios, HasEffects_Gene = knock_out_simulation(datadir=datadir,
                                       model_file='Th1_Cell_SpecificModel4manuscript.xml',
