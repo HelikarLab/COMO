@@ -10,7 +10,7 @@ from sqlalchemy import Column, ForeignKey, Integer, String, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, load_only
 from sqlalchemy import create_engine
-
+from project import configs
 from GSEpipelineFast import *
 
 #create declarative_base instance
@@ -49,11 +49,6 @@ Base.metadata.create_all(engine)
 
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
-
-# find project root dir
-currentdir = os.getcwd()
-dirlist = currentdir.split('/')
-projectdir = '/'.join(dirlist[0:-1])
 
 
 def lookupTranscriptomicsDB(gseXXX):
@@ -137,7 +132,7 @@ def queryTest(df):
     # fetch data of each gse if it is not in the database, update database
     for gse_id in gse_ids:
         querytable = df[df['GSE ID']==gse_id]
-        gseXXX = GSEproject(gse_id,querytable,projectdir)
+        gseXXX = GSEproject(gse_id,querytable,configs.rootdir)
         if lookupTranscriptomicsDB(gseXXX):
             print("{} already in database, skip over.".format(gseXXX.gsename))
             continue
@@ -267,7 +262,7 @@ def mergeLogicalTable(df_results):
 
 
 def load_transcriptomics_tests(filename):
-    inqueryFullPath = os.path.join(projectdir, 'data', filename)
+    inqueryFullPath = os.path.join(configs.rootdir, 'data', filename)
     if not os.path.isfile(inqueryFullPath):
         print('Error: file not found {}'.format(inqueryFullPath))
         return None
@@ -279,7 +274,7 @@ def load_transcriptomics_tests(filename):
     for sheet in sheet_name:
         # print(list(inqueries[i]))
         filename = 'transcriptomics_{}.csv'.format(sheet)
-        fullsavepath = os.path.join(projectdir, 'data', filename)
+        fullsavepath = os.path.join(configs.rootdir, 'data', filename)
         data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
         print('Read from {}'.format(fullsavepath))
         datas.append(data)
@@ -293,9 +288,9 @@ def main(args):
     filename = 'GeneExpressionDataUsed.xlsx'
     # sheet_name = list(range(5)) # first 5 sheets
 
-    # gse2770 = GSEproject('GSE2770',projectdir)
+    # gse2770 = GSEproject('GSE2770',configs.rootdir)
 
-    inqueryFullPath = os.path.join(projectdir, 'data', filename)
+    inqueryFullPath = os.path.join(configs.rootdir, 'data', filename)
     xl = pd.ExcelFile(inqueryFullPath)
     sheet_name = xl.sheet_names
     inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_name, header=0)
@@ -306,7 +301,7 @@ def main(args):
         df = inqueries[sheet].loc[:,['GSE ID','Samples','GPL ID','Instrument']]
         df_output = queryTest(df)
         filename = 'transcriptomics_{}.csv'.format(sheet)
-        fullsavepath = os.path.join(projectdir,'data',filename)
+        fullsavepath = os.path.join(configs.rootdir,'data',filename)
         df_output.to_csv(fullsavepath)
         print('Save to {}'.format(fullsavepath))
 

@@ -7,11 +7,12 @@ import pandas as pd
 import numpy as np
 # from bioservices import BioDBNet
 from transcriptomic_gen import *
+from project import configs
 
 # Load Proteomics
 def load_proteomics_data(datafilename):
     data_sheet = list(range(1)) # first 5 sheets
-    dataFullPath = os.path.join(projectdir, 'data', datafilename)
+    dataFullPath = os.path.join(configs.rootdir, 'data', datafilename)
     if os.path.isfile(dataFullPath):
         fulldata = pd.read_excel(dataFullPath, sheet_name=data_sheet, header=0)
     else:
@@ -39,7 +40,7 @@ def load_proteomics_data(datafilename):
 
 
 def load_supplementary_data(suppfilename):
-    suppFullPath = os.path.join(projectdir, 'data', suppfilename)
+    suppFullPath = os.path.join(configs.rootdir, 'data', suppfilename)
     supp_sheet = ['Proteomics']
     supplements = pd.read_excel(suppFullPath, sheet_name=supp_sheet, header=0)
     Proteomics = supplements['Proteomics']
@@ -47,7 +48,7 @@ def load_supplementary_data(suppfilename):
 
 
 def load_gene_symbol_map(gene_symbols, filename = 'proteomics_entrez_map.csv'):
-    filepath = os.path.join(projectdir, 'data', 'proteomics_entrez_map.csv')
+    filepath = os.path.join(configs.rootdir, 'data', 'proteomics_entrez_map.csv')
     if os.path.isfile(filepath):
         sym2id = pd.read_csv(filepath, index_col='Gene Symbol')
     else:
@@ -78,7 +79,7 @@ def save_proteomics_tests(Proteomics, proteomics_data):
         testdata['top 0.25'] = 0
         testdata.loc[testbool.any(axis=1), 'top 0.25'] = 1
 
-        output_path = os.path.join(projectdir, 'data', 'Proteomics_{}.csv'.format(test.strip()))
+        output_path = os.path.join(configs.rootdir, 'data', 'Proteomics_{}.csv'.format(test.strip()))
         testdata.to_csv(output_path, index_label='ENTREZ_GENE_ID')
         print('Test Data Saved to {}'.format(output_path))
         tests.append(test.strip())
@@ -97,7 +98,7 @@ def load_proteomics_tests(Proteomics):
     for test in list(Proteomics):
         if test == 'Statistics':
             break
-        output_path = os.path.join(projectdir, 'data', 'Proteomics_{}.csv'.format(test.strip()))
+        output_path = os.path.join(configs.rootdir, 'data', 'Proteomics_{}.csv'.format(test.strip()))
         testdata = pd.read_csv(output_path, index_col='ENTREZ_GENE_ID')
         print('Test Data Load From {}'.format(output_path))
         tests.append(test.strip().replace('ï', 'i'))
@@ -123,7 +124,7 @@ def main(argv):
     proteomics_data['ENTREZ_GENE_ID'] = sym2id['Gene ID']
     proteomics_data.dropna(subset=['ENTREZ_GENE_ID'], inplace=True)
     proteomics_data.set_index('ENTREZ_GENE_ID', inplace=True)
-    prote_data_filepath = os.path.join(projectdir, 'data', 'proteomics_data.csv')
+    prote_data_filepath = os.path.join(configs.rootdir, 'data', 'proteomics_data.csv')
     if not os.path.isfile(prote_data_filepath):
         proteomics_data.to_csv(prote_data_filepath, index_label='ENTREZ_GENE_ID')
 

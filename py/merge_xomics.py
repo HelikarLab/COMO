@@ -5,6 +5,7 @@ import time
 import pandas as pd
 import numpy as np
 # from bioservices import BioDBNet
+from project import configs
 from transcriptomic_gen import *
 from proteomics_gen import *
 
@@ -33,7 +34,7 @@ def merge_xomics(transcript_file='GeneExpressionDataUsed.xlsx', prote_file='Supp
         merge_data['Express'] = 0
         merge_data.loc[merge_data[['prote_0.5', 'trans_0.5']].sum(axis=1) == 2, 'Express'] = 1
         merge_data.loc[merge_data[['prote_top', 'trans_top']].sum(axis=1) > 0, 'Express'] = 1
-        filepath = os.path.join(projectdir, 'data', 'merged_{}.csv'.format(test))
+        filepath = os.path.join(configs.rootdir, 'data', 'merged_{}.csv'.format(test))
         merge_data.to_csv(filepath, index_label='ENTREZ_GENE_ID')
         files_dict[test] = filepath
 
@@ -55,7 +56,7 @@ def merge_xomics(transcript_file='GeneExpressionDataUsed.xlsx', prote_file='Supp
         merge_data = mergeLogicalTable(merge_data)
         merge_data['Express'] = 0
         merge_data.loc[merge_data[['0.5', 'top']].sum(axis=1) > 0, 'Express'] = 1
-        filepath = os.path.join(projectdir, 'data', 'merged_{}.csv'.format(test))
+        filepath = os.path.join(configs.rootdir, 'data', 'merged_{}.csv'.format(test))
         merge_data.to_csv(filepath, index_label='ENTREZ_GENE_ID')
         files_dict[test] = filepath
 
