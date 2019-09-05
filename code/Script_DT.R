@@ -8,8 +8,8 @@ Target_char=as.character(con_map_dt$Target)
 spl_dt=list();
 for (i in 1:length(Target_char)) #
 {
-x=strsplit(Target_char[i],split=", ")
-spl_dt=append(spl_dt,x)
+	x=strsplit(Target_char[i],split=", ")
+	spl_dt=append(spl_dt,x)
 }
 
 #### Drugs for each target SYMBOL
@@ -21,11 +21,11 @@ for(i in 1:length(spl_dt)) #length(spl_dt)
 	if(length(spl_dt[[i]])>0)
 	{
 		for(j in 1:length(spl_dt[[i]]))
-			{
+		{
 			x=which((spl_dt[[i]][j]==SymChar))
 			DT_Symb1=cbind(SymChar[x], con_map_dt[i,1:4])
 			DT_Symb=rbind(DT_Symb,DT_Symb1)
-			}	
+		}	
 	}
 }
 

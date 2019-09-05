@@ -2,17 +2,17 @@
 # read connectivityMap touchstone profiles and convert them into single data matrix 
 fnames=dir()
 data_comb={};
-for (i in 1:length(fnames)){
+for (i in 1:length(fnames))
+{
+	pert_gene_name=strsplit(fnames[i],'_')
+	pert_gene_name=pert_gene_name[[1]][1]
 
-pert_gene_name=strsplit(fnames[i],'_')
-pert_gene_name=pert_gene_name[[1]][1]
+	data=read.delim(fnames[i],header=T)
 
-data=read.delim(fnames[i],header=T)
+	pert_gene_col=rep(pert_gene_name,length(data$Name))
+	data_mat=cbind(pert_gene_col,as.character(data$Name), data$Score, as.character(data$Type))
 
-pert_gene_col=rep(pert_gene_name,length(data$Name))
-data_mat=cbind(pert_gene_col,as.character(data$Name), data$Score, as.character(data$Type))
-
-data_comb=rbind(data_comb, data_mat)
+	data_comb=rbind(data_comb, data_mat)
 }
 
 # Change gene names to Entrez_IDs
