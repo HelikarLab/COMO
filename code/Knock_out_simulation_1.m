@@ -1,3 +1,8 @@
+% Cobra toolbox
+% Create the model
+% data =tdfread('input_COBRA_list.txt')
+% test_tissue_model = createTissueSpecificModel(model,data)
+
 %import known dt genes (Entrez)
 %DT=tdfread('Targets_for_inhibitorsEntrez.txt')
 %DT_genes=num2str(DT.Target_ofInhibitos_ENTREZ)
@@ -61,22 +66,22 @@ combined_output={geneInd2genes(DAG_dis_met_genesInd), DAG_dis_met_rxnInd, DAG_rx
 
 gene_mat_out=[];
 for i = 1:length(hasEffect_DTgenes)
-FR_i=DAG_rxn_fluxRatio(:,i)
-naN_ind= find(isnan(DAG_rxn_fluxRatio(:,i)))
-FR_i([naN_ind])=[];
-Gene_i=combined_output{1}
-Gene_i([naN_ind])=[];
-Rind_i=combined_output{2}
-Rind_i([naN_ind])=[];
+	FR_i=DAG_rxn_fluxRatio(:,i)
+	naN_ind= find(isnan(DAG_rxn_fluxRatio(:,i)));
+	FR_i([naN_ind])=[];
+	Gene_i=combined_output{1};
+	Gene_i([naN_ind])=[];
+	Rind_i=combined_output{2};
+	Rind_i([naN_ind])=[];
 
-P_gene=repelem(hasEffect_DTgenes(i),length(Gene_i))
-P_gene=P_gene'
-pegene_mat=[P_gene Gene_i num2cell(FR_i)]
-gene_mat_out=[gene_mat_out; pegene_mat]
+	P_gene=repelem(hasEffect_DTgenes(i),length(Gene_i));
+	P_gene=P_gene';
+	pegene_mat=[P_gene Gene_i num2cell(FR_i)];
+	gene_mat_out=[gene_mat_out; pegene_mat];
 end
 % Change_file_name here
 T = cell2table(gene_mat_out);
-writetable(T,'Gene_Pairs_Inhi_Fratio_DOWN.txt')
+writetable(T,'Gene_Pairs_Inhi_Fratio_DOWN.txt');
 
 
 % get Flux distribution for Rxns of genes associated with Up-regulated genes- score ((total number of flux down/total numebr of fluxes)-total number of upregulated fluxes/total number of fluxes)
