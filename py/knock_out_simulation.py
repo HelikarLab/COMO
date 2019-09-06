@@ -119,8 +119,8 @@ def main(argv):
                                    geneInd2genes,
                                    fluxSolutionRatios,
                                    HasEffects_Gene,
-                                   RA_Down='RA_DOWN.txt')
-    Gene_Pairs_up.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_DOWN.txt'),index=False)
+                                   RA_Down='RA_UP.txt')
+    Gene_Pairs_up.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_UP.txt'),index=False)
     print(geneInd2genes)
     print(fluxSolutionRatios)
     print(HasEffects_Gene)
