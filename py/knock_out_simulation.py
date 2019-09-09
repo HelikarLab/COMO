@@ -57,7 +57,7 @@ def knock_out_simulation(datadir, model_file, inhibitors):
                 HasEffects_Gene.append(id)
                 break
     # HasEffects_Gene
-    return model, geneInd2genes, fluxSolutionRatios, HasEffects_Gene
+    return model, geneInd2genes, HasEffects_Gene, fluxSolutionRatios, fluxSolutionDiffs
 
 
 def create_gene_pairs(datadir, model, geneInd2genes, fluxSolutionRatios, HasEffects_Gene, RA_Down):
@@ -100,30 +100,80 @@ def create_gene_pairs(datadir, model, geneInd2genes, fluxSolutionRatios, HasEffe
     Gene_Pairs = pd.concat(gene_mat_out, ignore_index=True)
     return Gene_Pairs
 
+
+def score_gene_pairs(Gene_Pairs, filename):
+    p_model_genes = Gene_Pairs.Gene.unique()
+    d_score = pd.DataFrame([], columns=['score'])
+    for p_gene in p_model_genes:
+        data_p = Gene_Pairs.loc[Gene_Pairs['Gene'] == p_gene].copy()
+        # print(data_p)
+        total_aff = data_p['Gene IDs'].unique().size
+        # print(total_aff)
+        n_aff_down = data_p.loc[data_p['rxn_fluxRatio'] < 0.99, 'Gene IDs'].unique().size
+        # print(n_aff_down)
+        n_aff_up = data_p.loc[data_p['rxn_fluxRatio'] > 1, 'Gene IDs'].unique().size
+        # print(n_aff_up)
+        d_s = ((n_aff_down - n_aff_up) / total_aff)
+        # print(d_s)
+        d_score.at[p_gene, 'score'] = d_s
+
+    d_score.index.name = 'Gene'
+    d_score.to_csv(os.path.join(configs.datadir, filename))
+    return d_score
+
+
+def score_gene_pairs_diff(Gene_Pairs, filename):
+    p_model_genes = Gene_Pairs.Gene.unique()
+    d_score = pd.DataFrame([], columns=['score'])
+    for p_gene in p_model_genes:
+        data_p = Gene_Pairs.loc[Gene_Pairs['Gene'] == p_gene].copy()
+        # print(data_p)
+        total_aff = data_p['Gene IDs'].unique().size
+        # print(total_aff)
+        n_aff_down = data_p.loc[data_p['rxn_fluxRatio'] < -1e-8, 'Gene IDs'].unique().size
+        # print(n_aff_down)
+        n_aff_up = data_p.loc[data_p['rxn_fluxRatio'] > 1e-8, 'Gene IDs'].unique().size
+        # print(n_aff_up)
+        d_s = ((n_aff_down - n_aff_up) / total_aff)
+        # print(d_s)
+        d_score.at[p_gene, 'score'] = d_s
+
+    d_score.index.name = 'Gene'
+    d_score.to_csv(os.path.join(configs.datadir, filename))
+    return d_score
+
+
 def main(argv):
     print(configs.rootdir)
     datadir = os.path.join(configs.rootdir,'data')
     print(datadir)
-    model, geneInd2genes, fluxSolutionRatios, HasEffects_Gene = knock_out_simulation(datadir=datadir,
-                                      model_file='Th1_Cell_SpecificModel4manuscript.xml',
+    model, geneInd2genes, HasEffects_Gene, fluxSolutionRatios, fluxSolutionDiffs = knock_out_simulation(datadir=datadir,
+                                      model_file='Th1_Cell_SpecificModel4manuscript.mat',
                                       inhibitors='Th1_inhibitors_Entrez.txt')
     Gene_Pairs_down = create_gene_pairs(datadir,
                                    model,
                                    geneInd2genes,
-                                   fluxSolutionRatios,
+                                   fluxSolutionDiffs,
                                    HasEffects_Gene,
                                    RA_Down='RA_DOWN.txt')
     Gene_Pairs_down.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_DOWN.txt'),index=False)
     Gene_Pairs_up = create_gene_pairs(datadir,
                                    model,
                                    geneInd2genes,
-                                   fluxSolutionRatios,
+                                   fluxSolutionDiffs,
                                    HasEffects_Gene,
                                    RA_Down='RA_UP.txt')
     Gene_Pairs_up.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_UP.txt'),index=False)
     print(geneInd2genes)
     print(fluxSolutionRatios)
     print(HasEffects_Gene)
+    # d_score_down = score_gene_pairs(Gene_Pairs_down, 'd_score_DOWN.csv')
+    d_score_down = score_gene_pairs_diff(Gene_Pairs_down, 'd_score_DOWN.csv')
+    # d_score_up = score_gene_pairs(Gene_Pairs_up, 'd_score_UP.csv')
+    d_score_up = score_gene_pairs_diff(Gene_Pairs_up, 'd_score_UP.csv')
+    print(d_score_down)
+    print(d_score_up)
+
 
 if __name__ == "__main__":
    main(sys.argv[1:])
