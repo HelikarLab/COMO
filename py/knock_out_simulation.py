@@ -8,8 +8,8 @@ import cobra
 from cobra.flux_analysis import (single_gene_deletion, single_reaction_deletion,
                                  double_gene_deletion, double_reaction_deletion)
 from project import configs
-from transcriptomic_gen import *
-from proteomics_gen import *
+# from transcriptomic_gen import *
+# from proteomics_gen import *
 
 def knock_out_simulation(datadir, model_file, inhibitors):
 
