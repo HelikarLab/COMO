@@ -39,13 +39,14 @@ def knock_out_simulation(datadir, model_file, inhibitors):
 
     fluxsolution = pd.DataFrame()
     for id in DT_model:
-        # model_cp = copy.deepcopy(model)
-        gene = model.genes.get_by_id(id)
+        model_cp = copy.deepcopy(model)
+        gene = model_cp.genes.get_by_id(id)
         buff = gene._functional
         gene.knock_out()
-        opt_model = model.optimize().to_frame()
+        opt_model = model_cp.optimize().to_frame()
         gene._functional = buff
         fluxsolution[id]=opt_model['fluxes']
+        del model_cp
 
     # fluxsolution
     fluxsolution[abs(fluxsolution) < 1e-8] = 0.0
@@ -59,14 +60,14 @@ def knock_out_simulation(datadir, model_file, inhibitors):
     for id in DT_model:
         gene = model.genes.get_by_id(id)
         for rxn in gene.reactions:
-            if abs(fluxSolutionDiffs.at[rxn.id, id]) > 1e-7:
+            if (fluxSolutionRatios.at[rxn.id, id] == 0) | (abs(fluxSolutionDiffs.at[rxn.id, id]) > 1e-7):
                 HasEffects_Gene.append(id)
                 break
     # HasEffects_Gene
-    return model, geneInd2genes, HasEffects_Gene, fluxSolutionRatios, fluxSolutionDiffs
+    return model, geneInd2genes, HasEffects_Gene, fluxsolution, fluxSolutionRatios, fluxSolutionDiffs
 
 
-def create_gene_pairs(datadir, model, geneInd2genes, fluxSolutionRatios, HasEffects_Gene, RA_Down):
+def create_gene_pairs(datadir, model, geneInd2genes, fluxsolution, fluxSolutionRatios, fluxSolutionDiffs, HasEffects_Gene, RA_Down):
     RA_down = pd.read_csv(os.path.join(datadir,RA_Down))
     DAG_dis_genes = pd.DataFrame()
     DAG_dis_genes['Gene ID'] = RA_down.iloc[:,0].astype(str)
@@ -88,6 +89,8 @@ def create_gene_pairs(datadir, model, geneInd2genes, fluxSolutionRatios, HasEffe
     # Gene_df
 
     DAG_rxn_fluxRatio = fluxSolutionRatios.loc[DAG_dis_met_rxnInd]
+    DAG_rxn_fluxDiffs = fluxSolutionDiffs.loc[DAG_dis_met_rxnInd]
+    DAG_rxn_fluxValue = fluxsolution.loc[DAG_dis_met_rxnInd]
     # DAG_rxn_fluxRatio
 
     gene_mat_out = []
@@ -97,8 +100,11 @@ def create_gene_pairs(datadir, model, geneInd2genes, fluxSolutionRatios, HasEffe
         pegene = pd.DataFrame()
         pegene['Gene IDs'] = Gene_df['Gene IDs'].copy()
         pegene['rxn_fluxRatio'] = DAG_rxn_fluxRatio[id].copy()
+        rxn_fluxDiffs = DAG_rxn_fluxDiffs[id].copy()
+        rxn_fluxValue = DAG_rxn_fluxValue[id].copy()
         pegene['Gene'] = id
-        pegene.dropna(axis=0,subset=['rxn_fluxRatio'],inplace=True)
+        pegene = pegene.loc[(~pegene['rxn_fluxRatio'].isna()) & (abs(rxn_fluxDiffs) + abs(rxn_fluxValue) > 1e-10)]
+        # pegene.dropna(axis=0,subset=['rxn_fluxRatio'],inplace=True)
         pegene.index.name='reaction'
         pegene.reset_index(drop=False, inplace=True)
         gene_mat_out.append(pegene)
@@ -153,20 +159,20 @@ def main(argv):
     print(configs.rootdir)
     datadir = os.path.join(configs.rootdir,'data')
     print(datadir)
-    model, geneInd2genes, HasEffects_Gene, fluxSolutionRatios, fluxSolutionDiffs = knock_out_simulation(datadir=datadir,
+    model, geneInd2genes, HasEffects_Gene, fluxsolution, fluxSolutionRatios, fluxSolutionDiffs = knock_out_simulation(datadir=datadir,
                                       model_file='Th1_Cell_SpecificModel4manuscript.mat',
                                       inhibitors='Th1_inhibitors_Entrez.txt')
     Gene_Pairs_down = create_gene_pairs(datadir,
                                    model,
                                    geneInd2genes,
-                                   fluxSolutionRatios,
+                                   fluxsolution, fluxSolutionRatios, fluxSolutionDiffs,
                                    HasEffects_Gene,
                                    RA_Down='RA_DOWN.txt')
     Gene_Pairs_down.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_DOWN.txt'),index=False)
     Gene_Pairs_up = create_gene_pairs(datadir,
                                    model,
                                    geneInd2genes,
-                                   fluxSolutionRatios,
+                                   fluxsolution, fluxSolutionRatios, fluxSolutionDiffs,
                                    HasEffects_Gene,
                                    RA_Down='RA_UP.txt')
     Gene_Pairs_up.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_UP.txt'),index=False)
