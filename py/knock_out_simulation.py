@@ -5,6 +5,7 @@ import time
 import pandas as pd
 import numpy as np
 import cobra
+import copy
 from cobra.flux_analysis import (single_gene_deletion, single_reaction_deletion,
                                  double_gene_deletion, double_reaction_deletion)
 from project import configs
@@ -34,26 +35,31 @@ def knock_out_simulation(datadir, model_file, inhibitors):
     DT_model = list(DT_model)
 
     model_opt = model.optimize().to_frame()
+    model_opt[abs(model_opt) < 1e-8] = 0.0
 
     fluxsolution = pd.DataFrame()
     for id in DT_model:
+        # model_cp = copy.deepcopy(model)
         gene = model.genes.get_by_id(id)
+        buff = gene._functional
         gene.knock_out()
         opt_model = model.optimize().to_frame()
+        gene._functional = buff
         fluxsolution[id]=opt_model['fluxes']
 
     # fluxsolution
+    fluxsolution[abs(fluxsolution) < 1e-8] = 0.0
 
-    fluxSolutionRatios = fluxsolution.div(model_opt['fluxes'],axis=0)
+    fluxSolutionRatios = fluxsolution.div(model_opt['fluxes'], axis=0)
     # fluxSolutionRatios
-    fluxSolutionDiffs = fluxsolution.sub(model_opt['fluxes'],axis=0)
+    fluxSolutionDiffs = fluxsolution.sub(model_opt['fluxes'], axis=0)
     # fluxSolutionDiffs
 
     HasEffects_Gene = []
     for id in DT_model:
         gene = model.genes.get_by_id(id)
         for rxn in gene.reactions:
-            if fluxSolutionDiffs.at[rxn.id,id] != 0:
+            if abs(fluxSolutionDiffs.at[rxn.id, id]) > 1e-7:
                 HasEffects_Gene.append(id)
                 break
     # HasEffects_Gene
@@ -109,9 +115,9 @@ def score_gene_pairs(Gene_Pairs, filename):
         # print(data_p)
         total_aff = data_p['Gene IDs'].unique().size
         # print(total_aff)
-        n_aff_down = data_p.loc[data_p['rxn_fluxRatio'] < 0.99, 'Gene IDs'].unique().size
+        n_aff_down = data_p.loc[abs(data_p['rxn_fluxRatio']) < 0.99, 'Gene IDs'].unique().size
         # print(n_aff_down)
-        n_aff_up = data_p.loc[data_p['rxn_fluxRatio'] > 1, 'Gene IDs'].unique().size
+        n_aff_up = data_p.loc[abs(data_p['rxn_fluxRatio']) > 1.0, 'Gene IDs'].unique().size
         # print(n_aff_up)
         d_s = ((n_aff_down - n_aff_up) / total_aff)
         # print(d_s)
@@ -153,24 +159,24 @@ def main(argv):
     Gene_Pairs_down = create_gene_pairs(datadir,
                                    model,
                                    geneInd2genes,
-                                   fluxSolutionDiffs,
+                                   fluxSolutionRatios,
                                    HasEffects_Gene,
                                    RA_Down='RA_DOWN.txt')
     Gene_Pairs_down.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_DOWN.txt'),index=False)
     Gene_Pairs_up = create_gene_pairs(datadir,
                                    model,
                                    geneInd2genes,
-                                   fluxSolutionDiffs,
+                                   fluxSolutionRatios,
                                    HasEffects_Gene,
                                    RA_Down='RA_UP.txt')
     Gene_Pairs_up.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_UP.txt'),index=False)
     print(geneInd2genes)
     print(fluxSolutionRatios)
     print(HasEffects_Gene)
-    # d_score_down = score_gene_pairs(Gene_Pairs_down, 'd_score_DOWN.csv')
-    d_score_down = score_gene_pairs_diff(Gene_Pairs_down, 'd_score_DOWN.csv')
-    # d_score_up = score_gene_pairs(Gene_Pairs_up, 'd_score_UP.csv')
-    d_score_up = score_gene_pairs_diff(Gene_Pairs_up, 'd_score_UP.csv')
+    d_score_down = score_gene_pairs(Gene_Pairs_down, 'd_score_DOWN.csv')
+    # d_score_down = score_gene_pairs_diff(Gene_Pairs_down, 'd_score_DOWN.csv')
+    d_score_up = score_gene_pairs(Gene_Pairs_up, 'd_score_UP.csv')
+    # d_score_up = score_gene_pairs_diff(Gene_Pairs_up, 'd_score_UP.csv')
     print(d_score_down)
     print(d_score_up)
 
