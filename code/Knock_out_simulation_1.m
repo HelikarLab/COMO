@@ -32,8 +32,8 @@ hasEffect_DTgenes=DT_model(hasEffect_DT)
 
 fluxSolutionRatios=[];
 for i= 1:size(fluxSolution,2)
-FSratios=fluxSolution(:,i)./WT_sol;
-fluxSolutionRatios(:,i)=FSratios
+	FSratios=fluxSolution(:,i)./WT_sol;
+	fluxSolutionRatios(:,i)=FSratios
 end
 
 % Read files of up- and down-regulated genes from DAG_genes.txt
