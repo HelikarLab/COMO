@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import os
+import re
 import sys
 import time
 import pandas as pd
@@ -60,9 +61,21 @@ def knock_out_simulation(datadir, model_file, inhibitors):
     for id in DT_model:
         gene = model.genes.get_by_id(id)
         for rxn in gene.reactions:
-            if (fluxSolutionRatios.at[rxn.id, id] == 0) | (abs(fluxSolutionDiffs.at[rxn.id, id]) > 1e-7):
+            if fluxSolutionRatios.at[rxn.id, id] == 0:
                 HasEffects_Gene.append(id)
                 break
+            if np.isnan(fluxSolutionRatios.at[rxn.id, id]):
+                gene_reaction_rule = rxn.gene_reaction_rule
+                gene_ids = re.findall(r'\d+',gene_reaction_rule)
+                for gene_id in gene_ids:
+                    if gene_id == id:
+                        boolval = ' False '
+                    else:
+                        boolval = ' {} '.format(model.genes.get_by_id(gene_id)._functional)
+                    gene_reaction_rule = gene_reaction_rule.replace(' {} '.format(gene_id), boolval)
+                if ~eval(gene_reaction_rule):
+                    HasEffects_Gene.append(id)
+                    break
     # HasEffects_Gene
     return model, geneInd2genes, HasEffects_Gene, fluxsolution, fluxSolutionRatios, fluxSolutionDiffs
 
@@ -123,7 +136,7 @@ def score_gene_pairs(Gene_Pairs, filename):
         # print(total_aff)
         n_aff_down = data_p.loc[abs(data_p['rxn_fluxRatio']) < 0.99, 'Gene IDs'].unique().size
         # print(n_aff_down)
-        n_aff_up = data_p.loc[abs(data_p['rxn_fluxRatio']) > 1.0, 'Gene IDs'].unique().size
+        n_aff_up = data_p.loc[abs(data_p['rxn_fluxRatio']) > 1.0+1e-6, 'Gene IDs'].unique().size
         # print(n_aff_up)
         d_s = ((n_aff_down - n_aff_up) / total_aff)
         # print(d_s)
@@ -183,8 +196,11 @@ def main(argv):
     # d_score_down = score_gene_pairs_diff(Gene_Pairs_down, 'd_score_DOWN.csv')
     d_score_up = score_gene_pairs(Gene_Pairs_up, 'd_score_UP.csv')
     # d_score_up = score_gene_pairs_diff(Gene_Pairs_up, 'd_score_UP.csv')
+    PES = (d_score_up - d_score_down).sort_values(by='score', ascending=False)
+    PES.to_csv(os.path.join(datadir,'d_score.csv'))
     print(d_score_down)
     print(d_score_up)
+    print(PES)
 
 
 if __name__ == "__main__":
