@@ -61,10 +61,6 @@ def knock_out_simulation(datadir, model_file, inhibitors):
     for id in DT_model:
         gene = model.genes.get_by_id(id)
         for rxn in gene.reactions:
-            # if fluxSolutionRatios.at[rxn.id, id] == 0:
-            #     HasEffects_Gene.append(id)
-            #     break
-            # if np.isnan(fluxSolutionRatios.at[rxn.id, id]):
             gene_reaction_rule = rxn.gene_reaction_rule
             gene_ids = re.findall(r'\d+',gene_reaction_rule)
             for gene_id in gene_ids:
@@ -136,7 +132,7 @@ def score_gene_pairs(Gene_Pairs, filename):
         # print(total_aff)
         n_aff_down = data_p.loc[abs(data_p['rxn_fluxRatio']) < 0.99, 'Gene IDs'].unique().size
         # print(n_aff_down)
-        n_aff_up = data_p.loc[abs(data_p['rxn_fluxRatio']) > 1.0+1e-6, 'Gene IDs'].unique().size
+        n_aff_up = data_p.loc[abs(data_p['rxn_fluxRatio']) > 1.0, 'Gene IDs'].unique().size
         # print(n_aff_up)
         d_s = ((n_aff_down - n_aff_up) / total_aff)
         # print(d_s)
