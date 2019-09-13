@@ -69,11 +69,11 @@ def knock_out_simulation(datadir, model_file, inhibitors):
             gene_ids = re.findall(r'\d+',gene_reaction_rule)
             for gene_id in gene_ids:
                 if gene_id == id:
-                    boolval = ' False '
+                    boolval = 'False'
                 else:
-                    boolval = ' {} '.format(model.genes.get_by_id(gene_id)._functional)
-                gene_reaction_rule = gene_reaction_rule.replace(' {} '.format(gene_id), boolval)
-            if ~eval(gene_reaction_rule):
+                    boolval = '{}'.format(model.genes.get_by_id(gene_id)._functional)
+                gene_reaction_rule = gene_reaction_rule.replace('{}'.format(gene_id), boolval, 1)
+            if not eval(gene_reaction_rule):
                 HasEffects_Gene.append(id)
                 break
     # HasEffects_Gene
