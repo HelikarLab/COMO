@@ -1,4 +1,3 @@
-
 d_score=NULL;
 
 p_model_genes=unique(data_out2[,1])
@@ -21,6 +20,7 @@ for (i in 1:length(p_model_genes))
 write.table(d_score, "d_score_UP.txt")
 
 ##################### if above dont run ##################
+
 d_score=NULL;
 
 p_model_genes=unique(data_out2[,1])
@@ -48,5 +48,3 @@ for (i in 1:length(p_model_genes))
 }
 
 write.table(d_score, "d_score_UP.txt")
-
-
