@@ -61,21 +61,21 @@ def knock_out_simulation(datadir, model_file, inhibitors):
     for id in DT_model:
         gene = model.genes.get_by_id(id)
         for rxn in gene.reactions:
-            if fluxSolutionRatios.at[rxn.id, id] == 0:
+            # if fluxSolutionRatios.at[rxn.id, id] == 0:
+            #     HasEffects_Gene.append(id)
+            #     break
+            # if np.isnan(fluxSolutionRatios.at[rxn.id, id]):
+            gene_reaction_rule = rxn.gene_reaction_rule
+            gene_ids = re.findall(r'\d+',gene_reaction_rule)
+            for gene_id in gene_ids:
+                if gene_id == id:
+                    boolval = ' False '
+                else:
+                    boolval = ' {} '.format(model.genes.get_by_id(gene_id)._functional)
+                gene_reaction_rule = gene_reaction_rule.replace(' {} '.format(gene_id), boolval)
+            if ~eval(gene_reaction_rule):
                 HasEffects_Gene.append(id)
                 break
-            if np.isnan(fluxSolutionRatios.at[rxn.id, id]):
-                gene_reaction_rule = rxn.gene_reaction_rule
-                gene_ids = re.findall(r'\d+',gene_reaction_rule)
-                for gene_id in gene_ids:
-                    if gene_id == id:
-                        boolval = ' False '
-                    else:
-                        boolval = ' {} '.format(model.genes.get_by_id(gene_id)._functional)
-                    gene_reaction_rule = gene_reaction_rule.replace(' {} '.format(gene_id), boolval)
-                if ~eval(gene_reaction_rule):
-                    HasEffects_Gene.append(id)
-                    break
     # HasEffects_Gene
     return model, geneInd2genes, HasEffects_Gene, fluxsolution, fluxSolutionRatios, fluxSolutionDiffs
 
