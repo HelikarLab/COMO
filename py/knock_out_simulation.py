@@ -38,25 +38,6 @@ def knock_out_simulation(datadir, model_file, inhibitors):
     model_opt = model.optimize().to_frame()
     model_opt[abs(model_opt) < 1e-8] = 0.0
 
-    fluxsolution = pd.DataFrame()
-    for id in DT_model:
-        model_cp = copy.deepcopy(model)
-        gene = model_cp.genes.get_by_id(id)
-        buff = gene._functional
-        gene.knock_out()
-        opt_model = model_cp.optimize().to_frame()
-        gene._functional = buff
-        fluxsolution[id]=opt_model['fluxes']
-        del model_cp
-
-    # fluxsolution
-    fluxsolution[abs(fluxsolution) < 1e-8] = 0.0
-
-    fluxSolutionRatios = fluxsolution.div(model_opt['fluxes'], axis=0)
-    # fluxSolutionRatios
-    fluxSolutionDiffs = fluxsolution.sub(model_opt['fluxes'], axis=0)
-    # fluxSolutionDiffs
-
     HasEffects_Gene = []
     for id in DT_model:
         gene = model.genes.get_by_id(id)
@@ -72,6 +53,24 @@ def knock_out_simulation(datadir, model_file, inhibitors):
             if not eval(gene_reaction_rule):
                 HasEffects_Gene.append(id)
                 break
+
+    fluxsolution = pd.DataFrame()
+    for id in HasEffects_Gene:
+        model_cp = copy.deepcopy(model)
+        gene = model_cp.genes.get_by_id(id)
+        gene.knock_out()
+        opt_model = model_cp.optimize().to_frame()
+        fluxsolution[id]=opt_model['fluxes']
+        del model_cp
+
+    # fluxsolution
+    fluxsolution[abs(fluxsolution) < 1e-8] = 0.0
+
+    fluxSolutionRatios = fluxsolution.div(model_opt['fluxes'], axis=0)
+    # fluxSolutionRatios
+    fluxSolutionDiffs = fluxsolution.sub(model_opt['fluxes'], axis=0)
+    # fluxSolutionDiffs
+
     # HasEffects_Gene
     return model, geneInd2genes, HasEffects_Gene, fluxsolution, fluxSolutionRatios, fluxSolutionDiffs
 
@@ -112,7 +111,7 @@ def create_gene_pairs(datadir, model, geneInd2genes, fluxsolution, fluxSolutionR
         rxn_fluxDiffs = DAG_rxn_fluxDiffs[id].copy()
         rxn_fluxValue = DAG_rxn_fluxValue[id].copy()
         pegene['Gene'] = id
-        pegene = pegene.loc[(~pegene['rxn_fluxRatio'].isna()) & (abs(rxn_fluxDiffs) + abs(rxn_fluxValue) > 1e-10)]
+        pegene = pegene.loc[(~pegene['rxn_fluxRatio'].isna()) & (abs(rxn_fluxDiffs) + abs(rxn_fluxValue) > 1e-6)]
         # pegene.dropna(axis=0,subset=['rxn_fluxRatio'],inplace=True)
         pegene.index.name='reaction'
         pegene.reset_index(drop=False, inplace=True)
@@ -164,6 +163,14 @@ def score_gene_pairs_diff(Gene_Pairs, filename):
     return d_score
 
 
+def load_Inhi_Fratio(filepath):
+    temp2  =pd.read_csv(filepath)
+    temp2.rename(columns={'gene_mat_out1':'Gene','gene_mat_out2':'Gene IDs','gene_mat_out3':'rxn_fluxRatio'},inplace=True)
+    temp2.Gene = temp2.Gene.astype(str)
+    temp2['Gene IDs'] = temp2['Gene IDs'].astype(str)
+    return temp2
+
+
 def main(argv):
     print(configs.rootdir)
     datadir = os.path.join(configs.rootdir,'data')
@@ -185,9 +192,11 @@ def main(argv):
                                    HasEffects_Gene,
                                    RA_Down='RA_UP.txt')
     Gene_Pairs_up.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_UP.txt'),index=False)
-    print(geneInd2genes)
-    print(fluxSolutionRatios)
-    print(HasEffects_Gene)
+    # print(geneInd2genes)
+    # print(fluxSolutionRatios)
+    # print(HasEffects_Gene)
+    # Gene_Pairs_down = load_Inhi_Fratio(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_DOWN.txt'))
+    # Gene_Pairs_up = load_Inhi_Fratio(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_UP.txt'))
     d_score_down = score_gene_pairs(Gene_Pairs_down, 'd_score_DOWN.csv')
     # d_score_down = score_gene_pairs_diff(Gene_Pairs_down, 'd_score_DOWN.csv')
     d_score_up = score_gene_pairs(Gene_Pairs_up, 'd_score_UP.csv')
