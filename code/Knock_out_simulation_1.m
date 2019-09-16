@@ -2,13 +2,14 @@
 % Create the model
 % data =tdfread('input_COBRA_list.txt')
 % test_tissue_model = createTissueSpecificModel(model,data)
+model = load('../data/Th1_Cell_SpecificModel4manuscript.mat');
 
 %import known dt genes (Entrez)
 %DT=tdfread('Targets_for_inhibitorsEntrez.txt')
 %DT_genes=num2str(DT.Target_ofInhibitos_ENTREZ)
 %DT_genes=cellstr(DT_genes)
 
-fid = fopen('Th1_inhibitors_Entrez.txt'); % change filename
+fid = fopen('../data/Th1_inhibitors_Entrez.txt'); % change filename
 DT_genes = textscan(fid,'%s','Delimiter','\n');
 DT_genes = DT_genes{1,1};
 DT_model=intersect(model.genes,DT_genes);
@@ -21,19 +22,19 @@ geneInd2genes=model.genes(geneInd);
 %gtoKD=intersect(DT_model,geneInd2genes)
 
 % simulate WT and gene deletion by perturbing DT_model
-WT_sol=optimizeCbModel(model)
-WT_sol=WT_sol.x
-[grRatio,grRateKO,grRateWT,hasEffect,delRxns] = singleGeneDeletion(model,'MOMA',DT_model)
-hasEffect_DT=find(hasEffect==1)
-hasEffect_DTgenes=DT_model(hasEffect_DT)
-[grRatio,grRateKO,grRateWT,hasEffect,delRxns,fluxSolution] = singleGeneDeletion(model,'MOMA',hasEffect_DTgenes)
+WT_sol=optimizeCbModel(model);
+WT_sol=WT_sol.x;
+[grRatio,grRateKO,grRateWT,hasEffect,delRxns] = singleGeneDeletion(model,'MOMA',DT_model);
+hasEffect_DT=find(hasEffect==1);
+hasEffect_DTgenes=DT_model(hasEffect_DT);
+[grRatio,grRateKO,grRateWT,hasEffect,delRxns,fluxSolution] = singleGeneDeletion(model,'MOMA',hasEffect_DTgenes);
 
 % flux ratio matrix 
 
 fluxSolutionRatios=[];
 for i= 1:size(fluxSolution,2)
 	FSratios=fluxSolution(:,i)./WT_sol;
-	fluxSolutionRatios(:,i)=FSratios
+	fluxSolutionRatios(:,i)=FSratios;
 end
 
 % Read files of up- and down-regulated genes from DAG_genes.txt
@@ -44,29 +45,29 @@ end
 %%%DAG_dis_genes=strtrim(DAG_dis_genes)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-fid = fopen('RA_DOWN.txt'); % change filename, run this for both up and down regulated genes
+fid = fopen('../data/RA_DOWN.txt'); % change filename, run this for both up and down regulated genes
 DAG_dis_genes = textscan(fid,'%s','Delimiter','\n');
 DAG_dis_genes = DAG_dis_genes{1,1};
 
 % intersect with geneInd2gene to obtain DAG genes within the model
-DAG_dis_met_genes=intersect(DAG_dis_genes,geneInd2genes)
+DAG_dis_met_genes=intersect(DAG_dis_genes,geneInd2genes);
 
 % Obtain reactions associated with DAG_dis_met_genes
 % first obtain indices from geneIndtogenes
-DAG_dis_met_genesInd=find(ismember(geneInd2genes,DAG_dis_met_genes))
-DAG_dis_met_rxnInd = rxnInd(DAG_dis_met_genesInd)
+DAG_dis_met_genesInd=find(ismember(geneInd2genes,DAG_dis_met_genes));
+DAG_dis_met_rxnInd = rxnInd(DAG_dis_met_genesInd);
 
 % obtain DAG reactions flux ratios
-DAG_rxn_fluxRatio = fluxSolutionRatios(DAG_dis_met_rxnInd,:)
+DAG_rxn_fluxRatio = fluxSolutionRatios(DAG_dis_met_rxnInd,:);
 
 %
-combined_output={geneInd2genes(DAG_dis_met_genesInd), DAG_dis_met_rxnInd, DAG_rxn_fluxRatio}
+combined_output={geneInd2genes(DAG_dis_met_genesInd), DAG_dis_met_rxnInd, DAG_rxn_fluxRatio};
 
 % create network of genes based on the change 
 
 gene_mat_out=[];
 for i = 1:length(hasEffect_DTgenes)
-	FR_i=DAG_rxn_fluxRatio(:,i)
+	FR_i=DAG_rxn_fluxRatio(:,i);
 	naN_ind= find(isnan(DAG_rxn_fluxRatio(:,i)));
 	FR_i([naN_ind])=[];
 	Gene_i=combined_output{1};
@@ -81,7 +82,7 @@ for i = 1:length(hasEffect_DTgenes)
 end
 % Change_file_name here
 T = cell2table(gene_mat_out);
-writetable(T,'Gene_Pairs_Inhi_Fratio_DOWN.txt');
+writetable(T,'../data/Gene_Pairs_Inhi_Fratio_DOWN.txt');
 
 
 % get Flux distribution for Rxns of genes associated with Up-regulated genes- score ((total number of flux down/total numebr of fluxes)-total number of upregulated fluxes/total number of fluxes)
