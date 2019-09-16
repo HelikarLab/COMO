@@ -8,7 +8,7 @@ import numpy as np
 import cobra
 import copy
 from cobra.flux_analysis import (single_gene_deletion, single_reaction_deletion,
-                                 double_gene_deletion, double_reaction_deletion)
+                                 double_gene_deletion, double_reaction_deletion, moma)
 from project import configs
 # from transcriptomic_gen import *
 # from proteomics_gen import *
@@ -35,7 +35,8 @@ def knock_out_simulation(datadir, model_file, inhibitors):
     print(len(DT_model))
     DT_model = list(DT_model)
 
-    model_opt = model.optimize().to_frame()
+    model_opt = moma(model).to_frame()
+    # model_opt = model.optimize().to_frame()
     model_opt[abs(model_opt) < 1e-8] = 0.0
 
     HasEffects_Gene = []
@@ -59,7 +60,8 @@ def knock_out_simulation(datadir, model_file, inhibitors):
         model_cp = copy.deepcopy(model)
         gene = model_cp.genes.get_by_id(id)
         gene.knock_out()
-        opt_model = model_cp.optimize().to_frame()
+        opt_model = moma(model_cp).to_frame()
+        # opt_model = model_cp.optimize().to_frame() #FBA
         fluxsolution[id]=opt_model['fluxes']
         del model_cp
 
