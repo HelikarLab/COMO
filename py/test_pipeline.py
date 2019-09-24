@@ -10,7 +10,7 @@ projectdir = '/'.join(dirlist[0:-1])
 
 gse2770 = GSEproject('GSE2770',projectdir)
 
-platforms = ['GPL96','GPL97','GPL8300']
+platforms = ['GPL96','GPL97','GPL8300','GPL570','GPL4685']
 # maps_dict = download_gsm_id_maps(gse2770.datadir,gse2770.gse,platforms)
 
 
