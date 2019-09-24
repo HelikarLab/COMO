@@ -2,7 +2,8 @@
 % Create the model
 % data =tdfread('input_COBRA_list.txt')
 % test_tissue_model = createTissueSpecificModel(model,data)
-model = load('../data/Th1_Cell_SpecificModel4manuscript.mat');
+load('../data/Th1_Cell_SpecificModel4manuscript.mat');
+model = Th1_Cell_SpecificModel;
 
 %import known dt genes (Entrez)
 %DT=tdfread('Targets_for_inhibitorsEntrez.txt')
@@ -22,7 +23,8 @@ geneInd2genes=model.genes(geneInd);
 %gtoKD=intersect(DT_model,geneInd2genes)
 
 % simulate WT and gene deletion by perturbing DT_model
-WT_sol=optimizeCbModel(model);
+%WT_sol=optimizeCbModel(model);
+[Del_sol, WT_sol, totalFluxDiff, solStatus]=MOMA(model,model);
 WT_sol=WT_sol.x;
 [grRatio,grRateKO,grRateWT,hasEffect,delRxns] = singleGeneDeletion(model,'MOMA',DT_model);
 hasEffect_DT=find(hasEffect==1);
