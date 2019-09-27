@@ -43,6 +43,8 @@ RMAC Data
 * limma [R package](http://bioconductor.org/packages/release/bioc/html/limma.html), [AgiMicroRNA](https://bioconductor.org/packages/release/bioc/html/AgiMicroRna.html), [Analyzing Agilent MicroArray Data in R](https://support.bioconductor.org/p/96655/)
 * Bioconductor Tutorials: [Courses and Materials](http://master.bioconductor.org/help/course-materials/),
 * Python Package: [Bioservices](https://bioservices.readthedocs.io/en/master/)
+* SQLite: [database browser](https://sqlitebrowser.org/dl/)
+* Matlab Runtime, [Create Python Packages from Matlab code](https://www.mathworks.com/help/compiler_sdk/gs/create-a-python-application-with-matlab-code.html)
 
 
 ## Repository Structure
