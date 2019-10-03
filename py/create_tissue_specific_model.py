@@ -122,7 +122,7 @@ def mapExpressionToRxn(model_cobra, GeneExpressionFile):
     # GeneExpressions
 
     expressionRxns = collections.OrderedDict()
-    expVector = []
+    # expVector = []
     cnt = 0
     for rxn in model_cobra.reactions:
         gene_reaction_rule = rxn.gene_reaction_rule
@@ -139,12 +139,12 @@ def mapExpressionToRxn(model_cobra, GeneExpressionFile):
         try:
             gene_reaction_by_rule = gene_rule_float(gene_reaction_rule)
             expressionRxns[rxn.id] = eval(gene_reaction_by_rule)
-            expVector.append(expressionRxns[rxn.id])
+            # expVector.append(expressionRxns[rxn.id])
         except:
             print(gene_reaction_by_rule)
             cnt += 1
-    print(cnt)
-    expVector = np.array(expVector, dtype=np.float)
+    print('Map gene expression to reactions, {} errors.'.format(cnt))
+    expVector = np.array(list(expressionRxns.values()),dtype=np.float)
     return expressionRxns, expVector
 
 
@@ -164,6 +164,8 @@ def main(argv):
     GeneExpressionFile = os.path.join(configs.datadir, 'merged_Th1.csv')
     TissueModel = createTissueSpecificModel(GeneralModelFile, GeneExpressionFile)
     print(TissueModel)
+    cobra.io.mat.save_matlab_model(TissueModel, os.path.join(configs.datadir,'Th1_SpecificModel.mat'))
+    cobra.io.sbml.write_cobra_model_to_sbml_file(TissueModel, os.path.join(configs.datadir,'Th1_SpecificModel.xml'))
 
 if __name__ == "__main__":
    main(sys.argv[1:])
