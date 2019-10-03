@@ -1,0 +1,22 @@
+SampleNumber	FileName	Condition
+1	GSM1066005.txt.gz	control
+2	GSM1066006.txt.gz	control
+3	GSM1066007.txt.gz	control
+4	GSM1066008.txt.gz	control
+5	GSM1066009.txt.gz	control
+6	GSM1066010.txt.gz	control
+7	GSM1066011.txt.gz	control
+8	GSM1066012.txt.gz	control
+9	GSM1066013.txt.gz	control
+10	GSM1066014.txt.gz	control
+11	GSM1066015.txt.gz	patient
+12	GSM1066016.txt.gz	patient
+13	GSM1066017.txt.gz	patient
+14	GSM1066018.txt.gz	patient
+15	GSM1066019.txt.gz	patient
+16	GSM1066020.txt.gz	patient
+17	GSM1066021.txt.gz	patient
+18	GSM1066022.txt.gz	patient
+19	GSM1066023.txt.gz	patient
+20	GSM1066024.txt.gz	patient
+
