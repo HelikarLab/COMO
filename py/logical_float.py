@@ -1,4 +1,5 @@
-import sys;
+#!/usr/bin/python3
+import sys
 # sys.path.extend(['E:\\reconstruction', 'E:\\cobamp', 'E:\\reconstruction\\src', 'E:\\cobamp\\src', 'E:/reconstruction'])
 import cobra
 import framed
