@@ -1,0 +1,18 @@
+setwd("/home/robert/Desktop/AutoImmuneDisease/GSE21942/GSE21942_RAW/")
+library(limma)
+library(affy)
+targets = readTargets("targets.txt")
+mydata = ReadAffy()
+eset = rma(mydata)
+f <- factor(targets$Condition, levels = unique(targets$Condition))
+design <- model.matrix(~0 + f)
+colnames(design) <- levels(f)
+fit = lmFit(eset,design)
+design
+f
+contrast.matrix = makeContrasts("MS-Control",levels = design)
+fit2 = contrasts.fit(fit,contrast.matrix)
+fit2= eBayes(fit2)
+data = topTable(fit2,number = "inf")
+write.table(data,"differentialExpression.txt",sep = "\t")
+save.image("~/Desktop/AutoImmuneDisease/GSE21942/GSE21942_RAW/DifferentialExpressionWorkspace.RData")
