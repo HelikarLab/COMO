@@ -6,7 +6,7 @@ import cobamp
 import pandas as pd
 import numpy as np
 import pickle
-import scipy as sci
+import scipy
 import os
 import re
 
@@ -22,7 +22,6 @@ from troppo.utilities.statistics import normalize, z_score
 
 from project import configs
 
-testexp = '(( 2977 ) and ( 2983 )) or 4882 or (( 2982 ) and ( 2974 )) or 2986 or 2984 or 4881 or (( 2977 ) and ( 2974 )) or 3000 or (( 2982 ) and ( 2983 ))'
 
 def float_logical_exp(expressionIn, level=0):
     try:
@@ -62,7 +61,7 @@ generalmodelmat = os.path.join(configs.datadir,'GeneralModel.mat')
 
 model_cobra = cobra.io.load_matlab_model(generalmodelmat)
 
-mat = sci.io.loadmat(generalmodelmat)['Teff']
+mat = scipy.io.loadmat(generalmodelmat)['Teff']
 model = MatFormatReader(mat)
 S = model.S
 lb, ub = model.get_model_bounds(False, True)
@@ -93,18 +92,18 @@ print(model_GIMME_final.objective._get_expression())
 print(model_GIMME_final.optimize())
 
 
-csvfilepath = os.path.join(configs.datadir,'merged_Th1.csv')
+csvfilepath = os.path.join(configs.datadir, 'merged_Th1.csv')
 expressionData = pd.read_csv(csvfilepath)
-expressionData.rename(columns={'ENTREZ_GENE_ID':'Gene','Express':'Data'},inplace=True)
-expressionData = expressionData.loc[:,['Gene','Data']]
+expressionData.rename(columns={'ENTREZ_GENE_ID': 'Gene', 'Express': 'Data'},inplace=True)
+expressionData = expressionData.loc[:, ['Gene', 'Data']]
 singleGeneNames = expressionData[~expressionData.Gene.str.contains('//')].reset_index(drop=True)
 multipleGeneNames = expressionData[expressionData.Gene.str.contains('//')].reset_index(drop=True)
-breaksGeneNames = pd.DataFrame(columns=['Gene','Data'])
+breaksGeneNames = pd.DataFrame(columns=['Gene', 'Data'])
 print(singleGeneNames.shape)
 print(multipleGeneNames.shape)
 for index,row in multipleGeneNames.iterrows():
     for genename in row['Gene'].split('///'):
-        breaksGeneNames = breaksGeneNames.append({'Gene':genename,'Data':row['Data']},ignore_index=True)
+        breaksGeneNames = breaksGeneNames.append({'Gene': genename, 'Data': row['Data']},ignore_index=True)
 print(breaksGeneNames.shape)
 GeneExpressions = singleGeneNames.append(breaksGeneNames,ignore_index=True)
 print(GeneExpressions.shape)
@@ -136,6 +135,7 @@ for rxn in model_cobra.reactions:
 print(cnt)
 
 
+# testexp = '(( 2977 ) and ( 2983 )) or 4882 or (( 2982 ) and ( 2974 )) or 2986 or 2984 or 4881 or (( 2977 ) and ( 2974 )) or 3000 or (( 2982 ) and ( 2983 ))'
 
 # if not (testexp[0] == '(' and testexp[-1] == ')'):
 #     testexp = '('+testexp+')'
@@ -144,3 +144,10 @@ print(cnt)
 # outexp = outexp.replace('{','(')
 # outexp = outexp.replace('}',')')
 # print(eval(outexp))
+
+def main(argv):
+    print(configs.rootdir)
+
+
+if __name__ == "__main__":
+   main(sys.argv[1:])
