@@ -28,8 +28,30 @@ readaffydir <- function(addr){
     y <- y[,sort(names(y))]
     return(y)
 }
+
+fitaffydir <- function(addr, target){
+    crd <- getwd()
+    setwd(addr)
+    library(limma)
+    library(affy)
+    targets = readTargets(target)
+    mydata = ReadAffy()
+    setwd(crd)
+    eset = rma(mydata)
+    f <- factor(targets$Condition, levels = unique(targets$Condition))
+    design <- model.matrix(~0 + f)
+    colnames(design) <- levels(f)
+    fit = lmFit(eset,design)
+    contrast.matrix = makeContrasts("patient-control",levels = design)
+    fit2 = contrasts.fit(fit,contrast.matrix)
+    fit2= eBayes(fit2)
+    data = topTable(fit2,number = "inf")
+    # write.table(data,"differentialExpression.txt",sep = "\t")
+    return(data)
+}
 """
 affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
+
 
 agilentstring="""
 readaiglent <- function(addr,targets){
