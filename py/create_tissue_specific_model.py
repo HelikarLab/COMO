@@ -94,11 +94,6 @@ def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile):
 
     print('1\'s: ' + str(len(np.where(model_GIMME==1)[0])))
     print('2\'s: ' + str(len(np.where(model_GIMME==2)[0])))
-    print('Genes: ' + str(len(model_GIMME_final.genes)))
-    print('Metabolites: ' + str(len(model_GIMME_final.metabolites)))
-    print('Reactions: ' + str(len(model_GIMME_final.reactions)))
-    print(model_GIMME_final.objective._get_expression())
-    print(model_GIMME_final.optimize())
 
     return model_GIMME_final
 
@@ -165,7 +160,12 @@ def main(argv):
     TissueModel = createTissueSpecificModel(GeneralModelFile, GeneExpressionFile)
     print(TissueModel)
     cobra.io.mat.save_matlab_model(TissueModel, os.path.join(configs.datadir,'Th1_SpecificModel.mat'))
-    cobra.io.sbml.write_cobra_model_to_sbml_file(TissueModel, os.path.join(configs.datadir,'Th1_SpecificModel.xml'))
+    # cobra.io.sbml.write_cobra_model_to_sbml_file(TissueModel, os.path.join(configs.datadir,'Th1_SpecificModel.xml'))
+    print('Genes: ' + str(len(TissueModel.genes)))
+    print('Metabolites: ' + str(len(TissueModel.metabolites)))
+    print('Reactions: ' + str(len(TissueModel.reactions)))
+    print(TissueModel.objective._get_expression())
+    print(TissueModel.optimize())
 
 if __name__ == "__main__":
    main(sys.argv[1:])
