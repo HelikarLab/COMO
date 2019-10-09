@@ -173,6 +173,42 @@ def load_Inhi_Fratio(filepath):
     return temp2
 
 
+def repurposing_hub_preproc(drugFile):
+    drugDB = pd.read_csv(drugFile, sep='\t')
+    drugDB_new = pd.DataFrame()
+    for index, row in drugDB.iterrows():
+        if pd.isnull(row['Target']):
+            continue
+        for target in row['Target'].split(','):
+            drugDB_new = drugDB_new.append(
+                {'Name': row['Name'], 'MOA': row['MOA'], 'Target': target.strip(), 'Phase': row['Phase']},
+                ignore_index=True)
+    entrez_IDs = fetch_entrez_gene_id(drugDB_new['Target'].tolist(), input_db='Gene Symbol')
+    entrez_IDs.reset_index(drop=False, inplace=True)
+    drugDB_new['ENTREZ_GENE_ID'] = entrez_IDs['Gene ID']
+    drugDB_new = drugDB_new[['Name', 'MOA', 'Target', 'ENTREZ_GENE_ID', 'Phase']]
+    return drugDB_new
+
+
+def drug_repurposing(drugDB, d_score):
+    d_score['Gene'] = d_score['Gene'].astype(str)
+    d_score_geneSym = fetch_entrez_gene_id(d_score['Gene'].tolist(), input_db='Gene ID', output_db=['Gene Symbol'])
+    d_score.set_index('Gene', inplace=True)
+    d_score['Gene Symbol'] = d_score_geneSym['Gene Symbol']
+    d_score.reset_index(drop=False, inplace=True)
+    d_score_new = pd.DataFrame()
+    for index, row in d_score.iterrows():
+        target = row['Gene Symbol']
+        # print(target)
+        drugs = drugDB.loc[drugDB['Target'] == target, :]
+        # print(drugs)
+        drugs['d score'] = row['score']
+        d_score_new = d_score_new.append(drugs, ignore_index=True)
+
+    d_score_new.drop_duplicates(inplace=True)
+
+    return d_score_new
+
 def main(argv):
     print(configs.rootdir)
     datadir = os.path.join(configs.rootdir,'data')
@@ -208,6 +244,18 @@ def main(argv):
     print(d_score_down)
     print(d_score_up)
     print(PES)
+
+    # last step: output drugs based on d score
+    drugRawFile = os.path.join(configs.datadir, 'Repurposing_Hub_export.txt')
+    drugFile = os.path.join(configs.datadir, 'Repurposing_Hub_Preproc.csv')
+    if not os.path.isfile(drugFile):
+        drugDB = repurposing_hub_preproc(drugRawFile)
+        drugDB.to_csv(drugFile, index=False)
+    else:
+        drugDB = pd.read_csv(drugFile)
+    drug_score = drug_repurposing(drugDB, PES)
+    drugScoreFile = os.path.join(configs.datadir,'drug_score.csv')
+    drug_score.to_csv(drugScoreFile, index=False)
 
 
 if __name__ == "__main__":
