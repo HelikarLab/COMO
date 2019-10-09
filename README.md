@@ -36,15 +36,16 @@ RMAC Data
 * [biopython](https://biopython.org/wiki/Packages)
 * Python: [GEOparse](https://geoparse.readthedocs.io/) [PDF](./doc/geoparse.pdf), R: [GEOquery](https://bioconductor.org/packages/release/bioc/html/GEOquery.html)
 * [R Tutorial](https://www.cyclismo.org/tutorial/R/index.html)
-* Python RESTful [Tutorial 1](https://kite.com/blog/python/flask-sqlalchemy-tutorial/), [Tutorial 2: API](https://kite.com/blog/python/flask-restful-api-tutorial/), [Tutorial Index](https://realpython.com/tutorials/api/), [Book: RESTful Web Services](http://restfulwebapis.org/RESTful_Web_Services/)
+* Python RESTful [Tutorial 1](https://kite.com/blog/python/flask-sqlalchemy-tutorial/), [Tutorial 2: API](https://kite.com/blog/python/flask-restful-api-tutorial/), [Tutorial Index](https://realpython.com/tutorials/api/), [Book: RESTful Web Services](http://restfulwebapis.org/RESTful_Web_Services/), [CURL in Python](https://curl.trillworks.com/#python)
 * Docker: [Common components](https://www.digitalocean.com/community/tutorials/the-docker-ecosystem-an-introduction-to-common-components), [Containerization](https://www.digitalocean.com/community/tutorials/the-docker-ecosystem-an-overview-of-containerization), [Official Tutorials](https://docs.docker.com/get-started/)
 * Google Cloud Platform, Bigquery [Public Datasets](https://www.reddit.com/r/bigquery/wiki/datasets)
-* Biomart: ENTREZ ID search, [mygene](https://mygene.info/)
+* Biomart: ENTREZ ID search, [mygene](https://mygene.info/), [BioDBNet](https://biodbnet-abcc.ncifcrf.gov/db/db2db.php)
 * limma [R package](http://bioconductor.org/packages/release/bioc/html/limma.html), [AgiMicroRNA](https://bioconductor.org/packages/release/bioc/html/AgiMicroRna.html), [Analyzing Agilent MicroArray Data in R](https://support.bioconductor.org/p/96655/)
 * Bioconductor Tutorials: [Courses and Materials](http://master.bioconductor.org/help/course-materials/),
 * Python Package: [Bioservices](https://bioservices.readthedocs.io/en/master/)
 * SQLite: [database browser](https://sqlitebrowser.org/dl/)
 * Matlab Runtime, [Create Python Packages from Matlab code](https://www.mathworks.com/help/compiler_sdk/gs/create-a-python-application-with-matlab-code.html)
+* [Drug Repurposing Hub](https://clue.io/repurposing-app)
 
 
 ## Repository Structure
