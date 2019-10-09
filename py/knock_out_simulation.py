@@ -12,6 +12,7 @@ from cobra.flux_analysis import (single_gene_deletion, single_reaction_deletion,
 from project import configs
 # from transcriptomic_gen import *
 # from proteomics_gen import *
+from instruments import fetch_entrez_gene_id
 
 def knock_out_simulation(datadir, model_file, inhibitors):
 
@@ -244,6 +245,8 @@ def main(argv):
     print(d_score_down)
     print(d_score_up)
     print(PES)
+    PES.reset_index(drop=False, inplace=True)
+    # PES = pd.read_csv(os.path.join(datadir,'d_score.csv'))
 
     # last step: output drugs based on d score
     drugRawFile = os.path.join(configs.datadir, 'Repurposing_Hub_export.txt')
