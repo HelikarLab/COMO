@@ -250,9 +250,9 @@ def main(argv):
         elif opt in ("-r", "--drugfile"):
             drug_raw_file = arg
     datadir = os.path.join(configs.datadir, folder)
-    print('Output folder: "', datadir)
-    print('Tissue Specific Model file is "', tissue_Spec_Model_file)
-    print('Tissue Specific Inhibitors file is "', inhibitors_file)
+    print('Output folder: "{}"'.format(datadir))
+    print('Tissue Specific Model file is "{}"'.format(tissue_Spec_Model_file))
+    print('Tissue Specific Inhibitors file is "{}"'.format(inhibitors_file))
 
 
     # preprocess repurposing hub data
