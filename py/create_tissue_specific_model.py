@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import sys
+import getopt
 # sys.path.extend(['E:\\reconstruction', 'E:\\cobamp', 'E:\\reconstruction\\src', 'E:\\cobamp\\src', 'E:/reconstruction'])
 import cobra
 import framed
@@ -154,12 +155,33 @@ def mapExpressionToRxn(model_cobra, GeneExpressionFile):
 # print(eval(outexp))
 
 def main(argv):
-    print(configs.rootdir)
-    GeneralModelFile = os.path.join(configs.datadir,'GeneralModel.mat')
-    GeneExpressionFile = os.path.join(configs.datadir, 'merged_Th1.csv')
+    modelfile = 'GeneralModel.mat'
+    genefile = 'merged_Th1.csv'
+    outputfile = 'Th1_SpecificModel.mat'
+    try:
+        opts, args = getopt.getopt(argv, "hm:g:o:", ["mfile=", "gfile=", "ofile="])
+    except getopt.GetoptError:
+        print('python3 create_tissue_specific_model.py -m <modelfile> -g <genefile> -o <outputfile>')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print('python3 create_tissue_specific_model.py -m <modelfile> -g <genefile> -o <outputfile>')
+            sys.exit()
+        elif opt in ("-m", "--mfile"):
+            modelfile = arg
+        elif opt in ("-g", "--gfile"):
+            genefile = arg
+        elif opt in ("-o", "--ofile"):
+            outputfile = arg
+    print('General Model file is "{}"'.format(modelfile))
+    print('Gene Expression file is "{}"'.format(genefile))
+    print('Output file is "{}"'.format(outputfile))
+    #print(configs.rootdir)
+    GeneralModelFile = os.path.join(configs.datadir, modelfile)
+    GeneExpressionFile = os.path.join(configs.datadir, genefile)
     TissueModel = createTissueSpecificModel(GeneralModelFile, GeneExpressionFile)
     print(TissueModel)
-    cobra.io.mat.save_matlab_model(TissueModel, os.path.join(configs.datadir,'Th1_SpecificModel.mat'))
+    cobra.io.mat.save_matlab_model(TissueModel, os.path.join(configs.datadir, outputfile))
     # cobra.io.sbml.write_cobra_model_to_sbml_file(TissueModel, os.path.join(configs.datadir,'Th1_SpecificModel.xml'))
     print('Genes: ' + str(len(TissueModel.genes)))
     print('Metabolites: ' + str(len(TissueModel.metabolites)))

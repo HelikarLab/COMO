@@ -2,6 +2,7 @@
 import re
 import os
 import sys
+import getopt
 
 import pandas as pd
 import numpy as np
@@ -283,14 +284,31 @@ def load_transcriptomics_tests(filename):
     return transcriptomics_dict
 
 
-def main(args):
+def main(argv):
+    inputfile = 'GeneExpressionDataUsed.xlsx'
+    # outputfile = ''
+    try:
+        opts, args = getopt.getopt(argv, "hi:", ["ifile="])
+    except getopt.GetoptError:
+        print('python3 transcriptomic_gen.py -i <inputfile>')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print('transcriptomic_gen.py -i <inputfile>')
+            sys.exit()
+        elif opt in ("-i", "--ifile"):
+            inputfile = arg
+        # elif opt in ("-o", "--ofile"):
+        #     outputfile = arg
+    print('Input file is "', inputfile)
+    #print('Output file is "', outputfile)
     # input from user
-    filename = 'GeneExpressionDataUsed.xlsx'
+    # filename = 'GeneExpressionDataUsed.xlsx'
     # sheet_name = list(range(5)) # first 5 sheets
 
     # gse2770 = GSEproject('GSE2770',configs.rootdir)
 
-    inqueryFullPath = os.path.join(configs.rootdir, 'data', filename)
+    inqueryFullPath = os.path.join(configs.rootdir, 'data', inputfile)
     xl = pd.ExcelFile(inqueryFullPath)
     sheet_name = xl.sheet_names
     inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_name, header=0)
@@ -301,7 +319,7 @@ def main(args):
         df = inqueries[sheet].loc[:,['GSE ID','Samples','GPL ID','Instrument']]
         df_output = queryTest(df)
         filename = 'transcriptomics_{}.csv'.format(sheet)
-        fullsavepath = os.path.join(configs.rootdir,'data',filename)
+        fullsavepath = os.path.join(configs.rootdir, 'data', filename)
         df_output.to_csv(fullsavepath)
         print('Save to {}'.format(fullsavepath))
 

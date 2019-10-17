@@ -2,6 +2,7 @@
 
 import os
 import sys
+import getopt
 import time
 import pandas as pd
 import numpy as np
@@ -111,6 +112,22 @@ def load_proteomics_tests(Proteomics):
 def main(argv):
     datafilename = 'ni.3693-S5.xlsx'
     suppfilename = 'Supplementary Data 1.xlsx'
+    try:
+        opts, args = getopt.getopt(argv, "hd:s:", ["datafile=", "suppfile="])
+    except getopt.GetoptError:
+        print('python3 proteomics_gen.py -d <data file> -s <supplementary data file>')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print('python3 proteomics_gen.py -d <data file> -s <supplementary data file>')
+            sys.exit()
+        elif opt in ("-d", "--datafile"):
+            datafilename = arg
+        elif opt in ("-s", "--suppfile"):
+            suppfilename = arg
+    print('Data file is "{}"'.format(datafilename))
+    print('Supplementary Data file is "{}"'.format(suppfilename))
+
     proteomics_data = load_proteomics_data(datafilename)
     Proteomics = load_supplementary_data(suppfilename)
     sym2id = load_gene_symbol_map(gene_symbols=proteomics_data['Gene Symbol'].tolist(),
