@@ -2,6 +2,7 @@
 import os
 import re
 import sys
+import getopt
 import time
 import pandas as pd
 import numpy as np
@@ -14,7 +15,7 @@ from project import configs
 # from proteomics_gen import *
 from instruments import fetch_entrez_gene_id
 
-def knock_out_simulation(datadir, model_file, inhibitors):
+def knock_out_simulation(datadir, model_file, inhibitors, drugDB):
 
     if model_file[-4:] == '.xml':
         model = cobra.io.read_sbml_model(os.path.join(datadir, model_file))
@@ -24,9 +25,18 @@ def knock_out_simulation(datadir, model_file, inhibitors):
         print("Unsupported File Format of Model: {}".format(model_file))
         return None
 
-    DT_genes = pd.read_csv(os.path.join(datadir,inhibitors), header=None)
-    DT_genes.rename(columns={0:'Gene ID'},inplace=True)
-    DT_genes['Gene ID'] = DT_genes['Gene ID'].astype(str)
+    inhibitorsFullpath = os.path.join(datadir, inhibitors)
+    if os.path.isfile(inhibitorsFullpath):
+        DT_genes = pd.read_csv(os.path.join(datadir, inhibitors), header=None)
+        DT_genes.rename(columns={0:'Gene ID'},inplace=True)
+        DT_genes['Gene ID'] = DT_genes['Gene ID'].astype(str)
+    else:
+        # if inhibitors file does not exist, create a new one
+        DT_genes = pd.DataFrame(columns=['Gene ID'])
+        DT_genes['Gene ID'] = drugDB['ENTREZ_GENE_ID'].astype(str)
+        DT_genes.replace('-', np.nan, inplace=True)
+        DT_genes.dropna(axis=0,inplace=True)
+        DT_genes.to_csv(inhibitorsFullpath, header=False)
 
     geneInd2genes = [x.id for x in model.genes]
     print(len(geneInd2genes))
@@ -145,7 +155,7 @@ def score_gene_pairs(Gene_Pairs, filename):
     return d_score
 
 
-def score_gene_pairs_diff(Gene_Pairs, filename):
+def score_gene_pairs_diff(Gene_Pairs, fileFullPath):
     p_model_genes = Gene_Pairs.Gene.unique()
     d_score = pd.DataFrame([], columns=['score'])
     for p_gene in p_model_genes:
@@ -162,7 +172,7 @@ def score_gene_pairs_diff(Gene_Pairs, filename):
         d_score.at[p_gene, 'score'] = d_s
 
     d_score.index.name = 'Gene'
-    d_score.to_csv(os.path.join(configs.datadir, filename))
+    d_score.to_csv(fileFullPath)
     return d_score
 
 
@@ -210,35 +220,79 @@ def drug_repurposing(drugDB, d_score):
 
     return d_score_new
 
+
 def main(argv):
-    print(configs.rootdir)
-    datadir = os.path.join(configs.rootdir,'data')
-    print(datadir)
-    model, geneInd2genes, HasEffects_Gene, fluxsolution, fluxSolutionRatios, fluxSolutionDiffs = knock_out_simulation(datadir=datadir,
-                                      model_file='Th1_Cell_SpecificModel4manuscript.mat',
-                                      inhibitors='Th1_inhibitors_Entrez.txt')
-    Gene_Pairs_down = create_gene_pairs(datadir,
+    tissue_Spec_Model_file = 'Th1_Cell_SpecificModel4manuscript.mat'
+    inhibitors_file = 'Th2_inhibitors_Entrez.txt'
+    RA_Dn_file = 'RA_DOWN.txt'
+    RA_Up_file = 'RA_UP.txt'
+    drug_raw_file = 'Repurposing_Hub_export.txt'
+    folder = 'Th1'
+    try:
+        opts, args = getopt.getopt(argv, "ht:i:u:d:f:r:", ["tfile=", "ifile=", "upfile=", "downfile=", "folder=", "drugfile="])
+    except getopt.GetoptError:
+        print('python3 knock_out_simulation.py -t <tissue_model_file> -i <inhibitor_file> -u <up_reg_file> -d <down_reg_file> -f <output_folder> -r <repurpose drug raw file>')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print('python3 knock_out_simulation.py -t <tissue_model_file> -i <inhibitor_file> -u <up_reg_file> -d <down_reg_file> -f <output_folder> -r <repurpose drug raw file>')
+            sys.exit()
+        elif opt in ("-t", "--tfile"):
+            tissue_Spec_Model_file = arg
+        elif opt in ("-i", "--ifile"):
+            inhibitors_file = arg
+        elif opt in ("-u", "--upfile"):
+            RA_Up_file = arg
+        elif opt in ("-d", "--downfile"):
+            RA_Dn_file = arg
+        elif opt in ("-f", "--folder"):
+            folder = arg
+        elif opt in ("-r", "--drugfile"):
+            drug_raw_file = arg
+    datadir = os.path.join(configs.datadir, folder)
+    print('Output folder: "', datadir)
+    print('Tissue Specific Model file is "', tissue_Spec_Model_file)
+    print('Tissue Specific Inhibitors file is "', inhibitors_file)
+
+
+    # preprocess repurposing hub data
+    drug_csv_file = 'Repurposing_Hub_Preproc.csv'
+    drugRawFile = os.path.join(configs.datadir, drug_raw_file)
+    drugFile = os.path.join(configs.datadir, drug_csv_file)
+    if not os.path.isfile(drugFile):
+        drugDB = repurposing_hub_preproc(drugRawFile)
+        drugDB.to_csv(drugFile, index=False)
+    else:
+        drugDB = pd.read_csv(drugFile)
+
+
+    # Knock Out Simulation
+    model, geneInd2genes, HasEffects_Gene, fluxsolution, fluxSolutionRatios, fluxSolutionDiffs = knock_out_simulation(datadir=configs.datadir,
+                                      model_file=tissue_Spec_Model_file,
+                                      inhibitors=inhibitors_file,
+                                      drugDB=drugDB)
+    Gene_Pairs_down = create_gene_pairs(configs.datadir,
                                    model,
                                    geneInd2genes,
                                    fluxsolution, fluxSolutionRatios, fluxSolutionDiffs,
                                    HasEffects_Gene,
-                                   RA_Down='RA_DOWN.txt')
+                                   RA_Down=RA_Dn_file)
     Gene_Pairs_down.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_DOWN.txt'),index=False)
-    Gene_Pairs_up = create_gene_pairs(datadir,
+    Gene_Pairs_up = create_gene_pairs(configs.datadir,
                                    model,
                                    geneInd2genes,
                                    fluxsolution, fluxSolutionRatios, fluxSolutionDiffs,
                                    HasEffects_Gene,
-                                   RA_Down='RA_UP.txt')
+                                   RA_Down=RA_Up_file)
     Gene_Pairs_up.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_UP.txt'),index=False)
     # print(geneInd2genes)
     # print(fluxSolutionRatios)
     # print(HasEffects_Gene)
     # Gene_Pairs_down = load_Inhi_Fratio(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_DOWN.txt'))
     # Gene_Pairs_up = load_Inhi_Fratio(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_UP.txt'))
-    d_score_down = score_gene_pairs(Gene_Pairs_down, 'd_score_DOWN.csv')
+    d_score_down = score_gene_pairs(Gene_Pairs_down, os.path.join(datadir, 'd_score_DOWN.csv'))
     # d_score_down = score_gene_pairs_diff(Gene_Pairs_down, 'd_score_DOWN.csv')
-    d_score_up = score_gene_pairs(Gene_Pairs_up, 'd_score_UP.csv')
+    d_score_up = score_gene_pairs(Gene_Pairs_up, os.path.join(datadir, 'd_score_UP.csv'))
     # d_score_up = score_gene_pairs_diff(Gene_Pairs_up, 'd_score_UP.csv')
     PES = (d_score_up - d_score_down).sort_values(by='score', ascending=False)
     PES.to_csv(os.path.join(datadir,'d_score.csv'))
@@ -249,16 +303,10 @@ def main(argv):
     # PES = pd.read_csv(os.path.join(datadir,'d_score.csv'))
 
     # last step: output drugs based on d score
-    drugRawFile = os.path.join(configs.datadir, 'Repurposing_Hub_export.txt')
-    drugFile = os.path.join(configs.datadir, 'Repurposing_Hub_Preproc.csv')
-    if not os.path.isfile(drugFile):
-        drugDB = repurposing_hub_preproc(drugRawFile)
-        drugDB.to_csv(drugFile, index=False)
-    else:
-        drugDB = pd.read_csv(drugFile)
     drug_score = drug_repurposing(drugDB, PES)
-    drugScoreFile = os.path.join(configs.datadir,'drug_score.csv')
+    drugScoreFile = os.path.join(datadir, 'drug_score.csv')
     drug_score.to_csv(drugScoreFile, index=False)
+    print('Gene D score mapped to repurposing drugs saved to\n{}'.format(drugScoreFile))
 
 
 if __name__ == "__main__":

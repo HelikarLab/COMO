@@ -1,7 +1,9 @@
 #!/usr/bin/python3
 import re
 import sys
+import getopt
 import os
+import json
 import pandas as pd
 import numpy as np
 from project import configs
@@ -32,16 +34,31 @@ def pharse_configs(inqueryFullPath):
 
 
 def main(argv):
-    print(configs.rootdir)
-    filename = 'Disease_Gene_Analyzed.xlsx'
-    inqueryFullPath = os.path.join(configs.rootdir, 'data', filename)
+    inputfile = 'Disease_Gene_Analyzed.xlsx'
+    targetfile = 'targets.txt'
+    try:
+        opts, args = getopt.getopt(argv, "hi:", ["ifile="])
+    except getopt.GetoptError:
+        print('python3 disease_analysis.py -i <inputfile>')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print('python3 disease_analysis.py -i <inputfile>')
+            sys.exit()
+        elif opt in ("-i", "--ifile"):
+            inputfile = arg
+    print('Input file is "', inputfile)
+    # print('Target file is "', targetfile)
+    # print(configs.rootdir)
+    # filename = 'Disease_Gene_Analyzed.xlsx'
+    inqueryFullPath = os.path.join(configs.rootdir, 'data', inputfile)
     querytable, df_target = pharse_configs(inqueryFullPath)
-    targetdir = os.path.join(configs.datadir,'targets.txt')
+    targetdir = os.path.join(configs.datadir, targetfile)
     df_target.to_csv(targetdir, index=False, sep='\t')
     sr = querytable['GSE ID']
     gse_ids = sr[sr.str.match('GSE')].unique()
     GSE_ID = gse_ids[0]
-    gseXXX = GSEproject(GSE_ID,querytable,configs.rootdir)
+    gseXXX = GSEproject(GSE_ID, querytable, configs.rootdir)
     for key,val in gseXXX.platforms.items():
         rawdir = os.path.join(gseXXX.genedir,key)
         print('{}:{}, {}'.format(key, val, rawdir))
@@ -68,6 +85,12 @@ def main(argv):
     raw_file = os.path.join(configs.datadir, 'Raw_Fit_{}.csv'.format(GSE_ID))
     print('Raw Data saved to\n{}'.format(raw_file))
     data2.to_csv(raw_file, index=False)
+
+    files_dict = {'GSE': GSE_ID, 'UP_Reg': up_file, 'DN_Reg': down_file, 'RAW_Data': raw_file}
+    files_json = os.path.join(configs.datadir, 'step2_results_files.json')
+    with open(files_json, 'w') as fp:
+        json.dump(files_dict, fp)
+
 
 if __name__ == "__main__":
    main(sys.argv[1:])

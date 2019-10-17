@@ -1,9 +1,11 @@
 #!/usr/bin/python3
 import os
 import sys
+import getopt
 import time
 import pandas as pd
 import numpy as np
+import json
 # from bioservices import BioDBNet
 from project import configs
 from transcriptomic_gen import *
@@ -65,9 +67,30 @@ def merge_xomics(transcript_file='GeneExpressionDataUsed.xlsx', prote_file='Supp
     return files_dict
 
 def main(argv):
-    files_dict = merge_xomics(transcript_file='GeneExpressionDataUsed.xlsx',
-                              prote_file='Supplementary Data 1.xlsx')
+    transfile = 'GeneExpressionDataUsed.xlsx'
+    protefile = 'Supplementary Data 1.xlsx'
+    try:
+        opts, args = getopt.getopt(argv, "ht:p:", ["transfile=", "protefile="])
+    except getopt.GetoptError:
+        print('merge_xomics.py -t <transfile> -p <protefile>')
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print('merge_xomics.py -t <transfile> -p <protefile>')
+            sys.exit()
+        elif opt in ("-t", "--transfile"):
+            transfile = arg
+        elif opt in ("-p", "--protefile"):
+            protefile = arg
+    print('Transcriptomics file is "{}"'.format(transfile))
+    print('Proteomics file is "{}"'.format(protefile))
+    files_dict = merge_xomics(transcript_file=transfile,
+                              prote_file=protefile)
     print(files_dict)
+    files_json = os.path.join(configs.datadir, 'step1_results_files.json')
+    with open(files_json, 'w') as fp:
+        json.dump(files_dict, fp)
+
 
 if __name__ == "__main__":
    main(sys.argv[1:])
