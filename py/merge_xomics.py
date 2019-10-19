@@ -41,6 +41,7 @@ def merge_xomics(transcript_file='GeneExpressionDataUsed.xlsx', prote_file='Supp
         merge_data.to_csv(filepath, index_label='ENTREZ_GENE_ID')
 
         filepath = os.path.join(configs.rootdir, 'data', 'GeneExpression_{}_Merged.csv'.format(test))
+        merge_data.reset_index(drop=False, inplace=True)
         splitEntrez = splitGeneExpressionData(merge_data)
         splitEntrez.rename(columns={'Gene':'ENTREZ_GENE_ID', 'Data':'Express'}, inplace=True)
         splitEntrez.to_csv(filepath, index_label='ENTREZ_GENE_ID')
@@ -68,6 +69,7 @@ def merge_xomics(transcript_file='GeneExpressionDataUsed.xlsx', prote_file='Supp
         merge_data.to_csv(filepath, index_label='ENTREZ_GENE_ID')
 
         filepath = os.path.join(configs.rootdir, 'data', 'GeneExpression_{}_Merged.csv'.format(test))
+        merge_data.reset_index(drop=False, inplace=True)
         splitEntrez = splitGeneExpressionData(merge_data)
         splitEntrez.rename(columns={'Gene':'ENTREZ_GENE_ID', 'Data':'Express'}, inplace=True)
         splitEntrez.to_csv(filepath, index_label='ENTREZ_GENE_ID')
