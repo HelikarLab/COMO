@@ -99,7 +99,7 @@ def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile):
     return model_GIMME_final
 
 
-def mapExpressionToRxn(model_cobra, GeneExpressionFile):
+def splitGeneExpressionFile(GeneExpressionFile):
     expressionData = pd.read_csv(GeneExpressionFile)
     expressionData.rename(columns={'ENTREZ_GENE_ID': 'Gene', 'Express': 'Data'},inplace=True)
     expressionData = expressionData.loc[:, ['Gene', 'Data']]
@@ -115,6 +115,11 @@ def mapExpressionToRxn(model_cobra, GeneExpressionFile):
     GeneExpressions = singleGeneNames.append(breaksGeneNames,ignore_index=True)
     print(GeneExpressions.shape)
     GeneExpressions.set_index('Gene',inplace=True)
+    return GeneExpressions
+
+
+def mapExpressionToRxn(model_cobra, GeneExpressionFile):
+    GeneExpressions = splitGeneExpressionFile(GeneExpressionFile)
     # GeneExpressions
 
     expressionRxns = collections.OrderedDict()
