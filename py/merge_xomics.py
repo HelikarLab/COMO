@@ -10,7 +10,7 @@ import json
 from project import configs
 from transcriptomic_gen import *
 from proteomics_gen import *
-from create_tissue_specific_model import splitGeneExpressionFile
+from create_tissue_specific_model import splitGeneExpressionData
 
 # input parameters
 def merge_xomics(transcript_file='GeneExpressionDataUsed.xlsx', prote_file='Supplementary Data 1.xlsx'):
@@ -39,6 +39,11 @@ def merge_xomics(transcript_file='GeneExpressionDataUsed.xlsx', prote_file='Supp
         merge_data.loc[merge_data[['prote_top', 'trans_top']].sum(axis=1) > 0, 'Express'] = 1
         filepath = os.path.join(configs.rootdir, 'data', 'merged_{}.csv'.format(test))
         merge_data.to_csv(filepath, index_label='ENTREZ_GENE_ID')
+
+        filepath = os.path.join(configs.rootdir, 'data', 'GeneExpression_{}_Merged.csv'.format(test))
+        splitEntrez = splitGeneExpressionData(merge_data)
+        splitEntrez.rename(columns={'Gene':'ENTREZ_GENE_ID', 'Data':'Express'}, inplace=True)
+        splitEntrez.to_csv(filepath, index_label='ENTREZ_GENE_ID')
         files_dict[test] = filepath
 
         print('{}: save to {}\n'.format(test, filepath))
@@ -63,7 +68,7 @@ def merge_xomics(transcript_file='GeneExpressionDataUsed.xlsx', prote_file='Supp
         merge_data.to_csv(filepath, index_label='ENTREZ_GENE_ID')
 
         filepath = os.path.join(configs.rootdir, 'data', 'GeneExpression_{}_Merged.csv'.format(test))
-        splitEntrez = splitGeneExpressionFile(merge_data)
+        splitEntrez = splitGeneExpressionData(merge_data)
         splitEntrez.rename(columns={'Gene':'ENTREZ_GENE_ID', 'Data':'Express'}, inplace=True)
         splitEntrez.to_csv(filepath, index_label='ENTREZ_GENE_ID')
         files_dict[test] = filepath
