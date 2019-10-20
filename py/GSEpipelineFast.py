@@ -42,7 +42,7 @@ def download_gsm_id_maps(datadir, gse, gpls = ['GPL96','GPL97','GPL8300'],vendor
             print('Unsupported Platform: {}'.format(gpl))
             continue
         # Save to file
-        filefullpath = os.path.join(datadir,'{}entrez.csv'.format(gpl))
+        filefullpath = os.path.join(datadir,'{}entrez.csv'.format(gpl.lower()))
         print(filefullpath)
         temp.to_csv(filefullpath, index=False)
         # Single Table
@@ -119,7 +119,7 @@ class GSEproject:
         gsm_tables = {}
         for gpl,vendor in self.platforms.items():
             filename = '{}entrez.csv'.format(gpl.lower())
-            filepath = os.path.join(self.datadir,filename)
+            filepath = os.path.join(self.datadir, filename)
             if not os.path.isfile(filepath):
                 # Could improve to automatic download new tables based on platform
                 gse = load_gse_soft(self.gsename)
