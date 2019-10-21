@@ -223,7 +223,7 @@ def drug_repurposing(drugDB, d_score):
 
 def main(argv):
     tissue_Spec_Model_file = 'Th1_Cell_SpecificModel4manuscript.mat'
-    inhibitors_file = 'Th2_inhibitors_Entrez.txt'
+    inhibitors_file = 'Th1_inhibitors_Entrez.txt'
     RA_Dn_file = 'RA_DOWN.txt'
     RA_Up_file = 'RA_UP.txt'
     drug_raw_file = 'Repurposing_Hub_export.txt'
