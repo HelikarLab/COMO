@@ -4,6 +4,7 @@ import os
 import sys
 import getopt
 import time
+import unidecode
 import pandas as pd
 import numpy as np
 # from bioservices import BioDBNet
@@ -80,6 +81,7 @@ def save_proteomics_tests(Proteomics, proteomics_data):
         testdata['top 0.25'] = 0
         testdata.loc[testbool.any(axis=1), 'top 0.25'] = 1
 
+        test = unidecode.unidecode(test)
         output_path = os.path.join(configs.rootdir, 'data', 'Proteomics_{}.csv'.format(test.strip()))
         testdata.to_csv(output_path, index_label='ENTREZ_GENE_ID')
         print('Test Data Saved to {}'.format(output_path))
@@ -99,6 +101,7 @@ def load_proteomics_tests(Proteomics):
     for test in list(Proteomics):
         if test == 'Statistics':
             break
+        test = unidecode.unidecode(test)
         output_path = os.path.join(configs.rootdir, 'data', 'Proteomics_{}.csv'.format(test.strip()))
         testdata = pd.read_csv(output_path, index_col='ENTREZ_GENE_ID')
         print('Test Data Load From {}'.format(output_path))
