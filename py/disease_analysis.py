@@ -115,6 +115,7 @@ def main(argv):
     files_json = os.path.join(configs.datadir, 'step2_results_files.json')
     with open(files_json, 'w') as fp:
         json.dump(files_dict, fp)
+    os.remove(targetfile)
 
 
 if __name__ == "__main__":
