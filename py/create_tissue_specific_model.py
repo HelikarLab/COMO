@@ -102,6 +102,7 @@ def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile):
 def splitGeneExpressionData(expressionData):
     expressionData.rename(columns={'ENTREZ_GENE_ID': 'Gene', 'Express': 'Data'},inplace=True)
     expressionData = expressionData.loc[:, ['Gene', 'Data']]
+    expressionData['Gene'] = expressionData['Gene'].astype(str)
     singleGeneNames = expressionData[~expressionData.Gene.str.contains('//')].reset_index(drop=True)
     multipleGeneNames = expressionData[expressionData.Gene.str.contains('//')].reset_index(drop=True)
     breaksGeneNames = pd.DataFrame(columns=['Gene', 'Data'])
