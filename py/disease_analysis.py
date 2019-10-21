@@ -9,21 +9,26 @@ import numpy as np
 from project import configs
 from GSEpipelineFast import *
 
-
-def get_entrez_id(regulated, outputFullPath):
-    RA_UP = fetch_entrez_gene_id(list(regulated.index.values), input_db='Affy ID')
-    RA_UP.replace(to_replace='-', value=np.nan, inplace=True)
-    RA_UP.dropna(how='any', subset=['Gene ID'], inplace=True)
-
+def breakDownEntrezs(RA_UP):
+    RA_UP['Gene ID'] = RA_UP['Gene ID'].str.replace('///','//')
     singleGeneNames = RA_UP[~RA_UP['Gene ID'].str.contains('//')].reset_index(drop=True)
     multipleGeneNames = RA_UP[RA_UP['Gene ID'].str.contains('//')].reset_index(drop=True)
-    breaksGeneNames = pd.DataFrame(columns=['Gene ID', 'Ensembl Gene ID'])
+    breaksGeneNames = pd.DataFrame(columns=['Gene ID'])
     print(singleGeneNames.shape)
     print(multipleGeneNames.shape)
     for index, row in multipleGeneNames.iterrows():
         for genename in row['Gene ID'].split('//'):
-            breaksGeneNames = breaksGeneNames.append({'Gene ID': genename, 'Ensembl Gene ID': row['Ensembl Gene ID']}, ignore_index=True)
+            breaksGeneNames = breaksGeneNames.append({'Gene ID': genename}, ignore_index=True)
     GeneExpressions = singleGeneNames.append(breaksGeneNames, ignore_index=True)
+    return GeneExpressions
+
+def get_entrez_id(regulated, outputFullPath):
+    RA_UP = fetch_entrez_gene_id(list(regulated.index.values), input_db='Affy ID')
+    RA_UP.drop(columns=['Ensembl Gene ID'],inplace=True)
+    RA_UP.replace(to_replace='-', value=np.nan, inplace=True)
+    RA_UP.dropna(how='any', subset=['Gene ID'], inplace=True)
+
+    GeneExpressions = breakDownEntrezs(RA_UP)
     # GeneExpressions.set_index('Gene ID', inplace=True)
 
     GeneExpressions['Gene ID'].to_csv(outputFullPath, index=False)
@@ -86,6 +91,14 @@ def main(argv):
     down_file = os.path.join(configs.datadir,'RA_DOWN_{}.txt'.format(GSE_ID))
     RA_UP = get_entrez_id(up_regulated, up_file)
     RA_DOWN = get_entrez_id(down_regulated, down_file)
+    # RA_UP = pd.read_csv(up_file, index_col=False, header=None)
+    # RA_UP.rename(columns={0:'Gene ID'}, inplace=True)
+    # RA_UP['Gene ID'] = RA_UP['Gene ID'].astype(str)
+    # RA_UP = breakDownEntrezs(RA_UP)
+    # RA_DOWN = pd.read_csv(down_file, index_col=False, header=None)
+    # RA_DOWN.rename(columns={0:'Gene ID'}, inplace=True)
+    # RA_DOWN['Gene ID'] = RA_DOWN['Gene ID'].astype(str)
+    # RA_DOWN = breakDownEntrezs(RA_DOWN)
     print(RA_DOWN)
     print(RA_UP)
 
