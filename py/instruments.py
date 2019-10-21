@@ -135,7 +135,7 @@ def readagilent(datadir, gsms, scalefactor=1.1, quantile=0.95):
     return df_results.drop(['ControlType','SystematicName'],axis=1)
 
 
-def fetch_entrez_gene_id(input_values, input_db='Agilent ID', output_db = ['Gene ID','Ensembl Gene ID'], delay=30):
+def fetch_entrez_gene_id(input_values, input_db='Agilent ID', output_db = ['Gene ID','Ensembl Gene ID'], delay=60):
     s = BioDBNet()
     # input_db = 'Agilent ID'
     # input_values = df_results.ProbeName.tolist()

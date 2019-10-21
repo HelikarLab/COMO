@@ -190,6 +190,7 @@ def mergeLogicalTable(df_results):
     df_results.reset_index(drop=False, inplace=True)
     df_results['ENTREZ_GENE_ID'] = df_results['ENTREZ_GENE_ID'].str.replace(" /// ", "//")
     id_list = []
+    df_results.dropna(axis=0, subset=['ENTREZ_GENE_ID'], inplace=True)
     entrez_single_id_list = df_results[~df_results['ENTREZ_GENE_ID'].str.contains("//")]['ENTREZ_GENE_ID'].tolist()
     entrez_id_list = df_results[df_results['ENTREZ_GENE_ID'].str.contains("//")]['ENTREZ_GENE_ID'].tolist()
     for entrez_id in entrez_id_list:

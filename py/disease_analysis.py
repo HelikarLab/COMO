@@ -14,8 +14,20 @@ def get_entrez_id(regulated, outputFullPath):
     RA_UP = fetch_entrez_gene_id(list(regulated.index.values), input_db='Affy ID')
     RA_UP.replace(to_replace='-', value=np.nan, inplace=True)
     RA_UP.dropna(how='any', subset=['Gene ID'], inplace=True)
-    RA_UP['Gene ID'].to_csv(outputFullPath, index=False)
-    return RA_UP
+
+    singleGeneNames = RA_UP[~RA_UP['Gene ID'].str.contains('//')].reset_index(drop=True)
+    multipleGeneNames = RA_UP[RA_UP['Gene ID'].str.contains('//')].reset_index(drop=True)
+    breaksGeneNames = pd.DataFrame(columns=['Gene ID', 'Ensembl Gene ID'])
+    print(singleGeneNames.shape)
+    print(multipleGeneNames.shape)
+    for index, row in multipleGeneNames.iterrows():
+        for genename in row['Gene ID'].split('//'):
+            breaksGeneNames = breaksGeneNames.append({'Gene ID': genename, 'Ensembl Gene ID': row['Ensembl Gene ID']}, ignore_index=True)
+    GeneExpressions = singleGeneNames.append(breaksGeneNames, ignore_index=True)
+    # GeneExpressions.set_index('Gene ID', inplace=True)
+
+    GeneExpressions['Gene ID'].to_csv(outputFullPath, index=False)
+    return GeneExpressions
 
 
 def pharse_configs(inqueryFullPath):

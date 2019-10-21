@@ -2,6 +2,7 @@
 import os
 import sys
 import getopt
+import unidecode
 import time
 import pandas as pd
 import numpy as np
@@ -31,6 +32,7 @@ def merge_xomics(transcript_file='GeneExpressionDataUsed.xlsx', prote_file='Supp
 
         print(trans_data.shape)
         print(prote_data.shape)
+        test = unidecode.unidecode(test)
 
         merge_data = prote_data.join(trans_data, how='outer')
         merge_data = mergeLogicalTable(merge_data)
@@ -62,6 +64,7 @@ def merge_xomics(transcript_file='GeneExpressionDataUsed.xlsx', prote_file='Supp
             print('Unknown Error')
             return None
 
+        test = unidecode.unidecode(test)
         merge_data = mergeLogicalTable(merge_data)
         merge_data['Express'] = 0
         merge_data.loc[merge_data[['0.5', 'top']].sum(axis=1) > 0, 'Express'] = 1
