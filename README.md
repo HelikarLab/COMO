@@ -2,6 +2,16 @@
 
 This is the home page for pipeline project.
 
+## How To Run application
+- Install Docker
+- `docker import ./image/pipeline.tar`
+- `docker run -p 4000:8888 pipeline/r1.0`
+- Open `127.0.0.1:4000` from your Browser, input token shown in command line terminal from previous step
+- In your jupyter notebook, open `/pipelines/py/pipeline.ipynb`
+- Upload your configuration and data files `/pipelines/data/` according to the instructions in the notebook, update the file names in the jupyter notebook accordingly.
+- Run the notebook step by step, or run the step(s) by your needs
+
+
 ## FlowCharts
 ![1](./doc/IMG_1.jpg)
 
