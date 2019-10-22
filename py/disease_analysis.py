@@ -46,6 +46,7 @@ def pharse_configs(inqueryFullPath):
     df_target['FileName'] = df_target['FileName'].astype(str) + '.txt.gz'
     df_target['SampleNumber']= 1 + df_target.index.values
     df_target = df_target[['SampleNumber','FileName','Condition']]
+    df_target['Condition'] = df_target['Condition'].str.lower()
     return df, df_target
 
 
@@ -115,7 +116,7 @@ def main(argv):
     files_json = os.path.join(configs.datadir, 'step2_results_files.json')
     with open(files_json, 'w') as fp:
         json.dump(files_dict, fp)
-    os.remove(targetfile)
+    os.remove(targetdir)
 
 
 if __name__ == "__main__":
