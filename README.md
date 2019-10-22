@@ -4,7 +4,7 @@ This is the home page for pipeline project.
 
 ## How To Run application
 - Install Docker
-- `docker import ./image/pipeline.tar`
+- `docker import --change 'CMD ["jupyter", "notebook", "--ip=0.0.0.0", "--allow-root"]' ./image/pipeline.tar pipeline/r1.0` (replace the image id as yours)
 - `docker run -p 4000:8888 pipeline/r1.0`
 - Open `127.0.0.1:4000` from your Browser, input token shown in command line terminal from previous step
 - In your jupyter notebook, open `/pipelines/py/pipeline.ipynb`
