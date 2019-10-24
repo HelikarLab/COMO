@@ -3,10 +3,11 @@
 This is the home page for pipeline project.
 
 ## How To Run application
-- Install Docker
-- `docker import --change 'CMD ["jupyter", "notebook", "--ip=0.0.0.0", "--allow-root"]' ./image/pipeline.tar pipeline/r1.0` (replace the image id as yours)
-- `docker run -p 4000:8888 pipeline/r1.0`
-- Open `127.0.0.1:4000` from your Browser, input token shown in command line terminal from previous step
+- [Install Docker](https://docs.docker.com/install/)
+- `docker login its-registry.unl.edu -u username`, use your [personal access token](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html) as password
+- `docker pull its-registry.unl.edu/research-project/pipelines`
+- `docker run --cpus=2 -p 4000:8888 its-registry.unl.edu/research-project/pipelines` Run docker image and assign 2 CPUs to it.
+- Open [http://127.0.0.1:4000](http://127.0.0.1:4000) from your Browser, input token shown in command line terminal from previous step
 - In your jupyter notebook, open `/pipelines/py/pipeline.ipynb`
 - Upload your configuration and data files `/pipelines/data/` according to the instructions in the notebook, update the file names in the jupyter notebook accordingly.
 - Run the notebook step by step, or run the step(s) by your needs
