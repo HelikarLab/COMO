@@ -266,41 +266,41 @@ def main(argv):
         drugDB = pd.read_csv(drugFile)
 
 
-    # # Knock Out Simulation
-    # model, geneInd2genes, HasEffects_Gene, fluxsolution, fluxSolutionRatios, fluxSolutionDiffs = knock_out_simulation(datadir=configs.datadir,
-    #                                   model_file=tissue_Spec_Model_file,
-    #                                   inhibitors=inhibitors_file,
-    #                                   drugDB=drugDB)
-    # Gene_Pairs_down = create_gene_pairs(configs.datadir,
-    #                                model,
-    #                                geneInd2genes,
-    #                                fluxsolution, fluxSolutionRatios, fluxSolutionDiffs,
-    #                                HasEffects_Gene,
-    #                                RA_Down=RA_Dn_file)
-    # Gene_Pairs_down.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_DOWN.txt'),index=False)
-    # Gene_Pairs_up = create_gene_pairs(configs.datadir,
-    #                                model,
-    #                                geneInd2genes,
-    #                                fluxsolution, fluxSolutionRatios, fluxSolutionDiffs,
-    #                                HasEffects_Gene,
-    #                                RA_Down=RA_Up_file)
-    # Gene_Pairs_up.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_UP.txt'),index=False)
-    # # print(geneInd2genes)
-    # # print(fluxSolutionRatios)
-    # # print(HasEffects_Gene)
-    # # Gene_Pairs_down = load_Inhi_Fratio(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_DOWN.txt'))
-    # # Gene_Pairs_up = load_Inhi_Fratio(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_UP.txt'))
-    # d_score_down = score_gene_pairs(Gene_Pairs_down, os.path.join(datadir, 'd_score_DOWN.csv'))
-    # # d_score_down = score_gene_pairs_diff(Gene_Pairs_down, 'd_score_DOWN.csv')
-    # d_score_up = score_gene_pairs(Gene_Pairs_up, os.path.join(datadir, 'd_score_UP.csv'))
-    # # d_score_up = score_gene_pairs_diff(Gene_Pairs_up, 'd_score_UP.csv')
-    # PES = (d_score_up - d_score_down).sort_values(by='score', ascending=False)
-    # PES.to_csv(os.path.join(datadir,'d_score.csv'))
-    # print(d_score_down)
-    # print(d_score_up)
-    # print(PES)
-    # PES.reset_index(drop=False, inplace=True)
-    PES = pd.read_csv(os.path.join(datadir,'d_score.csv'))
+    # Knock Out Simulation
+    model, geneInd2genes, HasEffects_Gene, fluxsolution, fluxSolutionRatios, fluxSolutionDiffs = knock_out_simulation(datadir=configs.datadir,
+                                      model_file=tissue_Spec_Model_file,
+                                      inhibitors=inhibitors_file,
+                                      drugDB=drugDB)
+    Gene_Pairs_down = create_gene_pairs(configs.datadir,
+                                   model,
+                                   geneInd2genes,
+                                   fluxsolution, fluxSolutionRatios, fluxSolutionDiffs,
+                                   HasEffects_Gene,
+                                   RA_Down=RA_Dn_file)
+    Gene_Pairs_down.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_DOWN.txt'),index=False)
+    Gene_Pairs_up = create_gene_pairs(configs.datadir,
+                                   model,
+                                   geneInd2genes,
+                                   fluxsolution, fluxSolutionRatios, fluxSolutionDiffs,
+                                   HasEffects_Gene,
+                                   RA_Down=RA_Up_file)
+    Gene_Pairs_up.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_UP.txt'),index=False)
+    # print(geneInd2genes)
+    # print(fluxSolutionRatios)
+    # print(HasEffects_Gene)
+    # Gene_Pairs_down = load_Inhi_Fratio(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_DOWN.txt'))
+    # Gene_Pairs_up = load_Inhi_Fratio(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_UP.txt'))
+    d_score_down = score_gene_pairs(Gene_Pairs_down, os.path.join(datadir, 'd_score_DOWN.csv'))
+    # d_score_down = score_gene_pairs_diff(Gene_Pairs_down, 'd_score_DOWN.csv')
+    d_score_up = score_gene_pairs(Gene_Pairs_up, os.path.join(datadir, 'd_score_UP.csv'))
+    # d_score_up = score_gene_pairs_diff(Gene_Pairs_up, 'd_score_UP.csv')
+    PES = (d_score_up - d_score_down).sort_values(by='score', ascending=False)
+    PES.to_csv(os.path.join(datadir,'d_score.csv'))
+    print(d_score_down)
+    print(d_score_up)
+    print(PES)
+    PES.reset_index(drop=False, inplace=True)
+    # PES = pd.read_csv(os.path.join(datadir,'d_score.csv'))
 
     # last step: output drugs based on d score
     drug_score = drug_repurposing(drugDB, PES)
