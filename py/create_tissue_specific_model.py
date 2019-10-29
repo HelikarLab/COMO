@@ -187,13 +187,20 @@ def main(argv):
     GeneExpressionFile = os.path.join(configs.datadir, genefile)
     TissueModel = createTissueSpecificModel(GeneralModelFile, GeneExpressionFile)
     print(TissueModel)
-    cobra.io.mat.save_matlab_model(TissueModel, os.path.join(configs.datadir, outputfile))
+    if outputfile[-4:] == '.mat':
+        cobra.io.mat.save_matlab_model(TissueModel, os.path.join(configs.datadir, outputfile))
+    elif outputfile[-4:] == '.xml':
+        cobra.io.write_sbml_model(TissueModel, os.path.join(configs.datadir, outputfile), use_fbc_package=False)
+    else:
+        print('Error: unsupported model format: {}'.format(outputfile))
+        return None
     # cobra.io.sbml.write_cobra_model_to_sbml_file(TissueModel, os.path.join(configs.datadir,'Th1_SpecificModel.xml'))
     print('Genes: ' + str(len(TissueModel.genes)))
     print('Metabolites: ' + str(len(TissueModel.metabolites)))
     print('Reactions: ' + str(len(TissueModel.reactions)))
     print(TissueModel.objective._get_expression())
     print(TissueModel.optimize())
+    return None
 
 if __name__ == "__main__":
    main(sys.argv[1:])
