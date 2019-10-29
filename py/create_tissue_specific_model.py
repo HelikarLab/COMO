@@ -190,7 +190,7 @@ def main(argv):
     if outputfile[-4:] == '.mat':
         cobra.io.mat.save_matlab_model(TissueModel, os.path.join(configs.datadir, outputfile))
     elif outputfile[-4:] == '.xml':
-        cobra.io.write_sbml_model(TissueModel, os.path.join(configs.datadir, outputfile), use_fbc_package=False)
+        cobra.io.write_sbml_model(TissueModel, os.path.join(configs.datadir, outputfile))
     else:
         print('Error: unsupported model format: {}'.format(outputfile))
         return None
