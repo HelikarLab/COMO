@@ -21,6 +21,8 @@ def knock_out_simulation(datadir, model_file, inhibitors, drugDB):
         model = cobra.io.read_sbml_model(os.path.join(datadir, model_file))
     elif model_file[-4:] == '.mat':
         model = cobra.io.load_matlab_model(os.path.join(datadir, model_file))
+    elif model_file[-5:] == '.json':
+        model = cobra.io.load_json_model(os.path.join(datadir, model_file))
     else:
         print("Unsupported File Format of Model: {}".format(model_file))
         return None
