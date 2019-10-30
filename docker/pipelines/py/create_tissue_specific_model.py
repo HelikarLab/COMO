@@ -162,8 +162,8 @@ def mapExpressionToRxn(model_cobra, GeneExpressionFile):
 
 def main(argv):
     modelfile = 'GeneralModel.mat'
-    genefile = 'merged_Th1.csv'
-    outputfile = 'Th1_SpecificModel.mat'
+    genefile = 'GeneExpression_Th1_Merged.csv'
+    outputfile = 'Th1_SpecificModel.json'
     try:
         opts, args = getopt.getopt(argv, "hm:g:o:", ["mfile=", "gfile=", "ofile="])
     except getopt.GetoptError:
@@ -188,9 +188,13 @@ def main(argv):
     TissueModel = createTissueSpecificModel(GeneralModelFile, GeneExpressionFile)
     print(TissueModel)
     if outputfile[-4:] == '.mat':
-        cobra.io.mat.save_matlab_model(TissueModel, os.path.join(configs.datadir, outputfile))
+        # cobra.io.mat.save_matlab_model(TissueModel, os.path.join(configs.datadir, outputfile))
+        cobra.io.save_matlab_model(TissueModel, os.path.join(configs.datadir, outputfile))
     elif outputfile[-4:] == '.xml':
+        print('cobrapy only support level 2 SBML model, while this model is level 3')
         cobra.io.write_sbml_model(TissueModel, os.path.join(configs.datadir, outputfile))
+    elif outputfile[-5:] == '.json':
+        cobra.io.save_json_model(TissueModel, os.path.join(configs.datadir, outputfile))
     else:
         print('Error: unsupported model format: {}'.format(outputfile))
         return None
