@@ -35,7 +35,7 @@ def float_logical_exp(expressionIn, level=0):
             expressionIn = 'min{' + expressionIn + '}'
         elif 'or' in expressionIn:
             expressionIn = expressionIn.replace('or', ',')
-            expressionIn = 'min{' + expressionIn + '}'
+            expressionIn = 'max{' + expressionIn + '}'
         else:
             expressionIn = expressionIn.replace('[', '')
             expressionIn = expressionIn.replace(']', '')
@@ -49,7 +49,7 @@ def float_logical_exp(expressionIn, level=0):
         innerstring = 'min{'+innerstring+'}'
     elif 'or' in innerstring:
         innerstring = innerstring.replace('or', ',')
-        innerstring = 'min{'+innerstring+'}'
+        innerstring = 'max{'+innerstring+'}'
     else:
         innerstring = innerstring.replace('[', '')
         innerstring = innerstring.replace(']', '')
