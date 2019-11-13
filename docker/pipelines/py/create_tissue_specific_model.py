@@ -26,6 +26,41 @@ from troppo.utilities.statistics import normalize, z_score
 from project import configs
 
 
+def correct_bracket(rule, name):
+    rmatch = re.search(r'or|and', rule)
+    nmatch = re.search(r'or|and', name)
+    if rmatch is None:
+        lrule = rule
+        lname = name.strip()
+        rrule = ''
+        rname = ''
+        operator = ''
+    else:
+        lrule = rule[0:rmatch.span()[0]]
+        lname = name[0:nmatch.span()[0]].strip()
+        rrule = rule[rmatch.span()[1]:]
+        rname = name[nmatch.span()[1]:]
+        operator = rmatch.group()
+
+    #     rlist = lrule.split(' ')
+    rlist_new = []
+    for ch in list(lrule):
+        if ch.isspace() or ch.isdigit():  # re.match(r'\w+', ch)
+            rlist_new.append(ch)
+        elif len(lname) > 0:
+            if ch == lname[0]:
+                rlist_new.append(ch)
+                lname = lname[1:]
+    rule_left = "".join(rlist_new)
+
+    if rmatch is None:
+        rule_right = ''
+    else:
+        rule_right = correct_bracket(rrule, rname)
+
+    return ' '.join([rule_left, operator, rule_right])
+
+
 def float_logical_exp(expressionIn, level=0):
     try:
         loc_r = expressionIn.index(')')
@@ -127,7 +162,8 @@ def mapExpressionToRxn(model_cobra, GeneExpressionFile):
     # expVector = []
     cnt = 0
     for rxn in model_cobra.reactions:
-        gene_reaction_rule = rxn.gene_reaction_rule
+        gene_reaction_rule = correct_bracket(rxn.gene_reaction_rule, rxn.gene_name_reaction_rule)
+        # gene_reaction_rule = rxn.gene_reaction_rule
         gene_ids = re.findall(r'\d+', gene_reaction_rule)
         expressionRxns[rxn.id] = -1.0
         if gene_reaction_rule == '':
