@@ -176,6 +176,7 @@ def mapExpressionToRxn(model_cobra, GeneExpressionFile):
 
         try:
             gene_reaction_by_rule = gene_rule_float(gene_reaction_rule)
+            gene_reaction_by_rule = gene_reaction_by_rule.strip()
             expressionRxns[rxn.id] = eval(gene_reaction_by_rule)
             # expVector.append(expressionRxns[rxn.id])
         except:
