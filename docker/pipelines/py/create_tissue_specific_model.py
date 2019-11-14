@@ -166,7 +166,7 @@ def mapExpressionToRxn(model_cobra, GeneExpressionFile):
         # gene_reaction_rule = rxn.gene_reaction_rule
         gene_ids = re.findall(r'\d+', gene_reaction_rule)
         expressionRxns[rxn.id] = -1.0
-        if gene_reaction_rule == '':
+        if gene_reaction_rule.strip() == '':
             continue
         for id in gene_ids:
             boolval = '-1'
