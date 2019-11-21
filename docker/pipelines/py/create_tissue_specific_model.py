@@ -105,7 +105,7 @@ def gene_rule_float(expressionIn):
 def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile):
     model_cobra = cobra.io.load_matlab_model(GeneralModelFile)
 
-    mat = scipy.io.loadmat(GeneralModelFile)['Teff']
+    mat = scipy.io.loadmat(GeneralModelFile)['model'] # Created by writeCbModel in matlab instead of saveas
     model = MatFormatReader(mat)
     S = model.S
     lb, ub = model.get_model_bounds(False, True)
