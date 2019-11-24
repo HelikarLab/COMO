@@ -39,6 +39,8 @@ def knock_out_simulation(datadir, model_file, inhibitors, drugDB):
         DT_genes.replace('-', np.nan, inplace=True)
         DT_genes.dropna(axis=0,inplace=True)
         DT_genes.to_csv(inhibitorsFullpath, header=False)
+    # only keep inhibitor
+    DT_genes = DT_genes[DT_genes['MOA'].str.lower().str.contains('inhibitor') == True]
 
     geneInd2genes = [x.id for x in model.genes]
     print(len(geneInd2genes))
@@ -224,7 +226,7 @@ def drug_repurposing(drugDB, d_score):
 
 
 def main(argv):
-    tissue_Spec_Model_file = 'Th1_Cell_SpecificModel4manuscript.mat' # or 'Th1_SpecificModel_matlab.mat'
+    tissue_Spec_Model_file = 'Th1_SpecificModel.json' # 'Th1_Cell_SpecificModel4manuscript.mat' # or
     inhibitors_file = 'Th1_inhibitors_Entrez.txt'
     RA_Dn_file = 'RA_DOWN.txt'
     RA_Up_file = 'RA_UP.txt'
