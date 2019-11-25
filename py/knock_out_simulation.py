@@ -34,13 +34,13 @@ def knock_out_simulation(datadir, model_file, inhibitors, drugDB):
         DT_genes['Gene ID'] = DT_genes['Gene ID'].astype(str)
     else:
         # if inhibitors file does not exist, create a new one
+        # only keep inhibitor
+        drugDB = drugDB[drugDB['MOA'].str.lower().str.contains('inhibitor') == True]
         DT_genes = pd.DataFrame(columns=['Gene ID'])
         DT_genes['Gene ID'] = drugDB['ENTREZ_GENE_ID'].astype(str)
         DT_genes.replace('-', np.nan, inplace=True)
         DT_genes.dropna(axis=0,inplace=True)
         DT_genes.to_csv(inhibitorsFullpath, header=False)
-    # only keep inhibitor
-    DT_genes = DT_genes[DT_genes['MOA'].str.lower().str.contains('inhibitor') == True]
 
     geneInd2genes = [x.id for x in model.genes]
     print(len(geneInd2genes))
