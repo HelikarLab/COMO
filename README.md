@@ -4,7 +4,7 @@ This is the home page for pipeline project.
 
 ## How To Run application
 - [Install Docker](https://docs.docker.com/install/)
-- `docker login its-registry.unl.edu -u username`, use your [personal access token](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html) as password
+- `docker login its-registry.unl.edu -u username`, use your [personal access token](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html) as password, see [gitlab docker registry](https://docs.gitlab.com/ee/user/packages/container_registry/)
 - `docker pull its-registry.unl.edu/research-project/pipelines`
 - `docker run --cpus=2 -p 4000:8888 its-registry.unl.edu/research-project/pipelines` Run docker image and assign 2 CPUs to it.
 - Open [http://127.0.0.1:4000](http://127.0.0.1:4000) from your Browser, input token shown in command line terminal from previous step
