@@ -1,6 +1,6 @@
 # MADRID: a pipeline for MetAbolic Drug Repurposing IDentification
 
-This is the home page for MADRID.
+This is the home page for MADRID pipeline.
 
 ## How To Run application
 - [Install Docker](https://docs.docker.com/install/)
