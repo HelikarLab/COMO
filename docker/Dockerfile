@@ -28,6 +28,7 @@ RUN R -e "BiocManager::install('hgu133acdf', dep=TRUE, ask=FALSE)"
 RUN R -e "install.packages(c('rzmq','repr','IRkernel','IRdisplay'), repos = c('http://irkernel.github.io/', getOption('repos')), type = 'source')"
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
+RUN python3.6 -m pip install numpy --upgrade 
 RUN R -e "IRkernel::installspec()"
 COPY . .
 #RUN /root/MCR_R2018a_glnxa64_installer/install -destinationFolder /root/mcr -agreeToLicense yes -mode silent

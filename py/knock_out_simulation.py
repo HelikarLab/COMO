@@ -92,10 +92,10 @@ def knock_out_simulation(datadir, model_file, inhibitors, drugDB):
     return model, geneInd2genes, HasEffects_Gene, fluxsolution, fluxSolutionRatios, fluxSolutionDiffs
 
 
-def create_gene_pairs(datadir, model, geneInd2genes, fluxsolution, fluxSolutionRatios, fluxSolutionDiffs, HasEffects_Gene, RA_Down):
-    RA_down = pd.read_csv(os.path.join(datadir,RA_Down))
+def create_gene_pairs(datadir, model, geneInd2genes, fluxsolution, fluxSolutionRatios, fluxSolutionDiffs, HasEffects_Gene, Disease_Down):
+    Disease_down = pd.read_csv(os.path.join(datadir,Disease_Down))
     DAG_dis_genes = pd.DataFrame()
-    DAG_dis_genes['Gene ID'] = RA_down.iloc[:,0].astype(str)
+    DAG_dis_genes['Gene ID'] = Disease_down.iloc[:,0].astype(str)
     # DAG_dis_genes
 
     DAG_dis_met_genes = set(DAG_dis_genes['Gene ID'].tolist()).intersection(geneInd2genes)
@@ -228,8 +228,8 @@ def drug_repurposing(drugDB, d_score):
 def main(argv):
     tissue_Spec_Model_file = 'Th1_SpecificModel.json' # 'Th1_Cell_SpecificModel4manuscript.mat' # or
     inhibitors_file = 'Th1_inhibitors_Entrez.txt'
-    RA_Dn_file = 'RA_DOWN.txt'
-    RA_Up_file = 'RA_UP.txt'
+    Disease_Dn_file = 'Disease_DOWN.txt'
+    Disease_Up_file = 'Disease_UP.txt'
     drug_raw_file = 'Repurposing_Hub_export.txt'
     folder = 'Th1'
     try:
@@ -246,9 +246,9 @@ def main(argv):
         elif opt in ("-i", "--ifile"):
             inhibitors_file = arg
         elif opt in ("-u", "--upfile"):
-            RA_Up_file = arg
+            Disease_Up_file = arg
         elif opt in ("-d", "--downfile"):
-            RA_Dn_file = arg
+            Disease_Dn_file = arg
         elif opt in ("-f", "--folder"):
             folder = arg
         elif opt in ("-r", "--drugfile"):
@@ -280,14 +280,14 @@ def main(argv):
                                    geneInd2genes,
                                    fluxsolution, fluxSolutionRatios, fluxSolutionDiffs,
                                    HasEffects_Gene,
-                                   RA_Down=RA_Dn_file)
+                                   Disease_Down=Disease_Dn_file)
     Gene_Pairs_down.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_DOWN.txt'),index=False)
     Gene_Pairs_up = create_gene_pairs(configs.datadir,
                                    model,
                                    geneInd2genes,
                                    fluxsolution, fluxSolutionRatios, fluxSolutionDiffs,
                                    HasEffects_Gene,
-                                   RA_Down=RA_Up_file)
+                                   Disease_Down=Disease_Up_file)
     Gene_Pairs_up.to_csv(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_UP.txt'),index=False)
     # print(geneInd2genes)
     # print(fluxSolutionRatios)

@@ -286,7 +286,7 @@ def load_transcriptomics_tests(filename):
 
 
 def main(argv):
-    inputfile = 'GeneExpressionDataUsed.xlsx'
+    inputfile = 'transcriptomics_data_inputs.xlsx'
     # outputfile = ''
     try:
         opts, args = getopt.getopt(argv, "hi:", ["ifile="])
@@ -304,7 +304,7 @@ def main(argv):
     print('Input file is "', inputfile)
     #print('Output file is "', outputfile)
     # input from user
-    # filename = 'GeneExpressionDataUsed.xlsx'
+    # filename = 'transcriptomics_data_inputs.xlsx'
     # sheet_name = list(range(5)) # first 5 sheets
 
     # gse2770 = GSEproject('GSE2770',configs.rootdir)

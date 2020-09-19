@@ -1,6 +1,6 @@
-# pipelines
+# MADRID: a pipeline for MetAbolic Drug Repurposing IDentification
 
-This is the home page for pipeline project.
+This is the home page for MADRID.
 
 ## How To Run application
 - [Install Docker](https://docs.docker.com/install/)
@@ -13,7 +13,13 @@ This is the home page for pipeline project.
 - Run the notebook step by step, or run the step(s) by your needs
 
 
-## FlowCharts
+
+
+
+
+
+
+## Flow Charts
 ![1](./doc/IMG_1.jpg)
 
 ![2](./doc/IMG_2.jpg)
@@ -25,6 +31,19 @@ This is the home page for pipeline project.
 ## Run Script
 1. Download Data from https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE2770
 2. Run Affy_Script.r in the same folder of the extracted data files
+
+
+## Example
+
+Using pipeline to identify drug targets against Rheumatoid arthritis using GSMNs of four CD4+ T cell subtypes: naïve, Th1, Th2, and Th17 developed by Puniya et al., 2020. 
+
+1. In "pipelines/data" folder, we included GEO accession numbers of transcriptomics data in input file 1 (i.e., _“transcriptomics_data_inputs.xls”_) and sample names of proteomics data for each subtype in input file 2 (i.e., _“proteomics_data_inputs.xls”_). The protein abundance file is provided in input file 3 (i.e., _“ProteomicsDataMatrix.xls”_). Running Step 1 in _jupyter_ notebook will generate “gene activity” files based on transcriptomics and proteomics data, as described by Puniya et al., 2020. 
+
+2. Our pipeline includes a modified version of the Recon3D model to use as a reference for model contextualization. Running step 2 with gene activity and Recon3D will generate models for naive, Th1, Th2, and Th17 CD4+ T cell subtypes. These models can be directly used for drug target identification. These models can be further curated and reuploaded. We used already curated versions of developed models provided by Puniya et al., 2020. 
+
+3. We used a dataset of rheumatoid arthritis that is input for Step 3 to identify differentially expressed genes. The up and downregulated genes were used as inputs with curated models in Step 4. 
+
+4. Using constructed models, we perform knock-out simulations based on genes overlapping with input file “RepurposingHub.txt” obtained from the ConnectivityMap database and included in the pipeline. 
 
 Raw data
 RMAC Data
@@ -57,6 +76,10 @@ RMAC Data
 * SQLite: [database browser](https://sqlitebrowser.org/dl/)
 * Matlab Runtime, [Create Python Packages from Matlab code](https://www.mathworks.com/help/compiler_sdk/gs/create-a-python-application-with-matlab-code.html)
 * [Drug Repurposing Hub](https://clue.io/repurposing-app)
+
+
+
+
 
 
 ## Repository Structure
