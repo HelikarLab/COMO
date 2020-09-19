@@ -113,8 +113,8 @@ def load_proteomics_tests(Proteomics):
 
 
 def main(argv):
-    datafilename = 'ni.3693-S5.xlsx'
-    suppfilename = 'Supplementary Data 1.xlsx'
+    datafilename = 'ProteomicsDataMatrix.xlsx'
+    suppfilename = 'proteomics_data_inputs.xlsx'
     try:
         opts, args = getopt.getopt(argv, "hd:s:", ["datafile=", "suppfile="])
     except getopt.GetoptError:

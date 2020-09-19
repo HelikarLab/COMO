@@ -16,11 +16,11 @@ import collections
 # for testing the algorithms
 from cobamp.wrappers import MatFormatReader
 from cobamp.wrappers import COBRAModelObjectReader
-from troppo.methods.imat import IMAT
-from troppo.methods.gimme import GIMME
-from troppo.methods.tINIT import tINIT
-from troppo.methods.fastcore import FASTcore
-from troppo.reconstruction_properties import FastcoreProperties, tINITProperties, GIMMEProperties, IMATProperties
+from troppo.methods.reconstruction.imat import IMAT, IMATProperties
+from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
+from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
+from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
+#from troppo.reconstruction_properties import FastcoreProperties, tINITProperties, GIMMEProperties, IMATProperties
 from troppo.utilities.statistics import normalize, z_score
 
 from project import configs

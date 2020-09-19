@@ -14,7 +14,7 @@ from proteomics_gen import *
 from create_tissue_specific_model import splitGeneExpressionData
 
 # input parameters
-def merge_xomics(transcript_file='GeneExpressionDataUsed.xlsx', prote_file='Supplementary Data 1.xlsx'):
+def merge_xomics(transcript_file='transcriptomics_data_inputs.xlsx', prote_file='proteomics_data_inputs.xlsx'):
     transcriptomics_dict= load_transcriptomics_tests(filename = transcript_file)
     Proteomics = load_supplementary_data(prote_file)
     proteomics_dict = load_proteomics_tests(Proteomics)
@@ -83,8 +83,8 @@ def merge_xomics(transcript_file='GeneExpressionDataUsed.xlsx', prote_file='Supp
     return files_dict
 
 def main(argv):
-    transfile = 'GeneExpressionDataUsed.xlsx'
-    protefile = 'Supplementary Data 1.xlsx'
+    transfile = 'transcriptomics_data_inputs.xlsx'
+    protefile = 'proteomics_data_inputs.xlsx'
     try:
         opts, args = getopt.getopt(argv, "ht:p:", ["transfile=", "protefile="])
     except getopt.GetoptError:

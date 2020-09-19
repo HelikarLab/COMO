@@ -9,10 +9,10 @@ import numpy as np
 from project import configs
 from GSEpipelineFast import *
 
-def breakDownEntrezs(RA_UP):
-    RA_UP['Gene ID'] = RA_UP['Gene ID'].str.replace('///','//')
-    singleGeneNames = RA_UP[~RA_UP['Gene ID'].str.contains('//')].reset_index(drop=True)
-    multipleGeneNames = RA_UP[RA_UP['Gene ID'].str.contains('//')].reset_index(drop=True)
+def breakDownEntrezs(Disease_UP):
+    Disease_UP['Gene ID'] = Disease_UP['Gene ID'].str.replace('///','//')
+    singleGeneNames = Disease_UP[~Disease_UP['Gene ID'].str.contains('//')].reset_index(drop=True)
+    multipleGeneNames = Disease_UP[Disease_UP['Gene ID'].str.contains('//')].reset_index(drop=True)
     breaksGeneNames = pd.DataFrame(columns=['Gene ID'])
     print(singleGeneNames.shape)
     print(multipleGeneNames.shape)
@@ -23,12 +23,12 @@ def breakDownEntrezs(RA_UP):
     return GeneExpressions
 
 def get_entrez_id(regulated, outputFullPath):
-    RA_UP = fetch_entrez_gene_id(list(regulated.index.values), input_db='Affy ID')
-    RA_UP.drop(columns=['Ensembl Gene ID'],inplace=True)
-    RA_UP.replace(to_replace='-', value=np.nan, inplace=True)
-    RA_UP.dropna(how='any', subset=['Gene ID'], inplace=True)
+    Disease_UP = fetch_entrez_gene_id(list(regulated.index.values), input_db='Affy ID')
+    Disease_UP.drop(columns=['Ensembl Gene ID'],inplace=True)
+    Disease_UP.replace(to_replace='-', value=np.nan, inplace=True)
+    Disease_UP.dropna(how='any', subset=['Gene ID'], inplace=True)
 
-    GeneExpressions = breakDownEntrezs(RA_UP)
+    GeneExpressions = breakDownEntrezs(Disease_UP)
     # GeneExpressions.set_index('Gene ID', inplace=True)
 
     GeneExpressions['Gene ID'].to_csv(outputFullPath, index=False)
@@ -52,7 +52,7 @@ def pharse_configs(inqueryFullPath):
 
 
 def main(argv):
-    inputfile = 'Disease_Gene_Analyzed.xlsx'
+    inputfile = 'disease_transcriptomics_data_inputs.xlsx'
     targetfile = 'targets.txt'
     try:
         opts, args = getopt.getopt(argv, "hi:", ["ifile="])
@@ -88,25 +88,25 @@ def main(argv):
     down_regulated = regulated[regulated['logFC']<0]
     up_regulated = regulated[regulated['logFC']>0]
 
-    up_file = os.path.join(configs.datadir,'RA_UP_{}.txt'.format(GSE_ID))
-    down_file = os.path.join(configs.datadir,'RA_DOWN_{}.txt'.format(GSE_ID))
-    RA_UP = get_entrez_id(up_regulated, up_file)
-    RA_DOWN = get_entrez_id(down_regulated, down_file)
-    # RA_UP = pd.read_csv(up_file, index_col=False, header=None)
-    # RA_UP.rename(columns={0:'Gene ID'}, inplace=True)
-    # RA_UP['Gene ID'] = RA_UP['Gene ID'].astype(str)
-    # RA_UP = breakDownEntrezs(RA_UP)
-    # RA_DOWN = pd.read_csv(down_file, index_col=False, header=None)
-    # RA_DOWN.rename(columns={0:'Gene ID'}, inplace=True)
-    # RA_DOWN['Gene ID'] = RA_DOWN['Gene ID'].astype(str)
-    # RA_DOWN = breakDownEntrezs(RA_DOWN)
-    print(RA_DOWN)
-    print(RA_UP)
+    up_file = os.path.join(configs.datadir,'Disease_UP_{}.txt'.format(GSE_ID))
+    down_file = os.path.join(configs.datadir,'Disease_DOWN_{}.txt'.format(GSE_ID))
+    Disease_UP = get_entrez_id(up_regulated, up_file)
+    Disease_DOWN = get_entrez_id(down_regulated, down_file)
+    # Disease_UP = pd.read_csv(up_file, index_col=False, header=None)
+    # Disease_UP.rename(columns={0:'Gene ID'}, inplace=True)
+    # Disease_UP['Gene ID'] = Disease_UP['Gene ID'].astype(str)
+    # Disease_UP = breakDownEntrezs(Disease_UP)
+    # Disease_DOWN = pd.read_csv(down_file, index_col=False, header=None)
+    # Disease_DOWN.rename(columns={0:'Gene ID'}, inplace=True)
+    # Disease_DOWN['Gene ID'] = Disease_DOWN['Gene ID'].astype(str)
+    # Disease_DOWN = breakDownEntrezs(Disease_DOWN)
+    print(Disease_DOWN)
+    print(Disease_UP)
 
-    all_file = os.path.join(configs.datadir, 'RA_FULL_{}.txt'.format(GSE_ID))
-    RA_FULL = get_entrez_id(data2, all_file)
+    all_file = os.path.join(configs.datadir, 'Disease_FULL_{}.txt'.format(GSE_ID))
+    Disease_FULL = get_entrez_id(data2, all_file)
     data2.index.name = 'Affy ID'
-    data2['ENTREZ_GENE_ID'] = RA_FULL['Gene ID']
+    data2['ENTREZ_GENE_ID'] = Disease_FULL['Gene ID']
     data2.dropna(how='any', subset=['ENTREZ_GENE_ID'], inplace=True)
     raw_file = os.path.join(configs.datadir, 'Raw_Fit_{}.csv'.format(GSE_ID))
     print('Raw Data saved to\n{}'.format(raw_file))
