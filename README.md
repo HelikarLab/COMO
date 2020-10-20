@@ -28,9 +28,6 @@ This is the home page for MADRID pipeline.
 
 ![4](./doc/IMG_4.jpg)
 
-## Run Script
-1. Download Data from https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE2770
-2. Run Affy_Script.r in the same folder of the extracted data files
 
 
 ## Example
@@ -44,16 +41,6 @@ Using pipeline to identify drug targets against Rheumatoid arthritis using GSMNs
 3. We used a dataset of rheumatoid arthritis that is input for Step 3 to identify differentially expressed genes. The up and downregulated genes were used as inputs with curated models in Step 4. 
 
 4. Using constructed models, we perform knock-out simulations based on genes overlapping with input file “RepurposingHub.txt” obtained from the ConnectivityMap database and included in the pipeline. 
-
-Raw data
-RMAC Data
-
-## Todolist
-* Build a Python RESTful prototype
-* ~Implement Step 2 (when Bhanwar back)~ Have problem with agilent and one affy test in the input excel file tab 4
-* ~Implement step 1 (read raw data) via Python, automate the manual operations~
-* ~1. Setup development environment for R and Python~
-
 
 
 ## Resources
