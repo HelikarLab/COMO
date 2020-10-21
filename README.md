@@ -6,7 +6,7 @@ This is the home page for MADRID pipeline.
 - [Install Docker](https://docs.docker.com/install/)
 - `docker login`
 - `docker pull docker.pkg.github.com/helikarlab/madrid/madrid:r1.21`
-- `docker run --cpus=2 -p 4000:8888 docker.pkg.github.com/helikarlab/madrid/madrid:r1.01` Run docker image and assign 2 CPUs to it.
+- `docker run --cpus=2 -p 4000:8888 docker.pkg.github.com/helikarlab/madrid/madrid:r1.21` Run docker image and assign 2 CPUs to it.
 - Open [http://127.0.0.1:4000](http://127.0.0.1:4000) from your Browser, input token shown in command line terminal from previous step
 - In your jupyter notebook, open `/pipelines/py/pipeline.ipynb`
 - Upload your configuration and data files `/pipelines/data/` according to the instructions in the notebook, update the file names in the jupyter notebook accordingly.
