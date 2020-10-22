@@ -5,8 +5,8 @@ This is the home page for MADRID pipeline.
 ## How To Run application
 - [Install Docker](https://docs.docker.com/install/)
 - `docker login`
-- `docker pull docker.pkg.github.com/helikarlab/madrid/madrid:r1.21`
-- `docker run --cpus=2 -p 4000:8888 docker.pkg.github.com/helikarlab/madrid/madrid:r1.21` Run docker image and assign 2 CPUs to it.
+- `docker pull docker.pkg.github.com/helikarlab/madrid/madrid:r1.22`
+- `docker run --cpus=2 -p 4000:8888 docker.pkg.github.com/helikarlab/madrid/madrid:r1.22` Run docker image and assign 2 CPUs to it.
 - Open [http://127.0.0.1:4000](http://127.0.0.1:4000) from your Browser, input token shown in command line terminal from previous step
 - In your jupyter notebook, open `/pipelines/py/pipeline.ipynb`
 - Upload your configuration and data files `/pipelines/data/` according to the instructions in the notebook, update the file names in the jupyter notebook accordingly.
@@ -30,17 +30,52 @@ This is the home page for MADRID pipeline.
 
 
 
-## Example
+## Running pipeline: Example
 
-Using pipeline to identify drug targets against Rheumatoid arthritis using GSMNs of four CD4+ T cell subtypes: naïve, Th1, Th2, and Th17 developed by Puniya et al., 2020. 
+Identify drug targets against Rheumatoid arthritis using GSMN of naïve CD4+ T cell subtype.  
 
-1. In "pipelines/data" folder, we included GEO accession numbers of transcriptomics data in input file 1 (i.e., _“transcriptomics_data_inputs.xls”_) and sample names of proteomics data for each subtype in input file 2 (i.e., _“proteomics_data_inputs.xls”_). The protein abundance file is provided in input file 3 (i.e., _“ProteomicsDataMatrix.xls”_). Running Step 1 in _jupyter_ notebook will generate “gene activity” files based on transcriptomics and proteomics data, as described by Puniya et al., 2020. 
+Follow **How To Run application** instructions to run application and open Jupyter notebook.
 
-2. Our pipeline includes a modified version of the Recon3D model to use as a reference for model contextualization. Running step 2 with gene activity and Recon3D will generate models for naive, Th1, Th2, and Th17 CD4+ T cell subtypes. These models can be directly used for drug target identification. These models can be further curated and reuploaded. We used already curated versions of developed models provided by Puniya et al., 2020. 
+**Step 1.** In _"/root/pipelines/data/"_ folder, we included GEO accession numbers of transcriptomics data in input file _“transcriptomics_data_inputs.xls”_ and sample names of proteomics data in input file _“proteomics_data_inputs.xls”_. The protein abundance data is provided in input file  _“ProteomicsDataMatrix.xls”_. 
 
-3. We used a dataset of rheumatoid arthritis that is input for Step 3 to identify differentially expressed genes. The up and downregulated genes were used as inputs with curated models in Step 4. 
+_"transcriptomics_data_inputs.xls"_  includes Microarray samples of naive CD4+ T cells from GSE22886, GSE43005, GSE22045, and GSE24634. The file _"proteomics_data_inputs.xls"_ file contains sample names of Naive CD4+ T cells in _"ProteomicsDataMatrix.xls"_. 
 
-4. Using constructed models, we perform knock-out simulations based on genes overlapping with input file “RepurposingHub.txt” obtained from the ConnectivityMap database and included in the pipeline. 
+Running Step 1 in _jupyter_ notebook will generate “gene activity” files based on transcriptomics and proteomics data, as described by Puniya et al., 2020. This will save final output in   _"GeneExpression_Naive_Merged.csv"_  and its path in _"step1_results_files.json"
+
+**Step 2.** Our pipeline includes a modified version of the Recon3D model to use as a reference for model contextualization. 
+The modified version of Recon3D in _"/root/pipelines/data/"_ folder is available in _"GeneralModel.mat"_ file. 
+This step will use _"GeneExpression_Naive_Merged.csv"_ (created in Step 1) with _"GeneralModel.mat"_ and construct a cell-type-specific model of Naive CD4+ cells. This step will save the output file as _"Naive_SpecificModel.json"_ in _"/root/pipeline/data/"_.
+
+Running step 2 with gene activity and Recon3D will generate a model for naive CD4+ T cells. We can use this model in the next steps. However, we advise users to properly investigate, manually curate, and reupload the refined version in  _"/root/pipeline/data"_ to use in Step 4. We provided already curated versions of the Naive CD4+ T cell model uploaded as _"NaiveModel.mat"_ in  _"/root/pipeline/data/"_. 
+
+**Step 3.** We used a dataset (GSE56649) of rheumatoid arthritis to identify differentially expressed genes (disease genes). We defined accession ids of this dataset in input file _"disease_transcriptomics_data_inputs.xlsx"_
+
+This step will generate files _"Disease_UP_GSE56649.txt"_ and _"Disease_DOWN_GSE56649.txt"_ and save their paths in _"step2_results files.json"_ in _"/root/pipeline/data/"_.  Finally, this step will create _"disease_files"_ variable that will include paths of files for up and downregulated genes. 
+
+**Step 4.**  This step will use the model (constructed in Step 2/ uploaded curated version) and perform knock-out simulations of genes overlapping with the drug-target data file obtained from the ConnectivityMap database. We refined the drug target-data file and included in _"/root/pipeline/data/"_ as _"RepurposingHub.txt"_.
+
+This step will use model (either _"Naive_SpecificModel.json",  or an already curated version uploaded as _"NaiveModel.mat"_), _"Disease_UP_GSE56649.txt"_ and _"Disease_DOWN_GSE56649.txt"_, and  _"RepurposingHub.txt"_ . 
+
+The final output files will include drug targets ranked based on Perturbation Effect Score (PES), as described by Puniya et al., 2020.
+Final output folder: _"/root/pipelines/output/"_
+The output file  _"d_score.csv"_ will contain Entrez ids of ranked genes and corresponding PES.  The file _"drug_score.csv"_ will contain PES ranked drug targets (Entrez ids and gene symbols) with mapped repurposed drugs. 
+
+## Running pipeline: User-defined data
+Create config and data files and upload them to _"/root/pipelines/data/"_  of the _Jupyter_. 
+
+ 
+1. See _“transcriptomics_data_inputs.xls”_ and create a config file for transcriptomics data. Change the names in Step 1 of the Jupyter notebook. For multiple cell-types, use a separate tab for each cell type data in this file. Example: For Th1 and Th2 CD4+ T cell subtypes, the config file should contain two sheets. Each sheet should include samples related to one cell type. 
+2. If proteomics data is available, upload a data file with protein abundances (see _“ProteomicsDataMatrix.xls”_) and define sample names in the config file for proteomics data (see _“proteomics_data_inputs.xls”_).  For multiple cell-types, use the same names for the same subtype in transcriptomics (sheet names) and proteomics (headers) config files. 
+        
+        #If proteomics data is not available, please use the following file names in Step 1 of the Jupyter notebook.
+        proteomics_data_file = 'dummy_proteomics_data.xlsx'
+        proteomics_config_file = 'dummy_proteomics_config.xlsx' 
+3. We provide a generic human metabolic model in _"GeneralModel.mat"_ file in the pipeline. If user provide a new version of the human metabolic model, it should contain Entrez gene IDs in the gene rules.
+4. See _"disease_transcriptomics_data_inputs.xlsx"_ and create disease_gene_file. If using a different file name, please update the name in Step 3 of the Jupyter notebook. 
+5. For using the automatically created model(s), no change is required in  Step 4. If the user wants to use refined models, upload them in .mat format and uncomment the relevant lines and change file names in substep 3 of Step 4. 
+
+See final outputs in: _"/root/pipelines/output/"_  
+
 
 
 ## Resources
