@@ -188,6 +188,8 @@ def mergeLogicalTable(df_results):
     '''
     # step 1: get all plural ENTREZ_GENE_IDs in the input table, extract unique IDs
     df_results.reset_index(drop=False, inplace=True)
+    df_results['ENTREZ_GENE_ID'] = df_results['ENTREZ_GENE_ID'].astype(str)
+    print(df_results.dtypes)
     df_results['ENTREZ_GENE_ID'] = df_results['ENTREZ_GENE_ID'].str.replace(" /// ", "//")
     id_list = []
     df_results.dropna(axis=0, subset=['ENTREZ_GENE_ID'], inplace=True)
@@ -264,6 +266,16 @@ def mergeLogicalTable(df_results):
 
 
 def load_transcriptomics_tests(filename):
+    # CHANGED BC I CANT USE DOCKER DONT FORGET TO CHANGE BACK
+    #inqueryFullPath = "G:/GitHub/New Folder/MADRID/docker/pipelines/py/data/" + filename
+    if not filename:
+        tests = ["dummy"]
+        fullsavepath = os.path.join(configs.rootdir, 'data', "dummy_transcriptomics_data.csv")
+        data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
+        datas = [data]
+        transcriptomics_dict = dict(zip(tests, datas))
+        return transcriptomics_dict
+
     inqueryFullPath = os.path.join(configs.rootdir, 'data', filename)
     if not os.path.isfile(inqueryFullPath):
         print('Error: file not found {}'.format(inqueryFullPath))
@@ -276,6 +288,8 @@ def load_transcriptomics_tests(filename):
     for sheet in sheet_name:
         # print(list(inqueries[i]))
         filename = 'transcriptomics_{}.csv'.format(sheet)
+        # CHANGED BC I CANT USE DOCKER DONT FORGET TO CHANGE BACK
+        #fullsavepath = "G:/GitHub/New Folder/MADRID/docker/pipelines/py/data/" + filename
         fullsavepath = os.path.join(configs.rootdir, 'data', filename)
         data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
         print('Read from {}'.format(fullsavepath))
@@ -309,7 +323,10 @@ def main(argv):
 
     # gse2770 = GSEproject('GSE2770',configs.rootdir)
 
+    # CHANGED BC I CANT USE DOCKER DONT FORGET TO CHANGE BACK
+    #inqueryFullPath = "G:/GitHub/New Folder/MADRID/docker/pipelines/py/data/" + inputfile
     inqueryFullPath = os.path.join(configs.rootdir, 'data', inputfile)
+    print(inqueryFullPath)
     xl = pd.ExcelFile(inqueryFullPath)
     sheet_name = xl.sheet_names
     inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_name, header=0)
@@ -320,6 +337,8 @@ def main(argv):
         df = inqueries[sheet].loc[:,['GSE ID','Samples','GPL ID','Instrument']]
         df_output = queryTest(df)
         filename = 'transcriptomics_{}.csv'.format(sheet)
+        # CHANGED BC I CANT USE DOCKER DONT FORGET TO CHANGE BACK
+        #fullsavepath = "G:/GitHub/New Folder/MADRID/docker/pipelines/py/data/" + filename
         fullsavepath = os.path.join(configs.rootdir, 'data', filename)
         df_output.to_csv(fullsavepath)
         print('Save to {}'.format(fullsavepath))
