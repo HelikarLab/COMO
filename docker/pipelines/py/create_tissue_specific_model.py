@@ -220,22 +220,22 @@ def main(argv):
     print('Gene Expression file is "{}"'.format(genefile))
     print('Output file is "{}"'.format(outputfile))
     #print(configs.rootdir)
-    GeneralModelFile = os.path.join(configs.datadir, modelfile)
-    GeneExpressionFile = os.path.join(configs.datadir, genefile)
+    GeneralModelFile = os.path.join(configs.rootdir, 'data', modelfile)
+    GeneExpressionFile = os.path.join(configs.rootdir, 'data', genefile)
     TissueModel = createTissueSpecificModel(GeneralModelFile, GeneExpressionFile)
     print(TissueModel)
     if outputfile[-4:] == '.mat':
-        # cobra.io.mat.save_matlab_model(TissueModel, os.path.join(configs.datadir, outputfile))
-        cobra.io.save_matlab_model(TissueModel, os.path.join(configs.datadir, outputfile))
+        # cobra.io.mat.save_matlab_model(TissueModel, os.path.join(configs.rootdir, 'data', outputfile))
+        cobra.io.save_matlab_model(TissueModel, os.path.join(configs.rootdir, 'data', outputfile))
     elif outputfile[-4:] == '.xml':
         print('cobrapy only support level 2 SBML model, while this model is level 3')
-        cobra.io.write_sbml_model(TissueModel, os.path.join(configs.datadir, outputfile))
+        cobra.io.write_sbml_model(TissueModel, os.path.join(configs.rootdir, 'data', outputfile))
     elif outputfile[-5:] == '.json':
-        cobra.io.save_json_model(TissueModel, os.path.join(configs.datadir, outputfile))
+        cobra.io.save_json_model(TissueModel, os.path.join(configs.rootdir, 'data', outputfile))
     else:
         print('Error: unsupported model format: {}'.format(outputfile))
         return None
-    # cobra.io.sbml.write_cobra_model_to_sbml_file(TissueModel, os.path.join(configs.datadir,'Th1_SpecificModel.xml'))
+    # cobra.io.sbml.write_cobra_model_to_sbml_file(TissueModel, os.path.join(configs.rootdir, 'data','Th1_SpecificModel.xml'))
     print('Genes: ' + str(len(TissueModel.genes)))
     print('Metabolites: ' + str(len(TissueModel.metabolites)))
     print('Reactions: ' + str(len(TissueModel.reactions)))
