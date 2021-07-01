@@ -102,7 +102,7 @@ def gene_rule_float(expressionIn):
     return gene_reaction_by_rule
 
 
-def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile):
+def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algorithm):
     model_cobra = cobra.io.load_matlab_model(GeneralModelFile)
 
     mat = scipy.io.loadmat(GeneralModelFile)['model'] # Created by writeCbModel in matlab instead of saveas
@@ -113,25 +113,40 @@ def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile):
 
     expressionRxns, expVector = mapExpressionToRxn(model_cobra, GeneExpressionFile)
 
+    print(expressionRxns)
+    print(expVector)
+    expressed_rxns = list({k:v for (k,v) in expressionRxns.items() if v > 0}.keys())
+
     idx_objective = rx_names.index('biomass_reaction_Mphage')
-    properties = GIMMEProperties(exp_vector=expVector,#np.array(gimme_data['0']),
+
+    if recon_algorithm == "GIMME":
+        properties = GIMMEProperties(
+                                exp_vector=expVector,#np.array(gimme_data['0']),
                                 obj_frac=0.9,
                                 objectives= [{idx_objective:1}],
                                 preprocess=True,
                                 flux_threshold=0.9
                                 )
-    algorithm = GIMME(S, lb.astype(float), ub.astype(float), properties)
-    model_GIMME = algorithm.run()
+        algorithm = GIMME(S, lb.astype(float), ub.astype(float), properties)
 
-    model_GIMME_final = model_cobra.copy() # this is done since it alters the original model_cobra; this way is to guarantee that a new model is changed instead of the original model
-    r_ids = [r.id for r in model_GIMME_final.reactions]
-    to_remove_ids = [r_ids[r] for r in np.where(model_GIMME==0)[0]]
-    model_GIMME_final.remove_reactions(to_remove_ids,True) # this is to get the ids of the reactions to be removed in the model; True is to remove the pending genes/metabolites that with the removal of the reaction can no longer be connected in the network
+    elif recon_algorithm == "FASTCORE":
+        properties = FastcoreProperties(core=expressed_rxns)
+        algorithm = FASTcore(S, lb.astype(float), ub.astype(float), properties)
 
-    print('1\'s: ' + str(len(np.where(model_GIMME==1)[0])))
-    print('2\'s: ' + str(len(np.where(model_GIMME==2)[0])))
+    else:
+        print("Invalid reconstruction algorithm")
+        return None
 
-    return model_GIMME_final
+    model_seeded = algorithm.run()
+    model_seeded_final = model_cobra.copy() # this is done since it alters the original model_cobra; this way is to guarantee that a new model is changed instead of the original model
+    r_ids = [r.id for r in model_seeded_final.reactions]
+    to_remove_ids = [r_ids[r] for r in np.where(model_seeded==0)[0]]
+    model_seeded_final.remove_reactions(to_remove_ids,True) # this is to get the ids of the reactions to be removed in the model; True is to remove the pending genes/metabolites that with the removal of the reaction can no longer be connected in the network
+
+    print('1\'s: ' + str(len(np.where(model_seeded==1)[0])))
+    print('2\'s: ' + str(len(np.where(model_seeded==2)[0])))
+
+    return model_seeded_final
 
 
 def splitGeneExpressionData(expressionData):
@@ -183,7 +198,7 @@ def mapExpressionToRxn(model_cobra, GeneExpressionFile):
             print(gene_reaction_by_rule)
             cnt += 1
     print('Map gene expression to reactions, {} errors.'.format(cnt))
-    expVector = np.array(list(expressionRxns.values()),dtype=np.float)
+    expVector = np.array(list(expressionRxns.values()),dtype=float)
     return expressionRxns, expVector
 
 
@@ -202,13 +217,13 @@ def main(argv):
     genefile = 'GeneExpression_Th1_Merged.csv'
     outputfile = 'Th1_SpecificModel.json'
     try:
-        opts, args = getopt.getopt(argv, "hm:g:o:", ["mfile=", "gfile=", "ofile="])
+        opts, args = getopt.getopt(argv, "hm:g:o:a:", ["mfile=", "gfile=", "ofile=", "algorithm="])
     except getopt.GetoptError:
-        print('python3 create_tissue_specific_model.py -m <modelfile> -g <genefile> -o <outputfile>')
+        print('python3 create_tissue_specific_model.py -m <modelfile> -g <genefile> -o <outputfile> -a <algorithm>')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('python3 create_tissue_specific_model.py -m <modelfile> -g <genefile> -o <outputfile>')
+            print('python3 create_tissue_specific_model.py -m <modelfile> -g <genefile> -o <outputfile> -a <algorithm>')
             sys.exit()
         elif opt in ("-m", "--mfile"):
             modelfile = arg
@@ -216,13 +231,17 @@ def main(argv):
             genefile = arg
         elif opt in ("-o", "--ofile"):
             outputfile = arg
+        elif opt in ("-a", "--algorithm"):
+            recon_algorithm = arg
+
     print('General Model file is "{}"'.format(modelfile))
     print('Gene Expression file is "{}"'.format(genefile))
     print('Output file is "{}"'.format(outputfile))
+    print('Using "{}" reconstruction algorithm'.format(recon_algorithm))
     #print(configs.rootdir)
     GeneralModelFile = os.path.join(configs.rootdir, 'data', modelfile)
     GeneExpressionFile = os.path.join(configs.rootdir, 'data', genefile)
-    TissueModel = createTissueSpecificModel(GeneralModelFile, GeneExpressionFile)
+    TissueModel = createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algorithm)
     print(TissueModel)
     if outputfile[-4:] == '.mat':
         # cobra.io.mat.save_matlab_model(TissueModel, os.path.join(configs.rootdir, 'data', outputfile))
