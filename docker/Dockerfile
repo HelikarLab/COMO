@@ -28,7 +28,8 @@ RUN R -e "BiocManager::install('hgu133acdf', dep=TRUE, ask=FALSE)"
 RUN R -e "BiocManager::install('edgeR', dep=TRUE, ask=FALSE)"
 RUN R -e "BiocManager::install('genefilter', dep=TRUE, ask=FALSE)"
 RUN R -e "BiocManager::install('biomaRt', dep=TRUE, ask=FALSE)"
-RUN R -e "install.packages(c('rzmq','repr','IRkernel','IRdisplay', 'tidyverse', 'sjmisc'), repos = c('http://irkernel.github.io/', getOption('repos')), type = 'source')"
+RUN R -e "install.packages(c('rzmq','repr','IRkernel','IRdisplay'), repos = c('http://irkernel.github.io/', getOption('repos')), type = 'source')"
+RUN R -e "install.packages(c('tidyverse', 'sjmisc'))"
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 RUN python3.6 -m pip install numpy --upgrade 
