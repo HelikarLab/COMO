@@ -20,6 +20,9 @@ RUN apt-get install -y gdebi-core wget
 RUN wget https://download2.rstudio.org/server/trusty/amd64/rstudio-server-1.2.5001-amd64.deb
 RUN gdebi rstudio-server-1.2.5001-amd64.deb
 RUN apt-get install -y python3-rpy2
+RUN apt-get install -y libxml2-dev libcurl4-openssl-dev libssl-dev libv8-dev
+RUN R -e "install.packages('tidyverse', dependencies = TRUE, repos='http://cran.rstudio.com/')"
+RUN R -e "install.packages('sjmisc', dependencies = TRUE, repos='http://cran.rstudio.com/')"
 RUN R -e "if (!requireNamespace(\"BiocManager\", quietly = TRUE)) install.packages(\"BiocManager\")"
 RUN R -e "BiocManager::install('affy', dep=TRUE, ask=FALSE)"
 RUN R -e "BiocManager::install('agilp', dep=TRUE, ask=FALSE)"
