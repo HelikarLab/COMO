@@ -24,8 +24,8 @@ RUN apt-get install libxml2-dev
 RUN wget https://download2.rstudio.org/server/trusty/amd64/rstudio-server-1.2.5001-amd64.deb
 RUN gdebi rstudio-server-1.2.5001-amd64.deb
 RUN apt-get install -y python3-rpy2
-RUN R -e "install.packages('sjmisc')"
-RUN R -e "install.packages('tidyverse')"
+RUN R -e "install.packages('sjmisc', dependencies=TRUE)"
+RUN R -e "install.packages('tidyverse', dependencies=TRUE)"
 RUN R -e "if (!requireNamespace(\"BiocManager\", quietly = TRUE)) install.packages(\"BiocManager\")"
 RUN R -e "BiocManager::install('affy', dep=TRUE, ask=FALSE)"
 RUN R -e "BiocManager::install('agilp', dep=TRUE, ask=FALSE)"
