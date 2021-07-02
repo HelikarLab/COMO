@@ -21,18 +21,18 @@ RUN wget https://download2.rstudio.org/server/trusty/amd64/rstudio-server-1.2.50
 RUN gdebi rstudio-server-1.2.5001-amd64.deb
 RUN apt-get install -y python3-rpy2
 RUN apt-get install -y libxml2-dev libcurl4-openssl-dev libssl-dev libv8-dev
-RUN R -e "install.packages('tidyverse', dependencies = TRUE, repos='http://cran.rstudio.com/')"
-RUN R -e "install.packages('sjmisc', dependencies = TRUE, repos='http://cran.rstudio.com/')"
-RUN R -e "if (!requireNamespace(\"BiocManager\", quietly = TRUE)) install.packages(\"BiocManager\")"
-RUN R -e "BiocManager::install('affy', dep=TRUE, ask=FALSE)"
-RUN R -e "BiocManager::install('agilp', dep=TRUE, ask=FALSE)"
-RUN R -e "BiocManager::install('limma', dep=TRUE, ask=FALSE)"
-RUN R -e "BiocManager::install('hgu133acdf', dep=TRUE, ask=FALSE)"
-RUN R -e "install.packages(c('rzmq','repr','IRkernel','IRdisplay'), repos = c('http://irkernel.github.io/', getOption('repos')), type = 'source')"
+RUN Rscript -e "install.packages('tidyverse', dependencies = TRUE, repos='http://cran.rstudio.com/')"
+RUN Rscript -e "install.packages('sjmisc', dependencies = TRUE, repos='http://cran.rstudio.com/')"
+RUN Rscript -e "if (!requireNamespace(\"BiocManager\", quietly = TRUE)) install.packages(\"BiocManager\")"
+RUN Rscript -e "BiocManager::install('affy', dep=TRUE, ask=FALSE)"
+RUN Rscript -e "BiocManager::install('agilp', dep=TRUE, ask=FALSE)"
+RUN Rscript -e "BiocManager::install('limma', dep=TRUE, ask=FALSE)"
+RUN Rscript -e "BiocManager::install('hgu133acdf', dep=TRUE, ask=FALSE)"
+RUN Rscript -e "install.packages(c('rzmq','repr','IRkernel','IRdisplay'), repos = c('http://irkernel.github.io/', getOption('repos')), type = 'source')"
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 RUN python3.6 -m pip install numpy --upgrade 
-RUN R -e "IRkernel::installspec()"
+RUN Rscript -e "IRkernel::installspec()"
 COPY . .
 #RUN /root/MCR_R2018a_glnxa64_installer/install -destinationFolder /root/mcr -agreeToLicense yes -mode silent
 #RUN python3 /root/createTSM_GIMME/for_redistribution_files_only/setup.py install
