@@ -17,23 +17,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get -y install tzdata
 RUN apt-get install -y r-base
 RUN apt-get install -y gdebi-core wget
-RUN apt-get install libcurl4-openssl-dev
-RUN apt-get install libssl-dev
-RUN apt-get install libxml2-dev
-
 RUN wget https://download2.rstudio.org/server/trusty/amd64/rstudio-server-1.2.5001-amd64.deb
 RUN gdebi rstudio-server-1.2.5001-amd64.deb
 RUN apt-get install -y python3-rpy2
-RUN R -e "install.packages('sjmisc', dependencies=TRUE)"
-RUN R -e "install.packages('tidyverse', dependencies=TRUE)"
 RUN R -e "if (!requireNamespace(\"BiocManager\", quietly = TRUE)) install.packages(\"BiocManager\")"
 RUN R -e "BiocManager::install('affy', dep=TRUE, ask=FALSE)"
 RUN R -e "BiocManager::install('agilp', dep=TRUE, ask=FALSE)"
 RUN R -e "BiocManager::install('limma', dep=TRUE, ask=FALSE)"
 RUN R -e "BiocManager::install('hgu133acdf', dep=TRUE, ask=FALSE)"
-RUN R -e "BiocManager::install('edgeR', dep=TRUE, ask=FALSE)"
-RUN R -e "BiocManager::install('genefilter', dep=TRUE, ask=FALSE)"
-RUN R -e "BiocManager::install('biomaRt', dep=TRUE, ask=FALSE)"
 RUN R -e "install.packages(c('rzmq','repr','IRkernel','IRdisplay'), repos = c('http://irkernel.github.io/', getOption('repos')), type = 'source')"
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
