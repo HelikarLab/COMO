@@ -17,6 +17,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get -y install tzdata
 RUN apt-get install -y r-base
 RUN apt-get install -y gdebi-core wget
+RUN apt-get install libcurl4-openssl-dev
+RUN apt-get install libssl-dev
+RUN apt-get install libxml2-dev
+
 RUN wget https://download2.rstudio.org/server/trusty/amd64/rstudio-server-1.2.5001-amd64.deb
 RUN gdebi rstudio-server-1.2.5001-amd64.deb
 RUN apt-get install -y python3-rpy2
