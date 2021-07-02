@@ -29,7 +29,8 @@ RUN R -e "BiocManager::install('edgeR', dep=TRUE, ask=FALSE)"
 RUN R -e "BiocManager::install('genefilter', dep=TRUE, ask=FALSE)"
 RUN R -e "BiocManager::install('biomaRt', dep=TRUE, ask=FALSE)"
 RUN R -e "install.packages(c('rzmq','repr','IRkernel','IRdisplay'), repos = c('http://irkernel.github.io/', getOption('repos')), type = 'source')"
-RUN R -e "install.packages(c('tidyverse', 'sjmisc'))"
+RUN R -e "install.packages('https://cran.r-project.org/src/contrib/Archive/sjmisc/sjmisc_2.8.3.tar.gz', repos=NULL, type='source')"
+RUN R -e "install.packages('https://cran.r-project.org/src/contrib/Archive/tidyverse/tidyverse_1.3.0.tar.gz', repos=NULL, type='source')"
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 RUN python3.6 -m pip install numpy --upgrade 
