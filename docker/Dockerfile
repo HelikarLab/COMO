@@ -24,6 +24,8 @@ RUN apt-get install libxml2-dev
 RUN wget https://download2.rstudio.org/server/trusty/amd64/rstudio-server-1.2.5001-amd64.deb
 RUN gdebi rstudio-server-1.2.5001-amd64.deb
 RUN apt-get install -y python3-rpy2
+RUN R -e "install.packages('sjmisc')"
+RUN R -e "install.packages('tidyverse')"
 RUN R -e "if (!requireNamespace(\"BiocManager\", quietly = TRUE)) install.packages(\"BiocManager\")"
 RUN R -e "BiocManager::install('affy', dep=TRUE, ask=FALSE)"
 RUN R -e "BiocManager::install('agilp', dep=TRUE, ask=FALSE)"
@@ -33,8 +35,6 @@ RUN R -e "BiocManager::install('edgeR', dep=TRUE, ask=FALSE)"
 RUN R -e "BiocManager::install('genefilter', dep=TRUE, ask=FALSE)"
 RUN R -e "BiocManager::install('biomaRt', dep=TRUE, ask=FALSE)"
 RUN R -e "install.packages(c('rzmq','repr','IRkernel','IRdisplay'), repos = c('http://irkernel.github.io/', getOption('repos')), type = 'source')"
-RUN R -e "install.packages('sjmisc',dependencies=TRUE, repos='http://cran.rstudio.com/')"
-RUN R -e "install.packages('tidyverse',dependencies=TRUE, repos='http://cran.rstudio.com/')"
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 RUN python3.6 -m pip install numpy --upgrade 
