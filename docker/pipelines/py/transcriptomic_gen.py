@@ -329,7 +329,7 @@ def main(argv):
     print(inqueryFullPath)
     xl = pd.ExcelFile(inqueryFullPath)
     sheet_name = xl.sheet_names
-    inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_name, header=0)
+    inqueries = pd.read_csv(inqueryFullPath, sheet_name=sheet_name, header=0)
 
     for sheet in sheet_name:
         # print(list(inqueries[i]))
