@@ -1,44 +1,59 @@
-#Download base image ubuntu 18.04
-FROM ubuntu:18.04
-# Update Ubuntu Software repository
-RUN apt-get update && \
-        apt-get install -y software-properties-common && \
-        apt-get update -y  && \
-        apt-get install -y build-essential python3 python3-dev python3-pip apt-transport-https nano && \
-        apt-get install -y git curl wget && \
-        # update pip
-        python3 -m pip install pip --upgrade && \
-        python3 -m pip install wheel
-WORKDIR /root
-RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
-RUN add-apt-repository 'deb https://cloud.r-project.org/bin/linux/ubuntu bionic-cran35/'
-RUN apt-get update
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get -y install tzdata
-RUN apt-get install -y r-base
-RUN apt-get install -y gdebi-core wget
-RUN wget https://download2.rstudio.org/server/trusty/amd64/rstudio-server-1.2.5001-amd64.deb
-RUN gdebi rstudio-server-1.2.5001-amd64.deb
-RUN apt-get install -y python3-rpy2
-RUN apt-get install -y libxml2-dev libcurl4-openssl-dev libssl-dev libv8-dev
-RUN Rscript -e "install.packages('tidyverse', dependencies = TRUE, repos='http://cran.rstudio.com/')"
-RUN Rscript -e "install.packages('sjmisc', dependencies = TRUE, repos='http://cran.rstudio.com/')"
-RUN Rscript -e "if (!requireNamespace(\"BiocManager\", quietly = TRUE)) install.packages(\"BiocManager\")"
-RUN Rscript -e "BiocManager::install('affy', dep=TRUE, ask=FALSE)"
-RUN Rscript -e "BiocManager::install('agilp', dep=TRUE, ask=FALSE)"
-RUN Rscript -e "BiocManager::install('limma', dep=TRUE, ask=FALSE)"
-RUN Rscript -e "BiocManager::install('hgu133acdf', dep=TRUE, ask=FALSE)"
-RUN Rscript -e "install.packages(c('rzmq','repr','IRkernel','IRdisplay'), repos = c('http://irkernel.github.io/', getOption('repos')), type = 'source')"
-COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt
-RUN python3.6 -m pip install numpy --upgrade 
-RUN Rscript -e "IRkernel::installspec()"
-COPY . .
-#RUN /root/MCR_R2018a_glnxa64_installer/install -destinationFolder /root/mcr -agreeToLicense yes -mode silent
-#RUN python3 /root/createTSM_GIMME/for_redistribution_files_only/setup.py install
-#ENV XAPPLRESDIR=/root/mcr/v94/X11/app-defaults
-#ENV LD_LIBRARY_PATH=/root/mcr/v94/runtime/glnxa64:/root/mcr/v94/bin/glnxa64:/root/mcr/v94/sys/os/glnxa64:/root/mcr/v94/extern/bin/glnxa64
-#RUN rm -rf /root/MCR_R2018a_glnxa64_installer
-RUN rm -rf rstudio-server-1.2.5001-amd64.deb
-CMD ["rstudio-server", "start"]
-CMD ["jupyter", "notebook", "--ip=0.0.0.0", "--allow-root"]
+ARG UBUNTU_RELEASE=20.04
+ARG RPY2_VERSION=master
+FROM rpy2/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
+
+ARG DEBIAN_FRONTEND=noninteractive
+ENV CRAN_MIRROR=https://cloud.r-project.org \
+    CRAN_MIRROR_TAG=-cran35
+ENV JUPYTER_ENABLE_LAB=1
+ARG TINI_VERSION=v0.19.0
+ENV SHELL=/bin/bash \
+    NB_USER=jupyteruser \
+    NB_UID=1000
+
+USER root
+
+COPY install_py_libs.sh /opt/install_py_libs.sh
+COPY install_r_libs.sh /opt/install_r_libs.sh
+COPY install_jupyter.sh /opt/install_jupyter.sh
+COPY setup_jupyter.sh /opt/setup_jupyter.sh
+
+RUN \
+  sh /opt/install_py_libs.sh \
+  && sh /opt/install_r_libs.sh \
+  && apt-get update -qq \
+  && apt-get install -y curl \
+  && apt-get remove -y --purge nodejs npm \
+  && curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
+  && apt-get install -y nodejs \
+  && wget -O - https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
+  && apt-get update -qq \
+  && apt-get install -y yarn \
+  && npm install -g configurable-http-proxy \
+  && rm -rf /var/lib/apt/lists/* \
+  && useradd -m -s /bin/bash -N -u "${NB_UID}" "${NB_USER}" \
+  && sh /opt/install_jupyter.sh \
+  && echo "${NB_USER}" 'ALL=(ALL) NOPASSWD: /usr/bin/apt-get' >> /etc/sudoers \
+  && wget --quiet https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
+      -P /usr/local/bin/ \
+  && chmod +x /usr/local/bin/tini \
+  && sh /opt/setup_jupyter.sh \
+  && echo "Add Jupyter scripts emerging as ad hoc interface" \
+  && git clone --depth=1 https://github.com/jupyter/docker-stacks.git /tmp/docker-stacks \
+  && cd /tmp/docker-stacks/base-notebook \
+  && sed -e 's/jovyan/'"${NB_USER}"'/g' start.sh > /usr/local/bin/start.sh \
+  && cp start-notebook.sh /usr/local/bin/ \
+  && cp start-singleuser.sh /usr/local/bin/ \
+  && mkdir -p /etc/jupyter/ \
+  && cp jupyter_notebook_config.py /etc/jupyter/ \
+  && rm -rf /tmp/docker-stacks
+
+USER $NB_USER
+
+ENV HOME /home/${NB_USER}
+WORKDIR ${HOME}
+
+EXPOSE 8888
+
+ENTRYPOINT ["/usr/local/bin/tini", "--"]
+CMD ["start-notebook.sh"]
