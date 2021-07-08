@@ -3,13 +3,13 @@
 import os, time, sys
 import pandas as pd
 import getopt
-from rpy2.robjects.packages import importr
-from rpy2.robjects import r, pandas2ri
-import rpy2.robjects as ro
-from rpy2.robjects.conversion import localconverter
-from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
+from rpy2.robjects.packages import importr, SignatureTranslatedAnonymousPackage
+#from rpy2.robjects import r, pandas2ri
+#import rpy2.robjects as ro
+#from rpy2.robjects.conversion import localconverter
+#from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 
-pandas2ri.activate()
+#pandas2ri.activate()
 
 #limma = importr("limma")
 tidyverse = importr("tidyverse")
@@ -27,7 +27,7 @@ organizeFiles <- function(data_dir, technique) {
   fragmentFiles <- list()
   N_samples <- list()
   Names <- list()
-  count_dir_i <- paste(c(data_dir, "/bulk_geneCounts"),collapse="")
+  count_dir_i <- paste(c(data_dir, "/geneCounts"),collapse="")
   tab_dir <- list.dirs(path = count_dir_i, full.names = TRUE, recursive = FALSE)
   frag_dir_i <- paste(c(data_dir, "/fragLengths"),collapse="")
   frag_dir <- list.dirs(path = frag_dir_i, full.names = TRUE, recursive = FALSE)

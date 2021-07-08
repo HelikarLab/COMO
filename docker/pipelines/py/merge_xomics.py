@@ -38,12 +38,8 @@ def merge_xomics(transcript_file=None,
     tests = tests.union(set(keys3))
     tests.discard("dummy")
 
-    #tests = set(keys1).intersection(set(keys2))
-    print("keys1 generated")
-    print(tests)
     merge_data = None
     for test in tests:
-        print(test)
         if prote_file:
             prote_data = proteomics_dict[test].loc[:, ['expressed', 'top']]
             prote_data.rename(columns={'expressed': 'prote_exp',
@@ -73,8 +69,7 @@ def merge_xomics(transcript_file=None,
             bulk_data = bulk_dict[test].loc[:, ['expressed', 'top']]
             bulk_data.rename(columns={'expressed': 'bulk_exp',
                                       'top': 'bulk_top'}, inplace=True)
-            #bulk_data = mergeLogicalTable(bulk_data)
-            print(bulk_data)
+
             test = unidecode.unidecode(test)
             try:
                 if not merge_data:
