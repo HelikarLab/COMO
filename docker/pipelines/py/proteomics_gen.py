@@ -115,7 +115,11 @@ def save_proteomics_tests(Proteomics, proteomics_data, expr_prop, percentile):
 def load_proteomics_tests(Proteomics):
     try:
         if Proteomics==None:
-            return None
+            tests = ["dummy"]
+            fullsavepath = os.path.join(configs.rootdir, 'data', "dummy_transcriptomics_data.csv")
+            datas = ["dummy_data"]
+            proteomics_dict = dict(zip(tests, datas))
+            return proteomics_dict
     except:
         print("proteomics exists")
 
