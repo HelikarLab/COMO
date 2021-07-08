@@ -1,4 +1,4 @@
-R -e 'if (!requireNamespace(\"BiocManager\", quietly = TRUE)) install.packages(\"BiocManager\")'
+R -e 'if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")'
 R -e 'BiocManager::install('affy', dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install('agilp', dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install('limma', dep=TRUE, ask=FALSE)'
