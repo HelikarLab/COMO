@@ -13,18 +13,23 @@ ENV SHELL=/bin/bash \
 
 USER root
 
+RUN \
+  apt-get update \
+  && apt-get install libcurl4-openssl-dev \
+  && apt-get install libssl-dev \
+  && apt-get install libxml2-dev
+
 COPY install_py_libs.sh /opt/install_py_libs.sh
 COPY install_r_libs.sh /opt/install_r_libs.sh
 COPY install_jupyter.sh /opt/install_jupyter.sh
 COPY setup_jupyter.sh /opt/setup_jupyter.sh
 
-RUN \
-  apt-get install libcurl4-openssl-dev \
-  && apt-get install libssl-dev \
-  && apt-get install libxml2-dev \
+ RUN \
   && sh /opt/install_py_libs.sh \
-  && sh /opt/install_r_libs.sh \
-  && apt-get update -qq \
+  && sh /opt/install_r_libs.sh
+  
+RUN \
+  apt-get update -qq \
   && apt-get install -y curl \
   && apt-get remove -y --purge nodejs npm \
   && curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
