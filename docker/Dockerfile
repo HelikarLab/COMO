@@ -19,7 +19,10 @@ COPY install_jupyter.sh /opt/install_jupyter.sh
 COPY setup_jupyter.sh /opt/setup_jupyter.sh
 
 RUN \
-  sh /opt/install_py_libs.sh \
+  apt-get install libcurl4-openssl-dev
+  && apt-get install libssl-dev
+  && apt-get install libxml2-dev
+  && sh /opt/install_py_libs.sh \
   && sh /opt/install_r_libs.sh \
   && apt-get update -qq \
   && apt-get install -y curl \
