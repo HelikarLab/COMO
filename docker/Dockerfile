@@ -21,6 +21,10 @@ COPY install_py_libs.sh /opt/install_py_libs.sh
 COPY install_r_libs.sh /opt/install_r_libs.sh
 COPY install_jupyter.sh /opt/install_jupyter.sh
 COPY setup_jupyter.sh /opt/setup_jupyter.sh
+
+RUN \
+  sh /opt/install_py_libs.sh \
+  && sh /opt/install_r_libs.sh
   
 RUN \
   apt-get update -qq \
@@ -49,14 +53,10 @@ RUN \
   && mkdir -p /etc/jupyter/ \
   && cp jupyter_notebook_config.py /etc/jupyter/ \
   && rm -rf /tmp/docker-stacks
-  
-RUN \
-  sh /opt/install_py_libs.sh \
-  && sh /opt/install_r_libs.sh
-  
+    
 COPY pipelines/ /home/"${NB_USER}"/work/
-RUN chown -R "${NB_USER}" /home/"${NB_USER}"/py/
-RUN chown -R "${NB_USER}" /home/"${NB_USER}"/data/
+RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/py/
+RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/data/
 USER $NB_USER
 
 ENV HOME /home/${NB_USER}
