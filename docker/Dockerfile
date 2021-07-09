@@ -53,7 +53,8 @@ RUN \
   && mkdir -p /etc/jupyter/ \
   && cp jupyter_notebook_config.py /etc/jupyter/ \
   && rm -rf /tmp/docker-stacks
-
+  
+COPY pipelines/ /home/"${NB_USER}"/work/
 USER $NB_USER
 
 ENV HOME /home/${NB_USER}
