@@ -55,8 +55,8 @@ RUN \
   && rm -rf /tmp/docker-stacks
   
 COPY pipelines/ /home/"${NB_USER}"/work/
-chown -R "${NB_USER}" /home/"${NB_USER}"/py/
-chown -R "${NB_USER}" /home/"${NB_USER}"/data/
+RUN chown -R "${NB_USER}" /home/"${NB_USER}"/py/
+RUN chown -R "${NB_USER}" /home/"${NB_USER}"/data/
 USER $NB_USER
 
 ENV HOME /home/${NB_USER}
