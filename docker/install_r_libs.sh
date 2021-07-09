@@ -1,4 +1,5 @@
-mkdir /home/jupyteruser/rlibs
+mkdir /home/"${NB_USER}"/rlibs
+chown -R "${NB_USER}" /home/"${NB_USER}"/rlibs
 #R -e 'if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")'
 #R -e 'BiocManager::install("affy", dep=TRUE, ask=FALSE)'
 #R -e 'BiocManager::install("agilp", dep=TRUE, ask=FALSE)'
