@@ -51,8 +51,8 @@ RUN \
   && rm -rf /tmp/docker-stacks
   
 RUN \
-  sh /opt/install_py_libs.sh \
-  && sh /opt/install_r_libs.sh
+  sh /opt/install_py_libs.sh
+  #&& sh /opt/install_r_libs.sh
     
 COPY pipelines/ /home/"${NB_USER}"/work/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/py/
