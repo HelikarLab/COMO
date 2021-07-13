@@ -17,11 +17,6 @@ RUN \
   apt-get update \
   && apt-get install libssl-dev
 
-#COPY install_py_libs.sh /opt/install_py_libs.sh
-#COPY install_r_libs.sh /opt/install_r_libs.sh
-#COPY install_jupyter.sh /opt/install_jupyter.sh
-#COPY setup_jupyter.sh /opt/setup_jupyter.sh
-
 COPY install_py_libs.sh /opt/
 COPY install_r_libs.sh /opt/
 COPY install_jupyter.sh /opt/install_jupyter.sh
@@ -56,7 +51,6 @@ RUN \
   && mkdir -p /etc/jupyter/ \
   && cp jupyter_notebook_config.py /etc/jupyter/ \
   && rm -rf /tmp/docker-stacks
-  
   
 COPY pipelines/ /home/"${NB_USER}"/work/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/py/
