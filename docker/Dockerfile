@@ -17,8 +17,13 @@ RUN \
   apt-get update \
   && apt-get install libssl-dev
 
-COPY install_py_libs.sh /opt/install_py_libs.sh
-COPY install_r_libs.sh /opt/install_r_libs.sh
+#COPY install_py_libs.sh /opt/install_py_libs.sh
+#COPY install_r_libs.sh /opt/install_r_libs.sh
+#COPY install_jupyter.sh /opt/install_jupyter.sh
+#COPY setup_jupyter.sh /opt/setup_jupyter.sh
+
+COPY install_py_libs.sh /opt/
+COPY install_r_libs.sh /opt/
 COPY install_jupyter.sh /opt/install_jupyter.sh
 COPY setup_jupyter.sh /opt/setup_jupyter.sh
   
@@ -57,14 +62,6 @@ COPY pipelines/ /home/"${NB_USER}"/work/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/py/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/data/
 USER $NB_USER
-
-ENV HOME /home/${NB_USER}
-WORKDIR ${HOME}
-
-EXPOSE 8888
-
-ENTRYPOINT ["/usr/local/bin/tini", "--"]
-CMD ["start-notebook.sh"]
 
 ENV HOME /home/${NB_USER}
 WORKDIR ${HOME}
