@@ -39,8 +39,8 @@ RUN \
   && npm install -g configurable-http-proxy \
   && rm -rf /var/lib/apt/lists/* \
   && sh /opt/install_py_libs.sh \
-  && sed -z 's/for id, lb in zip(objective_ids, objective_lbs):/lbs_id = objective_lbs[objective_ids]\nfor id, lb in zip(objective_ids, lbs_id):/' /usr/local/lib/python3.8/dist-packages/cobamp/core/models.py
-  && sed -n p740,741 /usr/local/lib/python3.8/dist-packages/cobamp/core/models.py
+  && sed -z 's/for id, lb in zip(objective_ids, objective_lbs):/lbs_id = objective_lbs[objective_ids]\nfor id, lb in zip(objective_ids, lbs_id):/' /usr/local/lib/python3.8/dist-packages/cobamp/core/models.py \
+  && sed -n p740,741 /usr/local/lib/python3.8/dist-packages/cobamp/core/models.py \
   #&& sh /opt/install_r_libs.sh  \
   && useradd -m -s /bin/bash -N -u "${NB_UID}" "${NB_USER}" \
   && sh /opt/install_jupyter.sh \
