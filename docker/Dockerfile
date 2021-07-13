@@ -32,6 +32,8 @@ RUN \
   && apt-get install -y curl \
   && apt-get remove -y --purge nodejs npm \
   && sh /opt/install_py_libs.sh \
+  && sed -z 's/for id, lb in zip(objective_ids, objective_lbs):/lbs_id = objective_lbs[objective_ids]\nfor id, lb in zip(objective_ids, lbs_id):/' /usr/local/lib/python3.8/dist-packages/cobamp/core/models.py \
+  && sed -n p740,741 /usr/local/lib/python3.8/dist-packages/cobamp/core/models.py \
   #&& sh /opt/install_r_libs.sh  \
   && curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
   && apt-get install -y nodejs \
