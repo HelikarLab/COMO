@@ -31,6 +31,8 @@ RUN \
   apt-get update -qq \
   && apt-get install -y curl \
   && apt-get remove -y --purge nodejs npm \
+  sh /opt/install_py_libs.sh
+  #&& sh /opt/install_r_libs.sh 
   && curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
   && apt-get install -y nodejs \
   && wget -O - https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
@@ -55,10 +57,7 @@ RUN \
   && cp jupyter_notebook_config.py /etc/jupyter/ \
   && rm -rf /tmp/docker-stacks
   
-RUN \
-  sh /opt/install_py_libs.sh
-  #&& sh /opt/install_r_libs.sh
-    
+  
 COPY pipelines/ /home/"${NB_USER}"/work/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/py/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/data/
