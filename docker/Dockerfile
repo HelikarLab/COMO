@@ -34,7 +34,7 @@ RUN \
   && sh /opt/install_py_libs.sh \
   && sed -z 's/\t\tfor id, lb in zip(objective_ids, objective_lbs):/\t\tlbs_id = objective_lbs[objective_ids]\n\t\tfor id, lb in zip(objective_ids, lbs_id):/' /usr/local/lib/python3.8/dist-packages/cobamp/core/models.py \
   #&& sed -n p740,741 /usr/local/lib/python3.8/dist-packages/cobamp/core/models.py \
-  #&& sh /opt/install_r_libs.sh  \
+  && sh /opt/install_r_libs.sh  \
   && curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
   && apt-get install -y nodejs \
   && wget -O - https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
