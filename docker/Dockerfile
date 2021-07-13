@@ -31,8 +31,6 @@ RUN \
   apt-get update -qq \
   && apt-get install -y curl \
   && apt-get remove -y --purge nodejs npm \
-  && sh /opt/install_py_libs.sh \
-  #&& sh /opt/install_r_libs.sh  \
   && curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
   && apt-get install -y nodejs \
   && wget -O - https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
@@ -40,6 +38,8 @@ RUN \
   && apt-get install -y yarn \
   && npm install -g configurable-http-proxy \
   && rm -rf /var/lib/apt/lists/* \
+  && sh /opt/install_py_libs.sh \
+  #&& sh /opt/install_r_libs.sh  \
   && useradd -m -s /bin/bash -N -u "${NB_UID}" "${NB_USER}" \
   && sh /opt/install_jupyter.sh \
   && echo "${NB_USER}" 'ALL=(ALL) NOPASSWD: /usr/bin/apt-get' >> /etc/sudoers \
