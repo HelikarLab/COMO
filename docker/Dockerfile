@@ -15,7 +15,8 @@ USER root
 
 RUN \
   apt-get update \
-  && apt-get install libssl-dev
+  && apt-get install libssl-dev \
+  && apt-get install libxml2-dev
 
 #COPY install_py_libs.sh /opt/install_py_libs.sh
 #COPY install_r_libs.sh /opt/install_r_libs.sh
