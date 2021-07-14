@@ -6,8 +6,8 @@ import time
 # find project root dir
 class Configs():
     def __init__(self, projectdir):
-        #self.rootdir = projectdir
-        self.rootdir = "G:/GitHub/MADRID/docker/pipelines/"
+        self.rootdir = projectdir
+        #self.rootdir = "G:/GitHub/MADRID/docker/pipelines/"
         self.datadir = os.path.join(projectdir,'data')
         self.outputdir = os.path.join(projectdir,'output')
         self.pydir = os.path.join(projectdir,'py')

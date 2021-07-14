@@ -12,6 +12,7 @@ python3 -m pip --no-cache-dir install \
 	SQLAlchemy \
 	framed \
 	xlrd \
+	openpyxl \
 	cobamp \
 	unidecode \
 	troppo
