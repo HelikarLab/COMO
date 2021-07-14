@@ -56,8 +56,9 @@ RUN \
   && cp start-singleuser.sh /usr/local/bin/ \
   && mkdir -p /etc/jupyter/ \
   && cp jupyter_notebook_config.py /etc/jupyter/ \
-  && rm -rf /tmp/docker-stacks \
-  && sh /opt/install_r_libs.sh
+  && rm -rf /tmp/docker-stacks
+  
+RUN sh /opt/install_r_libs.sh  
   
   
 COPY pipelines/ /home/"${NB_USER}"/work/
