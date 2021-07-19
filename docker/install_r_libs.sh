@@ -9,3 +9,4 @@ R -e 'install.packages(c("rzmq","repr","IRkernel","IRdisplay"), repos = c("http:
 R -e 'install.packages(c("tidyverse", "sjmisc"), dependencies=TRUE, repos="'"${CRAN_MIRROR}"'", lib="/home/jupyteruser/rlibs")'
 R -e 'BiocManager::install("genefilter", dep=TRUE, ask=FALSE, lib="/home/jupyteruser/rlibs")'
 R -e 'BiocManager::install("biomaRt", dep=TRUE, ask=FALSE, lib="/home/jupyteruser/rlibs")'
+R -e 'BiocManager::install("edgeR", dep=TRUE, ask=FALSE, lib="/home/jupyteruser/rlibs")'
