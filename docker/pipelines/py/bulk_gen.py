@@ -13,12 +13,12 @@ import unidecode
 
 pandas2ri.activate()
 
-limma = importr("limma")
-tidyverse = importr("tidyverse")
-edgeR = importr("edgeR")
-genefilter = importr("genefilter")
-biomaRt = importr("biomaRt")
-sjmisc = importr("sjmisc")
+limma = importr("limma", lib_loc="/home/jupyteruser/rlibs"
+tidyverse = importr("tidyverse", lib_loc="/home/jupyteruser/rlibs")
+edgeR = importr("edgeR", lib_loc="/home/jupyteruser/rlibs")
+genefilter = importr("genefilter", lib_loc="/home/jupyteruser/rlibs")
+biomaRt = importr("biomaRt", lib_loc="/home/jupyteruser/rlibs")
+sjmisc = importr("sjmisc", lib_loc="/home/jupyteruser/rlibs")
 
 # automatically convert ryp2 dataframe to Pandas dataframe
 string="""
