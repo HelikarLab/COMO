@@ -10,6 +10,8 @@ import tarfile
 from instruments import *
 from GSEpipeline import load_gse_soft
 
+from rpy2.robjects import pandas2ri
+pandas2ri.activate()
 # Input: Extract Gene Info from GEO DataSets
 
 # gse = load_gse_soft(gsename)
@@ -200,8 +202,12 @@ class GSEproject:
             else:
                 print('Path not exist: {}'.format(platformdir))
                 continue
+            outputdf = ro.conversion.rpy2py(outputdf)
             outputdf['ENTREZ_GENE_ID'] = gsm_maps[key]['ENTREZ_GENE_ID']
+            print(outputdf)
             gsm_tables_sc500[key] = outputdf
+            print(gsm_tables_sc500[key])
+            print(gsm_tables_sc500)
 
         # step 2: Drop rows without ENTREZ GENE ID, set index to ENTREZ
         for key in self.platforms.keys():

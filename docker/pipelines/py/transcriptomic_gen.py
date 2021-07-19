@@ -271,7 +271,7 @@ def load_transcriptomics_tests(filename):
     if not filename:
         tests = ["dummy"]
         fullsavepath = os.path.join(configs.rootdir, 'data', "dummy_transcriptomics_data.csv")
-        data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
+        data = pd.read_excel(fullsavepath, index_col='ENTREZ_GENE_ID')
         datas = [data]
         transcriptomics_dict = dict(zip(tests, datas))
         return transcriptomics_dict
@@ -291,7 +291,7 @@ def load_transcriptomics_tests(filename):
         # CHANGED BC I CANT USE DOCKER DONT FORGET TO CHANGE BACK
         #fullsavepath = "G:/GitHub/New Folder/MADRID/docker/pipelines/py/data/" + filename
         fullsavepath = os.path.join(configs.rootdir, 'data', filename)
-        data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
+        data = pd.read_excel(fullsavepath, index_col='ENTREZ_GENE_ID')
         print('Read from {}'.format(fullsavepath))
         datas.append(data)
         tests.append(sheet)
@@ -329,7 +329,7 @@ def main(argv):
     print(inqueryFullPath)
     xl = pd.ExcelFile(inqueryFullPath)
     sheet_name = xl.sheet_names
-    inqueries = pd.read_csv(inqueryFullPath, sheet_name=sheet_name, header=0)
+    inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_name, header=0)
 
     for sheet in sheet_name:
         # print(list(inqueries[i]))

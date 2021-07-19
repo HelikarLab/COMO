@@ -12,7 +12,7 @@ from rpy2.robjects.packages import importr, SignatureTranslatedAnonymousPackage
 #pandas2ri.activate()
 
 #limma = importr("limma")
-tidyverse = importr("tidyverse")
+tidyverse = importr("tidyverse", lib_loc="/home/jupyteruser/rlibs")
 #edgeR = importr("edgeR")
 #genefilter = importr("genefilter")
 #biomaRt = importr("biomaRt")
@@ -20,7 +20,8 @@ tidyverse = importr("tidyverse")
 
 # automatically convert ryp2 dataframe to Pandas dataframe
 string="""
-library(tidyverse)
+library(tidyverse, lib.loc="/home/jupyteruser/rlibs")
+
 organizeFiles <- function(data_dir, technique) {
   SampMetrics <- list()
   countFiles <- list()
@@ -50,7 +51,7 @@ organizeFiles <- function(data_dir, technique) {
     n_samples <- length(cntFiles)
     sample_names <- rep(0,n_samples)
     for (i in 1:n_samples) {
-      samp_file <- str_match(cntFiles[i], "bulk_geneCounts/\\\\s*(.*?)\\\\s*.tab")[,2]
+      samp_file <- str_match(cntFiles[i], "geneCounts/\\\\s*(.*?)\\\\s*.tab")[,2]
       sample_names[i] <- unlist(strsplit(samp_file,"/"))[2]
     }
     entry[["CountFiles"]] <- cntFiles
@@ -74,8 +75,10 @@ prepSampCnts <- function(cntFile,files) {
       run_len <- length(run_count[,1])
       run_count <- run_count[4:run_len,]
       run_count <- na.omit(run_count)
+      genes <- run_count[,1]
       cl <- which.max(colSums(run_count[,2:4])) + 1
       run_count <- data.frame(cbind(run_count[,1], run_count[,cl]))
+      run_count[,1] <- genes # force rewrite genes bc rpy2 does not handle previous step properly
       colnames(run_count) <- c("genes", "counts")
       if ( is.null(samp_count) ) {
         samp_count <- run_count
@@ -85,31 +88,39 @@ prepSampCnts <- function(cntFile,files) {
         samp_count[is.na(samp_count)] <- 0
       }
     }
-    rnames <- samp_count["genes"]
+    print("spec 1")
+    genes <- samp_count["genes"]
     samp_count["genes"] <- NULL
     samp_count <- sapply(samp_count, as.numeric)
     samp_sum <- rowSums(samp_count)
-    samp_count <- data.frame(cbind(rnames, samp_sum))
+    samp_count <- data.frame(cbind(genes, samp_sum))
+    samp_count[,1] <- genes # rewrite bc rpy2 is weird
     colnames(samp_count)[2] <- "counts"
+    print("spec 2")
     return(samp_count)
   }
   else if ( grepl("R\\\\d+r", cntFile)==TRUE ) {
     return("skip")
   }
   else {
+    print("reg 1")
     samp_count <- read.delim(cntFile)
     samp_len <- length(samp_count[,1])
     samp_count <- samp_count[4:samp_len,]
     samp_count <- na.omit(samp_count)
+    genes <- samp_count[,1]
     cl <- which.max(colSums(samp_count[,2:4])) + 1
     samp_count <- data.frame(cbind(samp_count[,1], samp_count[,cl]))
+    samp_count[,1] <- genes # force rewrite genes bc rpy2 does not handle previous step properly
     colnames(samp_count) <- c("genes", "counts")
+    print("reg 2")
     return(samp_count)
   }
 }
 
 createCountMatrix <- function(files, sample_names, n_samples,
                               fragFiles, insertSizes, technique) {
+                              
   if ( technique=="zFPKM" ) {
     if ( grepl("r1",fragFiles[1],ignore.case=FALSE ) ) {
       groupSize <- c(fragFiles[1])
@@ -166,11 +177,6 @@ createCountMatrix <- function(files, sample_names, n_samples,
       groupSize <- c()
     }
   }
-  rnames <- counts[,"genes"]
-  counts <- counts[,-1]
-  counts <- sapply(counts, as.numeric)
-  counts <- as.matrix(counts)
-  row.names(counts) <- rnames
   if ( technique=="zFPKM" ) {
     res <-list("counts"=counts, "insertSizes"=re_insertSizes)
   }
@@ -181,31 +187,10 @@ createCountMatrix <- function(files, sample_names, n_samples,
 }
 
 genCountMatrix_main <- function(data_dir, out_dir, technique="quantile") {
-  filt_options <- list()
-  if ( exists("N_rep") ) {
-    filt_options$N_rep <- N_rep
-  } else {
-    filt_options$N_rep <- 0.2
-  }
-  if ( exists("N_samp") ) {
-    filt_options$N_samp <- N_samp
-  } else {
-    filt_options$N_samp <- 0.5
-  }
-  if ( exists("percentile") ) {
-    filt_options$percentile <- percentile
-  } else {
-    filt_options$percentile <- 0.5
-  }
-  if ( exists("min_count") ) {
-    filt_options$min_count <- min_count
-  } else {
-    filt_options$min_count <- 1
-  }
-
+  
   SampMetrics <- organizeFiles(data_dir, technique)
-
-
+  
+  
   for ( i in 1:length(SampMetrics) ) {
     if ( technique=="zFPKM" ) {
       j<-0
@@ -239,16 +224,23 @@ genCountMatrix_main <- function(data_dir, out_dir, technique="quantile") {
     }
     SampMetrics[[i]][["NumSamples"]] <- ncol(SampMetrics[[i]][["CountMatrix"]])
     if ( i == 1 ) {
-      full_count_matrix <- data.frame(SampMetrics[[i]][["CountMatrix"]])
+      #full_count_matrix <- data.frame(SampMetrics[[i]][["CountMatrix"]])
+      full_count_matrix <- SampMetrics[[i]][["CountMatrix"]]
     } else {
-      add_mat <-data.frame(SampMetrics[[i]][["CountMatrix"]])
+      #add_mat <-data.frame(SampMetrics[[i]][["CountMatrix"]])
+      add_mat <- SampMetrics[[i]][["CountMatrix"]]
       full_count_matrix <- merge(full_count_matrix, add_mat,
-                               by="row.names", all=TRUE)
-      row.names(full_count_matrix) <- full_count_matrix$Row.names
-      full_count_matrix["Row.names"] <- NULL
+                                 by="genes", all=TRUE)
+      #row.names(full_count_matrix) <- full_count_matrix$Row.names
+      #full_count_matrix["Row.names"] <- NULL
     }
   }
-  write.csv(full_count_matrix, paste(c(out_dir, "BulkRNAseqDataMatrix.csv"), collapse=""))
+  file_split <- unlist(strsplit(data_dir, "/"))
+  file_name <- paste(c(
+    out_dir, "/", file_split[length(file_split)], "_BulkRNAseqDataMatrix.csv"),collapse="") 
+  write.csv(full_count_matrix, file_name, row.names=FALSE)
+  cat("Count Matrix written at ", file_name, "\n")
+  #return(full_count_matrix)
 }
 """
 genCountMatrixio = SignatureTranslatedAnonymousPackage(string, "genCountMatrixio")
@@ -270,10 +262,11 @@ def main(argv):
         elif opt in ("-t", "--technique"):
             technique = arg
     print('Input directory is "{}"'.format(input_dir))
-    print('Output file is "{}"'.format(output_dir))
+    print('Output directory is "{}"'.format(output_dir))
     print('Active gene determination technique is "{}"'.format(technique))
 
     genCountMatrixio.genCountMatrix_main(input_dir, output_dir, technique)
+    print('Out')
 
 
 if __name__ == "__main__":
