@@ -32,8 +32,8 @@ readaffydir <- function(addr){
 fitaffydir <- function(addr, target){
     crd <- getwd()
     setwd(addr)
-    library(limma)
-    library(affy)
+    library(limma, lib.loc="/home/jupyteruser/rlibs/")
+    library(affy, lib.loc="/home/jupyteruser/rlibs/")
     targets = readTargets(target)
     mydata = ReadAffy()
     setwd(crd)
@@ -109,6 +109,7 @@ def agilent_raw(datadir, gsms):
 
     targets = pd.DataFrame(gzs,columns=['FileName'],index=txts)
     df_agilent = agilentio.readaiglent(datadir, targets)
+    df_agilent = ro.conversion.rpy2py(df_agilent)
     return df_agilent.rename(columns=cols)
 
 def readagilent(datadir, gsms, scalefactor=1.1, quantile=0.95):
