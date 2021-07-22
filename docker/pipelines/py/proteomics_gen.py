@@ -18,7 +18,7 @@ def load_proteomics_data(datafilename):
     #dataFullPath = "G:/GitHub/New Folder/MADRID/docker/pipelines/py/data/"+datafilename
     dataFullPath = os.path.join(configs.rootdir, 'data', datafilename)
     if os.path.isfile(dataFullPath):
-        fulldata = pd.read_csv(dataFullPath, sheet_name=data_sheet, header=0)
+        fulldata = pd.read_excel(dataFullPath, sheet_name=data_sheet, header=0)
     else:
         print("Error: file not found: {}".format(dataFullPath))
         return None
@@ -51,7 +51,7 @@ def load_prot_supplementary_data(suppfilename):
     #suppFullPath = "G:/GitHub/New Folder/MADRID/docker/pipelines/py/data/"+suppfilename
     suppFullPath = os.path.join(configs.rootdir, 'data', suppfilename)
     supp_sheet = ['Proteomics']
-    supplements = pd.read_csv(suppFullPath, sheet_name=supp_sheet, header=0)
+    supplements = pd.read_excel(suppFullPath, sheet_name=supp_sheet, header=0)
     Proteomics = supplements['Proteomics']
     print(Proteomics)
     return Proteomics
