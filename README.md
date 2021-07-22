@@ -1,5 +1,7 @@
 # MADRID: a pipeline for MetAbolic Drug Repurposing IDentification
 
+## MARDRID IS CURRENTLY IN DEVELOPMENT AND WILL NOT WORK IF YOU PULL IT YET TRY AGAIN IN AUGUST
+
 This is the home page for MADRID pipeline.
 
 ## How To Run application
