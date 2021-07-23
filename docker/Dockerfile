@@ -65,7 +65,7 @@ RUN sh /opt/install_r_libs.sh
 COPY pipelines/ /home/"${NB_USER}"/work/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/py/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/data/
-RUN chown -R /usr/local/lib/R/site-library
+RUN chown -R "${NB_USER}" /usr/local/lib/R/site-library
 
 USER $NB_USER
 
