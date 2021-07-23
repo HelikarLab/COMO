@@ -1,5 +1,4 @@
 R -e 'if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")'
-chown -R /usr/local/lib/R/site-library
 R -e 'BiocManager::install("affy", dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install("agilp", dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install("limma", dep=TRUE, ask=FALSE)'
