@@ -13,12 +13,12 @@ import unidecode
 
 pandas2ri.activate()
 
-limma = importr("limma", lib_loc="/home/jupyteruser/rlibs"
-tidyverse = importr("tidyverse", lib_loc="/home/jupyteruser/rlibs")
-edgeR = importr("edgeR", lib_loc="/home/jupyteruser/rlibs")
-genefilter = importr("genefilter", lib_loc="/home/jupyteruser/rlibs")
-biomaRt = importr("biomaRt", lib_loc="/home/jupyteruser/rlibs")
-sjmisc = importr("sjmisc", lib_loc="/home/jupyteruser/rlibs")
+limma = importr("limma")
+tidyverse = importr("tidyverse")
+edgeR = importr("edgeR")
+genefilter = importr("genefilter")
+biomaRt = importr("biomaRt")
+sjmisc = importr("sjmisc")
 
 # automatically convert ryp2 dataframe to Pandas dataframe
 string="""
@@ -29,29 +29,36 @@ library(genefilter)
 library(biomaRt)
 library(sjmisc)
 
-readCountMatrix <- function(cmat_file, config_file) {
+
+readCountMatrix <- function(cmat_file, config_file, info_file) {
+  gene_info <- read.csv(info_file)
+  gene_info$size <- (gene_info$end_position-gene_info$start_position)
+  conf <- read.csv(config_file, header=TRUE)
+  cmat_whole <- read.csv(cmat_file, header=TRUE)
+  cmat_whole <- cmat_whole[(gene_info$entrezgene_id!="-"),]
+  gene_info <- gene_info[(gene_info$entrezgene_id!="-"),]
+  genes <- gene_info$entrezgene_id
   SampMetrics <- list()
-  conf <- read.table(config_file, header=TRUE, sep=",")
-  cmat_whole <- read.table(cmat_file, header=TRUE, sep=",")
-  genes <- cmat_whole[,1]
   i=0
   insert_sizes <- c()
   samp_names <- c()
   for ( entry in conf$SampleName ) {
     i<-i+1
     if ( i==1 ) {
-        #print(paste(c("reading counts for ", entry),collapse=""))
     } else if ( grepl("GROUP", entry) ) {
       if ( i>2 ) {
-        rnames <- samp_mat[,"samp_mat"]
+        #rnames <- samp_mat[,"samp_mat"]
         samp_mat <- samp_mat[,-1]
         samp_mat <- sapply(data.frame(samp_mat), as.numeric)
         samp_mat <- as.matrix(samp_mat)
-        rownames(samp_mat) <- rnames
+        #rownames(samp_mat) <- rnames
         colnames(samp_mat) <- samp_names
         SampMetrics[[group]][["CountMatrix"]] <- samp_mat
         SampMetrics[[group]][["NumSamples"]] <- ncol(samp_mat)-1
         SampMetrics[[group]][["InsertSizes"]] <- insert_sizes
+        SampMetrics[[group]][["Entrez"]] <- as.character(gene_info$entrezgene_id)
+        SampMetrics[[group]][["GeneSizes"]] <- gene_info$size
+        
         insert_sizes <- c()
         samp_names <- c()
       }
@@ -63,30 +70,33 @@ readCountMatrix <- function(cmat_file, config_file) {
       samp_names <- c(samp_names, entry)
     } else {
       print(paste(c("config file entry ", entry, " not found in count matrix file."),
-                    collapse=""))
+                  collapse=""))
     }
   }
-  rnames <- samp_mat[,"samp_mat"]
+  #rnames <- samp_mat[,"samp_mat"]
   samp_mat <- samp_mat[,-1]
   samp_mat <- sapply(data.frame(samp_mat), as.numeric)
   samp_mat <- as.matrix(samp_mat)
-  rownames(samp_mat) <- rnames
+  #rownames(samp_mat) <- rnames
   colnames(samp_mat) <- samp_names
-
+  
   # remove version numbers from ensembl id
-  for ( j in 1:length(rownames(samp_mat)) ) {
-    r <- rownames(samp_mat)[j]
+  for ( j in 1:length(genes) ) {
+    r <- genes[j]
     if ( grepl("\\\\.", r) ) {
       gen <- unlist(str_split(r, "\\\\."))[1]
-      rownnames(samp_mat)[j] <- gen
+      genes[j] <- gen
     }
   }
   SampMetrics[[group]][["CountMatrix"]] <- samp_mat
   SampMetrics[[group]][["NumSamples"]] <- ncol(samp_mat)-1
   SampMetrics[[group]][["InsertSizes"]] <- insert_sizes
-
+  SampMetrics[[group]][["Entrez"]] <- as.character(gene_info$entrezgene_id)
+  SampMetrics[[group]][["GeneSizes"]] <- gene_info$size
+  
   return(SampMetrics)
 }
+
 
 calculateTPM <- function(SampMetrics, cell_types) {
   for ( i in 1:length(SampMetrics) ) {
@@ -103,6 +113,7 @@ calculateTPM <- function(SampMetrics, cell_types) {
   return(SampMetrics)
 }
 
+
 calculateZscore <- function(SampMetrics, cell_types, norm_tech) {
   for ( i in 1:length(SampMetrics)) {
     if ( norm_tech=="CPM" ) {
@@ -111,7 +122,7 @@ calculateZscore <- function(SampMetrics, cell_types, norm_tech) {
       tmat <- SampMetrics[[i]][["TPM_Matrix"]]
     }
     zmat <- matrix(nrow=nrow(tmat), ncol=ncol(tmat))
-    rownames(zmat) <- rownames(tmat)
+    #rownames(zmat) <- rownames(tmat)
     for ( j in 1:ncol(tmat) ) {
       tvec <- tmat[,j]
       logvec <- log2(tvec)
@@ -126,16 +137,15 @@ calculateZscore <- function(SampMetrics, cell_types, norm_tech) {
   return(SampMetrics)
 }
 
+
 CPM_filter <- function(SampMetrics, filt_options, cell_types) {
-  N <- filt_options$pos_rep
-  perc_top <- filt_options$top_percentile
+  N_exp <- filt_options$pos_rep
+  N_top <- filt_option$top_rep
   min.count <- filt_options$min_count
   for ( i in 1:length(SampMetrics) ) {
     counts <- SampMetrics[[i]][["CountMatrix"]]
-    ens <- SampMetrics[[i]][["ENSEMBL"]]
     ent <- SampMetrics[[i]][["Entrez"]]
     size <- SampMetrics[[i]][["GeneSizes"]]
-    symb <- SampMetrics[[i]][["GeneSymbol"]]
     lib.size <- colSums(counts)
     MedianLibSize <- median(lib.size)
     if ( min.count=="default" ) {
@@ -144,140 +154,124 @@ CPM_filter <- function(SampMetrics, filt_options, cell_types) {
       CPM.Cutoff <- min.count/MedianLibSize*1e6
     }
     CPM <- cpm(counts,lib.size=lib.size)
-    min.samples <- round(N * ncol(counts))
-    test_bools_top <- data.frame(genes=ens)
+    min.samples <- round(N_exp * ncol(counts))
+    top.samples <- round(N_top * ncol(counts))
+    test_bools_top <- data.frame(genes=ent)
     for ( j in 1:ncol(CPM) ) {
       cpm_q <- CPM[,j]
       cpm_q <- cpm_q[cpm_q>0]
       q_cutoff_top <- quantile(cpm_q, prob=1-perc_top/100)
       test_bools_top <- cbind(test_bools_top, as.integer(CPM[,j]>q_cutoff_top))
     }
-
+    
     f1 <- genefilter::kOverA(min.samples, CPM.Cutoff)
     flist <- genefilter::filterfun(f1)
     keep <- genefilter::genefilter(CPM, flist)
-    SampMetrics[[i]][["ENSEMBL"]] <- ens[keep]
     SampMetrics[[i]][["Entrez"]] <- ent[keep]
     SampMetrics[[i]][["GeneSizes"]] <- size[keep]
     SampMetrics[[i]][["CountMatrix"]] <- counts[keep,]
     SampMetrics[[i]][["CPM_Matrix"]] <- CPM[keep,]
-    SampMetrics[[i]][["GeneSymbol"]] <- symb[keep]
-
+    
     # top percentile genes
     test_bools_top["genes"] <- NULL
-    f1_top <- genefilter::kOverA(1, 0.9)
+    f1_top <- genefilter::kOverA(top.samples, CPM.Cutoff)
     flist_top <- genefilter::filterfun(f1_top)
     keep_top <- genefilter::genefilter(test_bools_top, flist_top)
-    SampMetrics[[i]][["ENSEMBL_top"]] <- ens[keep_top]
     SampMetrics[[i]][["Entrez_top"]] <- ent[keep_top]
-    SampMetrics[[i]][["GeneSymbol_top"]] <- symb[keep_top]
   }
   SampMetrics <- calculateZscore(SampMetrics, cell_types, "CPM")
   return(SampMetrics)
 }
 
+
 TPM_quant_filter <- function(SampMetrics, filt_options, cell_types) {
-  N <- filt_options$pos_rep
+  N_exp <- filt_options$pos_rep
+  N_top <- filt_options$top_rep
   perc <- filt_options$percentile
   perc_top <- filt_options$top_percentile
   SampMetrics <- calculateTPM(SampMetrics, cell_types)
   for ( i in 1:length(SampMetrics) ) {
-
+    
     counts <- SampMetrics[[i]][["CountMatrix"]]
-    ens <- SampMetrics[[i]][["ENSEMBL"]]
     ent <- SampMetrics[[i]][["Entrez"]]
     size <- SampMetrics[[i]][["GeneSizes"]]
-    symb <- SampMetrics[[i]][["GeneSymbol"]]
     tpm <- SampMetrics[[i]][["TPM_Matrix"]]
-    min.samples <- round(N * ncol(tpm))
-    test_bools <- data.frame(genes=ens)
+    min.samples <- round(N_exp * ncol(tpm))
+    top.samples <- round(N_top * ncol(tpm))
+    test_bools <- data.frame(gene=ent)
     test_bools_top <- test_bools
     for ( j in 1:ncol(tpm) ) {
       tpm_q <- tpm[,j]
       tpm_q <- tpm_q[tpm_q>0]
       q_cutoff <- quantile(tpm_q, prob=1-perc/100)
-      q_cutoff_top <- quantile(tpm_q, prob=1-perc_top/100)
+      #q_cutoff_top <- quantile(tpm_q, prob=1-perc_top/100)
+      #bools <- data.frame(as.integer(tpm[,j]>q_cutoff))
+      #bools_top <- data.frame(as.integer(tpm[,j]>q_cutoff_top))
       test_bools <- cbind(test_bools, as.integer(tpm[,j]>q_cutoff))
-      test_bools_top <- cbind(test_bools_top, as.integer(tpm[,j]>q_cutoff_top))
     }
-    test_bools["genes"] <- NULL
-    test_bools_top["genes"] <- NULL
+    test_bools["gene"] <- NULL
+    #test_bools_top["gene"] <- NULL
     f1 <- genefilter::kOverA(min.samples, 0.9)
     flist <- genefilter::filterfun(f1)
     keep <- genefilter::genefilter(test_bools, flist)
-    SampMetrics[[i]][["ENSEMBL"]] <- ens[keep]
     SampMetrics[[i]][["Entrez"]] <- ent[keep]
     SampMetrics[[i]][["GeneSizes"]] <- size[keep]
     SampMetrics[[i]][["CountMatrix"]] <- counts[keep,]
     SampMetrics[[i]][["TPM_Matrix"]] <- tpm[keep,]
-    SampMetrics[[i]][["GeneSymbol"]] <- symb[keep]
-    f1_top <- genefilter::kOverA(min.samples, 0.9)
+    f1_top <- genefilter::kOverA(top.samples, 0.9)
     flist_top <- genefilter::filterfun(f1_top)
-    keep_top <- genefilter::genefilter(test_bools_top, flist_top)
-    SampMetrics[[i]][["ENSEMBL_top"]] <- ens[keep_top]
+    keep_top <- genefilter::genefilter(test_bools, flist_top)
     SampMetrics[[i]][["Entrez_top"]] <- ent[keep_top]
-    SampMetrics[[i]][["GeneSymbol_top"]] <- symb[keep_top]
   }
   SampMetrics <- calculateZscore(SampMetrics, cell_types, "TPM")
   return(SampMetrics)
 }
 
-zFPKM_filter <- function(SampMetrics, filt_options, mart, cell_types) {
-  N <- filt_options$pos_rep
+
+zFPKM_filter <- function(SampMetrics, filt_options, cell_types) {
+  N_exp <- filt_options$pos_rep
+  N_top <- filt_options$top_rep
   perc_top <- filt_options$top_percentile
   for ( i in 1:length(SampMetrics) ) {
     cmat <- SampMetrics[[i]][["CountMatrix"]]
-    gnames <- SampMetrics[[i]][["ENSEMBL"]]
-    rownames(cmat) <- make.names(gnames, unique = TRUE)
+    #rownames(cmat) <- make.names(gnames, unique = TRUE)
     fmat <- fpkm(cmat, SampMetrics[[i]][["GeneSizes"]],
                  SampMetrics[[i]][["InsertSizes"]])
-
+    
     ent <- SampMetrics[[i]][["Entrez"]]
     size <- SampMetrics[[i]][["GenesSizes"]]
-    symb <- SampMetrics[[i]][["GeneSymbol"]]
-
+    
     fdf <- data.frame(fmat)
     zmat <- zFPKM(fdf, assayName="FPKM")
-    inames <- rownames(zmat)
-
-    min.samples <- round(N * ncol(zmat))
-
-    test_bools_top <- data.frame(genes=ens)
+    #inames <- rownames(zmat)
+    
+    min.samples <- round(N_exp * ncol(zmat))
+    top.samples <- round(N_top * ncol(zmat))
+    test_bools_top <- data.frame(genes=ent)
     for ( j in 1:ncol(zmat) ) {
       z_q <- zmat[,j]
       z_q <- z_q[z_q>-3]
       q_cutoff_top <- quantile(z_q, prob=1-perc_top/100)
       test_bools_top <- cbind(test_bools_top, as.integer(zmat[,j]>q_cutoff_top))
     }
-
+    
     cutoff <- -3
     f1 <- genefilter::kOverA(min.samples, cutoff)
     flist <- genefilter::filterfun(f1)
     keep <- genefilter::genefilter(zmat, flist)
     SampMetrics[[i]][["zFPKM_Matrix"]] <- zmat[keep,]
-    SampMetrics[[i]][["ENSEMBL"]] <- inames[keep]
     SampMetrics[[i]][["FPKM_Matrix"]] <- fmat
-
-    gene_inf <- getBM(filters="ensembl_gene_id",
-                      attributes=c("ensembl_gene_id", "entrezgene_id",
-                                   "start_position", "end_position"),
-                      values=SampMetrics[[i]][["ENSEMBL"]], mart=mart)
-
-    gene_inf$size <- (gene_inf$end_position-gene_inf$start_position)
-    SampMetrics[[i]][["GeneSizes"]] <- gene_inf$size
-    SampMetrics[[i]][["Entrez"]] <- gene_inf$entrezgene_id
-
-     # top percentile genes
+    
+    # top percentile genes
     test_bools_top["genes"] <- NULL
-    f1_top <- genefilter::kOverA(1, 0.9)
+    f1_top <- genefilter::kOverA(top.samples, cutoff)
     flist_top <- genefilter::filterfun(f1_top)
     keep_top <- genefilter::genefilter(test_bools_top, flist_top)
-    SampMetrics[[i]][["ENSEMBL_top"]] <- gnames[keep_top]
     SampMetrics[[i]][["Entrez_top"]] <- ent[keep_top]
-    SampMetrics[[i]][["GeneSymbol_top"]] <- symb[keep_top]
   }
   return(SampMetrics)
 }
+
 
 filterCounts <- function(SampMetrics, technique, filt_options, mart, cell_types) {
   switch(technique,
@@ -286,11 +280,12 @@ filterCounts <- function(SampMetrics, technique, filt_options, mart, cell_types)
          quantile = TPM_quant_filter(SampMetrics, filt_options, cell_types))
 }
 
-save_bulk_tests <- function(cmat_file, config_file, out_file, pos_rep=0.5,
-                              pos_samp=0.5, technique="quantile", quantile=0.9,
-                              min_count=10, top_percentile=25, gene_format="ensembl",
-                              species_dataset="hsapiens_gene_ensembl") {
 
+
+save_bulk_tests <- function(cmat_file, config_file, out_file, info_file,
+                            pos_rep=0.5, pos_samp=0.5, top_rep=0.9, top_samp=0.9, 
+                            technique="quantile", quantile=0.9, min_count=10) {
+  
   # condense filter options
   filt_options <- list()
   if ( exists("pos_rep") ) {
@@ -313,64 +308,20 @@ save_bulk_tests <- function(cmat_file, config_file, out_file, pos_rep=0.5,
   } else {
     filt_options$min_count <- 1
   }
-  if ( exists("top_percentile") ) {
-    filt_options$top_percentile <- top_percentile
+  if ( exists("top_rep") ) {
+    filt_options$top_rep<- top_rep
   } else {
-    filt_options$top_percentile <- 90
+    filt_options$top_rep <- 0.9
   }
-
-  SampMetrics <- readCountMatrix(cmat_file, config_file)
-  #View(SampMetrics[[1]][["CountMatrix"]])
-  if ( toupper(species_dataset)=="HUMAN" ) {
-    species_dataset <- "hsapiens_gene_ensembl"
-  } else if ( toupper(species_dataset)=="MOUSE" ) {
-    species_dataset <- "mmusculus_gene_ensembl"
+  if ( exists("top_samp") ) {
+    filt_options$top_samp <- top_samp
+  } else {
+    filt_options$top_samp <- 0.9
   }
-  mart <- useDataset(species_dataset, useMart("ensembl"))
-  if ( toupper(gene_format)=="ENSEMBL" ) {
-    gene_format <- "ensembl_gene_id"
-  } else if (toupper(gene_format)=="SYMBOL") {
-    gene_format <- "hgnc_symbol"
-  }
-  for ( i in 1:length(SampMetrics) ) {
-    gene_list <- rownames(SampMetrics[[i]][["CountMatrix"]])
-    if ( species_dataset!="hsapiens_gene_ensembl" ) {
-          gene_info <- getBM(filters=gene_format,
-                       attributes=c("ensembl_gene_id", "entrezgene_id",
-                                    "start_position", "end_position"),
-                       values=gene_list, mart=mart)
-    } else {
-           gene_info <- getBM(filters=gene_format,
-                       attributes=c("ensembl_gene_id", "hgnc_symbol", "entrezgene_id",
-                                    "start_position", "end_position"),
-                       values=gene_list, mart=mart)
-    }
-    gene_info$size <- (gene_info$end_position-gene_info$start_position)
-    cdf <- data.frame(SampMetrics[[i]][["CountMatrix"]])
-    if ( gene_format=="ensembl_gene_id" ) {
-      cdf$ensembl_gene_id <- rownames(SampMetrics[[i]][["CountMatrix"]])
-      cdf <- merge(cdf, gene_info, by="ensembl_gene_id")
-    } else if ( gene_format=="hgnc_symbol") {
-      cdf$hgnc_symbol <- rownames(SampMetrics[[i]][["CountMatrix"]])
-      cdf <- merge(cdf, gene_info, by="hgnc_symbol")
-    }
-    cdf["ensembl_gene_id"] <- NULL
-    if ( species_dataset=="hsapiens_gene_ensembl" ) {
-      cdf["hgnc_symbol"] <- NULL
-    }
-    cdf["size"] <- NULL
-    cdf["start_position"] <- NULL
-    cdf["end_position"] <- NULL
-    cdf["entrezgene_id"] <- NULL
-    SampMetrics[[i]][["CountMatrix"]] <- cdf
-    SampMetrics[[i]][["GeneSizes"]] <- gene_info$size
-    SampMetrics[[i]][["ENSEMBL"]] <- gene_info$ensembl_gene_id
-    SampMetrics[[i]][["GeneSymbol"]] <- gene_info$hgnc_symbol
-    SampMetrics[[i]][["Entrez"]] <- gene_info$entrezgene_id
-
-    rm(gene_info)
-  }
+  print("Reading Counts Matrix")
+  SampMetrics <- readCountMatrix(cmat_file, config_file, info_file)
   entrez_all <- SampMetrics[[1]][["Entrez"]]
+  print("Filtering Counts")
   SampMetrics <- filterCounts(SampMetrics, technique, filt_options, mart, cell_types)
   expressedGenes <- c()
   topGenes <- c()
@@ -386,22 +337,23 @@ save_bulk_tests <- function(cmat_file, config_file, out_file, pos_rep=0.5,
   SampMetrics[["ExpressionMatrix"]] <- expMat
   SampMetrics[["TopMatrix"]] <- topMat
   SampMetrics[["ExpressedGenes"]] <- as.character(expMat$expressedGenes[expMat$Prop>=pos_samp])
-  SampMetrics[["TopGenes"]] <- as.character(topMat$topGenes[topMat$Prop>=pos_samp])
-  write_table <- data.frame(entrez_all[!is.na(entrez_all)])
+  SampMetrics[["TopGenes"]] <- as.character(topMat$topGenes[topMat$Prop>=top_samp])
+  #write_table <- data.frame(entrez_all[!is.na(entrez_all)])
+  write_table <- data.frame(entrez_all)
   write_table <- cbind(write_table, rep(0, nrow(write_table)))
   write_table <- cbind(write_table, rep(0, nrow(write_table)))
   for ( i in 1:nrow(write_table) ) {
-    if (write_table$entrez_all[i] %in% SampMetrics$ExpressedGenes) {
+    if (as.character(write_table[i,1]) %in% as.character(SampMetrics$ExpressedGenes)) {
       write_table[i,2] <- 1
     }
-    if (write_table$entrez_all[i] %in% SampMetrics$TopGenes) {
+    if (as.character(write_table$entrez_all[i]) %in% as.character(SampMetrics$TopGenes)) {
       write_table[i,3] <- 1
     }
   }
   header <- c("ENTREZ_GENE_ID", "expressed", "top")
-  write_table <- rbind(header, write_table)
-  View(write_table)
-  write.table(write_table, out_file, sep=",", row.names=FALSE, col.names=FALSE)
+  #write_table <- rbind(header, write_table)
+  colnames(write_table) <- header
+  write.csv(write_table, out_file, row.names=FALSE, col.names=FALSE)
 }
 """
 
@@ -451,22 +403,15 @@ def load_bulk_tests(Bulk):
     return bulk_dict
 
 def main(argv):
-    datafile = 'BulkRNAseqDataMatrix.csv'
-    suppfile = 'bulk_data_inputs.csv'
-    gene_format = 'ensembl'
-    species_dataset = 'human'
     pos_rep = 0.5
     pos_samp = 0.5
-    top_percentile = 0.25
-    technique = 'quantile'
+    top_rep = 0.5
+    top_samp = 0.5
     quantile = 0.9
     min_count = 10
-    top_percentile = 25
-    gene_format = "ensembl"
-    species_dataset = "human"
 
     try:
-        opts, args = getopt.getopt(argv, "hf:c:g:d:r:s:p:t:q:m:",
+        opts, args = getopt.getopt(argv, "hi:c:g:r:s:x:y:t:q:m:",
                 ["datafile=", "suppfile=", "gene_format=", "species_dataset=",
                  "expr_prop_rep=", "expr_prop_samp=", "top_percentile=",
                  "technique=", "quantile=", "min_count="])
@@ -490,46 +435,50 @@ python3 proteomics_gen.py -f <data file> -c <config file>\n
               """
             print(help_str)
             sys.exit()
-        elif opt in ("-f", "--datafile"):
-            datafilename = arg
+        elif opt in ("-i", "--datafile"):
+            datafile = arg
         elif opt in ("-c", "--suppfile"):
-            suppfilename = arg
-        elif opt in ("-g", "--gene_format"):
-            gene_format = arg
-        elif opt in ("-d", "--species_dataset"):
-            species_dataset = arg
+            suppfile = arg
+        elif opt in ('-g', '--gene_info_file'):
+            gene_info_file = arg
         elif opt in ("-r", "--expr_prop_rep"):
             pos_rep = float(arg)
         elif opt in ("-s", "--expr_prop_samp"):
             pos_samp = float(arg)
-        elif opt in ("-p", "--top_percentile"):
-            top_percentile = int(arg)
+        elif opt in ("-x", "--top_prop_rep"):
+            top_rep = float(arg)
+        elif opt in ("-y", "--top_prop_samp"):
+            top_samp = float(arg)
         elif opt in ("-t", "--technique"):
             technique = arg
         elif opt in ("-q", "--quantile"):
-            quantile = float(arg)
+            quantile = int(arg)
         elif opt in ("-m", "--min_count"):
             min_count = int(arg)
-    print('Data file is "{}"'.format(datafilename))
-    print('Supplementary Data file is "{}"'.format(suppfilename))
+    
+    print('Data file is "{}"'.format(datafile))
+    print('Supplementary Data file is "{}"'.format(suppfile))
+    print('Gene info file is "{}"'.format(gene_info_file))
 
     bulk_config_filepath = os.path.join(configs.rootdir, "data", suppfile)
     bulk_input_filepath = os.path.join(configs.rootdir, "data", datafile)
+    gene_info_filepath = os.path.join(configs.rootdir, "data", gene_info_file)
     #if not os.path.isfile(prote_data_filepath):
     #    proteomics_data.to_csv(prote_data_filepath, index_label='ENTREZ_GENE_ID')
 
     config_df = pd.read_csv(bulk_config_filepath)
     model_name = "".join(["Bulk_",config_df["InsertSize"][0] ,".csv"])
+    print(model_name)
     bulk_output_filepath = os.path.join(configs.rootdir, "data", model_name)
-    print(bulk_output_filepath)
+    print('Output File is "{}"'.format(bulk_output_filepath))
 
     bulkio.save_bulk_tests(bulk_input_filepath, bulk_config_filepath,
-                           bulk_output_filepath, pos_rep=pos_rep,
-                           pos_samp=pos_samp, technique=technique,
-                           quantile=quantile, min_count=min_count,
-                           top_percentile=top_percentile,
-                           gene_format=gene_format,
-                           species_dataset=species_dataset)
+                           bulk_output_filepath, gene_info_filepath, 
+                           pos_rep=pos_rep, pos_samp=pos_samp,
+                           top_rep=top_rep, top_samp=top_samp,
+                           technique=technique, quantile=quantile,
+                           min_count=min_count)
+    
     print("Test data saved to " + bulk_output_filepath)
     # save proteomics data by test
     #proteomics_dict, testdata_dict = save_proteomics_tests(Proteomics, proteomics_data, expr_prop, percentile)
