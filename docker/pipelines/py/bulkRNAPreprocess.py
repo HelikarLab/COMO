@@ -235,7 +235,7 @@ genCountMatrix_main <- function(data_dir, out_dir, technique="quantile") {
   }
   file_split <- unlist(strsplit(data_dir, "/"))
   file_name <- paste(c(
-    out_dir, "/", file_split[length(file_split)], "_BulkRNAseqDataMatrix.csv"),collapse="") 
+    out_dir, "/", "BulkRNAseqDataMatrix_", file_split[length(file_split)], ".csv"),collapse="") 
   write.csv(full_count_matrix, file_name, row.names=FALSE)
   cat("Count Matrix written at ", file_name, "\n")
 }
@@ -296,7 +296,7 @@ def main(argv):
     if make_matrix:
         print("Creating Counts Matrix")
         genCountMatrixio.genCountMatrix_main(input_dir, output_dir, technique)
-    geneCountFile = os.path.join(output_dir, (tissue_name+"_BulkRNAseqDataMatrix.csv"))
+    geneCountFile = os.path.join(output_dir, ("BulkRNAseqDataMatrix_"+tissue_name+".csv"))
     print('Fetching gene info using genes in "{}"'.format(geneCountFile))
     genes = pd.read_csv(geneCountFile)['genes'].to_list()
     output_db=['Ensembl Gene ID', 'Gene Symbol', 'Gene ID', 'Chromosomal Location']               
@@ -313,7 +313,7 @@ def main(argv):
     gene_info.index.rename("ensembl_gene_id", inplace=True)
     gene_info.rename(columns={"Gene Symbol": "hgnc_symbol", "Gene ID": "entrezgene_id"}, inplace=True)
     gene_info.drop(['Chromosomal Location'], axis=1, inplace=True)
-    gene_info_file = os.path.join(output_dir, (tissue_name+"_GeneInfo.csv"))
+    gene_info_file = os.path.join(output_dir, ("GeneInfo_"+tissue_name+".csv"))
     gene_info.to_csv(gene_info_file)
     print('Gene Info file written at "{}"'.format(gene_info_file))
 

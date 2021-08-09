@@ -121,7 +121,7 @@ def updateTranscriptomicsDB(gseXXX):
 
 
 # function to complete the inquery of a sheet
-def queryTest(df):
+def queryTest(df, expression_proportion, top_proportion):
     sr = df['GSE ID']
     gse_ids = sr[sr.str.match('GSE')].unique()
     sr = df['Samples'].dropna()
@@ -140,12 +140,22 @@ def queryTest(df):
         updateTranscriptomicsDB(gseXXX)
 
     df_results = fetchLogicalTable(gsm_ids)
+    print("log table:")
+    print(df_results)
     df_output = mergeLogicalTable(df_results)
 
+    df_output = df_output.apply(pd.to_numeric)
     posratio = df_output.sum(axis=1,skipna=True)/df_output.count(axis=1)
+    print(df_output.head())
+    print("sum:")
+    print(df_output.sum(axis=1,skipna=True))
+    print("count:")
+    print(df_output.count(axis=1))
+    print('pos:')
+    print(posratio)
     df_output['Pos'] = posratio
-    df_output['0.5'] = np.where(posratio >= 0.5, 1, 0)
-    df_output['0.9'] = np.where(posratio >= 0.9, 1, 0)
+    df_output['expressed'] = np.where(posratio >= expression_proportion, 1, 0)
+    df_output['top'] = np.where(posratio >= top_proportion, 1, 0)
 
     return df_output
 
@@ -266,12 +276,14 @@ def mergeLogicalTable(df_results):
 
 
 def load_transcriptomics_tests(filename):
+    print("FILENAME")
+    print(filename)
     # CHANGED BC I CANT USE DOCKER DONT FORGET TO CHANGE BACK
     #inqueryFullPath = "G:/GitHub/New Folder/MADRID/docker/pipelines/py/data/" + filename
-    if not filename:
+    if not filename or filename=="None":
         tests = ["dummy"]
         fullsavepath = os.path.join(configs.rootdir, 'data', "dummy_transcriptomics_data.csv")
-        data = pd.read_excel(fullsavepath, index_col='ENTREZ_GENE_ID')
+        data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
         datas = [data]
         transcriptomics_dict = dict(zip(tests, datas))
         return transcriptomics_dict
@@ -291,7 +303,8 @@ def load_transcriptomics_tests(filename):
         # CHANGED BC I CANT USE DOCKER DONT FORGET TO CHANGE BACK
         #fullsavepath = "G:/GitHub/New Folder/MADRID/docker/pipelines/py/data/" + filename
         fullsavepath = os.path.join(configs.rootdir, 'data', filename)
-        data = pd.read_excel(fullsavepath, index_col='ENTREZ_GENE_ID')
+        print(fullsavepath)
+        data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
         print('Read from {}'.format(fullsavepath))
         datas.append(data)
         tests.append(sheet)
@@ -303,19 +316,25 @@ def main(argv):
     inputfile = 'transcriptomics_data_inputs.xlsx'
     # outputfile = ''
     try:
-        opts, args = getopt.getopt(argv, "hi:", ["ifile="])
+        opts, args = getopt.getopt(argv, "hi:e:t:", ["ifile=", "expression_proportion=", "top_proportion="])
     except getopt.GetoptError:
-        print('python3 transcriptomic_gen.py -i <inputfile>')
+        print('python3 transcriptomic_gen.py -i <inputfile> -e <expression_proportion> -t <top_proportion>')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('transcriptomic_gen.py -i <inputfile>')
+            print('python3 transcriptomic_gen.py -i <inputfile> -e <expression_proportion> -t top_proportion>')
             sys.exit()
         elif opt in ("-i", "--ifile"):
             inputfile = arg
+        elif opt in ("-e", "--expression_proportion"):
+            expression_proportion = float(arg)
+        elif opt in ("-t", "--top_proportion"):
+            top_proportion = float(arg)
         # elif opt in ("-o", "--ofile"):
         #     outputfile = arg
-    print('Input file is "', inputfile)
+    print('Input file is ', inputfile)
+    print('Expression Proportion for Gene Expression is ', expression_proportion)
+    print('Top proportion for high-confidence genes is ', top_proportion)
     #print('Output file is "', outputfile)
     # input from user
     # filename = 'transcriptomics_data_inputs.xlsx'
@@ -335,7 +354,7 @@ def main(argv):
         # print(list(inqueries[i]))
         inqueries[sheet].fillna(method='ffill',inplace=True)
         df = inqueries[sheet].loc[:,['GSE ID','Samples','GPL ID','Instrument']]
-        df_output = queryTest(df)
+        df_output = queryTest(df, expression_proportion, top_proportion)
         filename = 'transcriptomics_{}.csv'.format(sheet)
         # CHANGED BC I CANT USE DOCKER DONT FORGET TO CHANGE BACK
         #fullsavepath = "G:/GitHub/New Folder/MADRID/docker/pipelines/py/data/" + filename

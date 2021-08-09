@@ -17,7 +17,8 @@ from create_tissue_specific_model import splitGeneExpressionData
 # input parameters
 def merge_xomics(transcript_file=None,
                  prote_file=None,
-                 bulk_file=None):
+                 bulk_file=None,
+                 exp_req='default'):
 
     transcriptomics_dict= load_transcriptomics_tests(filename = transcript_file)
     Proteomics = load_prot_supplementary_data(prote_file)
@@ -92,11 +93,28 @@ def merge_xomics(transcript_file=None,
         if bulk_file:
             exp_list.append('bulk_exp')
             top_list.append('bulk_top')
-
+        
+        num_sources = len(exp_list)
+        if exp_req=='default': exp_req = num_sources
+        
+        print("sources", num_sources)
+        print("req", exp_req)
         merge_data['Express'] = 0
-        merge_data.loc[merge_data[exp_list].sum(axis=1) == len(exp_list), 'Express'] = 1
+        merge_data['Required'] = 0
+        print("explist")
+        print(merge_data[exp_list])
+        merge_data.loc[:,'Required'] = merge_data[exp_list].apply(
+                                    lambda x: exp_req-(num_sources-x.count()) \
+                                           if (exp_req-(num_sources-x.count()) > 0) \
+                                           else 1, \
+                                    axis=1)
+                                    
+        #merge_data.loc[:,'Required'] = exp_req - merge_data[exp_list].isnull().sum(axis=0)
+        merge_data.loc[merge_data[exp_list].sum(axis=1)>=merge_data['Required'], 'Express'] = 1
         merge_data.loc[merge_data[top_list].sum(axis=1) > 0, 'Express'] = 1
-
+        #merge_data = merge_data['Express'].astype(int)
+        print("mergeData")
+        print(merge_data.head())
 
         filepath = os.path.join(configs.rootdir, 'data', 'merged_{}.csv'.format(test))
         merge_data.to_csv(filepath, index_label='ENTREZ_GENE_ID')
@@ -117,14 +135,15 @@ def main(argv):
     transfile = None
     protefile = None
     bulkfile = None
+    expression_requirement = 'default'
     try:
-        opts, args = getopt.getopt(argv, "ht:p:b:", ["transfile=", "protefile=", "bulkfile="])
+        opts, args = getopt.getopt(argv, "ht:p:b:r:", ["transfile=", "protefile=", "bulkfile=", "expression_requirement="])
     except getopt.GetoptError:
-        print('merge_xomics.py -t <transfile> -p <protefile>')
+        print('merge_xomics.py -t <transfile> -p <protefile> -r <expression_requirement>')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('merge_xomics.py -t <transfile> -p <protefile>')
+            print('merge_xomics.py -t <transfile> -p <protefile> -r <expression_requirement>')
             sys.exit()
         elif opt in ("-t", "--transfile"):
             transfile = arg
@@ -132,12 +151,16 @@ def main(argv):
             protefile = arg
         elif opt in ('-b', "--bulkfile"):
             bulkfile = arg
+        elif opt in ('-r', "--expression_requirement"):
+            expression_requirement = int(arg)
+            
     print('Transcriptomics file is "{}"'.format(transfile))
     print('Proteomics file is "{}"'.format(protefile))
     print('Bulk RNA-seq file is "{}"'.format(bulkfile))
     files_dict = merge_xomics(transcript_file=transfile,
                               prote_file=protefile,
-                              bulk_file=bulkfile)
+                              bulk_file=bulkfile,
+                              exp_req=expression_requirement)
     print(files_dict)
     files_json = os.path.join(configs.rootdir, 'data', 'step1_results_files.json')
     with open(files_json, 'w') as fp:

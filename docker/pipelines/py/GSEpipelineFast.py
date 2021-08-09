@@ -165,14 +165,17 @@ class GSEproject:
         :param gse: gse object
         :return: pandas dataframe for table of GSE
         '''
+        print("ENTREZ_TABLE PIPE")
         filefullpath = os.path.join(self.genedir, '{}_sc500_full_table.csv'.format(self.gsename))
+        print(filefullpath)
         if fromcsv and os.path.isfile(filefullpath):
             try:
                 df_clean_sc500 = pd.read_csv(filefullpath)
                 df_clean_sc500.dropna(axis='columns', how='all', inplace=True)
                 df_clean_sc500.dropna(how='all', inplace=True)
                 df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='last')]
-                if self.gsms_included_by(df_clean_sc500):
+                print(df_clean_sc500)
+                if self.gsms_included_by(df_clean_sc500) and not df_clean_sc500.empty:
                     return df_clean_sc500
                 else:
                     print("Need Append GSMs")
@@ -244,7 +247,11 @@ class GSEproject:
         if not 'df_clean_sc500' in locals():
             df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)
             df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='first')]
+        elif df_clean_sc500.empty:
+            df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)
+            df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='first')]
         else:
+            print(df_clean_sc500)
             df_clean_sc500.set_index('ENTREZ_GENE_ID', inplace=True)
             placeholder = pd.DataFrame([], columns=['placeholder'],index=df_outer_sc500.index)
             placeholder['placeholder'] = 0
