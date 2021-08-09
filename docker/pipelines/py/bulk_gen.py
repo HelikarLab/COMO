@@ -360,7 +360,7 @@ save_bulk_tests <- function(cmat_file, config_file, out_file, info_file,
 bulkio = SignatureTranslatedAnonymousPackage(string, "bulkio")
 
 def load_bulk_supplementary_data(suppfilename):
-    if suppfilename=="None":
+    if not suppfilename or suppfilename=="None":
         return "None"
     suppFullPath = os.path.join(configs.rootdir, 'data', suppfilename)
     supplements = pd.read_csv(suppFullPath, header=0)
@@ -374,8 +374,12 @@ def load_bulk_supplementary_data(suppfilename):
 # Read data from csv files
 def load_bulk_tests(Bulk):
     try:
-        if not Bulk:
-            return None
+        if not Bulk or Bulk=="None":
+            tests = ["dummy"]
+            fullsavepath = os.path.join(configs.rootdir, 'data', "dummy_data.csv")
+            datas = ["dummy_data"]
+            bulk_dict = dict(zip(tests, datas))
+            return bulk_dict
     except:
         print("bulk exists")
 
