@@ -14,8 +14,6 @@ from project import configs
 # Load Proteomics
 def load_proteomics_data(datafilename):
     data_sheet = list(range(1)) # first 5 sheets
-    # CHANGED BC I CANT USE DOCKER DONT FORGET TO CHANGE BACK
-    #dataFullPath = "G:/GitHub/New Folder/MADRID/docker/pipelines/py/data/"+datafilename
     dataFullPath = os.path.join(configs.rootdir, 'data', datafilename)
     if os.path.isfile(dataFullPath):
         fulldata = pd.read_excel(dataFullPath, sheet_name=data_sheet, header=0)
@@ -47,8 +45,6 @@ def load_prot_supplementary_data(suppfilename):
     if not suppfilename:
         #suppfilename = "dummy_proteomics_config.xlsx"
         return None
-    # CHANGED BC I CANT USE DOCKER DONT FORGET TO CHANGE BACK
-    #suppFullPath = "G:/GitHub/New Folder/MADRID/docker/pipelines/py/data/"+suppfilename
     suppFullPath = os.path.join(configs.rootdir, 'data', suppfilename)
     supp_sheet = ['Proteomics']
     supplements = pd.read_excel(suppFullPath, sheet_name=supp_sheet, header=0)
@@ -70,7 +66,7 @@ def load_gene_symbol_map(gene_symbols, filename = 'proteomics_entrez_map.csv'):
     return sym2id[~sym2id.index.duplicated()]
 
 
-def save_proteomics_tests(Proteomics, proteomics_data, expr_prop, percentile):
+def save_proteomics_tests(Proteomics, proteomics_data, expr_prop, top_prop, percentile):
     tests = []
     files = []
     datas = []
@@ -94,8 +90,8 @@ def save_proteomics_tests(Proteomics, proteomics_data, expr_prop, percentile):
         testdata['top'] = 0
         #testdata.loc[testbool.any(axis=1), 'top '+str(percentile)] = 1
         #TODO: change this to expr_prop
-        testdata.loc[testbool.any(axis=1), 'top'] = 1
-
+        #testdata.loc[testbool.any(axis=1), 'top'] = 1
+        testdata.loc[(testdata['pos'] > top_prop), ['top']] = 1
         test = unidecode.unidecode(test)
         # CHANGED BC I CANT USE DOCKER DONT FORGET TO CHANGE BACK
         #output_path = 'G:/GitHub/New Folder/MADRID/docker/pipelines/py/data' + 'Proteomics_{}.csv'.format(test.strip()))
@@ -116,7 +112,7 @@ def load_proteomics_tests(Proteomics):
     try:
         if Proteomics==None:
             tests = ["dummy"]
-            fullsavepath = os.path.join(configs.rootdir, 'data', "dummy_transcriptomics_data.csv")
+            fullsavepath = os.path.join(configs.rootdir, 'data', "dummy_data.csv")
             datas = ["dummy_data"]
             proteomics_dict = dict(zip(tests, datas))
             return proteomics_dict
@@ -130,8 +126,6 @@ def load_proteomics_tests(Proteomics):
         if test == 'Statistics':
             break
         test = unidecode.unidecode(test)
-        # CHANGED BC I CANT USE DOCKER DONT FORGET TO CHANGE BACK
-        #output_path = 'G:/GitHub/New Folder/MADRID/docker/pipelines/py/data' + 'Proteomics_{}.csv'.format(test.strip()))
         output_path = os.path.join(configs.rootdir, 'data', 'Proteomics_{}.csv'.format(test.strip()))
         testdata = pd.read_csv(output_path, index_col='ENTREZ_GENE_ID')
 
@@ -147,16 +141,17 @@ def main(argv):
     datafilename = 'ProteomicsDataMatrix.xlsx'
     suppfilename = 'proteomics_data_inputs.xlsx'
     expr_prop = 0.5
-    percentile = 0.25
+    top_prop = 0.9
+    percentile = 25
 
     try:
-        opts, args = getopt.getopt(argv, "hd:s:e:p:", ["datafile=", "suppfile=", "expr_proportion=", "percentile="])
+        opts, args = getopt.getopt(argv, "hd:s:e:t:p:", ["datafile=", "suppfile=", "expr_proportion=", "top_proportion=", "percentile="])
     except getopt.GetoptError:
-        print('python3 proteomics_gen.py -d <data file> -s <supplementary data file>')
+        print('python3 proteomics_gen.py -d <data file> -s <supplementary data file> -e <expression_proportion> -t <top_proportion>')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('python3 proteomics_gen.py -d <data file> -s <supplementary data file>')
+            print('python3 proteomics_gen.py -d <data file> -s <supplementary data file> -e <expression_proportion> -t <top_proportion>')
             sys.exit()
         elif opt in ("-d", "--datafile"):
             datafilename = arg
@@ -164,6 +159,8 @@ def main(argv):
             suppfilename = arg
         elif opt in ("-e"):
             expr_prop = float(arg)
+        elif opt in ("-t"):
+            top_prop = float(arg)
         elif opt in ("-p"):
             percentile = float(arg)/100
     print('Data file is "{}"'.format(datafilename))
@@ -189,7 +186,7 @@ def main(argv):
         proteomics_data.to_csv(prote_data_filepath, index_label='ENTREZ_GENE_ID')
 
     # save proteomics data by test
-    proteomics_dict, testdata_dict = save_proteomics_tests(Proteomics, proteomics_data, expr_prop, percentile)
+    proteomics_dict, testdata_dict = save_proteomics_tests(Proteomics, proteomics_data, expr_prop, top_prop, percentile)
     return True
 
 
