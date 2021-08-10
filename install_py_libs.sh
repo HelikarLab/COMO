@@ -13,7 +13,7 @@ python3 -m pip --no-cache-dir install \
 	framed \
 	xlrd \
 	openpyxl \
-	cobamp \
+	git+git://github.com/babessell1/cobamp.git@master#egg=cobamp \
 	unidecode \
 	troppo
 rm -rf /root/.cache
