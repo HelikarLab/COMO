@@ -16,5 +16,4 @@ python3 -m pip --no-cache-dir install \
 	git+git://github.com/babessell1/cobamp.git@master#egg=cobamp \
 	unidecode \
 	troppo
-# cheetos
 rm -rf /root/.cache
