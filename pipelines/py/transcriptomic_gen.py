@@ -174,18 +174,28 @@ def fetchLogicalTable(gsm_ids):
             session.query(Sample).filter_by(Sample=gsm).options(load_only("ABS_CALL", "ENTREZ_GENE_ID")).statement,
             session.bind,
             index_col='ENTREZ_GENE_ID')
+        print( " .x.x.x.x.x.x.x.x.x corn")
+    
         df.drop('id', axis=1, inplace=True)
         df.rename(columns={'ABS_CALL': gsm}, inplace=True)
+        df.loc[df[gsm] == '1', gsm] = 'A'
+        df.loc[df[gsm] == '3', gsm] = 'P'
+        df.loc[df[gsm] == '2', gsm] = 'M'
+        
         df.loc[df[gsm] == 'A', gsm] = 0
         df.loc[df[gsm] == 'P', gsm] = 1
         df.loc[df[gsm] == 'M', gsm] = 1
+        print(df)
         df.sort_values(by=['ENTREZ_GENE_ID',gsm],inplace=True)
         df = df[~df.index.duplicated(keep='last')]
 
         df_results = pd.concat([df_results, df], axis=1, sort=False)
+        
 
     # Need to set index name after merge
     df_results.index.name = 'ENTREZ_GENE_ID'
+    print("=-----------------------------df results=-------------------------")
+    print(df_results)
     return df_results
 
 
