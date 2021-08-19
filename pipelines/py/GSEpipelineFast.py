@@ -45,7 +45,6 @@ def download_gsm_id_maps(datadir, gse, gpls = ['GPL96','GPL97','GPL8300'],vendor
             continue
         # Save to file
         filefullpath = os.path.join(datadir,'{}entrez.csv'.format(gpl.lower()))
-        print(filefullpath)
         temp.to_csv(filefullpath, index=False)
         # Single Table
         # temp.dropna(axis=0,inplace=True)
@@ -165,9 +164,8 @@ class GSEproject:
         :param gse: gse object
         :return: pandas dataframe for table of GSE
         '''
-        print("ENTREZ_TABLE PIPE")
+        
         filefullpath = os.path.join(self.genedir, '{}_sc500_full_table.csv'.format(self.gsename))
-        print(filefullpath)
         if fromcsv and os.path.isfile(filefullpath):
             try:
                 df_clean_sc500 = pd.read_csv(filefullpath)
@@ -207,10 +205,7 @@ class GSEproject:
                 continue
             outputdf = ro.conversion.rpy2py(outputdf)
             outputdf['ENTREZ_GENE_ID'] = gsm_maps[key]['ENTREZ_GENE_ID']
-            print(outputdf)
             gsm_tables_sc500[key] = outputdf
-            print(gsm_tables_sc500[key])
-            print(gsm_tables_sc500)
 
         # step 2: Drop rows without ENTREZ GENE ID, set index to ENTREZ
         for key in self.platforms.keys():
@@ -251,7 +246,7 @@ class GSEproject:
             df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)
             df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='first')]
         else:
-            print(df_clean_sc500)
+            #print(df_clean_sc500)
             df_clean_sc500.set_index('ENTREZ_GENE_ID', inplace=True)
             placeholder = pd.DataFrame([], columns=['placeholder'],index=df_outer_sc500.index)
             placeholder['placeholder'] = 0

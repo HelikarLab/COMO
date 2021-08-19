@@ -23,18 +23,13 @@ def merge_xomics(transcript_file=None,
     transcriptomics_dict= load_transcriptomics_tests(filename = transcript_file)
     Proteomics = load_prot_supplementary_data(prote_file)
     proteomics_dict = load_proteomics_tests(Proteomics)
-    print(proteomics_dict)
     Bulk = load_bulk_supplementary_data(bulk_file)
     bulk_dict = load_bulk_tests(Bulk)
-    print(bulk_dict)
     files_dict = dict()
 
     keys1 = proteomics_dict.keys()
     keys2 = transcriptomics_dict.keys()
     keys3 = bulk_dict.keys()
-    print(keys1)
-    print(keys2)
-    print(keys3)
     tests = set(keys1).union(set(keys2))
     tests = tests.union(set(keys3))
     tests.discard("dummy")
@@ -46,7 +41,6 @@ def merge_xomics(transcript_file=None,
             prote_data.rename(columns={'expressed': 'prote_exp',
                                        'top': 'prote_top'}, inplace=True)
             #prote_data = mergeLogicalTable(prote_data)
-            print(prote_data)
             test = unidecode.unidecode(test)
             try:
                 if not merge_data:
@@ -78,10 +72,8 @@ def merge_xomics(transcript_file=None,
             except:
                 merge_data = merge_data.join(bulk_data, how='outer')
 
-        print(merge_data)
         merge_data = mergeLogicalTable(merge_data)
         #test = unidecode.unidecode(test)
-        print(merge_data)
         exp_list = []
         top_list = []
         if prote_file:
@@ -97,12 +89,8 @@ def merge_xomics(transcript_file=None,
         num_sources = len(exp_list)
         if exp_req=='default': exp_req = num_sources
         
-        print("sources", num_sources)
-        print("req", exp_req)
         merge_data['Express'] = 0
         merge_data['Required'] = 0
-        print("explist")
-        print(merge_data[exp_list])
         merge_data.loc[:,'Required'] = merge_data[exp_list].apply(
                                     lambda x: exp_req-(num_sources-x.count()) \
                                            if (exp_req-(num_sources-x.count()) > 0) \
@@ -113,8 +101,6 @@ def merge_xomics(transcript_file=None,
         merge_data.loc[merge_data[exp_list].sum(axis=1)>=merge_data['Required'], 'Express'] = 1
         merge_data.loc[merge_data[top_list].sum(axis=1) > 0, 'Express'] = 1
         #merge_data = merge_data['Express'].astype(int)
-        print("mergeData")
-        print(merge_data.head())
 
         filepath = os.path.join(configs.rootdir, 'data', 'merged_{}.csv'.format(test))
         merge_data.to_csv(filepath, index_label='ENTREZ_GENE_ID')
@@ -161,7 +147,7 @@ def main(argv):
                               prote_file=protefile,
                               bulk_file=bulkfile,
                               exp_req=expression_requirement)
-    print(files_dict)
+    
     files_json = os.path.join(configs.rootdir, 'data', 'step1_results_files.json')
     with open(files_json, 'w') as fp:
         json.dump(files_dict, fp)

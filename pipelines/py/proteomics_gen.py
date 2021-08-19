@@ -40,7 +40,7 @@ def load_proteomics_data(datafilename):
     proteomics_data.rename(columns={'Gene names':'Gene Symbol'}, inplace=True)
     return proteomics_data
 
-
+# read config file
 def load_prot_supplementary_data(suppfilename):
     if not suppfilename:
         #suppfilename = "dummy_proteomics_config.xlsx"
@@ -49,10 +49,9 @@ def load_prot_supplementary_data(suppfilename):
     supp_sheet = ['Proteomics']
     supplements = pd.read_excel(suppFullPath, sheet_name=supp_sheet, header=0)
     Proteomics = supplements['Proteomics']
-    print(Proteomics)
     return Proteomics
 
-
+# read map to convert to entrez
 def load_gene_symbol_map(gene_symbols, filename = 'proteomics_entrez_map.csv'):
     # CHANGED BC I CANT USE DOCKER DONT FORGET TO CHANGE BACK
     #filepath = "G:/GitHub/New Folder/MADRID/docker/pipelines/py/data/proteomics_entrez_map.csv"
@@ -65,7 +64,7 @@ def load_gene_symbol_map(gene_symbols, filename = 'proteomics_entrez_map.csv'):
         sym2id.to_csv(filepath, index_label='Gene Symbol')
     return sym2id[~sym2id.index.duplicated()]
 
-
+# determine expression logicals and save results
 def save_proteomics_tests(Proteomics, proteomics_data, expr_prop, top_prop, percentile):
     tests = []
     files = []
@@ -122,7 +121,6 @@ def load_proteomics_tests(Proteomics):
     tests = []
     datas = []
     for test in list(Proteomics):
-        print(test)
         if test == 'Statistics':
             break
         test = unidecode.unidecode(test)

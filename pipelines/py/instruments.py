@@ -8,86 +8,26 @@ from rpy2.robjects.conversion import localconverter
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 from bioservices import BioDBNet
 
-
-
-# automatically convert ryp2 dataframe to Pandas dataframe
+# enable R to py conversions
 pandas2ri.activate()
-# Initialize Rpy2 for Affy package
+
+# import R libraries
 affy = importr("affy")
 limma = importr("limma")
-# Define R function for read affy
-string = """
-readaffydir <- function(addr){
-    crd <- getwd()
-    setwd(addr)
-    mydata = ReadAffy()
-    setwd(crd)
-    eset = mas5(mydata)
-    eset_PMA <- mas5calls(mydata)
-    y <- data.frame(exprs(eset), exprs(eset_PMA), assayDataElement(eset_PMA, "se.exprs"))
-    y <- y[,sort(names(y))]
-    return(y)
-}
 
-fitaffydir <- function(addr, target){
-    crd <- getwd()
-    setwd(addr)
-    library(limma, lib.loc="/home/jupyteruser/rlibs/")
-    library(affy, lib.loc="/home/jupyteruser/rlibs/")
-    targets = readTargets(target)
-    mydata = ReadAffy()
-    setwd(crd)
-    eset = rma(mydata)
-    f <- factor(targets$Condition, levels = unique(targets$Condition))
-    design <- model.matrix(~0 + f)
-    colnames(design) <- levels(f)
-    fit = lmFit(eset,design)
-    contrast.matrix = makeContrasts("patient-control",levels = design)
-    fit2 = contrasts.fit(fit,contrast.matrix)
-    fit2= eBayes(fit2)
-    data = topTable(fit2,number = "inf")
-    # write.table(data,"differentialExpression.txt",sep = "\t")
-    return(data)
-}
-"""
+# read and translate R functions for handling affy
+f = open("/home/jupyteruser/work/py/rscripts/fitAffy.R", "r")
+string = f.read()
+f.close()
 affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
 
-
-agilentstring="""
-readaiglent <- function(addr,targets){
-    crd <- getwd()
-    setwd(addr)
-    # targets <- dir(".", "txt.gz")
-    x <- read.maimages(targets, "agilent", green.only = TRUE)
-    setwd(crd)
-    y <- backgroundCorrect(x,method="normexp") 
-    y <- normalizeBetweenArrays(y,method="quantile") 
-    yo <- c(y$genes,as.data.frame(y$E))
-    ydf <- data.frame(yo)
-    return(ydf)
-}
-fitagilent <- function(addr,target){
-    crd <- getwd()
-    setwd(addr)    
-    targets <- readTargets(target)
-    x <- read.maimages(targets, path="somedirectory", source="agilent",green.only=TRUE)
-    y <- backgroundCorrect(x, method="normexp", offset=16)
-    y <- normalizeBetweenArrays(y, method="quantile")
-    y.ave <- avereps(y, ID=y$genes$ProbeName)
-    f <- factor(targets$Condition, levels = unique(targets$Condition))
-    design <- model.matrix(~0 + f)
-    colnames(design) <- levels(f)
-    fit <- lmFit(y.ave, design)
-    contrast.matrix <- makeContrasts("Treatment1-Treatment2", "Treatment1-Treatment3", "Treatment2-Treatment1", levels=design)
-    fit2 = contrasts.fit(fit,contrast.matrix)
-    fit2 = eBayes(fit2)
-    data = topTable(fit2,number = "inf")
-    return(data)
-    }
-"""
-
+# read and translate R functions for handling agilent
+f = open("/home/jupyteruser/work/py/rscripts/fitAgilent.R", "r")
+agilentstring = f.read()
+f.close()
 agilentio = SignatureTranslatedAnonymousPackage(agilentstring, "agilentio")
 
+# setup agilent df
 def agilent_raw(datadir, gsms):
     files = os.listdir(datadir)
     txts = []
@@ -112,6 +52,7 @@ def agilent_raw(datadir, gsms):
     df_agilent = ro.conversion.rpy2py(df_agilent)
     return df_agilent.rename(columns=cols)
 
+# read agilent outputs for each gsm
 def readagilent(datadir, gsms, scalefactor=1.1, quantile=0.95):
     df_raw = agilent_raw(datadir,gsms)
     df = df_raw.drop(columns=['Row', 'Col'])
@@ -135,7 +76,7 @@ def readagilent(datadir, gsms, scalefactor=1.1, quantile=0.95):
     df_results.set_index('ID', inplace=True)
     return df_results.drop(['ControlType','SystematicName'],axis=1)
 
-
+# convert gene ids to entrez
 def fetch_entrez_gene_id(input_values, input_db='Agilent ID', output_db = ['Gene ID','Ensembl Gene ID'], delay=30):
     s = BioDBNet()
     # input_db = 'Agilent ID'
