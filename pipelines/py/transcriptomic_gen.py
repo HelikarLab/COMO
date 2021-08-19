@@ -140,19 +140,11 @@ def queryTest(df, expression_proportion, top_proportion):
         updateTranscriptomicsDB(gseXXX)
 
     df_results = fetchLogicalTable(gsm_ids)
-    print("log table:")
-    print(df_results)
     df_output = mergeLogicalTable(df_results)
 
     df_output = df_output.apply(pd.to_numeric)
     posratio = df_output.sum(axis=1,skipna=True)/df_output.count(axis=1)
-    print(df_output.head())
-    print("sum:")
-    print(df_output.sum(axis=1,skipna=True))
-    print("count:")
-    print(df_output.count(axis=1))
-    print('pos:')
-    print(posratio)
+    
     df_output['Pos'] = posratio
     df_output['expressed'] = np.where(posratio >= expression_proportion, 1, 0)
     df_output['top'] = np.where(posratio >= top_proportion, 1, 0)
@@ -174,8 +166,6 @@ def fetchLogicalTable(gsm_ids):
             session.query(Sample).filter_by(Sample=gsm).options(load_only("ABS_CALL", "ENTREZ_GENE_ID")).statement,
             session.bind,
             index_col='ENTREZ_GENE_ID')
-        print( " .x.x.x.x.x.x.x.x.x corn")
-    
         df.drop('id', axis=1, inplace=True)
         df.rename(columns={'ABS_CALL': gsm}, inplace=True)
         df.loc[df[gsm] == '1', gsm] = 'A'
@@ -185,17 +175,13 @@ def fetchLogicalTable(gsm_ids):
         df.loc[df[gsm] == 'A', gsm] = 0
         df.loc[df[gsm] == 'P', gsm] = 1
         df.loc[df[gsm] == 'M', gsm] = 1
-        print(df)
         df.sort_values(by=['ENTREZ_GENE_ID',gsm],inplace=True)
         df = df[~df.index.duplicated(keep='last')]
 
         df_results = pd.concat([df_results, df], axis=1, sort=False)
-        
 
     # Need to set index name after merge
     df_results.index.name = 'ENTREZ_GENE_ID'
-    print("=-----------------------------df results=-------------------------")
-    print(df_results)
     return df_results
 
 
@@ -209,7 +195,7 @@ def mergeLogicalTable(df_results):
     # step 1: get all plural ENTREZ_GENE_IDs in the input table, extract unique IDs
     df_results.reset_index(drop=False, inplace=True)
     df_results['ENTREZ_GENE_ID'] = df_results['ENTREZ_GENE_ID'].astype(str)
-    print(df_results.dtypes)
+    #print(df_results.dtypes)
     df_results['ENTREZ_GENE_ID'] = df_results['ENTREZ_GENE_ID'].str.replace(" /// ", "//")
     id_list = []
     df_results.dropna(axis=0, subset=['ENTREZ_GENE_ID'], inplace=True)
@@ -286,10 +272,6 @@ def mergeLogicalTable(df_results):
 
 
 def load_transcriptomics_tests(filename):
-    print("FILENAME")
-    print(filename)
-    # CHANGED BC I CANT USE DOCKER DONT FORGET TO CHANGE BACK
-    #inqueryFullPath = "G:/GitHub/New Folder/MADRID/docker/pipelines/py/data/" + filename
     if not filename or filename=="None":
         tests = ["dummy"]
         fullsavepath = os.path.join(configs.rootdir, 'data', "dummy_transcriptomics_data.csv")
@@ -313,7 +295,6 @@ def load_transcriptomics_tests(filename):
         # CHANGED BC I CANT USE DOCKER DONT FORGET TO CHANGE BACK
         #fullsavepath = "G:/GitHub/New Folder/MADRID/docker/pipelines/py/data/" + filename
         fullsavepath = os.path.join(configs.rootdir, 'data', filename)
-        print(fullsavepath)
         data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
         print('Read from {}'.format(fullsavepath))
         datas.append(data)
@@ -352,10 +333,7 @@ def main(argv):
 
     # gse2770 = GSEproject('GSE2770',configs.rootdir)
 
-    # CHANGED BC I CANT USE DOCKER DONT FORGET TO CHANGE BACK
-    #inqueryFullPath = "G:/GitHub/New Folder/MADRID/docker/pipelines/py/data/" + inputfile
     inqueryFullPath = os.path.join(configs.rootdir, 'data', inputfile)
-    print(inqueryFullPath)
     xl = pd.ExcelFile(inqueryFullPath)
     sheet_name = xl.sheet_names
     inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_name, header=0)

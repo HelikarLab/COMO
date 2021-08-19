@@ -112,9 +112,6 @@ def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algori
     rx_names = model.get_reaction_and_metabolite_ids()[0]
 
     expressionRxns, expVector = mapExpressionToRxn(model_cobra, GeneExpressionFile)
-
-    print(expressionRxns)
-    print(expVector)
     expressed_rxns = list({k:v for (k,v) in expressionRxns.items() if v > 0}.keys())
 
     idx_objective = rx_names.index('biomass_reaction_Mphage')
@@ -143,8 +140,8 @@ def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algori
     to_remove_ids = [r_ids[r] for r in np.where(model_seeded==0)[0]]
     model_seeded_final.remove_reactions(to_remove_ids,True) # this is to get the ids of the reactions to be removed in the model; True is to remove the pending genes/metabolites that with the removal of the reaction can no longer be connected in the network
 
-    print('1\'s: ' + str(len(np.where(model_seeded==1)[0])))
-    print('2\'s: ' + str(len(np.where(model_seeded==2)[0])))
+    #print('1\'s: ' + str(len(np.where(model_seeded==1)[0])))
+    #print('2\'s: ' + str(len(np.where(model_seeded==2)[0])))
 
     return model_seeded_final
 
@@ -156,14 +153,14 @@ def splitGeneExpressionData(expressionData):
     singleGeneNames = expressionData[~expressionData.Gene.str.contains('//')].reset_index(drop=True)
     multipleGeneNames = expressionData[expressionData.Gene.str.contains('//')].reset_index(drop=True)
     breaksGeneNames = pd.DataFrame(columns=['Gene', 'Data'])
-    print(singleGeneNames.shape)
-    print(multipleGeneNames.shape)
+    #print(singleGeneNames.shape)
+    #print(multipleGeneNames.shape)
     for index,row in multipleGeneNames.iterrows():
         for genename in row['Gene'].split('///'):
             breaksGeneNames = breaksGeneNames.append({'Gene': genename, 'Data': row['Data']},ignore_index=True)
-    print(breaksGeneNames.shape)
+    #print(breaksGeneNames.shape)
     GeneExpressions = singleGeneNames.append(breaksGeneNames,ignore_index=True)
-    print(GeneExpressions.shape)
+    #print(GeneExpressions.shape)
     GeneExpressions.set_index('Gene',inplace=True)
     return GeneExpressions
 
@@ -242,7 +239,7 @@ def main(argv):
     GeneralModelFile = os.path.join(configs.rootdir, 'data', modelfile)
     GeneExpressionFile = os.path.join(configs.rootdir, 'data', genefile)
     TissueModel = createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algorithm)
-    print(TissueModel)
+    #print(TissueModel)
     if outputfile[-4:] == '.mat':
         # cobra.io.mat.save_matlab_model(TissueModel, os.path.join(configs.rootdir, 'data', outputfile))
         cobra.io.save_matlab_model(TissueModel, os.path.join(configs.rootdir, 'data', outputfile))
