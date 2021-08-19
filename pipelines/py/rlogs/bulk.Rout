@@ -1,0 +1,17 @@
+Warning messages:
+1: In (function (package, help, pos = 2, lib.loc = NULL, character.only = FALSE,  :
+  library ‘/usr/lib/R/site-library’ contains no packages
+2: In (function (package, help, pos = 2, lib.loc = NULL, character.only = FALSE,  :
+  library ‘/usr/lib/R/site-library’ contains no packages
+3: In (function (package, help, pos = 2, lib.loc = NULL, character.only = FALSE,  :
+  library ‘/usr/lib/R/site-library’ contains no packages
+4: In (function (package, help, pos = 2, lib.loc = NULL, character.only = FALSE,  :
+  library ‘/usr/lib/R/site-library’ contains no packages
+5: In (function (package, help, pos = 2, lib.loc = NULL, character.only = FALSE,  :
+  library ‘/usr/lib/R/site-library’ contains no packages
+6: In (function (package, help, pos = 2, lib.loc = NULL, character.only = FALSE,  :
+  library ‘/usr/lib/R/site-library’ contains no packages
+7: In (function (package, help, pos = 2, lib.loc = NULL, character.only = FALSE,  :
+  library ‘/usr/lib/R/site-library’ contains no packages
+8: In write.csv(write_table, out_file, row.names = FALSE, col.names = FALSE) :
+  attempt to set 'col.names' ignored
