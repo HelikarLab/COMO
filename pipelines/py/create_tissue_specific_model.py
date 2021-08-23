@@ -102,7 +102,7 @@ def gene_rule_float(expressionIn):
     return gene_reaction_by_rule
 
 
-def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algorithm):
+def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algorithm, objective, exclude_rxns):
     model_cobra = cobra.io.load_matlab_model(GeneralModelFile)
 
     mat = scipy.io.loadmat(GeneralModelFile)['model'] # Created by writeCbModel in matlab instead of saveas
@@ -110,11 +110,22 @@ def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algori
     S = model.S
     lb, ub = model.get_model_bounds(False, True)
     rx_names = model.get_reaction_and_metabolite_ids()[0]
-
+    #print("exclude: ", exclude_rxns)
     expressionRxns, expVector = mapExpressionToRxn(model_cobra, GeneExpressionFile)
     expressed_rxns = list({k:v for (k,v) in expressionRxns.items() if v > 0}.keys())
+    #print("exp reactions: ", expressionRxns)
+    for idx, (rxn, exp) in enumerate(expressionRxns.items()):
+        if rxn in exclude_rxns:
+            expVector[idx] = 0
 
-    idx_objective = rx_names.index('biomass_reaction_Mphage')
+
+    idx_objective = rx_names.index(objective)
+    #print("expVector: ", expVector)
+    #print("expressionRxns:", expressionRxns)
+    
+    exp_idx_list = [idx for (idx, val) in enumerate(expVector) if val != 0]
+    print( len(exp_idx_list) )
+    #print("exp_idx_list: ", exp_idx_list)
 
     if recon_algorithm == "GIMME":
         properties = GIMMEProperties(
@@ -127,7 +138,7 @@ def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algori
         algorithm = GIMME(S, lb.astype(float), ub.astype(float), properties)
 
     elif recon_algorithm == "FASTCORE":
-        properties = FastcoreProperties(core=expressed_rxns)
+        properties = FastcoreProperties(core=exp_idx_list, solver='GLPK')
         algorithm = FASTcore(S, lb.astype(float), ub.astype(float), properties)
 
     else:
@@ -211,14 +222,16 @@ def mapExpressionToRxn(model_cobra, GeneExpressionFile):
 
 def main(argv):
     modelfile = 'GeneralModel.mat'
+    objective = 'biomass_reaction'
+    exclude_rxns = []
     try:
-        opts, args = getopt.getopt(argv, "ht:m:g:o:a:", ["mfile=", "gfile=", "ofile=", "algorithm="])
+        opts, args = getopt.getopt(argv, "ht:m:g:o:s:x:a:", ["mfile=", "gfile=", "ofile=", "objective=", "exrxns=", "algorithm="])
     except getopt.GetoptError:
-        print('python3 create_tissue_specific_model.py -m <modelfile> -g <genefile> -o <outputfile> -a <algorithm>')
+        print('python3 create_tissue_specific_model.py -m <modelfile> -g <genefile> -o <outputfile> -s <objective> -x <exclude reactions> -a <algorithm>')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('python3 create_tissue_specific_model.py -m <modelfile> -g <genefile> -o <outputfile> -a <algorithm>')
+            print('python3 create_tissue_specific_model.py -m <modelfile> -g <genefile> -o <outputfile> -s <objective>--x <exclude reactions> -a <algorithm>')
             sys.exit()
         elif opt in ("-t", "--tissue_name"):
             tissue_name = arg
@@ -228,8 +241,12 @@ def main(argv):
             genefile = arg
         elif opt in ("-o", "--ofile"):
             outputfile = arg
+        elif opt in ("-s", "--objective"):
+            objective = arg
+        elif opt in ("-x", "--excludeRxns"):
+            exclude_rxns = pd.read_csv(arg, header=0)['Rxn Name'].to_list()
         elif opt in ("-a", "--algorithm"):
-            recon_algorithm = arg
+            recon_algorithm = arg.upper()
     print('Tissue Name is "{}"'.format(tissue_name))
     print('General Model file is "{}"'.format(modelfile))
     print('Gene Expression file is "{}"'.format(genefile))
@@ -238,7 +255,8 @@ def main(argv):
     #print(configs.rootdir)
     GeneralModelFile = os.path.join(configs.rootdir, 'data', modelfile)
     GeneExpressionFile = os.path.join(configs.rootdir, 'data', 'results', tissue_name, genefile)
-    TissueModel = createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algorithm)
+    TissueModel = createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, 
+                                            recon_algorithm, objective, exclude_rxns)
     #print(TissueModel)
     if outputfile[-4:] == '.mat':
         # cobra.io.mat.save_matlab_model(TissueModel, os.path.join(configs.rootdir, 'data', outputfile))
