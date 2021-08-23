@@ -36,7 +36,7 @@ readCountMatrix <- function(cmat_file, config_file) {
   return(SampMetrics)
 }
 
-dgeAnalysis <- function(SampMetrics, test_name) {
+dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name) {
   gene_list <- SampMetrics[[1]][[1]][["Entrez"]]
   
   df <- data.frame(Entrez=gene_list)
@@ -56,10 +56,10 @@ dgeAnalysis <- function(SampMetrics, test_name) {
   dgList <- calcNormFactors(dgList, method="TMM")
   
   tmm <- cpm(dgList)
-  write.csv(tmm, paste(c(test_name,"_TMM.csv"),collapse=""))
+  write.csv(tmm, paste(c("/home/jupyteruser/work/data/results/", tissue_name, "/", disease_name, "/TMM_Matrix.csv"),collapse=""))
   
   # MDS Plot
-  plotname <- paste(c(test_name,"_plotMDS.jpg"), collapse="")
+  plotname <- paste(c("/home/jupyteruser/work/data/results/", tissue_name, "/", disease_name, "/", "MDS_plot.jpg"), collapse="")
   title <- paste(c("DGEList Multi-Dimensional Scaling"),collapse="")
   jpeg(plotname)
   lab <- colnames(df)
@@ -71,7 +71,7 @@ dgeAnalysis <- function(SampMetrics, test_name) {
   colnames(designMat) <- levels(dgList$samples$group)
   
   # BCV plot
-  plotname <- paste(c(test_name, "_plotBCV.jpg"), collapse="")
+  plotname <- paste(c("/home/jupyteruser/work/data/results/", tissue_name, "/", disease_name, "/", "BCV_plot.jpg"), collapse="")
   title <- paste(c("DGEList Biological Coefficient of Variation"),collapse="")
   dgList <- estimateGLMCommonDisp(dgList, design=designMat)
   dgList <- estimateGLMTrendedDisp(dgList, design=designMat)
@@ -100,10 +100,10 @@ dgeAnalysis <- function(SampMetrics, test_name) {
     names(expTab)[names(expTab) == "PValue"] <- "P.Value"
     names(expTab)[names(expTab) == "genes"] <- "Gene ID"
     #expTab <- expTab[,deGenes==TRUE]
-    #write.csv(expTab,paste(c(test_name,"_DiffExp.csv"),collapse=""))
+    write.csv(expTab,paste(c("/home/jupyteruser/work/data/results/", tissue_name, "/", disease_name, "/", "DiffExp.csv"),collapse=""))
     
     # smear plot
-    plotname <- paste(c(test_name,"_plotSmear.jpg"),collapse="")
+    plotname <- paste(c("/home/jupyteruser/work/data/results/", tissue_name, "/", disease_name, "/", "smear_plot.jpg"),collapse="")
     title <- paste(c("DGEList Smear Plot ", test_cell),collapse="")
     jpeg(plotname)
     plotSmear(qlf, de.tags=deGenes, main=title)
@@ -113,7 +113,7 @@ dgeAnalysis <- function(SampMetrics, test_name) {
   return(expTab)
 }
 
-DGE_main <- function(cmat_file, config_file) {
+DGE_main <- function(cmat_file, config_file, tissue_name, disease_name) {
   print("Reading Counts Matrix")
   test_name <- cmat_file
   test_name <-unlist(strsplit(test_name, "_RawCounts"))[1]
@@ -122,6 +122,6 @@ DGE_main <- function(cmat_file, config_file) {
   SampMetrics <- readCountMatrix(cmat_file, config_file)
   entrez_all <- SampMetrics[[1]][[1]][["Entrez"]]
   print("Performing DGE")
-  data_table <- dgeAnalysis(SampMetrics, test_name)
+  data_table <- dgeAnalysis(SampMetrics, test_name, tissue_name, disease_name)
   return(data_table)
 }
