@@ -211,10 +211,8 @@ def mapExpressionToRxn(model_cobra, GeneExpressionFile):
 
 def main(argv):
     modelfile = 'GeneralModel.mat'
-    genefile = 'GeneExpression_Th1_Merged.csv'
-    outputfile = 'Th1_SpecificModel.json'
     try:
-        opts, args = getopt.getopt(argv, "hm:g:o:a:", ["mfile=", "gfile=", "ofile=", "algorithm="])
+        opts, args = getopt.getopt(argv, "ht:m:g:o:a:", ["mfile=", "gfile=", "ofile=", "algorithm="])
     except getopt.GetoptError:
         print('python3 create_tissue_specific_model.py -m <modelfile> -g <genefile> -o <outputfile> -a <algorithm>')
         sys.exit(2)
@@ -222,6 +220,8 @@ def main(argv):
         if opt == '-h':
             print('python3 create_tissue_specific_model.py -m <modelfile> -g <genefile> -o <outputfile> -a <algorithm>')
             sys.exit()
+        elif opt in ("-t", "--tissue_name"):
+            tissue_name = arg
         elif opt in ("-m", "--mfile"):
             modelfile = arg
         elif opt in ("-g", "--gfile"):
@@ -230,24 +230,27 @@ def main(argv):
             outputfile = arg
         elif opt in ("-a", "--algorithm"):
             recon_algorithm = arg
-
+    print('Tissue Name is "{}"'.format(tissue_name))
     print('General Model file is "{}"'.format(modelfile))
     print('Gene Expression file is "{}"'.format(genefile))
     print('Output file is "{}"'.format(outputfile))
     print('Using "{}" reconstruction algorithm'.format(recon_algorithm))
     #print(configs.rootdir)
     GeneralModelFile = os.path.join(configs.rootdir, 'data', modelfile)
-    GeneExpressionFile = os.path.join(configs.rootdir, 'data', genefile)
+    GeneExpressionFile = os.path.join(configs.rootdir, 'data', 'results', tissue_name, genefile)
     TissueModel = createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algorithm)
     #print(TissueModel)
     if outputfile[-4:] == '.mat':
         # cobra.io.mat.save_matlab_model(TissueModel, os.path.join(configs.rootdir, 'data', outputfile))
-        cobra.io.save_matlab_model(TissueModel, os.path.join(configs.rootdir, 'data', outputfile))
+        cobra.io.save_matlab_model(TissueModel, os.path.join(configs.rootdir, 'data', 
+                                                             'results', tissue_name, outputfile))
     elif outputfile[-4:] == '.xml':
         print('cobrapy only support level 2 SBML model, while this model is level 3')
-        cobra.io.write_sbml_model(TissueModel, os.path.join(configs.rootdir, 'data', outputfile))
+        cobra.io.write_sbml_model(TissueModel, os.path.join(configs.rootdir, 'data',
+                                                            'results', tissue_name, outputfile))
     elif outputfile[-5:] == '.json':
-        cobra.io.save_json_model(TissueModel, os.path.join(configs.rootdir, 'data', outputfile))
+        cobra.io.save_json_model(TissueModel, os.path.join(configs.rootdir, 'data',
+                                                           'results', tissue_name, outputfile))
     else:
         print('Error: unsupported model format: {}'.format(outputfile))
         return None

@@ -18,11 +18,11 @@ from instruments import fetch_entrez_gene_id
 def knock_out_simulation(datadir, model_file, inhibitors, drugDB):
 
     if model_file[-4:] == '.xml':
-        model = cobra.io.read_sbml_model(os.path.join(datadir, model_file))
+        model = cobra.io.read_sbml_model(model_file)
     elif model_file[-4:] == '.mat':
-        model = cobra.io.load_matlab_model(os.path.join(datadir, model_file))
+        model = cobra.io.load_matlab_model(model_file)
     elif model_file[-5:] == '.json':
-        model = cobra.io.load_json_model(os.path.join(datadir, model_file))
+        model = cobra.io.load_json_model(model_file)
     else:
         print("Unsupported File Format of Model: {}".format(model_file))
         return None
@@ -226,20 +226,16 @@ def drug_repurposing(drugDB, d_score):
 
 
 def main(argv):
-    tissue_Spec_Model_file = 'Th1_SpecificModel.json' # 'Th1_Cell_SpecificModel4manuscript.mat' # or
-    inhibitors_file = 'Th1_inhibitors_Entrez.txt'
-    Disease_Dn_file = 'Disease_DOWN.txt'
-    Disease_Up_file = 'Disease_UP.txt'
     drug_raw_file = 'Repurposing_Hub_export.txt'
-    folder = 'Th1'
+    
     try:
-        opts, args = getopt.getopt(argv, "ht:i:u:d:f:r:", ["tfile=", "ifile=", "upfile=", "downfile=", "folder=", "drugfile="])
+        opts, args = getopt.getopt(argv, "ht:i:u:d:f:r:", ["tfile=", "ifile=", "upfile=", "downfile=", "output_dir=", "drugfile="])
     except getopt.GetoptError:
-        print('python3 knock_out_simulation.py -t <tissue_model_file> -i <inhibitor_file> -u <up_reg_file> -d <down_reg_file> -f <output_folder> -r <repurpose drug raw file>')
+        print('python3 knock_out_simulation.py -t <tissue_model_file> -i <inhibitor_file> -u <up_reg_file> -d <down_reg_file> -f <output_dir> -r <repurpose drug raw file>')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('python3 knock_out_simulation.py -t <tissue_model_file> -i <inhibitor_file> -u <up_reg_file> -d <down_reg_file> -f <output_folder> -r <repurpose drug raw file>')
+            print('python3 knock_out_simulation.py -t <tissue_model_file> -i <inhibitor_file> -u <up_reg_file> -d <down_reg_file> -f <output_dir> -r <repurpose drug raw file>')
             sys.exit()
         elif opt in ("-t", "--tfile"):
             tissue_Spec_Model_file = arg
@@ -249,20 +245,20 @@ def main(argv):
             Disease_Up_file = arg
         elif opt in ("-d", "--downfile"):
             Disease_Dn_file = arg
-        elif opt in ("-f", "--folder"):
-            folder = arg
+        elif opt in ("-f", "--output_dir"):
+            datadir = arg
         elif opt in ("-r", "--drugfile"):
             drug_raw_file = arg
-    datadir = os.path.join(configs.datadir, folder)
-    print('Output folder: "{}"'.format(datadir))
-    print('Tissue Specific Model file is "{}"'.format(tissue_Spec_Model_file))
+    #datadir = os.path.join(configs.datadir, folder)
+    print('Output directory: "{}"'.format(datadir))
+    print('Tissue Specific Model file is at "{}"'.format(tissue_Spec_Model_file))
     print('Tissue Specific Inhibitors file is "{}"'.format(inhibitors_file))
 
 
     # preprocess repurposing hub data
     drug_csv_file = 'Repurposing_Hub_Preproc.csv'
     drugRawFile = os.path.join(configs.datadir, drug_raw_file)
-    drugFile = os.path.join(configs.datadir, drug_csv_file)
+    drugFile = os.path.join(datadir, drug_csv_file)
     if not os.path.isfile(drugFile):
         drugDB = repurposing_hub_preproc(drugRawFile)
         drugDB.to_csv(drugFile, index=False)

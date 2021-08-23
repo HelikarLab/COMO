@@ -59,48 +59,69 @@ def main(argv):
                                     "gene_format=",
                                     "technique="])
     except getopt.GetoptError:
-        print('python3 bulkRNAPreprocess.py -n <tissue_name> -c <create_counts_matrix> -f <gene_format> -t <technique>')
+        errstr = """
+        python3 bulkRNAPreprocess.py -n <tissue_names> -c <create_counts_matrix> \n
+        -f <gene_format> -t <technique>
+        """
+        print(errstr)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('python3 bulkRNAPreprocess.py -n <tissue_name> -c <create_counts_matrix> -f <gene_format> -t <technique>')
+            helpstr = """
+            python3 bulkRNAPreprocess.py -n <tissue_names> -c <create_counts_matrix> \n
+            -f <gene_format> -t <technique>
+            """
+            print(helpstr)
             sys.exit()
-        elif opt in ("-n", "--tissue_name"):
-            tissue_name = arg
+        elif opt in ("-n", "--tissue_names"):
+            tissue_names = arg
         elif opt in ("-c", "--create_counts_matrix"):
             make_matrix = arg
         elif opt in ("-f", "--gene_format"):
             gene_format = arg  
         elif opt in ("-t", "--technique"):
             technique = arg
-    input_dir = os.path.join(configs.rootdir, 'data', 'bulkData', tissue_name)
-    output_dir = os.path.join(configs.rootdir, 'data')
-    print('Input directory is "{}"'.format(input_dir))
-    print('Output directory is "{}"'.format(output_dir))
-    print('Active gene determination technique is "{}"'.format(technique))
-    if make_matrix:
-        print("Creating Counts Matrix")
-        genCountMatrixio.genCountMatrix_main(input_dir, output_dir, technique)
-    geneCountFile = os.path.join(output_dir, ("BulkRNAseqDataMatrix_"+tissue_name+".csv"))
-    print('Fetching gene info using genes in "{}"'.format(geneCountFile))
-    genes = pd.read_csv(geneCountFile)['genes'].to_list()
-    output_db=['Ensembl Gene ID', 'Gene Symbol', 'Gene ID', 'Chromosomal Location']               
-    if gene_format.upper()=="ENSEMBL":
-         form = "Ensembl Gene ID"                     
-    elif gene_format.upper()=="ENTREZ":
-         form = "Gene ID"
-    elif gene_format.upper()=="SYMBOL":
-          form = "Gene Symbol"                       
-    output_db.remove(form)  
-    gene_info = fetch_gene_info(genes, input_db=form, output_db=output_db)
-    gene_info['start_position'] = gene_info['Chromosomal Location'].str.extract("chr_start: (\d+)")
-    gene_info['end_position'] = gene_info['Chromosomal Location'].str.extract("chr_end: (\d+)")
-    gene_info.index.rename("ensembl_gene_id", inplace=True)
-    gene_info.rename(columns={"Gene Symbol": "hgnc_symbol", "Gene ID": "entrezgene_id"}, inplace=True)
-    gene_info.drop(['Chromosomal Location'], axis=1, inplace=True)
-    gene_info_file = os.path.join(output_dir, ("GeneInfo_"+tissue_name+".csv"))
-    gene_info.to_csv(gene_info_file)
-    print('Gene Info file written at "{}"'.format(gene_info_file))
+            
+    tissue_names = tissue_names.strip("[").strip("]").replace("'", "").split(",")
+    #tissue_names = tissue_names.split(",")
+    for tissue_name in tissue_names:
+        print(tissue_name)
+        input_dir = os.path.join(configs.rootdir, 'data', 'STAR_output', tissue_name)
+        gene_output_dir = os.path.join(configs.rootdir, 'data', 'results', tissue_name)
+        matrix_output_dir = os.path.join(configs.rootdir, 'data', 'data_matrices', tissue_name)
+        os.makedirs(gene_output_dir, exist_ok=True)
+        os.makedirs(matrix_output_dir, exist_ok=True) 
+        print('Input directory is "{}"'.format(input_dir))
+        print('Gene info output directory is "{}"'.format(gene_output_dir))
+        print('Active gene determination technique is "{}"'.format(technique))
+        
+        if make_matrix:
+            matrix_output_dir = os.path.join(configs.rootdir, 'data', 'data_matrices', tissue_name)  
+            print("Creating Counts Matrix")
+            genCountMatrixio.genCountMatrix_main(input_dir, matrix_output_dir, technique)
+            
+        geneCountFile = os.path.join(matrix_output_dir, ("BulkRNAseqDataMatrix_"+tissue_name+".csv"))
+        print('Fetching gene info using genes in "{}"'.format(geneCountFile))
+        genes = pd.read_csv(geneCountFile)['genes'].to_list()
+        output_db=['Ensembl Gene ID', 'Gene Symbol', 'Gene ID', 'Chromosomal Location']               
+        if gene_format.upper()=="ENSEMBL":
+             form = "Ensembl Gene ID"                     
+        elif gene_format.upper()=="ENTREZ":
+             form = "Gene ID"
+        elif gene_format.upper()=="SYMBOL":
+              form = "Gene Symbol"                       
+        output_db.remove(form)  
+        gene_info = fetch_gene_info(genes, input_db=form, output_db=output_db)
+        gene_info['start_position'] = gene_info['Chromosomal Location'].str.extract("chr_start: (\d+)")
+        gene_info['end_position'] = gene_info['Chromosomal Location'].str.extract("chr_end: (\d+)")
+        gene_info.index.rename("ensembl_gene_id", inplace=True)
+        gene_info.rename(columns={"Gene Symbol": "hgnc_symbol", "Gene ID": "entrezgene_id"}, inplace=True)
+        gene_info.drop(['Chromosomal Location'], axis=1, inplace=True)
+        gene_info_file = os.path.join(gene_output_dir, ("GeneInfo_"+tissue_name+".csv"))
+        gene_info.to_csv(gene_info_file)
+        print('Gene Info file written at "{}"'.format(gene_info_file))
+        
+    return True
 
 
 if __name__ == "__main__":

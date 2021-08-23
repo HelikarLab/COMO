@@ -9,7 +9,7 @@ import numpy as np
 import json
 # from bioservices import BioDBNet
 from project import configs
-from transcriptomic_gen import *
+from microarray_gen import *
 from proteomics_gen import *
 from bulk_gen import *
 from create_tissue_specific_model import splitGeneExpressionData
@@ -20,15 +20,15 @@ def merge_xomics(transcript_file=None,
                  bulk_file=None,
                  exp_req='default'):
 
-    transcriptomics_dict= load_transcriptomics_tests(filename = transcript_file)
-    Proteomics = load_prot_supplementary_data(prote_file)
-    proteomics_dict = load_proteomics_tests(Proteomics)
-    Bulk = load_bulk_supplementary_data(bulk_file)
-    bulk_dict = load_bulk_tests(Bulk)
+    microarray_dict= load_microarray_tests(filename=transcript_file)
+    #Proteomics = load_prot_supplementary_data(prote_file)
+    proteomics_dict = load_proteomics_tests(filename=prote_file)
+    #Bulk = load_bulk_supplementary_data(bulk_file)
+    bulk_dict = load_bulk_tests(filename=bulk_file)
     files_dict = dict()
 
     keys1 = proteomics_dict.keys()
-    keys2 = transcriptomics_dict.keys()
+    keys2 = microarray_dict.keys()
     keys3 = bulk_dict.keys()
     tests = set(keys1).union(set(keys2))
     tests = tests.union(set(keys3))
@@ -49,7 +49,7 @@ def merge_xomics(transcript_file=None,
                 merge_data = None
 
         if transcript_file:
-            trans_data = transcriptomics_dict[test].loc[:, ['expressed', 'top']]
+            trans_data = microarray_dict[test].loc[:, ['expressed', 'top']]
             trans_data.rename(columns={'expressed': 'trans_exp',
                                        'top': 'trans_top'}, inplace=True)
 
@@ -102,10 +102,10 @@ def merge_xomics(transcript_file=None,
         merge_data.loc[merge_data[top_list].sum(axis=1) > 0, 'Express'] = 1
         #merge_data = merge_data['Express'].astype(int)
 
-        filepath = os.path.join(configs.rootdir, 'data', 'merged_{}.csv'.format(test))
+        filepath = os.path.join(configs.rootdir, 'data', 'results', test, 'merged_{}.csv'.format(test))
         merge_data.to_csv(filepath, index_label='ENTREZ_GENE_ID')
 
-        filepath = os.path.join(configs.rootdir, 'data', 'GeneExpression_{}_Merged.csv'.format(test))
+        filepath = os.path.join(configs.rootdir, 'data', 'results', test, 'GeneExpression_{}_Merged.csv'.format(test))
         merge_data.reset_index(drop=False, inplace=True)
 
         splitEntrez = splitGeneExpressionData(merge_data)
@@ -140,7 +140,7 @@ def main(argv):
         elif opt in ('-r', "--expression_requirement"):
             expression_requirement = int(arg)
             
-    print('Transcriptomics file is "{}"'.format(transfile))
+    print('Microarray file is "{}"'.format(transfile))
     print('Proteomics file is "{}"'.format(protefile))
     print('Bulk RNA-seq file is "{}"'.format(bulkfile))
     files_dict = merge_xomics(transcript_file=transfile,
@@ -148,7 +148,7 @@ def main(argv):
                               bulk_file=bulkfile,
                               exp_req=expression_requirement)
     
-    files_json = os.path.join(configs.rootdir, 'data', 'step1_results_files.json')
+    files_json = os.path.join(configs.rootdir, 'data', 'results', 'step1_results_files.json')
     with open(files_json, 'w') as fp:
         json.dump(files_dict, fp)
 

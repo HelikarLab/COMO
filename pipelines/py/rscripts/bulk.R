@@ -43,7 +43,6 @@ readCountMatrix <- function(cmat_file, config_file, info_file, model_name) {
     group <- conf$Group[i]
     insert_size <- conf$InsertSize[i]     
     if ( entry %in% colnames(cmat_whole) ) {
-        print(entry)
         samp_mat <- SampMetrics[[group]][["CountMatrix"]]
         insert_sizes <- SampMetrics[[group]][["InsertSizes"]]
         samp_names <- SampMetrics[[group]][["SampNames"]]
@@ -57,7 +56,6 @@ readCountMatrix <- function(cmat_file, config_file, info_file, model_name) {
        print(paste(c(entry., " not found in count matrix."),collapse=""))
     }
   }  
-  print("merge complete")
   for (group in groups) {
     samp_mat <- SampMetrics[[group]][["CountMatrix"]] 
     #print(samp_mat)
