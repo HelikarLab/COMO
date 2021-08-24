@@ -172,7 +172,6 @@ class GSEproject:
                 df_clean_sc500.dropna(axis='columns', how='all', inplace=True)
                 df_clean_sc500.dropna(how='all', inplace=True)
                 df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='last')]
-                print(df_clean_sc500)
                 if self.gsms_included_by(df_clean_sc500) and not df_clean_sc500.empty:
                     return df_clean_sc500
                 else:
@@ -183,6 +182,7 @@ class GSEproject:
 
         print('Create new table: {}'.format(filefullpath))
         gsm_maps = self.get_gsm_tables()
+        #gsm_maps_test = gsm_maps.dropna(how='all')
         if not any(gsm_maps):
             print("Not available, return empty dataframe")
             return pd.DataFrame([])
@@ -195,22 +195,35 @@ class GSEproject:
             if os.path.exists(platformdir):
                 if vendor.lower() == 'affy':
                     outputdf = affyio.readaffydir(platformdir)
+                    outputdf = ro.conversion.rpy2py(outputdf)
                 elif vendor.lower() == 'agilent':
+                
                     outputdf = readagilent(platformdir, list(self.gsm_platform.keys()))
+                    #outputdf = ro.conversion.rpy2py(outputdf)
+                    gsm_maps[key] = fetch_entrez_gene_id(list(map(str, 
+                                                          list(outputdf['ProbeName']))),
+                                                          input_db='Agilent ID',
+                                                          output_db = ['Gene ID'])
+                    gsm_maps[key].rename(columns={'Gene ID':'ENTREZ_GENE_ID'},inplace=True)
                 else:
                     print("Unsupported Platform {} and Vendor {}".format(key,vendor))
                     continue
             else:
                 print('Path not exist: {}'.format(platformdir))
                 continue
-            outputdf = ro.conversion.rpy2py(outputdf)
-            outputdf['ENTREZ_GENE_ID'] = gsm_maps[key]['ENTREZ_GENE_ID']
+           # outputdf = ro.conversion.rpy2py(outputdf)
+
+            drop_idx = np.where(gsm_maps[key]['ENTREZ_GENE_ID'] == "-")[0].tolist()
+            outputdf.drop(outputdf.index[drop_idx], axis=0, inplace=True)
+            gsm_maps[key].drop(gsm_maps[key].index[drop_idx], axis=0, inplace=True)
+            outputdf['ENTREZ_GENE_ID'] = gsm_maps[key]['ENTREZ_GENE_ID'].to_list()
             gsm_tables_sc500[key] = outputdf
 
         # step 2: Drop rows without ENTREZ GENE ID, set index to ENTREZ
         for key in self.platforms.keys():
             gsm_tables_sc500[key].dropna(subset=['ENTREZ_GENE_ID'], inplace=True)
             gsm_tables_sc500[key].set_index('ENTREZ_GENE_ID', inplace=True)
+            print("gsm table drop: ", gsm_tables_sc500[key])
 
         # step 3: Merge tables of platforms
         df_outer_sc500 = None
@@ -246,7 +259,6 @@ class GSEproject:
             df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)
             df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='first')]
         else:
-            #print(df_clean_sc500)
             df_clean_sc500.set_index('ENTREZ_GENE_ID', inplace=True)
             placeholder = pd.DataFrame([], columns=['placeholder'],index=df_outer_sc500.index)
             placeholder['placeholder'] = 0
