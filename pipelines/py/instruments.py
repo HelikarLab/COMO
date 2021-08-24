@@ -48,8 +48,11 @@ def agilent_raw(datadir, gsms):
     cols = dict(zip(txts,keys))
 
     targets = pd.DataFrame(gzs,columns=['FileName'],index=txts)
-    df_agilent = agilentio.readaiglent(datadir, targets)
+    df_agilent = agilentio.readagilent(datadir, targets)
     df_agilent = ro.conversion.rpy2py(df_agilent)
+    df_temp = pd.read_csv(os.path.join(datadir, "ydf_temp.csv"), header=0)
+    df_agilent['ProbeName'] = df_temp['ProbeName'].to_list()
+ 
     return df_agilent.rename(columns=cols)
 
 # read agilent outputs for each gsm
@@ -72,8 +75,9 @@ def readagilent(datadir, gsms, scalefactor=1.1, quantile=0.95):
         df_results.loc[:, col] = 1.0-quantile
         col = '{}.cel.gz'.format(gsm.lower())
         df_results.rename(columns={gsm: col}, inplace=True)
-    df_results.rename(columns={'ProbeName': 'ID'}, inplace=True)
-    df_results.set_index('ID', inplace=True)
+    #df_results.rename(columns={'ProbeName': 'ID'}, inplace=True)
+    #df_results.set_index('ID', inplace=True)
+    #df_results.set_index('ProbeName', inplace=True)
     return df_results.drop(['ControlType','SystematicName'],axis=1)
 
 # convert gene ids to entrez

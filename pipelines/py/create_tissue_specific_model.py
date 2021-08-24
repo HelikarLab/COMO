@@ -104,28 +104,20 @@ def gene_rule_float(expressionIn):
 
 def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algorithm, objective, exclude_rxns):
     model_cobra = cobra.io.load_matlab_model(GeneralModelFile)
-
     mat = scipy.io.loadmat(GeneralModelFile)['model'] # Created by writeCbModel in matlab instead of saveas
     model = MatFormatReader(mat)
     S = model.S
     lb, ub = model.get_model_bounds(False, True)
     rx_names = model.get_reaction_and_metabolite_ids()[0]
-    #print("exclude: ", exclude_rxns)
     expressionRxns, expVector = mapExpressionToRxn(model_cobra, GeneExpressionFile)
     expressed_rxns = list({k:v for (k,v) in expressionRxns.items() if v > 0}.keys())
-    #print("exp reactions: ", expressionRxns)
+ 
     for idx, (rxn, exp) in enumerate(expressionRxns.items()):
         if rxn in exclude_rxns:
             expVector[idx] = 0
 
-
-    idx_objective = rx_names.index(objective)
-    #print("expVector: ", expVector)
-    #print("expressionRxns:", expressionRxns)
-    
+    idx_objective = rx_names.index(objective)   
     exp_idx_list = [idx for (idx, val) in enumerate(expVector) if val != 0]
-    print( len(exp_idx_list) )
-    #print("exp_idx_list: ", exp_idx_list)
 
     if recon_algorithm == "GIMME":
         properties = GIMMEProperties(
