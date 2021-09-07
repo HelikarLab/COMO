@@ -1,7 +1,7 @@
 zz <- file("/home/jupyteruser/work/py/rlogs/fitAgilent.Rout", open="wt")
 sink(zz, type="message")
 
-readaiglent <- function(addr,targets){
+readagilent <- function(addr,targets){
     crd <- getwd()
     setwd(addr)
     # targets <- dir(".", "txt.gz")
@@ -11,6 +11,8 @@ readaiglent <- function(addr,targets){
     y <- normalizeBetweenArrays(y,method="quantile") 
     yo <- c(y$genes,as.data.frame(y$E))
     ydf <- data.frame(yo)
+    write.csv(ydf, paste(c(addr, "/ydf_temp.csv"),collapse=""))
+    
     return(ydf)
 }
 fitagilent <- function(addr,target){
@@ -29,5 +31,6 @@ fitagilent <- function(addr,target){
     fit2 = contrasts.fit(fit,contrast.matrix)
     fit2 = eBayes(fit2)
     data = topTable(fit2,number = "inf")
+    
     return(data)
     }
