@@ -22,7 +22,7 @@ RUN \
 #COPY install_r_libs.sh /opt/install_r_libs.sh
 #COPY install_jupyter.sh /opt/install_jupyter.sh
 #COPY setup_jupyter.sh /opt/setup_jupyter.sh
-
+# force
 COPY install_py_libs.sh /opt/
 COPY install_r_libs.sh /opt/
 COPY install_jupyter.sh /opt/install_jupyter.sh
