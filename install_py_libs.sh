@@ -15,5 +15,6 @@ python3 -m pip --no-cache-dir install \
 	git+git://github.com/babessell1/cobamp.git@master#egg=cobamp \
 	unidecode \
 	troppo \
-	bioservices
+	git+git://github.com/cokelaer/bioservices.git@master#egg=bioservices
+	#bioservices
 rm -rf /root/.cache
