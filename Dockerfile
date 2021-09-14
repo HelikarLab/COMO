@@ -63,7 +63,7 @@ RUN sh /opt/install_r_libs.sh
   
   
 COPY pipelines/ /home/"${NB_USER}"/work/
-COPY __init__.py /usr/local/lib/python3.8/dist-packages/bioservices/
+#COPY __init__.py /usr/local/lib/python3.8/dist-packages/bioservices/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/py/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/data/
 RUN chown -R "${NB_USER}" /usr/local/lib/R/site-library
