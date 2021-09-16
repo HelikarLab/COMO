@@ -1,5 +1,5 @@
 python3 -m pip --no-cache-dir install pip --upgrade
-python3 -m pip --no-cache-dir install setuptools --upgrade
+python3 -m pip --no-cache-dir install setuptools==58.0.1 --upgrade
 python3 -m pip --no-cache-dir install wheel --upgrade
 python3 -m pip --no-cache-dir install \
 	git+git://github.com/cokelaer/bioservices.git@master#egg=bioservices \
