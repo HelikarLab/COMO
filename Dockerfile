@@ -22,7 +22,7 @@ RUN \
 #COPY install_r_libs.sh /opt/install_r_libs.sh
 #COPY install_jupyter.sh /opt/install_jupyter.sh
 #COPY setup_jupyter.sh /opt/setup_jupyter.sh
-# force
+
 COPY install_py_libs.sh /opt/
 COPY install_r_libs.sh /opt/
 COPY install_jupyter.sh /opt/install_jupyter.sh
@@ -63,7 +63,6 @@ RUN sh /opt/install_r_libs.sh
   
   
 COPY pipelines/ /home/"${NB_USER}"/work/
-#COPY __init__.py /usr/local/lib/python3.8/dist-packages/bioservices/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/py/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/data/
 RUN chown -R "${NB_USER}" /usr/local/lib/R/site-library
