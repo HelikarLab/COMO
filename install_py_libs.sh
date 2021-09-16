@@ -16,5 +16,4 @@ python3 -m pip --no-cache-dir install \
 	unidecode \
 	troppo \
 	git+git://github.com/cokelaer/bioservices.git@master#egg=bioservices
-	#bioservices
 rm -rf /root/.cache
