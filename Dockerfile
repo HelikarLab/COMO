@@ -22,7 +22,7 @@ RUN \
 #COPY install_r_libs.sh /opt/install_r_libs.sh
 #COPY install_jupyter.sh /opt/install_jupyter.sh
 #COPY setup_jupyter.sh /opt/setup_jupyter.sh
-
+# force
 COPY install_py_libs.sh /opt/
 COPY install_r_libs.sh /opt/
 COPY install_jupyter.sh /opt/install_jupyter.sh
@@ -33,7 +33,7 @@ RUN \
   && apt-get install -y curl \
   && apt-get remove -y --purge nodejs npm \
   && sh /opt/install_py_libs.sh \
-  && sed -z 's/\t\tfor id, lb in zip(objective_ids, objective_lbs):/\t\tlbs_id = objective_lbs[objective_ids]\n\t\tfor id, lb in zip(objective_ids, lbs_id):/' /usr/local/lib/python3.8/dist-packages/cobamp/core/models.py \
+  #&& sed -z 's/\t\tfor id, lb in zip(objective_ids, objective_lbs):/\t\tlbs_id = objective_lbs[objective_ids]\n\t\tfor id, lb in zip(objective_ids, lbs_id):/' /usr/local/lib/python3.8/dist-packages/cobamp/core/models.py \
   #&& sed -n p740,741 /usr/local/lib/python3.8/dist-packages/cobamp/core/models.py \
   && curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
   && apt-get install -y nodejs \
@@ -63,6 +63,7 @@ RUN sh /opt/install_r_libs.sh
   
   
 COPY pipelines/ /home/"${NB_USER}"/work/
+#COPY __init__.py /usr/local/lib/python3.8/dist-packages/bioservices/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/py/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/data/
 RUN chown -R "${NB_USER}" /usr/local/lib/R/site-library
