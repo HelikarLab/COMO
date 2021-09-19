@@ -274,7 +274,7 @@ def mergeLogicalTable(df_results):
 def load_microarray_tests(filename):
     if not filename or filename=="None":
         tests = ["dummy"]
-        fullsavepath = os.path.join(configs.rootdir, 'data', 'config_sheets', 'dummy_microarray_data.csv')
+        fullsavepath = os.path.join(configs.rootdir, 'data', 'data_matrices', 'dummy', 'dummy_microarray_data.csv')
         data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
         datas = [data]
         microarray_dict = dict(zip(tests, datas))

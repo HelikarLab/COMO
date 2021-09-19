@@ -75,7 +75,7 @@ def save_proteomics_tests(model_name, testdata, expr_prop, top_prop, percentile)
 def load_proteomics_tests(filename):
     if not filename or filename=="None":
         tests = ["dummy"]
-        fullsavepath = os.path.join(configs.rootdir, 'data', 'config_sheets', 'dummy_proteomics_data.csv')
+        fullsavepath = os.path.join(configs.rootdir, 'data', 'data_matrices', 'dummy', 'dummy_proteomics_data.csv')
         data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
         datas = [data]
         proteomics_dict = dict(zip(tests, datas))
