@@ -29,7 +29,7 @@ genCountMatrixio = SignatureTranslatedAnonymousPackage(string, "genCountMatrixio
 
 def fetch_gene_info(input_values, input_db='Ensembl Gene ID',
                     output_db=['Gene Symbol','Gene ID','Chromosomal Location'],
-                    delay=15):
+                    delay=15, taxon_id=9606):
  
     s = BioDBNet()   
     # input_db = 'Agilent ID'
@@ -39,29 +39,32 @@ def fetch_gene_info(input_values, input_db='Ensembl Gene ID',
     df_maps.index.name=input_db
     i = 0
     # for i in range(0,len(input_values),500):
+    batch_len = 300
     while i < len(input_values):
-        print('retrieve {}:{}'.format(i,min(i+500,len(input_values))))
-        df_test = s.db2db(input_db, output_db, input_values[i:min(i+500,len(input_values))], 9606)
+        print('retrieve {}:{}'.format(i,min(i+batch_len,len(input_values))))
+        df_test = s.db2db(input_db, output_db, input_values[i:min(i+batch_len,len(input_values))], taxon_id)
         if isinstance(df_test, pd.DataFrame):
             df_maps = pd.concat([df_maps, df_test], sort=False)
         elif df_test == '414':
             print("bioDBnet busy, try again in {} seconds".format(delay))
             time.sleep(delay)
             continue
-        i += 500
+        i += batch_len
     return df_maps
 
 def main(argv):
+    taxon_id = 9606
     try:
-        opts, args = getopt.getopt(argv, "hn:c:f:t:",
+        opts, args = getopt.getopt(argv, "hn:c:f:i:t:",
                                    ["tissue_name=",
                                     "create_counts_matrix=",
                                     "gene_format=",
+                                    "taxon_id=",
                                     "technique="])
     except getopt.GetoptError:
         errstr = """
         python3 bulkRNAPreprocess.py -n <tissue_names> -c <create_counts_matrix> \n
-        -f <gene_format> -t <technique>
+        -f <gene_format> -i <taxon_id> -t <technique>
         """
         print(errstr)
         sys.exit(2)
@@ -69,7 +72,7 @@ def main(argv):
         if opt == '-h':
             helpstr = """
             python3 bulkRNAPreprocess.py -n <tissue_names> -c <create_counts_matrix> \n
-            -f <gene_format> -t <technique>
+            -f <gene_format> -i <taxon_id> -t <technique>
             """
             print(helpstr)
             sys.exit()
@@ -78,9 +81,16 @@ def main(argv):
         elif opt in ("-c", "--create_counts_matrix"):
             make_matrix = arg
         elif opt in ("-f", "--gene_format"):
-            gene_format = arg  
+            gene_format = arg
+        elif opt in ("-i", "--taxon_id"):
+            taxon_id = arg
         elif opt in ("-t", "--technique"):
             technique = arg
+    
+    if taxon_id=="human" or taxon_id=="homo sapiens":
+        taxon_id = 9606
+    if taxon_id=="mouse" or taxon_id=="mus musculus":
+        taxon_id = 10090
             
     tissue_names = tissue_names.strip("[").strip("]").replace("'", "").split(",")
     #tissue_names = tissue_names.split(",")
@@ -111,7 +121,7 @@ def main(argv):
         elif gene_format.upper()=="SYMBOL":
               form = "Gene Symbol"                       
         output_db.remove(form)  
-        gene_info = fetch_gene_info(genes, input_db=form, output_db=output_db)
+        gene_info = fetch_gene_info(genes, input_db=form, output_db=output_db, taxon_id=taxon_id)
         gene_info['start_position'] = gene_info['Chromosomal Location'].str.extract("chr_start: (\d+)")
         gene_info['end_position'] = gene_info['Chromosomal Location'].str.extract("chr_end: (\d+)")
         gene_info.index.rename("ensembl_gene_id", inplace=True)

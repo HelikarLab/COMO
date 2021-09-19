@@ -137,7 +137,7 @@ def main(argv):
                                pos_rep=pos_rep, pos_samp=pos_samp,
                                top_rep=top_rep, top_samp=top_samp,
                                technique=technique, quantile=quantile,
-                               min_count=min_count)
+                               min_count=min_count, model_name=model_name)
     
         print("Test data saved to " + bulk_output_filepath)
 
