@@ -104,12 +104,25 @@ def gene_rule_float(expressionIn):
 
 def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algorithm, objective, exclude_rxns, force_rxns):
     model_cobra = cobra.io.load_matlab_model(GeneralModelFile)
+    
+   
+    '''
+    #print(scipy.io.loadmat(GeneralModelFile))
+    #mat = scipy.io.loadmat(GeneralModelFile)['iMM1865']
     mat = scipy.io.loadmat(GeneralModelFile)['model'] # Created by writeCbModel in matlab instead of saveas
     #mat = scipy.io.loadmat(GeneralModelFile)['mouseGEM']
     model = MatFormatReader(mat)
     S = model.S
     lb, ub = model.get_model_bounds(False, True)
     rx_names = model.get_reaction_and_metabolite_ids()[0]
+    '''
+    cobamp_model = COBRAModelObjectReader(model_cobra)
+    cobamp_model.get_irreversibilities(True)
+    S = cobamp_model.get_stoichiometric_matrix()
+    lb, ub = cobamp_model.get_model_bounds(False, True)
+    rx_names = cobamp_model.get_reaction_and_metabolite_ids()[0]
+    pd.DataFrame(rx_names).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'rx_names'))
+    
     expressionRxns, expVector = mapExpressionToRxn(model_cobra, GeneExpressionFile)
     expressed_rxns = list({k:v for (k,v) in expressionRxns.items() if v > 0}.keys())
  
@@ -119,8 +132,12 @@ def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algori
         if rxn in force_rxns:
             expVector[idx] = 1
 
-    idx_objective = rx_names.index(objective)   
-    exp_idx_list = [idx for (idx, val) in enumerate(expVector) if val != 0]
+            
+    idx_objective = rx_names.index(objective)  
+    
+    pd.DataFrame(expVector).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'expVector'))
+    
+    exp_idx_list = [idx for (idx, val) in enumerate(expVector) if val > 0]
     
 
     if recon_algorithm == "GIMME":
@@ -131,16 +148,32 @@ def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algori
                                 preprocess=True,
                                 flux_threshold=0.9
                                 )
-        algorithm = GIMME(S, lb.astype(float), ub.astype(float), properties)
+        algorithm = GIMME(S, lb, ub, properties)
+        model_seeded = algorithm.run()
+        model_seeded_final = model_cobra.copy() 
+        r_ids = [r.id for r in model_seeded_final.reactions]
+        to_remove_ids = [r_ids[r] for r in np.where(model_seeded==0)[0]]
+        print("remove")
+        print(to_remove_ids[:10])
+        model_seeded_final.remove_reactions(to_remove_ids,True)
 
     elif recon_algorithm == "FASTCORE":
         properties = FastcoreProperties(core=exp_idx_list, solver='GLPK')
-        algorithm = FASTcore(S, lb.astype(float), ub.astype(float), properties)
+        #algorithm = FASTcore(S, lb.astype(float), ub.astype(float), properties)
+        algorithm = FASTcore(S, lb, ub, properties)
+        tissue_rxns = algorithm.fastcore()
+        pd.DataFrame(tissue_rxns).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'tissue_rxns'))
+        model_seeded_final = model_cobra.copy() 
+        r_ids = [r.id for r in model_seeded_final.reactions]
+        remove_rxns = [r_ids[int(i)] for i in range(S.shape[1]) if i not in tissue_rxns]
+        pd.DataFrame(remove_rxns).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'remove_rxns'))
+        model_seeded_final.remove_reactions(remove_rxns, True)
 
     else:
         print("Invalid reconstruction algorithm")
         return None
 
+    '''
     model_seeded = algorithm.run()
     model_seeded_final = model_cobra.copy() # this is done since it alters the original model_cobra; this way is to guarantee that a new model is changed instead of the original model
     r_ids = [r.id for r in model_seeded_final.reactions]
@@ -149,7 +182,8 @@ def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algori
 
     #print('1\'s: ' + str(len(np.where(model_seeded==1)[0])))
     #print('2\'s: ' + str(len(np.where(model_seeded==2)[0])))
-
+    '''
+    
     return model_seeded_final, exp_idx_list
 
 
@@ -258,7 +292,7 @@ def main(argv):
                                             recon_algorithm, objective, exclude_rxns,
                                             force_rxns)
                      
-    if reacon_algorithm=="FASTCORE":
+    if recon_algorithm=="FASTCORE":
         pd.DataFrame(core_list).to_csv(os.path.join(configs.rootdir, 'data', 'results', tissue_name, 'core_rxns'))
     #print(TissueModel)
     if outputfile[-4:] == '.mat':
