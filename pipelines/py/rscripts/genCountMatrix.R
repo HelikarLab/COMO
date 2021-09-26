@@ -8,14 +8,15 @@ organizeFiles <- function(data_dir, technique) {
   fragmentFiles <- list()
   N_samples <- list()
   Names <- list()
-  print(data_dir)
   tlist <- unlist(strsplit(data_dir, "/"))
   tissue_name <- tlist[length(tlist)] 
   count_dir_i <- paste(c(data_dir, "/geneCounts"),collapse="")
-  tab_dir <- list.dirs(path = count_dir_i, full.names = TRUE, recursive = FALSE)
+  tab_dir <- list.dirs(path = count_dir_i, full.names = TRUE, recursive = FALSE) %>%
+      Filter(function(x) !any(grepl(".ipynb_checkpoints", x)), .)
   frag_dir_i <- paste(c(data_dir, "/fragLengths"),collapse="")
   frag_dir <- list.dirs(path = frag_dir_i, full.names = TRUE, recursive = FALSE)
   for (j in 1:length(tab_dir) ) {
+    print(j)
     s <- tab_dir[j]
     f <- frag_dir[j]
     sname <- unlist(strsplit(s,"/"))
@@ -99,7 +100,8 @@ prepSampCnts <- function(cntFile,files) {
 
 createCountMatrix <- function(files, sample_names, n_samples,
                               fragFiles, insertSizes, technique) {
-                              
+  #print("files")
+  #print(files)                           
   if ( technique=="zFPKM" ) {
     if ( grepl("r1",fragFiles[1],ignore.case=FALSE ) ) {
       groupSize <- c(fragFiles[1])
@@ -110,8 +112,12 @@ createCountMatrix <- function(files, sample_names, n_samples,
     }
   }
   i_adjust <- 0
-  counts <- prepSampCnts(files[1])
-  colnames(counts)[2] <- sample_names[1]
+  counts <- prepSampCnts(files[1], files)
+  if ( grepl("R\\d+r1", sample_names[1], ignore.case=FALSE) ) {
+    colnames(counts)[2] <- unlist(strsplit(sample_names[1], "r\\d+"))[1]
+  } else {  
+    colnames(counts)[2] <- sample_names[1]
+  }
   for ( i in 2:n_samples) {
     new_cnts <- prepSampCnts(files[i], files)
     options(warn=-1)
@@ -125,7 +131,11 @@ createCountMatrix <- function(files, sample_names, n_samples,
     counts <- merge(counts, new_cnts, by="genes", all=TRUE)
     counts[is.na(counts)] <- 0
     if ( grepl("R\\d+r1", sample_names[i], ignore.case=FALSE) ) {
-      samp_name <- unlist(strsplit(sample_names[i], "r"))[1]
+      print("pre-split")
+      print(sample_names[i])
+      samp_name <- unlist(strsplit(sample_names[i], "r\\d+"))[1]
+      print("post-split")
+      print(samp_name)
       if ( technique=="zFPKM" ) {
         if ( length(groupSize) > 1 ) {
           re_insertSizes[i-i_adjust] <- mean(groupSize)
@@ -148,7 +158,10 @@ createCountMatrix <- function(files, sample_names, n_samples,
         }
       }
     }
+
     colnames(counts)[i+1-i_adjust] <- samp_name
+    print("colname")
+    print(colnames(counts)[i+1-i_adjust])
   }
   if ( technique=="zFPKM" ) {
     if ( length(groupSize) > 1 ) {
@@ -166,7 +179,7 @@ createCountMatrix <- function(files, sample_names, n_samples,
 }
 
 genCountMatrix_main <- function(data_dir, out_dir, technique="quantile") {
-  
+  print("Organizing Files")
   SampMetrics <- organizeFiles(data_dir, technique)
   
   
@@ -187,6 +200,7 @@ genCountMatrix_main <- function(data_dir, out_dir, technique="quantile") {
       SampMetrics[[i]][["InsertSizes"]] <- NA
     }
   }
+  print("Creating counts matrix")
   for ( i in 1:length(SampMetrics) ) {
     res <- createCountMatrix(SampMetrics[[i]][["CountFiles"]],
                              SampMetrics[[i]][["SampleNames"]],
@@ -210,11 +224,15 @@ genCountMatrix_main <- function(data_dir, out_dir, technique="quantile") {
       add_mat <- SampMetrics[[i]][["CountMatrix"]]
       full_count_matrix <- merge(full_count_matrix, add_mat,
                                  by="genes", all=TRUE)
+        
 
       #row.names(full_count_matrix) <- full_count_matrix$Row.names
       #full_count_matrix["Row.names"] <- NULL
     }
   }
+  #F <- function(x) unlist(strsplit(x,  "."))
+  full_count_matrix["genes"] <- sub("\\.\\d+", "", full_count_matrix$genes)
+
   #snames <- c()
   #for ( i in 1:length(SampMetrics) ) {
   #    snames <- c(snames, SampMetrics[[i]][["SampleNames"]])
