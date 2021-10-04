@@ -10,6 +10,14 @@ library(sjmisc)
 
 
 readCountMatrix <- function(cmat_file, config_file, info_file, model_name) {
+      print("cmat")
+    print(cmat_file)
+    print("config")
+    print(config_file)
+    print("info")
+    print(info_file)
+    print("model")
+    print(model_name)
   gene_info <- read.csv(info_file)
   gene_info$size <- (gene_info$end_position-gene_info$start_position)
   conf <- read.xlsx(config_file, model_name, colNames=TRUE)
