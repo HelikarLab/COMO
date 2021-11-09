@@ -10,14 +10,8 @@ library(sjmisc)
 
 
 readCountMatrix <- function(cmat_file, config_file, info_file, model_name) {
-      print("cmat")
-    print(cmat_file)
-    print("config")
-    print(config_file)
-    print("info")
-    print(info_file)
-    print("model")
-    print(model_name)
+  print(cmat_file)
+  print(model_name)
   gene_info <- read.csv(info_file)
   gene_info$size <- (gene_info$end_position-gene_info$start_position)
   conf <- read.xlsx(config_file, model_name, colNames=TRUE)
@@ -61,7 +55,7 @@ readCountMatrix <- function(cmat_file, config_file, info_file, model_name) {
         SampMetrics[[group]][["InsertSizes"]] <- insert_sizes
         SampMetrics[[group]][["SampNames"]] <-  samp_names
     } else {
-       print(paste(c(entry., " not found in count matrix."),collapse=""))
+       print(paste(c(entry, " not found in count matrix."),collapse=""))
     }
   }  
   for (group in groups) {
@@ -81,7 +75,7 @@ readCountMatrix <- function(cmat_file, config_file, info_file, model_name) {
 }
 
 
-calculateTPM <- function(SampMetrics, cell_types) {
+calculateTPM <- function(SampMetrics) {
   for ( i in 1:length(SampMetrics) ) {
     count_matrix <- SampMetrics[[i]][["CountMatrix"]]
     gene_size <- SampMetrics[[i]][["GeneSizes"]]
@@ -97,7 +91,7 @@ calculateTPM <- function(SampMetrics, cell_types) {
 }
 
 
-calculateZscore <- function(SampMetrics, cell_types, norm_tech) {
+calculateZscore <- function(SampMetrics, norm_tech) {
   for ( i in 1:length(SampMetrics)) {
     if ( norm_tech=="CPM" ) {
       tmat <- SampMetrics[[i]][["CPM_Matrix"]]
@@ -121,7 +115,7 @@ calculateZscore <- function(SampMetrics, cell_types, norm_tech) {
 }
 
 
-CPM_filter <- function(SampMetrics, filt_options, cell_types) {
+CPM_filter <- function(SampMetrics, filt_options) {
   N_exp <- filt_options$pos_rep
   N_top <- filt_option$top_rep
   min.count <- filt_options$min_count
@@ -162,23 +156,28 @@ CPM_filter <- function(SampMetrics, filt_options, cell_types) {
     keep_top <- genefilter::genefilter(test_bools_top, flist_top)
     SampMetrics[[i]][["Entrez_top"]] <- ent[keep_top]
   }
-  SampMetrics <- calculateZscore(SampMetrics, cell_types, "CPM")
+  SampMetrics <- calculateZscore(SampMetrics, "CPM")
   return(SampMetrics)
 }
 
 
-TPM_quant_filter <- function(SampMetrics, filt_options, cell_types) {
+TPM_quant_filter <- function(SampMetrics, filt_options, model_name) {
   N_exp <- filt_options$pos_rep
   N_top <- filt_options$top_rep
   perc <- filt_options$percentile
   perc_top <- filt_options$top_percentile
-  SampMetrics <- calculateTPM(SampMetrics, cell_types)
+  SampMetrics <- calculateTPM(SampMetrics)
   for ( i in 1:length(SampMetrics) ) {
     
     counts <- SampMetrics[[i]][["CountMatrix"]]
     ent <- SampMetrics[[i]][["Entrez"]]
     size <- SampMetrics[[i]][["GeneSizes"]]
     tpm <- SampMetrics[[i]][["TPM_Matrix"]]
+    tpm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/TPM_Matrix"),collapse="")
+    write_tpm <- cbind(ent, tpm)
+    print("booty")
+    write.csv(write_tpm, tpm_fname)
+    print("shorts")
     min.samples <- round(N_exp * ncol(tpm))
     top.samples <- round(N_top * ncol(tpm))
     test_bools <- data.frame(gene=ent)
@@ -206,12 +205,12 @@ TPM_quant_filter <- function(SampMetrics, filt_options, cell_types) {
     keep_top <- genefilter::genefilter(test_bools, flist_top)
     SampMetrics[[i]][["Entrez_top"]] <- ent[keep_top]
   }
-  SampMetrics <- calculateZscore(SampMetrics, cell_types, "TPM")
+  SampMetrics <- calculateZscore(SampMetrics, "TPM")
   return(SampMetrics)
 }
 
 
-zFPKM_filter <- function(SampMetrics, filt_options, cell_types) {
+zFPKM_filter <- function(SampMetrics, filt_options) {
   N_exp <- filt_options$pos_rep
   N_top <- filt_options$top_rep
   perc_top <- filt_options$top_percentile
@@ -256,11 +255,11 @@ zFPKM_filter <- function(SampMetrics, filt_options, cell_types) {
 }
 
 
-filterCounts <- function(SampMetrics, technique, filt_options, mart, cell_types) {
+filterCounts <- function(SampMetrics, technique, filt_options, mart, model_name) {
   switch(technique,
-         cpm = CPM_filter(SampMetrics, filt_options, cell_types),
-         zFPKM = zFPKM_filter(SampMetrics, filt_options, mart, cell_types),
-         quantile = TPM_quant_filter(SampMetrics, filt_options, cell_types))
+         cpm = CPM_filter(SampMetrics, filt_options),
+         zFPKM = zFPKM_filter(SampMetrics, filt_options, mart),
+         quantile = TPM_quant_filter(SampMetrics, filt_options, model_name))
 }
 
 
@@ -305,7 +304,7 @@ save_bulk_tests <- function(cmat_file, config_file, out_file, info_file, model_n
   SampMetrics <- readCountMatrix(cmat_file, config_file, info_file, model_name)
   entrez_all <- SampMetrics[[1]][["Entrez"]]
   print("Filtering Counts")
-  SampMetrics <- filterCounts(SampMetrics, technique, filt_options, mart, cell_types)
+  SampMetrics <- filterCounts(SampMetrics, technique, filt_options, mart, model_name)
   expressedGenes <- c()
   topGenes <- c()
   for ( i in 1:length(SampMetrics) ) {
@@ -336,5 +335,7 @@ save_bulk_tests <- function(cmat_file, config_file, out_file, info_file, model_n
   header <- c("ENTREZ_GENE_ID", "expressed", "top")
   #write_table <- rbind(header, write_table)
   colnames(write_table) <- header
+  print("corn")
   write.csv(write_table, out_file, row.names=FALSE, col.names=FALSE)
+  print("dog")
 }

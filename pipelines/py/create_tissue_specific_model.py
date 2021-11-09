@@ -13,6 +13,8 @@ import os
 import re
 import collections
 
+from warnings import warn
+
 # for testing the algorithms
 from cobamp.wrappers import MatFormatReader
 from cobamp.wrappers import COBRAModelObjectReader
@@ -102,10 +104,44 @@ def gene_rule_float(expressionIn):
     return gene_reaction_by_rule
 
 
-def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algorithm, objective, exclude_rxns, force_rxns):
+def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algorithm, objective, exclude_rxns, force_rxns, force_lb, force_ub):
     model_cobra = cobra.io.load_matlab_model(GeneralModelFile)
+    #cobra.util.set_objective(model_cobra, dict(zip([objective], [1.0])))
+    #with model_cobra:
+    model_cobra.objective = {getattr(model_cobra.reactions, objective) : 1}
+        
+    all_rxns = model_cobra.reactions
+    #exchange_rxns = [rxn.id for rxn in all_rxns if (re.search("EX_", rxn.id) and not rxn.id in force_rxns)] 
+    #sink_rxns = [rxn.id for rxn in all_rxns if (re.search("SK_", rxn.id) and not rxn.id in force_rxns)]
     
-   
+    exchange_rxns = [rxn.id for rxn in all_rxns if re.search("EX_", rxn.id)] 
+    sink_rxns = [rxn.id for rxn in all_rxns if re.search("SK_", rxn.id)]
+    
+    for rxn in sink_rxns:
+        if rxn not in force_rxns:
+            getattr(model_cobra.reactions, rxn).lower_bound = 0.
+        
+    medium = model_cobra.medium
+    #for rxn in exchange_rxns:
+        #medium[rxn] = 0.0
+    for rxn in exchange_rxns:
+        if rxn in force_rxns:
+            idx = force_rxns.index(rxn)
+            medium[rxn] = -float(force_lb[idx])
+            print(float(force_lb[idx]))
+        else:
+            medium[rxn] = 0.0
+    
+    model_cobra.medium = medium
+    #print(exchange_rxns[1:50])
+    
+    #model_cobra.remove_reactions(exchange_rxns)
+    model_cobra_rm = cobra.flux_analysis.fastcc(model_cobra)
+    incon_rxns = set(model_cobra.reactions.list_attr("id")) - set(model_cobra_rm.reactions.list_attr("id"))
+    del(model_cobra_rm)
+    print("incon: ", str(len(incon_rxns)))
+    
+     
     '''
     #print(scipy.io.loadmat(GeneralModelFile))
     #mat = scipy.io.loadmat(GeneralModelFile)['iMM1865']
@@ -121,21 +157,25 @@ def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algori
     S = cobamp_model.get_stoichiometric_matrix()
     lb, ub = cobamp_model.get_model_bounds(False, True)
     rx_names = cobamp_model.get_reaction_and_metabolite_ids()[0]
-    pd.DataFrame(rx_names).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'rx_names'))
+    #pd.DataFrame(rx_names).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'rx_names'))
     
     expressionRxns, expVector = mapExpressionToRxn(model_cobra, GeneExpressionFile)
     expressed_rxns = list({k:v for (k,v) in expressionRxns.items() if v > 0}.keys())
- 
+     
+    for rxn in force_rxns:
+        if rxn not in rx_names:
+            warn(f"{rxn} from force reactions not in general model")
+    
     for idx, (rxn, exp) in enumerate(expressionRxns.items()):
-        if rxn in exclude_rxns:
-            expVector[idx] = 0
         if rxn in force_rxns:
             expVector[idx] = 1
+        if rxn in exclude_rxns or rxn in incon_rxns:
+            expVector[idx] = 0
 
             
     idx_objective = rx_names.index(objective)  
     
-    pd.DataFrame(expVector).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'expVector'))
+    #pd.DataFrame(expVector).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'expVector'))
     
     exp_idx_list = [idx for (idx, val) in enumerate(expVector) if val > 0]
     
@@ -162,11 +202,11 @@ def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algori
         #algorithm = FASTcore(S, lb.astype(float), ub.astype(float), properties)
         algorithm = FASTcore(S, lb, ub, properties)
         tissue_rxns = algorithm.fastcore()
-        pd.DataFrame(tissue_rxns).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'tissue_rxns'))
+       # pd.DataFrame(tissue_rxns).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'tissue_rxns'))
         model_seeded_final = model_cobra.copy() 
         r_ids = [r.id for r in model_seeded_final.reactions]
         remove_rxns = [r_ids[int(i)] for i in range(S.shape[1]) if i not in tissue_rxns]
-        pd.DataFrame(remove_rxns).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'remove_rxns'))
+        #pd.DataFrame(remove_rxns).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'remove_rxns'))
         model_seeded_final.remove_reactions(remove_rxns, True)
 
     else:
@@ -255,6 +295,8 @@ def main(argv):
     objective = 'biomass_reaction'
     exclude_rxns = []
     force_rxns = []
+    force_ub = []
+    force_lb = []
     try:
         opts, args = getopt.getopt(argv, "ht:m:g:o:s:x:f:a:", ["mfile=", "gfile=", "ofile=", "objective=", "excludeRxns=", "forceRxns=", "algorithm="])
     except getopt.GetoptError:
@@ -275,9 +317,17 @@ def main(argv):
         elif opt in ("-s", "--objective"):
             objective = arg
         elif opt in ("-x", "--excludeRxns"):
-            exclude_rxns = pd.read_csv(arg, header=0)['Rxn Name'].to_list()
+            exclude_rxns = pd.read_csv(arg, header=0)['Rxn'].to_list()
         elif opt in ("-f", "--forceRxns"):
-            force_rxns = pd.read_csv(arg, header=0)['Rxn Name'].to_list()
+            try:
+                df = pd.read_csv(arg, header=0, sep=",")
+                print(df.head())
+                force_rxns = df['Rxn'].to_list()
+                force_ub = df['Upperbound'].to_list()
+                force_lb = df['Lowerbound'].to_list()
+                del(df)
+            except:
+                raise TypeError("Force reactions must have three columns: Rxn Name, Lowerbound, Upperbound")
         elif opt in ("-a", "--algorithm"):
             recon_algorithm = arg.upper()
     print('Tissue Name is "{}"'.format(tissue_name))
@@ -290,7 +340,7 @@ def main(argv):
     GeneExpressionFile = os.path.join(configs.rootdir, 'data', 'results', tissue_name, genefile)
     TissueModel, core_list = createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, 
                                             recon_algorithm, objective, exclude_rxns,
-                                            force_rxns)
+                                            force_rxns, force_lb, force_ub)
                      
     if recon_algorithm=="FASTCORE":
         pd.DataFrame(core_list).to_csv(os.path.join(configs.rootdir, 'data', 'results', tissue_name, 'core_rxns'))
@@ -309,7 +359,7 @@ def main(argv):
     else:
         print('Error: unsupported model format: {}'.format(outputfile))
         return None
-    # cobra.io.sbml.write_cobra_model_to_sbml_file(TissueModel, os.path.join(configs.rootdir, 'data','Th1_SpecificModel.xml'))
+    cobra.io.write_sbml_model(TissueModel, os.path.join(configs.rootdir, 'data', 'results', tissue_name, 'sbml_model.xml'))
     print('Genes: ' + str(len(TissueModel.genes)))
     print('Metabolites: ' + str(len(TissueModel.metabolites)))
     print('Reactions: ' + str(len(TissueModel.reactions)))
