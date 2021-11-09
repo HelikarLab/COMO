@@ -95,6 +95,7 @@ def main(argv):
     tissue_names = tissue_names.strip("[").strip("]").replace("'", "").split(",")
     #tissue_names = tissue_names.split(",")
     for tissue_name in tissue_names:
+        tissue_name = tissue_name.strip(" ")
         print(tissue_name)
         input_dir = os.path.join(configs.rootdir, 'data', 'STAR_output', tissue_name)
         gene_output_dir = os.path.join(configs.rootdir, 'data', 'results', tissue_name)

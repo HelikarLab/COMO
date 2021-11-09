@@ -18,13 +18,14 @@ from create_tissue_specific_model import splitGeneExpressionData
 def merge_xomics(transcript_file=None,
                  prote_file=None,
                  bulk_file=None,
+                 sheet="Sheet1",
                  exp_req='default'):
 
     microarray_dict= load_microarray_tests(filename=transcript_file)
     #Proteomics = load_prot_supplementary_data(prote_file)
     proteomics_dict = load_proteomics_tests(filename=prote_file)
     #Bulk = load_bulk_supplementary_data(bulk_file)
-    bulk_dict = load_bulk_tests(filename=bulk_file)
+    bulk_dict = load_bulk_tests(filename=bulk_file, model_name=sheet)
     files_dict = dict()
 
     keys1 = proteomics_dict.keys()
@@ -133,24 +134,37 @@ def main(argv):
             sys.exit()
         elif opt in ("-t", "--transfile"):
             transfile = arg
+            micro_config_filepath = os.path.join(configs.rootdir, "data", "config_sheets", transfile)
+            xl = pd.ExcelFile(micro_config_filepath)
+            sheet_names = xl.sheet_names
         elif opt in ("-p", "--protefile"):
             protefile = arg
+            prote_config_filepath = os.path.join(configs.rootdir, "data", "config_sheets", protefile)
+            xl = pd.ExcelFile(prote_config_filepath)
+            sheet_names = xl.sheet_names
         elif opt in ('-b', "--bulkfile"):
             bulkfile = arg
+            bulk_config_filepath = os.path.join(configs.rootdir, "data", "config_sheets", bulkfile)
+            xl = pd.ExcelFile(bulk_config_filepath)
+            sheet_names = xl.sheet_names
         elif opt in ('-r', "--expression_requirement"):
             expression_requirement = int(arg)
             
     print('Microarray file is "{}"'.format(transfile))
     print('Proteomics file is "{}"'.format(protefile))
     print('Bulk RNA-seq file is "{}"'.format(bulkfile))
-    files_dict = merge_xomics(transcript_file=transfile,
-                              prote_file=protefile,
-                              bulk_file=bulkfile,
-                              exp_req=expression_requirement)
-    
+    dict_list = {}
     files_json = os.path.join(configs.rootdir, 'data', 'results', 'step1_results_files.json')
+    for tissue_name in sheet_names:
+        files_dict = merge_xomics(transcript_file=transfile,
+                                  prote_file=protefile,
+                                  bulk_file=bulkfile,
+                                  exp_req=expression_requirement,
+                                  sheet=tissue_name)
+        dict_list.update(files_dict)
+            
     with open(files_json, 'w') as fp:
-        json.dump(files_dict, fp)
+        json.dump(dict_list, fp)
 
 
 if __name__ == "__main__":

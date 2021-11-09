@@ -31,7 +31,7 @@ f.close()
 bulkio = SignatureTranslatedAnonymousPackage(string, "bulkio")
 
 # read data from csv files
-def load_bulk_tests(filename):
+def load_bulk_tests(filename, model_name):
     if not filename or filename=="None":
         tests = ["dummy"]
         fullsavepath = os.path.join(configs.rootdir, 'data', 'config_sheets', 'dummy_bulk_data.csv')
@@ -49,14 +49,16 @@ def load_bulk_tests(filename):
 
     tests = []
     datas = []
-    for model_name in sheet_names:
-        # print(list(inqueries[i]))
-        filename = 'Bulk_{}.csv'.format(model_name)
-        fullsavepath = os.path.join(configs.rootdir, 'data', 'results', model_name, filename)
-        data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
-        print('Read from {}'.format(fullsavepath))
-        datas.append(data)
-        tests.append(model_name)
+    #for model_name in sheet_names:
+    # print(list(inqueries[i]))
+    filename = 'Bulk_{}.csv'.format(model_name)
+    fullsavepath = os.path.join(configs.rootdir, 'data', 'results', model_name, filename)
+    data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
+    print('Read from {}'.format(fullsavepath))
+    datas.append(data)
+    tests.append(model_name)
+        
+        
     bulk_dict = dict(zip(tests, datas))
     return bulk_dict
 
@@ -118,6 +120,7 @@ def main(argv):
     sheet_names = xl.sheet_names
 
     for model_name in sheet_names:
+        print("model: ", model_name)
         bulk_output_file = "".join(["Bulk_", model_name, ".csv"])
         bulk_output_filepath = os.path.join(configs.rootdir, "data", "results",
                                             model_name, bulk_output_file)
