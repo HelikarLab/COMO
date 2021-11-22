@@ -65,6 +65,7 @@ COPY pipelines/ /home/"${NB_USER}"/work/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/py/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/data/
 RUN chown -R "${NB_USER}" /usr/local/lib/R/site-library
+RUN chown -R "${NB_USER}" /usr/local/bin/start-notebook.sh
 
 USER $NB_USER
 
