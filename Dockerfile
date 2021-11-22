@@ -1,6 +1,6 @@
 ARG UBUNTU_RELEASE=20.04
 ARG RPY2_VERSION=master
-FROM gurobi/python:9.5.0
+#FROM gurobi/python:9.5.0
 FROM rpy2/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
 
 ARG DEBIAN_FRONTEND=noninteractive
