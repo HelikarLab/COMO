@@ -1,5 +1,6 @@
 ARG UBUNTU_RELEASE=20.04
 ARG RPY2_VERSION=master
+FROM gurobi/python:9.5.0
 FROM rpy2/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -33,8 +34,6 @@ RUN \
   && apt-get install -y curl \
   && apt-get remove -y --purge nodejs npm \
   && sh /opt/install_py_libs.sh \
-  #&& sed -z 's/\t\tfor id, lb in zip(objective_ids, objective_lbs):/\t\tlbs_id = objective_lbs[objective_ids]\n\t\tfor id, lb in zip(objective_ids, lbs_id):/' /usr/local/lib/python3.8/dist-packages/cobamp/core/models.py \
-  #&& sed -n p740,741 /usr/local/lib/python3.8/dist-packages/cobamp/core/models.py \
   && curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
   && apt-get install -y nodejs \
   && wget -O - https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
@@ -63,7 +62,6 @@ RUN sh /opt/install_r_libs.sh
   
   
 COPY pipelines/ /home/"${NB_USER}"/work/
-#COPY __init__.py /usr/local/lib/python3.8/dist-packages/bioservices/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/py/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/data/
 RUN chown -R "${NB_USER}" /usr/local/lib/R/site-library
