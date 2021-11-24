@@ -76,5 +76,5 @@ WORKDIR ${HOME}
 EXPOSE 8888
 
 ENTRYPOINT ["/usr/local/bin/tini", "--"]
-RUN ["chmod", "+x", "start-notebook.sh"]
+#RUN ["chmod", "+x", "start-notebook.sh"]
 CMD ["start-notebook.sh"]
