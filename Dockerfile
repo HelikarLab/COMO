@@ -65,7 +65,7 @@ COPY pipelines/ /home/"${NB_USER}"/work/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/py/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/data/
 RUN chown -R "${NB_USER}" /usr/local/lib/R/site-library
-RUN chmod 755 /usr/local/bin/start-notebook.sh
+#RUN chmod 755 /usr/local/bin/start-notebook.sh
 
 
 USER $NB_USER
@@ -75,6 +75,6 @@ WORKDIR ${HOME}
 
 EXPOSE 8888
 
-#RUN ["chmod", "+x", "start-notebook.sh"]
+RUN ["chmod", "+x", "/usr/local/bin/start-notebook.sh"]
 ENTRYPOINT ["/usr/local/bin/tini", "--"]
 CMD ["start-notebook.sh"]
