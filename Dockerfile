@@ -53,6 +53,7 @@ RUN \
   && cd /tmp/docker-stacks/base-notebook \
   && sed -e 's/jovyan/'"${NB_USER}"'/g' start.sh > /usr/local/bin/start.sh \
   && cp start-notebook.sh /usr/local/bin/ \
+  && chmod +x /usr/local/bin/start-notebook.sh
   && cp start-singleuser.sh /usr/local/bin/ \
   && mkdir -p /etc/jupyter/ \
   && cp jupyter_notebook_config.py /etc/jupyter/ \
@@ -76,6 +77,6 @@ WORKDIR ${HOME}
 EXPOSE 8888
 
 #RUN chmod +x /usr/local/bin/start-notebook.sh
-ENTRYPOINT ["sh", "/usr/local/bin/start-notebook.sh", "--"]
+#ENTRYPOINT ["sh", "/usr/local/bin/start-notebook.sh", "--"]
 ENTRYPOINT ["/usr/local/bin/tini", "--"]
 CMD ["start-notebook.sh"]
