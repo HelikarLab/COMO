@@ -11,7 +11,7 @@ ARG TINI_VERSION=v0.19.0
 ENV SHELL=/bin/bash \
     NB_USER=jupyteruser \
     NB_UID=1000
-#force
+
 USER root
 
 RUN \
