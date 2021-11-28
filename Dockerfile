@@ -54,6 +54,7 @@ RUN \
   && sed -e 's/jovyan/'"${NB_USER}"'/g' start.sh > /usr/local/bin/start.sh \
   && cp start-notebook.sh /usr/local/bin/ \
   && chmod +x /usr/local/bin/start-notebook.sh \
+  && chmod +x /usr/local/bin/start.sh \
   && cp start-singleuser.sh /usr/local/bin/ \
   && mkdir -p /etc/jupyter/ \
   && cp jupyter_notebook_config.py /etc/jupyter/ \
