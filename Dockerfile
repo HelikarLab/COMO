@@ -1,7 +1,12 @@
 ARG UBUNTU_RELEASE=20.04
 ARG RPY2_VERSION=master
-FROM gurobi/python:9.5.0
+
 FROM rpy2/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
+ARG GRB_VERSION=9.5.0
+LABEL vendor="Gurobi"
+LABEL version=${GRB_VERSION}
+
+
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV CRAN_MIRROR=https://cloud.r-project.org \
@@ -32,6 +37,15 @@ COPY setup_jupyter.sh /opt/setup_jupyter.sh
 RUN \
   apt-get update -qq \
   && apt-get install -y curl \
+  # Gurobi
+  && apt-get install --no-install-recommends -y \
+	ca-certificates \
+	p7zip-full
+	zip \
+  && update-ca-certificates \
+  && python3 -m pip --no-cache-dir install gurobipy=${GRB_VERSION} \
+  && && rm -rf /var/lib/apt/lists/*
+  #
   && apt-get remove -y --purge nodejs npm \
   && sh /opt/install_py_libs.sh \
   && curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
