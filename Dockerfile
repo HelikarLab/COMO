@@ -40,7 +40,7 @@ RUN \
   # Gurobi
   && apt-get install --no-install-recommends -y \
 	ca-certificates \
-	p7zip-full
+	p7zip-full \
 	zip \
   && update-ca-certificates \
   && python3 -m pip --no-cache-dir install gurobipy=${GRB_VERSION} \
