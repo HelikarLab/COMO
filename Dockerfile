@@ -94,7 +94,7 @@ RUN apt-get update \
 RUN python3 -m pip --no-cache-dir install gurobipy
 
 WORKDIR /opt/gurobi
-COPY --from=buildoptimizer /opt/gurobi .
+#COPY --from=buildoptimizer /opt/gurobi .
 
 ENV GUROBI_HOME /opt/gurobi/linux64
 ENV PATH $PATH:$GUROBI_HOME/bin
