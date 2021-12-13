@@ -2,11 +2,6 @@ ARG UBUNTU_RELEASE=20.04
 ARG RPY2_VERSION=master
 
 FROM rpy2/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
-ARG GRB_VERSION=9.5.0
-LABEL vendor="Gurobi"
-LABEL version=${GRB_VERSION}
-
-
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV CRAN_MIRROR=https://cloud.r-project.org \
@@ -19,31 +14,39 @@ ENV SHELL=/bin/bash \
 
 USER root
 
+#### Gurobi Install #####
+# https://github.com/Gurobi/docker-optimizer/blob/master/9.5.0/Dockerfile
+
+ARG GRB_VERSION=9.5.0
+ARG GRB_SHORT_VERSION=9.5
+WORKDIR /opt
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y\
+       ca-certificates  \
+       wget \
+    && update-ca-certificates \
+    && wget -v https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
+    && tar -xvf gurobi${GRB_VERSION}_linux64.tar.gz  \
+    && rm -f gurobi${GRB_VERSION}_linux64.tar.gz \
+    && mv -f gurobi* gurobi \
+    && rm -rf gurobi/linux64/docs
+	
+#### Bioconductor dependencies ####
+
 RUN \
   apt-get update \
   && apt-get install -y libssl-dev \
   && apt-get install -y libxml2-dev
 
-#COPY install_py_libs.sh /opt/install_py_libs.sh
-#COPY install_r_libs.sh /opt/install_r_libs.sh
-#COPY install_jupyter.sh /opt/install_jupyter.sh
-#COPY setup_jupyter.sh /opt/setup_jupyter.sh
+#### Copy install scripts ####
 
 COPY install_py_libs.sh /opt/
 COPY install_r_libs.sh /opt/
 COPY install_jupyter.sh /opt/install_jupyter.sh
 COPY setup_jupyter.sh /opt/setup_jupyter.sh
-  
-RUN \
-  apt-get update -qq \
-  # Gurobi
-  && apt-get install --no-install-recommends -y \
-	ca-certificates \
-	p7zip-full \
-	zip \
-  && update-ca-certificates \
-  && python3 -m pip --no-cache-dir install gurobipy=${GRB_VERSION} \
-  && rm -rf /var/lib/apt/lists/*
+
+#### Juypter and Python lib install ####
 
 RUN \
   && apt-get install -y curl \
@@ -75,15 +78,41 @@ RUN \
   && cp jupyter_notebook_config.py /etc/jupyter/ \
   && rm -rf /tmp/docker-stacks
   
-RUN sh /opt/install_r_libs.sh  
+#### Gurobi Setup ####
+
+LABEL vendor="Gurobi"
+LABEL version=${GRB_VERSION}
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y\
+       ca-certificates  \
+       p7zip-full \
+       zip \
+    && update-ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+	
+RUN python3 -m pip --no-cache-dir install gurobipy
+
+WORKDIR /opt/gurobi
+COPY --from=buildoptimizer /opt/gurobi .
+
+ENV GUROBI_HOME /opt/gurobi/linux64
+ENV PATH $PATH:$GUROBI_HOME/bin
+ENV LD_LIBRARY_PATH $GUROBI_HOME/lib
   
+#### R lib install ####
   
+RUN sh /opt/install_r_libs.sh 
+
+#### Ownership ####  
+
 COPY pipelines/ /home/"${NB_USER}"/work/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/py/
 RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/data/
 RUN chown -R "${NB_USER}" /usr/local/lib/R/site-library
 #RUN chmod 755 /usr/local/bin/start-notebook.sh
 
+#### change to work directory and run Juypterlab ####
 
 USER $NB_USER
 
@@ -91,8 +120,5 @@ ENV HOME /home/${NB_USER}
 WORKDIR ${HOME}
 
 EXPOSE 8888
-
-#RUN chmod +x /usr/local/bin/start-notebook.sh
-#ENTRYPOINT ["sh", "/usr/local/bin/start-notebook.sh", "--"]
 ENTRYPOINT ["/usr/local/bin/tini", "--"]
 CMD ["start-notebook.sh"]
