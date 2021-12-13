@@ -43,7 +43,7 @@ RUN \
 	zip \
   && update-ca-certificates \
   && python3 -m pip --no-cache-dir install gurobipy=${GRB_VERSION} \
-  && && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/*
 
 RUN \
   && apt-get install -y curl \
