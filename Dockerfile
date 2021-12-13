@@ -36,7 +36,6 @@ COPY setup_jupyter.sh /opt/setup_jupyter.sh
   
 RUN \
   apt-get update -qq \
-  && apt-get install -y curl \
   # Gurobi
   && apt-get install --no-install-recommends -y \
 	ca-certificates \
@@ -44,8 +43,10 @@ RUN \
 	zip \
   && update-ca-certificates \
   && python3 -m pip --no-cache-dir install gurobipy=${GRB_VERSION} \
-  && && rm -rf /var/lib/apt/lists/* \
-  #
+  && && rm -rf /var/lib/apt/lists/*
+
+RUN \
+  && apt-get install -y curl \
   && apt-get remove -y --purge nodejs npm \
   && sh /opt/install_py_libs.sh \
   && curl -sL https://deb.nodesource.com/setup_14.x | sudo -E bash - \
