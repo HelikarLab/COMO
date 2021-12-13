@@ -48,7 +48,7 @@ COPY setup_jupyter.sh /opt/setup_jupyter.sh
 
 #### Juypter and Python lib install ####
 
-RUN \
+RUN apt-get update -qq \
   && apt-get install -y curl \
   && apt-get remove -y --purge nodejs npm \
   && sh /opt/install_py_libs.sh \
