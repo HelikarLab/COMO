@@ -175,9 +175,7 @@ TPM_quant_filter <- function(SampMetrics, filt_options, model_name) {
     tpm <- SampMetrics[[i]][["TPM_Matrix"]]
     tpm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/TPM_Matrix"),collapse="")
     write_tpm <- cbind(ent, tpm)
-    print("booty")
     write.csv(write_tpm, tpm_fname)
-    print("shorts")
     min.samples <- round(N_exp * ncol(tpm))
     top.samples <- round(N_top * ncol(tpm))
     test_bools <- data.frame(gene=ent)
@@ -335,7 +333,5 @@ save_bulk_tests <- function(cmat_file, config_file, out_file, info_file, model_n
   header <- c("ENTREZ_GENE_ID", "expressed", "top")
   #write_table <- rbind(header, write_table)
   colnames(write_table) <- header
-  print("corn")
   write.csv(write_table, out_file, row.names=FALSE, col.names=FALSE)
-  print("dog")
 }
