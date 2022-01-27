@@ -1,34 +1,25 @@
 #!/usr/bin/python3
 import sys
 import getopt
-# sys.path.extend(['E:\\reconstruction', 'E:\\cobamp', 'E:\\reconstruction\\src', 'E:\\cobamp\\src', 'E:/reconstruction'])
 import cobra
-import framed
-import cobamp
 import pandas as pd
 import numpy as np
-import pickle
-import scipy
 import os
 import re
 import collections
-
 from warnings import warn
 
-# for testing the algorithms
-from cobamp.wrappers import MatFormatReader
 from cobamp.wrappers import COBRAModelObjectReader
-from troppo.methods.reconstruction.imat import IMAT, IMATProperties
 from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
-from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
 from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
-#from troppo.reconstruction_properties import FastcoreProperties, tINITProperties, GIMMEProperties, IMATProperties
-from troppo.utilities.statistics import normalize, z_score
 
 from project import configs
 
 
 def correct_bracket(rule, name):
+    """
+    Correct GPR rules to format readable by
+    """
     rmatch = re.search(r'or|and', rule)
     nmatch = re.search(r'or|and', name)
     if rmatch is None:
@@ -44,7 +35,6 @@ def correct_bracket(rule, name):
         rname = name[nmatch.span()[1]:]
         operator = rmatch.group()
 
-    #     rlist = lrule.split(' ')
     rlist_new = []
     for ch in list(lrule):
         if ch.isspace() or ch.isdigit():  # re.match(r'\w+', ch)
@@ -63,309 +53,398 @@ def correct_bracket(rule, name):
     return ' '.join([rule_left, operator, rule_right])
 
 
-def float_logical_exp(expressionIn, level=0):
+def gene_rule_logical(expression_in, level=0):
+    """
+    creates an expression from GPR rule which can be evauated as true or false
+    """
     try:
-        loc_r = expressionIn.index(')')
-    except:
-        if 'and' in expressionIn:
-            expressionIn = expressionIn.replace('and', ',')
-            expressionIn = 'min{' + expressionIn + '}'
-        elif 'or' in expressionIn:
-            expressionIn = expressionIn.replace('or', ',')
-            expressionIn = 'max{' + expressionIn + '}'
+        loc_r = expression_in.index(')')
+    except BaseException:
+        if 'and' in expression_in:
+            expression_in = expression_in.replace('and', ',')
+            expression_in = 'min{' + expression_in + '}'
+        elif 'or' in expression_in:
+            expression_in = expression_in.replace('or', ',')
+            expression_in = 'max{' + expression_in + '}'
         else:
-            expressionIn = expressionIn.replace('[', '')
-            expressionIn = expressionIn.replace(']', '')
-        return expressionIn
-    loc_l = expressionIn[0:loc_r].rindex('(')
-    innerstring = expressionIn[loc_l:loc_r+1]
-    innerstring = innerstring.replace('(', '[')
-    innerstring = innerstring.replace(')', ']')
-    if 'and' in innerstring:
-        innerstring = innerstring.replace('and', ',')
-        innerstring = 'min{'+innerstring+'}'
-    elif 'or' in innerstring:
-        innerstring = innerstring.replace('or', ',')
-        innerstring = 'max{'+innerstring+'}'
+            expression_in = expression_in.replace('[', '')
+            expression_in = expression_in.replace(']', '')
+        return expression_in
+    loc_l = expression_in[0:loc_r].rindex('(')
+    inner_string = expression_in[loc_l:loc_r + 1]
+    inner_string = inner_string.replace('(', '[')
+    inner_string = inner_string.replace(')', ']')
+    if 'and' in inner_string:
+        inner_string = inner_string.replace('and', ',')
+        inner_string = 'min{' + inner_string + '}'
+    elif 'or' in inner_string:
+        inner_string = inner_string.replace('or', ',')
+        inner_string = 'max{' + inner_string + '}'
     else:
-        innerstring = innerstring.replace('[', '')
-        innerstring = innerstring.replace(']', '')
+        inner_string = inner_string.replace('[', '')
+        inner_string = inner_string.replace(']', '')
 
-    expressionOut = '{}{}{}'.format(expressionIn[0:loc_l], innerstring, expressionIn[loc_r+1:])
-    expressionOut = float_logical_exp(expressionOut, level+1)
+    expression_out = '{}{}{}'.format(expression_in[0:loc_l], inner_string, expression_in[loc_r + 1:])
+    expression_out = gene_rule_logical(expression_out, level + 1)
 
-    return expressionOut
+    return expression_out
 
 
-def gene_rule_float(expressionIn):
-    gene_reaction_by_rule = float_logical_exp(expressionIn)
+def gene_rule_evaluable(expression_in):
+    """
+    Make expression rule evaluatable
+    """
+    gene_reaction_by_rule = gene_rule_logical(expression_in)
     gene_reaction_by_rule = gene_reaction_by_rule.replace('{', '(')
     gene_reaction_by_rule = gene_reaction_by_rule.replace('}', ')')
+
     return gene_reaction_by_rule
 
 
-def createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, recon_algorithm, objective, exclude_rxns, force_rxns, force_lb, force_ub):
-    model_cobra = cobra.io.load_matlab_model(GeneralModelFile)
-    #cobra.util.set_objective(model_cobra, dict(zip([objective], [1.0])))
-    #with model_cobra:
-    model_cobra.objective = {getattr(model_cobra.reactions, objective) : 1}
-        
-    all_rxns = model_cobra.reactions
-    #exchange_rxns = [rxn.id for rxn in all_rxns if (re.search("EX_", rxn.id) and not rxn.id in force_rxns)] 
-    #sink_rxns = [rxn.id for rxn in all_rxns if (re.search("SK_", rxn.id) and not rxn.id in force_rxns)]
-    
-    exchange_rxns = [rxn.id for rxn in all_rxns if re.search("EX_", rxn.id)] 
+def create_tissue_specific_model(general_model_file, gene_expression_file, recon_algorithm, objective,
+                                 exclude_rxns, force_rxns, bound_rxns, bound_lb, bound_ub, solver):
+    """
+    Seed a context specific model. Core reactions are determined from GPR associations with gene expression logicals.
+    Core reactions that do not necessarily meet GPR association requirements can be forced if in the force reaction
+    file. Metabolite exchange (media), sinks, and demands are determined from exchanges file. Reactions can also be
+    force excluded even if they meet GPR association requirements using the force exclude file.
+    """
+    model_cobra = cobra.io.load_matlab_model(general_model_file)  # load reference model
+    model_cobra.objective = {getattr(model_cobra.reactions, objective): 1}  # set objective
+    all_rxns = model_cobra.reactions  # get all reactions
+
+    # get boundary reactions
+    exchange_rxns = [rxn.id for rxn in all_rxns if re.search("EX_", rxn.id)]
     sink_rxns = [rxn.id for rxn in all_rxns if re.search("SK_", rxn.id)]
-    
-    for rxn in sink_rxns:
-        if rxn not in force_rxns:
+    demand_rxns = [rxn.id for rxn in all_rxns if re.search("DM_", rxn.id)]
+
+    # close sinks and demands
+    for i, rxn in enumerate(sink_rxns):  # set sinks to 0
+        if rxn not in bound_rxns:  # exchange file
             getattr(model_cobra.reactions, rxn).lower_bound = 0.
-        
-    medium = model_cobra.medium
-    #for rxn in exchange_rxns:
-        #medium[rxn] = 0.0
-    for rxn in exchange_rxns:
-        if rxn in force_rxns:
-            idx = force_rxns.index(rxn)
-            medium[rxn] = -float(force_lb[idx])
-            print(float(force_lb[idx]))
         else:
+            getattr(model_cobra.reactions, rxn).lower_bound = bound_lb[i]
+            getattr(model_cobra.reactions, rxn).upper_bound = bound_ub[i]
+
+    for i, rxn in enumerate(demand_rxns):
+        if rxn not in bound_rxns:  # exchange file
+            getattr(model_cobra.reactions, rxn).upper_bound = 0.
+        else:
+            getattr(model_cobra.reactions, rxn).lower_bound = bound_lb[i]
+
+    # Reaction media
+    medium = model_cobra.medium  # get reaction media to modify
+    for rxn in exchange_rxns:  # open exchanges from exchange file, close unspecified exchanges
+        if rxn not in bound_rxns:
             medium[rxn] = 0.0
-    
-    model_cobra.medium = medium
-    #print(exchange_rxns[1:50])
-    
-    #model_cobra.remove_reactions(exchange_rxns)
-    model_cobra_rm = cobra.flux_analysis.fastcc(model_cobra)
+        else:
+            medium[rxn] = -float(bound_lb[bound_rxns.index(rxn)])
+
+    model_cobra.medium = medium  # set new media
+
+    # check number of unsolvable reactions for reference model under media assumptions
+    model_cobra_rm = cobra.flux_analysis.fastcc(model_cobra)  # create flux consistant model (rmemoves some reactions)
     incon_rxns = set(model_cobra.reactions.list_attr("id")) - set(model_cobra_rm.reactions.list_attr("id"))
-    del(model_cobra_rm)
-    print("incon: ", str(len(incon_rxns)))
-    
-     
-    '''
-    #print(scipy.io.loadmat(GeneralModelFile))
-    #mat = scipy.io.loadmat(GeneralModelFile)['iMM1865']
-    mat = scipy.io.loadmat(GeneralModelFile)['model'] # Created by writeCbModel in matlab instead of saveas
-    #mat = scipy.io.loadmat(GeneralModelFile)['mouseGEM']
-    model = MatFormatReader(mat)
-    S = model.S
-    lb, ub = model.get_model_bounds(False, True)
-    rx_names = model.get_reaction_and_metabolite_ids()[0]
-    '''
-    cobamp_model = COBRAModelObjectReader(model_cobra)
+    del model_cobra_rm
+    print(f''"Under given boundary assumptions, there are {incon_rxns_cnt} infeasible reactions in the\n \
+            reference model.\n\n \
+            These reactions will not be considered active in context specific model contstruction. If\n \
+            any infeasible reactions are found to be active according to expression data, or, are\n \
+            found in the force reactions list, they will be specified in 'InfeasibleRxns.csv'\n\n \
+            \n\nNote that it is normal for this value to be very large, however, if many of these\n \
+            reactions are active according to your expression data, it is likely that you are\n \
+            missing some critical exchange (media) reactions.")
+
+    # CoBAMP methods
+    cobamp_model = COBRAModelObjectReader(model_cobra)  # load model in readable format for CoBAMP
     cobamp_model.get_irreversibilities(True)
-    S = cobamp_model.get_stoichiometric_matrix()
+    s_matrix = cobamp_model.get_stoichiometric_matrix()
     lb, ub = cobamp_model.get_model_bounds(False, True)
     rx_names = cobamp_model.get_reaction_and_metabolite_ids()[0]
-    #pd.DataFrame(rx_names).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'rx_names'))
-    
-    expressionRxns, expVector = mapExpressionToRxn(model_cobra, GeneExpressionFile)
-    expressed_rxns = list({k:v for (k,v) in expressionRxns.items() if v > 0}.keys())
-     
+    # pd.DataFrame(rx_names).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'rx_names'))
+
+    # get expressed reactions
+    expression_rxns, expr_vector = map_expression_to_rxn(model_cobra, gene_expression_file)
+    # expressed_rxns = list({k: v for (k, v) in expression_rxns.items() if v > 0}.keys())
+
+    # find reactions in the force reactions file that are not in general model
     for rxn in force_rxns:
         if rxn not in rx_names:
-            warn(f"{rxn} from force reactions not in general model")
-    
-    for idx, (rxn, exp) in enumerate(expressionRxns.items()):
+            warn(f"{rxn} from force reactions not in general model, check BiGG \
+            (or database for reactions used in your general model) for synonyms")
+
+    # collect list of reactions that are infeasible but active in expression data or user defined
+    infeas_exp_rxns = []
+    infeas_force_rxns = []
+    infeas_exp_cnt = 0
+    infeas_force_cnt = 0
+    for idx, (rxn, exp) in enumerate(expression_rxns.items()):
+        if rxn in incon_rxns and expr_vector[idx] == 1:
+            infeas_exp_cnt += 1
+            infeas_exp_rxns.append(rxn)
+        if rxn in incon_rxns and rxn in force_rxns:
+            infeas_force_cnt += 1
+            infeas_force_rxns.append(rxn)
+
+        # make changes to expressed reactions base on user defined force/exclude reactions
         if rxn in force_rxns:
-            expVector[idx] = 1
-        if rxn in exclude_rxns or rxn in incon_rxns:
-            expVector[idx] = 0
+            expr_vector[idx] = 1  # set force reactions to 1
+        if rxn in incon_rxns or rxn in exclude_rxns:
+            expr_vector[idx] = 0  # set exclude and infeasible reactions to 0
+        # if rxn in incon_rxns and expr_vector[idx] == 1:
+        #    do_nothing="nothing"
+        if rxn == objective:
+            expr_vector[idx] = 1
 
-            
-    idx_objective = rx_names.index(objective)  
-    
-    #pd.DataFrame(expVector).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'expVector'))
-    
-    exp_idx_list = [idx for (idx, val) in enumerate(expVector) if val > 0]
-    
+    # get index of objective
+    idx_objective = rx_names.index(objective)
+    exp_idx_list = [idx for (idx, val) in enumerate(expr_vector) if val > 0]
 
+    # seed contextual model with GIMME
+    # `Becker and Palsson (2008). Context-specific metabolic networks are
+    # consistent with experiments. PLoS Comput. Biol. 4, e1000082.`
     if recon_algorithm == "GIMME":
         properties = GIMMEProperties(
-                                exp_vector=expVector,#np.array(gimme_data['0']),
-                                obj_frac=0.9,
-                                objectives= [{idx_objective:1}],
-                                preprocess=True,
-                                flux_threshold=0.9
-                                )
-        algorithm = GIMME(S, lb, ub, properties)
+            exp_vector=expr_vector,  # np.array(gimme_data['0']),
+            obj_frac=0.9,
+            objectives=[{idx_objective: 1}],
+            preprocess=True,
+            flux_threshold=0.9
+        )
+        algorithm = GIMME(s_matrix, lb, ub, properties)
         model_seeded = algorithm.run()
-        model_seeded_final = model_cobra.copy() 
+        model_seeded_final = model_cobra.copy()
         r_ids = [r.id for r in model_seeded_final.reactions]
-        to_remove_ids = [r_ids[r] for r in np.where(model_seeded==0)[0]]
-        print("remove")
-        print(to_remove_ids[:10])
-        model_seeded_final.remove_reactions(to_remove_ids,True)
+        to_remove_ids = [r_ids[r] for r in np.where(model_seeded == 0)[0]]
+        model_seeded_final.remove_reactions(to_remove_ids, True)
 
+    # seed contextual model with FastCORE
+    # 'Vlassis, Pacheco, Sauter (2014). Fast reconstruction of compact
+    # context-specific metbolic network models. PLoS Comput. Biol. 10,
+    # e1003424.'
     elif recon_algorithm == "FASTCORE":
-        properties = FastcoreProperties(core=exp_idx_list, solver='GLPK')
-        #algorithm = FASTcore(S, lb.astype(float), ub.astype(float), properties)
-        algorithm = FASTcore(S, lb, ub, properties)
+        properties = FastcoreProperties(core=exp_idx_list, solver=solver)
+        algorithm = FASTcore(s_matrix, lb, ub, properties)
         tissue_rxns = algorithm.fastcore()
-       # pd.DataFrame(tissue_rxns).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'tissue_rxns'))
-        model_seeded_final = model_cobra.copy() 
+        model_seeded_final = model_cobra.copy()
         r_ids = [r.id for r in model_seeded_final.reactions]
-        remove_rxns = [r_ids[int(i)] for i in range(S.shape[1]) if i not in tissue_rxns]
-        #pd.DataFrame(remove_rxns).to_csv(os.path.join(configs.rootdir, 'data', 'results', 'liver_control', 'remove_rxns'))
+        remove_rxns = [r_ids[int(i)] for i in range(s_matrix.shape[1]) if i not in tissue_rxns]
         model_seeded_final.remove_reactions(remove_rxns, True)
 
     else:
         print("Invalid reconstruction algorithm")
         return None
 
-    '''
-    model_seeded = algorithm.run()
-    model_seeded_final = model_cobra.copy() # this is done since it alters the original model_cobra; this way is to guarantee that a new model is changed instead of the original model
-    r_ids = [r.id for r in model_seeded_final.reactions]
-    to_remove_ids = [r_ids[r] for r in np.where(model_seeded==0)[0]]
-    model_seeded_final.remove_reactions(to_remove_ids,True) # this is to get the ids of the reactions to be removed in the model; True is to remove the pending genes/metabolites that with the removal of the reaction can no longer be connected in the network
+    # check number of unsolvable reactions for seeded model under media assumptions
+    model_cobra_rm = cobra.flux_analysis.fastcc(model_seeded_final)  # create flux consistant model
+    incon_rxns_cs = set(model_seeded_final.reactions.list_attr("id")) - set(model_cobra_rm.reactions.list_attr("id"))
+    incon_rxns_cnt_cs = len(incon_rxns_cs)
+    del model_cobra_rm
+    print(f"""
+    Under given boundary assumptions, with infeasible reactions from the general model not considered
+    there are {incon_rxns_cnt_cs} new infeasible reactions in the tissue-specific model\n\n
+    These reactions will be removed from the output model to ensure they can be simulated.\n\n
+    Note that this value should be very low.""")
 
-    #print('1\'s: ' + str(len(np.where(model_seeded==1)[0])))
-    #print('2\'s: ' + str(len(np.where(model_seeded==2)[0])))
-    '''
-    
-    return model_seeded_final, exp_idx_list
+    incon_df = pd.DataFrame({'general_infeasible_rxns': list(incon_rxns)})
+    infeas_exp_df = pd.DataFrame({'expressed_infeasible_rxns': infeas_exp_rxns})
+    infeas_force_df = pd.DataFrame({'infeasible_rxns_in_force_list': infeas_exp_rxns})
+    incon_df_cs = pd.DataFrame({'infeasible_rxns_from_seeding': list(incon_rxns_cs)})
+    infeasible_df = pd.concat([incon_df, infeas_exp_df, infeas_force_df, incon_df_cs], ignore_index=True, axis=1)
+    infeasible_df.head()
+
+    return model_seeded_final, exp_idx_list, infeasible_df
 
 
-def splitGeneExpressionData(expressionData):
-    expressionData.rename(columns={'ENTREZ_GENE_ID': 'Gene', 'Express': 'Data'},inplace=True)
-    expressionData = expressionData.loc[:, ['Gene', 'Data']]
-    expressionData['Gene'] = expressionData['Gene'].astype(str)
-    singleGeneNames = expressionData[~expressionData.Gene.str.contains('//')].reset_index(drop=True)
-    multipleGeneNames = expressionData[expressionData.Gene.str.contains('//')].reset_index(drop=True)
-    breaksGeneNames = pd.DataFrame(columns=['Gene', 'Data'])
-    #print(singleGeneNames.shape)
-    #print(multipleGeneNames.shape)
-    for index,row in multipleGeneNames.iterrows():
+def split_gene_expression_data(expression_data):
+    """
+    Splits genes that have mapped to multiple Entrez IDs are formated as "gene12//gene2//gene3"
+    """
+    expression_data.rename(columns={'ENTREZ_GENE_ID': 'Gene', 'Express': 'Data'}, inplace=True)
+    expression_data = expression_data.loc[:, ['Gene', 'Data']]
+    expression_data['Gene'] = expression_data['Gene'].astype(str)
+    single_gene_names = expression_data[~expression_data.Gene.str.contains('//')].reset_index(drop=True)
+    multiple_gene_names = expression_data[expression_data.Gene.str.contains('//')].reset_index(drop=True)
+    breaks_gene_names = pd.DataFrame(columns=['Gene', 'Data'])
+    # print(single_gene_names.shape)
+    # print(multiple_gene_names.shape)
+    for index, row in multiple_gene_names.iterrows():
         for genename in row['Gene'].split('///'):
-            breaksGeneNames = breaksGeneNames.append({'Gene': genename, 'Data': row['Data']},ignore_index=True)
-    #print(breaksGeneNames.shape)
-    GeneExpressions = singleGeneNames.append(breaksGeneNames,ignore_index=True)
-    #print(GeneExpressions.shape)
-    GeneExpressions.set_index('Gene',inplace=True)
-    return GeneExpressions
+            breaks_gene_names = breaks_gene_names.append({'Gene': genename, 'Data': row['Data']}, ignore_index=True)
+    # print(breaks_gene_names.shape)
+    gene_expressions = single_gene_names.append(breaks_gene_names, ignore_index=True)
+    # print(gene_expressions.shape)
+    gene_expressions.set_index('Gene', inplace=True)
+    return gene_expressions
 
 
-def mapExpressionToRxn(model_cobra, GeneExpressionFile):
-    expressionData = pd.read_csv(GeneExpressionFile)
-    GeneExpressions = splitGeneExpressionData(expressionData)
-    # GeneExpressions
-
-    expressionRxns = collections.OrderedDict()
-    # expVector = []
+def map_expression_to_rxn(model_cobra, gene_expression_file):
+    """
+    Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules
+    which are defined in general genome-scale metabolic model
+    """
+    expression_data = pd.read_csv(gene_expression_file)
+    gene_expressions = split_gene_expression_data(expression_data)
+    expression_rxns = collections.OrderedDict()
+    # expr_vector = []
     cnt = 0
     for rxn in model_cobra.reactions:
         gene_reaction_rule = correct_bracket(rxn.gene_reaction_rule, rxn.gene_name_reaction_rule)
-        # gene_reaction_rule = rxn.gene_reaction_rule
         gene_ids = re.findall(r'\d+', gene_reaction_rule)
-        expressionRxns[rxn.id] = -1.0
+        expression_rxns[rxn.id] = -1.0
         if gene_reaction_rule.strip() == '':
             continue
-        for id in gene_ids:
+        for gid in gene_ids:
             boolval = '-1'
-            if id in GeneExpressions.index:
-                boolval = '{}'.format(GeneExpressions.at[id, 'Data'])
-            gene_reaction_rule = gene_reaction_rule.replace('{}'.format(id), boolval, 1)
+            if gid in gene_expressions.index:
+                boolval = '{}'.format(gene_expressions.at[gid, 'Data'])
+            gene_reaction_rule = gene_reaction_rule.replace('{}'.format(gid), boolval, 1)
 
         try:
-            gene_reaction_by_rule = gene_rule_float(gene_reaction_rule)
+            gene_reaction_by_rule = gene_rule_evaluable(gene_reaction_rule)
             gene_reaction_by_rule = gene_reaction_by_rule.strip()
-            expressionRxns[rxn.id] = eval(gene_reaction_by_rule)
-            # expVector.append(expressionRxns[rxn.id])
-        except:
-            print(gene_reaction_by_rule)
+            expression_rxns[rxn.id] = eval(gene_reaction_by_rule)
+            # expr_vector.append(expression_rxns[rxn.id])
+        except BaseException:
+            # print(gene_reaction_by_rule)
             cnt += 1
     print('Map gene expression to reactions, {} errors.'.format(cnt))
-    expVector = np.array(list(expressionRxns.values()),dtype=float)
-    return expressionRxns, expVector
+    expr_vector = np.array(list(expression_rxns.values()), dtype=float)
+    return expression_rxns, expr_vector
 
-
-# testexp = '(( 2977 ) and ( 2983 )) or 4882 or (( 2982 ) and ( 2974 )) or 2986 or 2984 or 4881 or (( 2977 ) and ( 2974 )) or 3000 or (( 2982 ) and ( 2983 ))'
-
-# if not (testexp[0] == '(' and testexp[-1] == ')'):
-#     testexp = '('+testexp+')'
-# outexp=float_logical_exp(testexp)
-#
-# outexp = outexp.replace('{','(')
-# outexp = outexp.replace('}',')')
-# print(eval(outexp))
 
 def main(argv):
-    modelfile = 'GeneralModel.mat'
+    # default arguments, all other args are required for script to run
     objective = 'biomass_reaction'
     exclude_rxns = []
     force_rxns = []
-    force_ub = []
-    force_lb = []
+    bound_rxns = []
+    bound_ub = []
+    bound_lb = []
+    recon_alg = "GIMME"
+    solver = "GLPK"
+    out_formats = [".mat"]
+
     try:
-        opts, args = getopt.getopt(argv, "ht:m:g:o:s:x:f:a:", ["mfile=", "gfile=", "ofile=", "objective=", "excludeRxns=", "forceRxns=", "algorithm="])
+        opts, args = getopt.getopt(argv, "hn:m:g:o:b:x:f:a:s:t:",
+                                   ["tissue_name=", "reference_model_file=", "gene_expression_file=",
+                                    "objective=", "boundary_reactions_file", "exclude_reactions=",
+                                    "forceRxns=", "algorithm=", "solver=", "output_model_file_types"])
     except getopt.GetoptError:
-        print('python3 create_tissue_specific_model.py -m <modelfile> -g <genefile> -o <outputfile> -s <objective> -x <exclude reactions> -f <force_reactions> -a <algorithm>')
+        print('python3 create_tissue_specific_model.py -n <tissue_name*> -m <reference_model_file*> \
+               -g <gene_expression_file*> -o <objective*> -b <boundary_reactions_file> \
+               -x <exclude_reactions_file> -f <force_reactions_file> -a <algorithm> -s <solver> \
+               -t <output_model_file_types')
         sys.exit(2)
     for opt, arg in opts:
-        if opt == '-h':
-            print('python3 create_tissue_specific_model.py -m <modelfile> -g <genefile> -o <outputfile> -s <objective>--x <exclude reactions> -f <force_reactions> -a <algorithm>')
+        if opt in ("-h", "--help"):
+            print('python3 create_tissue_specific_model.py -n <tissue_name*> -m <reference_model_file*> \
+                   -g <gene_expression_file*> -o <objective*> -b <boundary_reactions_file> \
+                   -x <exclude_reactions_file> -f <force_reactions_file> -a <algorithm> -s <solver> \
+                   -t <output_model_file_types')
             sys.exit()
-        elif opt in ("-t", "--tissue_name"):
+        elif opt in ("-n", "--tissue_name"):
             tissue_name = arg
-        elif opt in ("-m", "--mfile"):
+        elif opt in ("-m", "--reference_model_file"):
             modelfile = arg
-        elif opt in ("-g", "--gfile"):
+            # output model format defaults to input model format unless otherwise specified
+            if modelfile[-4:] == ".mat":
+                out_formats = [".mat"]
+            elif modelfile[-4] == ".xml":
+                out_formats = [".xml"]
+            elif modelfile[-5] == ".json":
+                out_formats = [".json"]
+        elif opt in ("-g", "--gene_expression_file"):
             genefile = arg
-        elif opt in ("-o", "--ofile"):
-            outputfile = arg
-        elif opt in ("-s", "--objective"):
+            # assign output model file
+        elif opt in ("-o", "--objective"):
             objective = arg
-        elif opt in ("-x", "--excludeRxns"):
-            exclude_rxns = pd.read_csv(arg, header=0)['Rxn'].to_list()
-        elif opt in ("-f", "--forceRxns"):
+        elif opt in ("-b", "--boundary_reactions_file"):
             try:
                 df = pd.read_csv(arg, header=0, sep=",")
-                print(df.head())
+                bound_rxns = df['Rxn'].to_list()
+                bound_ub = df['Upperbound'].to_list()
+                bound_lb = df['Lowerbound'].to_list()
+                del df
+            except BaseException:
+                raise NameError("Force reactions must have three columns: Rxn Name, Lowerbound, Upperbound")
+        elif opt in ("-x", "--exclude_reactions_file"):
+            exclude_rxns = pd.read_csv(arg, header=0)['Rxn'].to_list()
+        elif opt in ("-f", "--force_reactions_file"):
+            try:
+                df = pd.read_csv(arg, header=0, sep=",")
                 force_rxns = df['Rxn'].to_list()
-                force_ub = df['Upperbound'].to_list()
-                force_lb = df['Lowerbound'].to_list()
-                del(df)
+                del df
             except:
-                raise TypeError("Force reactions must have three columns: Rxn Name, Lowerbound, Upperbound")
+                raise NameError("Force reactions must have three columns: Rxn Name, Lowerbound, Upperbound")
         elif opt in ("-a", "--algorithm"):
-            recon_algorithm = arg.upper()
-    print('Tissue Name is "{}"'.format(tissue_name))
-    print('General Model file is "{}"'.format(modelfile))
-    print('Gene Expression file is "{}"'.format(genefile))
-    print('Output file is "{}"'.format(outputfile))
-    print('Using "{}" reconstruction algorithm'.format(recon_algorithm))
-    #print(configs.rootdir)
-    GeneralModelFile = os.path.join(configs.rootdir, 'data', modelfile)
-    GeneExpressionFile = os.path.join(configs.rootdir, 'data', 'results', tissue_name, genefile)
-    TissueModel, core_list = createTissueSpecificModel(GeneralModelFile, GeneExpressionFile, 
-                                            recon_algorithm, objective, exclude_rxns,
-                                            force_rxns, force_lb, force_ub)
-                     
-    if recon_algorithm=="FASTCORE":
-        pd.DataFrame(core_list).to_csv(os.path.join(configs.rootdir, 'data', 'results', tissue_name, 'core_rxns'))
-    #print(TissueModel)
-    if outputfile[-4:] == '.mat':
-        # cobra.io.mat.save_matlab_model(TissueModel, os.path.join(configs.rootdir, 'data', outputfile))
-        cobra.io.save_matlab_model(TissueModel, os.path.join(configs.rootdir, 'data', 
-                                                             'results', tissue_name, outputfile))
-    elif outputfile[-4:] == '.xml':
-        print('cobrapy only support level 2 SBML model, while this model is level 3')
-        cobra.io.write_sbml_model(TissueModel, os.path.join(configs.rootdir, 'data',
-                                                            'results', tissue_name, outputfile))
-    elif outputfile[-5:] == '.json':
-        cobra.io.save_json_model(TissueModel, os.path.join(configs.rootdir, 'data',
-                                                           'results', tissue_name, outputfile))
-    else:
-        print('Error: unsupported model format: {}'.format(outputfile))
-        return None
-    cobra.io.write_sbml_model(TissueModel, os.path.join(configs.rootdir, 'data', 'results', tissue_name, 'sbml_model.xml'))
-    print('Genes: ' + str(len(TissueModel.genes)))
-    print('Metabolites: ' + str(len(TissueModel.metabolites)))
-    print('Reactions: ' + str(len(TissueModel.reactions)))
-    print(TissueModel.objective._get_expression())
-    print(TissueModel.optimize())
+            recon_alg = arg.upper()
+        elif opt in ("-t", "--output_model_file_types"):
+            out_formats = arg.strip("[").strip("]").replace("'", "").replace(" ", "").split(",")
+    try:
+        print('Tissue Name is "{}"'.format(tissue_name))
+    except:
+        raise NameError("Missing tissue name argument, use -h for list of inputs")
+    try:
+        print('General Model file is "{}"'.format(modelfile))
+    except:
+        raise NameError("Missing general model file, use -h for list of inputs")
+    try:
+        print('Gene Expression file is "{}"'.format(genefile))
+    except:
+        raise NameError("Missing gene expression file, use -h for ")
+
+    print('Constructing model with "{}" reconstruction algorithm using "{}" solver'.format(recon_alg, solver))
+    outfile_basename = tissue_name + "_SpecificModel"
+
+    # check if any unsupported filetypes are specified before creating CS models
+    if any(form not in [".xml", ".json", ".mat"] for form in out_formats):
+        raise NameError('Unsupported model format. Supports ".xml", ".mat", and ".json".')
+
+    # check if any unsupported algorithms are specified before creating CS models
+    if recon_alg not in ["GIMME", "FASTCORE"]:
+        raise NameError('Unsupported algorithm. Supports "GIMME", "FastCORE"')
+
+    general_model_file = os.path.join(configs.rootdir, 'data', modelfile)
+    gene_expression_file = os.path.join(configs.rootdir, 'data', 'results', tissue_name, genefile)
+    tissue_model, core_list, infeas_df = create_tissue_specific_model(general_model_file, gene_expression_file,
+                                                                      recon_alg, objective, exclude_rxns,
+                                                                      force_rxns, bound_rxns, bound_lb, bound_ub,
+                                                                      solver)
+
+    infeas_df.to_csv(os.path.join(configs.rootdir, "data", "results", tissue_name,
+                                  tissue_name + "_infeasible_rxns.csv"),
+                     index=False)
+
+    if recon_alg == "FASTCORE":
+        pd.DataFrame(core_list).to_csv(os.path.join(configs.rootdir, "data", "results", tissue_name,
+                                                    tissue_name + "_core_rxns.csv"),
+                                       index=False)
+    if ".mat" in out_formats:
+        outputfile = outfile_basename + ".mat"
+        print('Output file is "{}"'.format(outputfile))
+        # cobra.io.mat.save_matlab_model(tissue_model, os.path.join(configs.rootdir, 'data', outputfile))
+        cobra.io.save_matlab_model(tissue_model, os.path.join(configs.rootdir, "data",
+                                                              "results", tissue_name, outputfile))
+    if ".xml" in out_formats:
+        outputfile = outfile_basename + ".xml"
+        print('Output file is "{}"'.format(outputfile))
+        print('**Note cobrapy only supports level 2 SBML model, while this model is level 3')
+        cobra.io.write_sbml_model(tissue_model, os.path.join(configs.rootdir, 'data',
+                                                             "results", tissue_name, outputfile))
+    if ".json" in out_formats:
+        outputfile = outfile_basename + ".json"
+        print('Output file is "{}"'.format(outputfile))
+        cobra.io.save_json_model(tissue_model, os.path.join(configs.rootdir, 'data',
+                                                            "results", tissue_name, outputfile))
+
+    print("Number of Genes: " + str(len(tissue_model.genes)))
+    print("Number of Metabolites: " + str(len(tissue_model.metabolites)))
+    print("Number of Reactions: " + str(len(tissue_model.reactions)))
+    print(tissue_model.objective._get_expression())
+    print(tissue_model.optimize())
     return None
 
+
 if __name__ == "__main__":
-   main(sys.argv[1:])
+    main(sys.argv[1:])
