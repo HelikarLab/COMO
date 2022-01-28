@@ -8,11 +8,9 @@ import os
 import re
 import collections
 from warnings import warn
-
 from cobamp.wrappers import COBRAModelObjectReader
 from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
-
 from project import configs
 
 
@@ -109,7 +107,15 @@ def create_tissue_specific_model(general_model_file, gene_expression_file, recon
     file. Metabolite exchange (media), sinks, and demands are determined from exchanges file. Reactions can also be
     force excluded even if they meet GPR association requirements using the force exclude file.
     """
-    model_cobra = cobra.io.load_matlab_model(general_model_file)  # load reference model
+    if general_model_file[-4:] == ".mat":
+        model_cobra = cobra.io.load_matlab_model(general_model_file)  # load matlab model
+    elif general_model_file[-4:] == ".xml":
+        model_cobra = cobra.io.load_sbml_model(general_model_file)  # load reference model
+    elif general_model_file[-5:] == ".json":
+        model_cobra = cobra.io.load_json_model(general_model_file) # load json model
+    else:
+        raise NameError("reference model format must be .xml, .mat, or .json")
+
     model_cobra.objective = {getattr(model_cobra.reactions, objective): 1}  # set objective
     all_rxns = model_cobra.reactions  # get all reactions
 
@@ -145,15 +151,16 @@ def create_tissue_specific_model(general_model_file, gene_expression_file, recon
     # check number of unsolvable reactions for reference model under media assumptions
     model_cobra_rm = cobra.flux_analysis.fastcc(model_cobra)  # create flux consistant model (rmemoves some reactions)
     incon_rxns = set(model_cobra.reactions.list_attr("id")) - set(model_cobra_rm.reactions.list_attr("id"))
+    incon_rxns_cnt = len(incon_rxns)
     del model_cobra_rm
-    print(f''"Under given boundary assumptions, there are {incon_rxns_cnt} infeasible reactions in the\n \
-            reference model.\n\n \
-            These reactions will not be considered active in context specific model contstruction. If\n \
-            any infeasible reactions are found to be active according to expression data, or, are\n \
-            found in the force reactions list, they will be specified in 'InfeasibleRxns.csv'\n\n \
-            \n\nNote that it is normal for this value to be very large, however, if many of these\n \
-            reactions are active according to your expression data, it is likely that you are\n \
-            missing some critical exchange (media) reactions.")
+    print(('Under given boundary assumptions, there are "{incon_rxns_cnt}" infeasible reactions in the ' +
+            'reference model.\n').format(str(incon_rxns_cnt)))
+    print('These reactions will not be considered active in context specific model contstruction. If any infeasible ' +
+           'reactions are found to be active according to expression data, or, are found in the force reactions ' +
+           'list, they will be specified in "InfeasibleRxns.csv\n')
+    print('Note that it is normal for this value to be very large, however, if many of these reactions are active ' +
+          'according to your expression data, it is likely that you are missing some critical exchange (media) ' +
+          'reactions.\n')
 
     # CoBAMP methods
     cobamp_model = COBRAModelObjectReader(model_cobra)  # load model in readable format for CoBAMP
@@ -170,8 +177,8 @@ def create_tissue_specific_model(general_model_file, gene_expression_file, recon
     # find reactions in the force reactions file that are not in general model
     for rxn in force_rxns:
         if rxn not in rx_names:
-            warn(f"{rxn} from force reactions not in general model, check BiGG \
-            (or database for reactions used in your general model) for synonyms")
+            warn('"{}" from force reactions not in general model, check BiGG ' +
+                 '(or relevant database used in your general model) for synonyms'.format(rxn))
 
     # collect list of reactions that are infeasible but active in expression data or user defined
     infeas_exp_rxns = []
@@ -240,11 +247,10 @@ def create_tissue_specific_model(general_model_file, gene_expression_file, recon
     incon_rxns_cs = set(model_seeded_final.reactions.list_attr("id")) - set(model_cobra_rm.reactions.list_attr("id"))
     incon_rxns_cnt_cs = len(incon_rxns_cs)
     del model_cobra_rm
-    print(f"""
-    Under given boundary assumptions, with infeasible reactions from the general model not considered
-    there are {incon_rxns_cnt_cs} new infeasible reactions in the tissue-specific model\n\n
-    These reactions will be removed from the output model to ensure they can be simulated.\n\n
-    Note that this value should be very low.""")
+    print('Under given boundary assumptions, with infeasible reactions from the general model not considered there ' +
+          'are "{}" new infeasible reactions in the tissue-specific model.\n'.format(incon_rxns_cnt_cs))
+    print('These reactions will be removed from the output model to ensure the model is solvable')
+    print('Note that this value should be very low compared to the reference model.')
 
     incon_df = pd.DataFrame({'general_infeasible_rxns': list(incon_rxns)})
     infeas_exp_df = pd.DataFrame({'expressed_infeasible_rxns': infeas_exp_rxns})
@@ -315,7 +321,6 @@ def map_expression_to_rxn(model_cobra, gene_expression_file):
 
 def main(argv):
     # default arguments, all other args are required for script to run
-    objective = 'biomass_reaction'
     exclude_rxns = []
     force_rxns = []
     bound_rxns = []
@@ -325,28 +330,35 @@ def main(argv):
     solver = "GLPK"
     out_formats = [".mat"]
 
+    # for handling required arguments
+    found_n = False
+    found_m = False
+    found_g = False
+    found_o = False
+
+    help_str = """python3 create_tissue_specific_model.py -n <tissue_name*> -m <reference_model_file*> \
+               -g <gene_expression_file*> -o <objective*> -b <boundary_reactions_file> \
+               -x <exclude_reactions_file> -f <force_reactions_file> -a <algorithm> -s <solver> \
+               -t <output_model_file_types"""
+
     try:
         opts, args = getopt.getopt(argv, "hn:m:g:o:b:x:f:a:s:t:",
                                    ["tissue_name=", "reference_model_file=", "gene_expression_file=",
                                     "objective=", "boundary_reactions_file", "exclude_reactions=",
                                     "forceRxns=", "algorithm=", "solver=", "output_model_file_types"])
     except getopt.GetoptError:
-        print('python3 create_tissue_specific_model.py -n <tissue_name*> -m <reference_model_file*> \
-               -g <gene_expression_file*> -o <objective*> -b <boundary_reactions_file> \
-               -x <exclude_reactions_file> -f <force_reactions_file> -a <algorithm> -s <solver> \
-               -t <output_model_file_types')
+        print(help_str)
         sys.exit(2)
     for opt, arg in opts:
         if opt in ("-h", "--help"):
-            print('python3 create_tissue_specific_model.py -n <tissue_name*> -m <reference_model_file*> \
-                   -g <gene_expression_file*> -o <objective*> -b <boundary_reactions_file> \
-                   -x <exclude_reactions_file> -f <force_reactions_file> -a <algorithm> -s <solver> \
-                   -t <output_model_file_types')
+            print(help_str)
             sys.exit()
         elif opt in ("-n", "--tissue_name"):
             tissue_name = arg
+            found_n = True
         elif opt in ("-m", "--reference_model_file"):
             modelfile = arg
+            found_m = True
             # output model format defaults to input model format unless otherwise specified
             if modelfile[-4:] == ".mat":
                 out_formats = [".mat"]
@@ -354,11 +366,15 @@ def main(argv):
                 out_formats = [".xml"]
             elif modelfile[-5] == ".json":
                 out_formats = [".json"]
+            else:
+                print('Unsupported reference model format. Supports ".xml", ".mat", and ".json"')
         elif opt in ("-g", "--gene_expression_file"):
             genefile = arg
+            found_g = True
             # assign output model file
         elif opt in ("-o", "--objective"):
             objective = arg
+            found_o = True
         elif opt in ("-b", "--boundary_reactions_file"):
             try:
                 df = pd.read_csv(arg, header=0, sep=",")
@@ -367,43 +383,77 @@ def main(argv):
                 bound_lb = df['Lowerbound'].to_list()
                 del df
             except BaseException:
-                raise NameError("Force reactions must have three columns: Rxn Name, Lowerbound, Upperbound")
+                print("Boundary reactions file must be a csv with three columns: Rxn Name, Lowerbound, Upperbound")
         elif opt in ("-x", "--exclude_reactions_file"):
-            exclude_rxns = pd.read_csv(arg, header=0)['Rxn'].to_list()
+            try:
+                exclude_rxns = pd.read_csv(arg, header=0).to_list()
+            except BaseException:
+                print("exclude reactions file must be a csv with one column.")
+                print("This column should be populated with reaction ids in the reference model which will not be " +
+                      "included in the context specific model, regardless of omics expression")
         elif opt in ("-f", "--force_reactions_file"):
             try:
                 df = pd.read_csv(arg, header=0, sep=",")
                 force_rxns = df['Rxn'].to_list()
                 del df
-            except:
-                raise NameError("Force reactions must have three columns: Rxn Name, Lowerbound, Upperbound")
+            except BaseException:
+                print("Force reactions must have three columns with one column. ")
+                print("This column should be populated with reaction ids in the reference model which will be force " +
+                      "included in the context specific model, regardless of omics expression (unless the reaction " +
+                      "causes the model to be infeasible).")
         elif opt in ("-a", "--algorithm"):
             recon_alg = arg.upper()
         elif opt in ("-t", "--output_model_file_types"):
-            out_formats = arg.strip("[").strip("]").replace("'", "").replace(" ", "").split(",")
-    try:
+            try:
+                out_formats = arg.strip("[").strip("]").replace("'", "").replace(" ", "").split(",")
+            except:
+                print("output model file types must be in format: \"['.extension1', 'extention2', ... etc]\"")
+                print("for example, if you want to output in all 3 accepted formats, argument -t would be:")
+                print("\"['.mat', '.xml', '.json']\"")
+                print("Note the outer quotes required to be interpreted by cmd. This a string, not a python list")
+
+    if found_n:
         print('Tissue Name is "{}"'.format(tissue_name))
-    except:
-        raise NameError("Missing tissue name argument, use -h for list of inputs")
-    try:
+    else:
+        print("Missing tissue name argument, -n or --tissue_name")
+        print(help_str)
+        sys.exit(2)
+    if found_m:
         print('General Model file is "{}"'.format(modelfile))
-    except:
-        raise NameError("Missing general model file, use -h for list of inputs")
-    try:
+    else:
+        print("Missing general model file, -m or --reference_model_file")
+        print(help_str)
+        sys.exit(2)
+    if found_g:
         print('Gene Expression file is "{}"'.format(genefile))
-    except:
-        raise NameError("Missing gene expression file, use -h for ")
+    else:
+        print("Missing gene expression file, -g or --gene_expression_file")
+        print(help_str)
+        sys.exit(2)
+    if found_o:
+        print('Objective function is "{}".'.format(objective))
+    else:
+        print("Missing objective, -g or --gene_expression_file")
+        print("Example, biomass_reaction")
+        print(help_str)
+        sys.exit(2)
 
     print('Constructing model with "{}" reconstruction algorithm using "{}" solver'.format(recon_alg, solver))
     outfile_basename = tissue_name + "_SpecificModel"
 
     # check if any unsupported filetypes are specified before creating CS models
     if any(form not in [".xml", ".json", ".mat"] for form in out_formats):
-        raise NameError('Unsupported model format. Supports ".xml", ".mat", and ".json".')
+        print('Unsupported model format. Arg "-t or --output_model_filetypes"')
+        print('Supports ".xml", ".mat", and ".json".')
+        print("output model file types must be in format: \"['.extension1', 'extention2', ... etc]\"")
+        print("for example, if you want to output in all 3 accepted formats, argument -t would be:")
+        print("\"['.mat', '.xml', '.json']\"")
+        print("Note the outer quotes required to be interpreted by cmd. This a string, not a python list")
+
 
     # check if any unsupported algorithms are specified before creating CS models
     if recon_alg not in ["GIMME", "FASTCORE"]:
-        raise NameError('Unsupported algorithm. Supports "GIMME", "FastCORE"')
+        raise NameError('Unsupported algorithm. Supports either "GIMME", or "FastCORE"')
 
     general_model_file = os.path.join(configs.rootdir, 'data', modelfile)
     gene_expression_file = os.path.join(configs.rootdir, 'data', 'results', tissue_name, genefile)
