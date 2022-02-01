@@ -112,7 +112,7 @@ def create_tissue_specific_model(general_model_file, gene_expression_file, recon
     elif general_model_file[-4:] == ".xml":
         model_cobra = cobra.io.load_sbml_model(general_model_file)  # load reference model
     elif general_model_file[-5:] == ".json":
-        model_cobra = cobra.io.load_json_model(general_model_file) # load json model
+        model_cobra = cobra.io.load_json_model(general_model_file)  # load json model
     else:
         raise NameError("reference model format must be .xml, .mat, or .json")
 
@@ -154,10 +154,10 @@ def create_tissue_specific_model(general_model_file, gene_expression_file, recon
     incon_rxns_cnt = len(incon_rxns)
     del model_cobra_rm
     print(('Under given boundary assumptions, there are "{incon_rxns_cnt}" infeasible reactions in the ' +
-            'reference model.\n').format(str(incon_rxns_cnt)))
+           'reference model.\n').format(str(incon_rxns_cnt)))
     print('These reactions will not be considered active in context specific model contstruction. If any infeasible ' +
-           'reactions are found to be active according to expression data, or, are found in the force reactions ' +
-           'list, they will be specified in "InfeasibleRxns.csv\n')
+          'reactions are found to be active according to expression data, or, are found in the force reactions ' +
+          'list, they will be specified in "InfeasibleRxns.csv\n')
     print('Note that it is normal for this value to be very large, however, if many of these reactions are active ' +
           'according to your expression data, it is likely that you are missing some critical exchange (media) ' +
           'reactions.\n')
@@ -403,6 +403,8 @@ def main(argv):
                       "causes the model to be infeasible).")
         elif opt in ("-a", "--algorithm"):
             recon_alg = arg.upper()
+        elif opt in ("-s", "--solver"):
+            solver = arg.upper()
         elif opt in ("-t", "--output_model_file_types"):
             try:
                 out_formats = arg.strip("[").strip("]").replace("'", "").replace(" ", "").split(",")
@@ -437,6 +439,12 @@ def main(argv):
         print("Example, biomass_reaction")
         print(help_str)
         sys.exit(2)
+    if recon_alg not in ["FASTCORE", "GIMME"]:
+        print('Algorithim "{}" not supported. Please use "GIMME" or "FASTCORE"'.format(recon_alg))
+        sys.exit(2)
+    if solver not in ["GUROBI", "GLPK"]:
+        print('Solver "{}" not supported. Please use "GLPK" or "GUROBI"'.format(solver))
+        sys.exit(2)
 
     print('Constructing model with "{}" reconstruction algorithm using "{}" solver'.format(recon_alg, solver))
     outfile_basename = tissue_name + "_SpecificModel"
@@ -449,7 +457,6 @@ def main(argv):
         print("for example, if you want to output in all 3 accepted formats, argument -t would be:")
         print("\"['.mat', '.xml', '.json']\"")
         print("Note the outer quotes required to be interpreted by cmd. This a string, not a python list")
-
 
     # check if any unsupported algorithms are specified before creating CS models
     if recon_alg not in ["GIMME", "FASTCORE"]:

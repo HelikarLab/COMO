@@ -121,4 +121,4 @@ WORKDIR ${HOME}
 
 EXPOSE 8888
 ENTRYPOINT ["/usr/local/bin/tini", "--"]
-CMD ["start-notebook.sh"]
+CMD ["start-notebook.sh"] # rebuild

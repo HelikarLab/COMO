@@ -9,6 +9,8 @@ R -e 'BiocManager::install("genefilter", dep=TRUE, ask=FALSE)'
 #R -e 'BiocManager::install("biomaRt", dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install("edgeR", dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install("DESeq2", dep=TRUE, ask=FALSE)'
+R -e 'install.packages("countToFPKM", dependencies=True, ask=FALSE)'
+
 #mkdir /home/"${NB_USER}"/rlibs
 #chown -R "${NB_USER}" /home/"${NB_USER}"/rlibs
 #R -e 'if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")'
