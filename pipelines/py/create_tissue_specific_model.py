@@ -90,7 +90,7 @@ def gene_rule_logical(expression_in, level=0):
 
 def gene_rule_evaluable(expression_in):
     """
-    Make expression rule evaluatable
+    Make expression rule evaluable
     """
     gene_reaction_by_rule = gene_rule_logical(expression_in)
     gene_reaction_by_rule = gene_reaction_by_rule.replace('{', '(')
@@ -336,16 +336,16 @@ def main(argv):
     found_g = False
     found_o = False
 
-    help_str = """python3 create_tissue_specific_model.py -n <tissue_name*> -m <reference_model_file*> \
-               -g <gene_expression_file*> -o <objective*> -b <boundary_reactions_file> \
-               -x <exclude_reactions_file> -f <force_reactions_file> -a <algorithm> -s <solver> \
-               -t <output_model_file_types"""
+    help_str = """python3 create_tissue-specific-model.py -n <tissue-name*> -m <reference-model-file*> \
+               -g <gene-expression-file*> -o <objective*> -b <boundary-reactions-file> \
+               -x <exclude-reactions-file> -f <force-reactions-file> -a <algorithm> -s <solver> \
+               -t <output-model-file-types"""
 
     try:
         opts, args = getopt.getopt(argv, "hn:m:g:o:b:x:f:a:s:t:",
-                                   ["tissue_name=", "reference_model_file=", "gene_expression_file=",
-                                    "objective=", "boundary_reactions_file", "exclude_reactions=",
-                                    "forceRxns=", "algorithm=", "solver=", "output_model_file_types"])
+                                   ["tissue-name=", "reference-model-file=", "gene-expression-file=",
+                                    "objective=", "boundary-reactions-file", "exclude-reactions=",
+                                    "forceRxns=", "algorithm=", "solver=", "output-model-file-types"])
     except getopt.GetoptError:
         print(help_str)
         sys.exit(2)
@@ -353,10 +353,10 @@ def main(argv):
         if opt in ("-h", "--help"):
             print(help_str)
             sys.exit()
-        elif opt in ("-n", "--tissue_name"):
+        elif opt in ("-n", "--tissue-name"):
             tissue_name = arg
             found_n = True
-        elif opt in ("-m", "--reference_model_file"):
+        elif opt in ("-m", "--reference-model-file"):
             modelfile = arg
             found_m = True
             # output model format defaults to input model format unless otherwise specified
@@ -368,14 +368,14 @@ def main(argv):
                 out_formats = [".json"]
             else:
                 print('Unsupported reference model format. Supports ".xml", ".mat", and ".json"')
-        elif opt in ("-g", "--gene_expression_file"):
+        elif opt in ("-g", "--gene-expression-file"):
             genefile = arg
             found_g = True
             # assign output model file
         elif opt in ("-o", "--objective"):
             objective = arg
             found_o = True
-        elif opt in ("-b", "--boundary_reactions_file"):
+        elif opt in ("-b", "--boundary-reactions-file"):
             try:
                 df = pd.read_csv(arg, header=0, sep=",")
                 bound_rxns = df['Rxn'].to_list()
@@ -384,7 +384,7 @@ def main(argv):
                 del df
             except BaseException:
                 print("Boundary reactions file must be a csv with three columns: Rxn Name, Lowerbound, Upperbound")
-        elif opt in ("-x", "--exclude_reactions_file"):
+        elif opt in ("-x", "--exclude-reactions-file"):
             try:
                 exclude_rxns = pd.read_csv(arg, header=0).to_list()
             except BaseException:
@@ -405,7 +405,7 @@ def main(argv):
             recon_alg = arg.upper()
         elif opt in ("-s", "--solver"):
             solver = arg.upper()
-        elif opt in ("-t", "--output_model_file_types"):
+        elif opt in ("-t", "--output-model-file-types"):
             try:
                 out_formats = arg.strip("[").strip("]").replace("'", "").replace(" ", "").split(",")
             except:
@@ -417,25 +417,25 @@ def main(argv):
     if found_n:
         print('Tissue Name is "{}"'.format(tissue_name))
     else:
-        print("Missing tissue name argument, -n or --tissue_name")
+        print("Missing tissue name argument, -n or --tissue-name")
         print(help_str)
         sys.exit(2)
     if found_m:
         print('General Model file is "{}"'.format(modelfile))
     else:
-        print("Missing general model file, -m or --reference_model_file")
+        print("Missing general model file, -m or --reference-model-file")
         print(help_str)
         sys.exit(2)
     if found_g:
         print('Gene Expression file is "{}"'.format(genefile))
     else:
-        print("Missing gene expression file, -g or --gene_expression_file")
+        print("Missing gene expression file, -g or --gene-expression-file")
         print(help_str)
         sys.exit(2)
     if found_o:
         print('Objective function is "{}".'.format(objective))
     else:
-        print("Missing objective, -g or --gene_expression_file")
+        print("Missing objective, -g or --gene-expression-file")
         print("Example, biomass_reaction")
         print(help_str)
         sys.exit(2)
@@ -451,7 +451,7 @@ def main(argv):
 
     # check if any unsupported filetypes are specified before creating CS models
     if any(form not in [".xml", ".json", ".mat"] for form in out_formats):
-        print('Unsupported model format. Arg "-t or --output_model_filetypes"')
+        print('Unsupported model format. Arg "-t or --output-model-filetypes"')
         print('Supports ".xml", ".mat", and ".json".')
         print("output model file types must be in format: \"['.extension1', 'extention2', ... etc]\"")
         print("for example, if you want to output in all 3 accepted formats, argument -t would be:")
