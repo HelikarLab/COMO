@@ -5,22 +5,17 @@ import pandas as pd
 from project import configs
 import re
 import os, time, sys
-# import getopt
 import argparse
 from rpy2.robjects.packages import importr, SignatureTranslatedAnonymousPackage
+import glob
 
-# limma = importr("limma")
+# import R libraries
 tidyverse = importr("tidyverse")
-# edgeR = importr("edgeR")
-# genefilter = importr("genefilter")
-# biomaRt = importr("biomaRt")
-# sjmisc = importr("sjmisc")
 
-# automatically convert ryp2 dataframe to Pandas dataframe
+# read and translate R functions
 f = open(os.path.join("rscripts", "generate_counts_matrix.R"), "r")
 string = f.read()
 f.close()
-
 generate_counts_matrix_io = SignatureTranslatedAnonymousPackage(string, 'generate_counts_matrix_io')
 
 
@@ -55,7 +50,8 @@ def fetch_gene_info(input_values, input_db="Ensembl Gene ID",
         i += batch_len
     return df_maps
 
-def create_counts_matrix(tissue_name, technique):
+
+def create_counts_matrix(tissue_name):
     """
     Create a counts matrix by reading gene counts tables in MADRID_inputs/<tissue name>/<study number>/geneCounts/
     Uses R in backend (generate_counts_matrix.R)
@@ -64,21 +60,138 @@ def create_counts_matrix(tissue_name, technique):
     print(f"Looking for STAR gene count tables in '{input_dir}'")
     matrix_output_dir = os.path.join(configs.rootdir, 'data', 'data_matrices', tissue_name)
     print(f"Creating Counts Matrix for '{tissue_name}'")
-    # call genCountMatrix_old.R to create count matrix from MADRID_input folder
+    # call generate_counts_matrix.R to create count matrix from MADRID_input folder
     generate_counts_matrix_io.generate_counts_matrix_main(input_dir, matrix_output_dir)
 
     return
 
-def create_config_sheet(tissue_name):
+
+def create_config_sheet(tissue_name, excel_writer):
     """
     Create configuration sheet at /work/data/config_sheets/rnaseq_data_inputs_auto.xlsx
     based on the gene counts matrix. If using zFPKM normalization technique, fetch mean fragment lengths from
     /work/data/MADRID_inputs/<tissue name>/<study number>/fragmentSizes/
     """
+    gene_counts_glob = os.path.join(configs.rootdir, "data", "MADRID_input", tissue_name, "geneCounts", "*", "*.tab")
+    gene_counts_files = glob.glob(gene_counts_glob, recursive=True)
 
-    init_df = pd.DataFrame(columns=['SampleName', 'FragmentSize', 'Layout', 'Strand', 'Group'])
+    out_df = pd.DataFrame(columns=['SampleName', 'FragmentLength', 'Layout', 'Strand', 'Group'])
+
+    for gcfilename in gene_counts_files:
+        try:
+            label = re.findall(r"S[1-999]R[1-999]r?[1-999]?", gcfilename)[0]
+
+        except IndexError:
+            print(f"\nfilename of {gcfilename} is not valid. Should be 'tissueName_SXRYrZ.tab', where X is the "
+                  "study/batch number, Y is the replicate number, and Z is the run number. If not a multi-run sample, "
+                  "exclude 'rZ' from the filename.")
+            sys.exit()
+
+        study_number = re.findall(r"S[1-999]", label)[0]
+        run = re.findall(r"r[1-999]", label)
+        multi_flag = 0
+
+        if len(run) > 1:
+            if run[0] != "r1":
+                continue
+            else:
+                label_glob = study_number + "R*" + "r*"
+                runs = [run for run in gene_counts_files if re.search(label_glob, run)]
+                multi_flag = 1
+                frag_files = []
+
+                for r in runs:
+                    r_label = re.findall(r"r?[1-999]?", r)[0]
+                    R_label = re.findall(r"R?[1-999]?", r)[0]
+                    frag_filename = "".join([tissue_name, "_", study_number, R_label, r_label, "_fragment_size.txt"])
+                    frag_files.append(os.path.join(configs.rootdir, "data", "MADRID_input", tissue_name,
+                                                   "fragmentSizes", study_number, frag_filename))
+
+        layout_file = tissue_name + "_" + label + "_layout.txt"
+        strand_file = tissue_name + "_" + label + "_strandedness.txt"
+        frag_file = tissue_name + "_" + label + "_fragment_size.txt"
+
+        tissue_path = os.path.join(configs.rootdir, "data", "MADRID_input", tissue_name)
+        layout_path = os.path.join(tissue_path, "layouts", "*", layout_file)
+        strand_path = os.path.join(tissue_path, "strandedness", "*", strand_file)
+        frag_path = os.path.join(tissue_path, "fragmentSizes", "*", frag_file)
+
+        layout_glob = glob.glob(layout_path, recursive=False)
+        strand_glob = glob.glob(strand_path, recursive=False)
+        frag_glob = glob.glob(frag_path, recursive=False)
+
+        # Get layout
+        if len(layout_glob) < 1:
+            print(f"\nNo layout file found for {label}, writing as 'UNKNOWN', this should be defined by user if using "
+                  "zFPKM or rnaseq_gen.py will not run")
+            layout = "UNKNOWN"
+        elif len(layout_glob) > 1:
+            print(f"\nMultiple matching layout files for {label}, make sure there is only one copy for each replicate "
+                  "in MADRID_input")
+            sys.exit()
+        else:
+            with open(layout_glob[0]) as file:
+                layout = file.read().strip()
+
+        # Get strandedness
+        if len(strand_glob) < 1:
+            print(f"\nNo strandedness file found for {label}, writing as 'UNKNOWN' This will not interfere with the "
+                  "analysis since you have already set rnaseq_preprocess.py to infer the strandedness when writing "
+                  "the counts matrix")
+            strand = "UNKNOWN"
+        elif len(strand_glob) > 1:
+            print(f"\nMultiple matching strandedness files for {label}, make sure there is only one copy for each "
+                  "replicate in MADRID_input")
+            sys.exit()
+        else:
+            with open(strand_glob[0]) as file:
+                strand = file.read().strip()
+
+        # Get fragment length
+        if len(frag_glob) < 1:
+            print(f"\nNo fragment file found for {label}, writing as 'UNKNOWN' This must be defined by the user in "
+                  "order to use zFPKM normalization")
+            strand = "UNKNOWN"
+        elif len(frag_glob) > 1:
+            print(f"\nMultiple matching fragment length files for {label}, make sure there is only one copy for each "
+                  "replicate in MADRID_input")
+            sys.exit()
+        else:
+
+            if layout == "single-end":
+                mean_fragment_size = 0
+            else:
+                if not multi_flag:
+                    frag_df = pd.read_table(frag_glob[0], low_memory=False)
+                    frag_df['meanxcount'] = frag_df['frag_mean'] * frag_df['frag_count']
+                    mean_fragment_size = sum(frag_df['meanxcount'] / sum(frag_df['frag_count']))
+
+                else:
+                    mean_fragment_sizes = np.array([])
+                    library_sizes = np.array([])
+                    for ff in frag_files:
+                        frag_df = pd.read_table(ff, low_memory=False)
+                        frag_df['meanxcount'] = frag_df['frag_mean']*frag_df['frag_count']
+                        mean_fragment_size = sum(frag_df['meanxcount']/sum(frag_df['frag_count']))
+                        mean_fragment_sizes.append(mean_fragment_size)
+                        library_sizes.append(sum(frag_df['frag_count']))
+
+                    mean_fragment_size = sum(mean_fragment_sizes * library_sizes) / sum(library_sizes)
+
+        label = "_".join([tissue_name, re.findall(r"S[1-999]R[1-999]", label)[0]])  # remove run number if there
+
+        new_row = pd.DataFrame({'SampleName': [label],
+                                'FragmentLength': [mean_fragment_size],
+                                'Layout': [layout],
+                                'Strand': [strand],
+                                'Group': [study_number]})
+
+        out_df = out_df.append(new_row)
+
+    out_df.to_excel(excel_writer, sheet_name=tissue_name, header=True, index=False)
 
     return
+
 
 def create_gene_info_file(tissue_name, count_matrix_file, form, taxon_id, gene_output_dir):
     """
@@ -102,34 +215,38 @@ def create_gene_info_file(tissue_name, count_matrix_file, form, taxon_id, gene_o
 
     return
 
-def handle_tissue_batch(tissue_names, mode, technique, form, taxon_id):
+
+def handle_tissue_batch(tissue_names, mode, form, taxon_id):
     """
     Handle iteration through each tissue type and create files according to flag used (config, matrix, info)
     """
+    config_filename = os.path.join(configs.rootdir, "data", "config_sheets", "rnaseq_data_inputs_auto.xlsx")
+    if mode == "config":
+        writer = pd.ExcelWriter(config_filename)
 
-    config_file_path = os.path.join(configs.rootdir, "data", "config_sheets", "rnaseq_data_inputs.xlsx")
     for tissue_name in tissue_names:
         tissue_name = tissue_name.strip(" ")
+        print(f"Preprocessing {tissue_name}")
         gene_output_dir = os.path.join(configs.rootdir, "data", "results", tissue_name)
         matrix_output_dir = os.path.join(configs.rootdir, "data", "data_matrices", tissue_name)
         os.makedirs(gene_output_dir, exist_ok=True)
         os.makedirs(matrix_output_dir, exist_ok=True)
         print('Gene info output directory is "{}"'.format(gene_output_dir))
-        print('Active gene determination technique is "{}"'.format(technique))
 
         if mode in ["matrix", "config"]:
-            create_counts_matrix(tissue_name, technique)
+            create_counts_matrix(tissue_name)
 
         count_matrix_file = os.path.join(matrix_output_dir, ("gene_counts_matrix_" + tissue_name + ".csv"))
 
         if mode == "config":
-            init_df = pd.DataFrame(columns=['SampleName', 'FragmentSize', 'Layout', 'Strand', 'Group'])
-            init_df.to_excel(config_file_path, sheet_name=tissue_name)
-            create_config_sheet('temp')
+            create_config_sheet(tissue_name, writer)
 
         create_gene_info_file(tissue_name, count_matrix_file, form, taxon_id, gene_output_dir)
 
-        return
+    if mode == "config":
+        writer.close()
+
+    return
 
 
 def main(argv):
@@ -185,16 +302,9 @@ def main(argv):
                         dest="taxon_id",
                         help="BioDbNet taxon ID number, also accepts 'human', or 'mouse'"
                         )
-    parser.add_argument("-t", "--norm-technique",
-                        type=str,
-                        required=False,
-                        default="tpm-quantile",
-                        dest="technique",
-                        help="Normalization technique, accepts 'tpm-quantile', 'cpm', or 'zFPKM'"
-                        )
 
     group = parser.add_mutually_exclusive_group(required=True)
-    
+
     group.add_argument("-x", "--info-only",
                        action="store_true",
                        required=False,
@@ -228,12 +338,12 @@ def main(argv):
     tissue_names = args.tissue_names
     gene_format = args.gene_format
     taxon_id = args.taxon_id
-    technique = args.technique
     info_only = args.info_only
     make_matrix = args.make_matrix
     make_config = args.make_config
 
     tissue_names = tissue_names.strip("[").strip("]").replace("'", "").replace(" ", "").split(",") # convert to py list
+
     if gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
         form = "Ensembl Gene ID"
 
@@ -269,7 +379,7 @@ def main(argv):
     elif make_config:
         mode = "config"
 
-    handle_tissue_batch(tissue_names, mode, technique, form, taxon_id)
+    handle_tissue_batch(tissue_names, mode, form, taxon_id)
 
     return
 
