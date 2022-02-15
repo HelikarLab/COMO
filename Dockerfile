@@ -75,7 +75,7 @@ RUN apt-get update -qq \
   && chmod +x /usr/local/bin/start.sh \
   && cp start-singleuser.sh /usr/local/bin/ \
   && mkdir -p /etc/jupyter/ \
-  && cp jupyter_notebook_config.py /etc/jupyter/ \
+  && cp jupyter_server_config.py /etc/jupyter/ \
   && rm -rf /tmp/docker-stacks
   
 #### Gurobi Setup ####
