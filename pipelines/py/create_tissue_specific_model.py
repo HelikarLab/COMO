@@ -153,9 +153,9 @@ def create_tissue_specific_model(general_model_file, gene_expression_file, recon
     incon_rxns = set(model_cobra.reactions.list_attr("id")) - set(model_cobra_rm.reactions.list_attr("id"))
     incon_rxns_cnt = len(incon_rxns)
     del model_cobra_rm
-    print(('Under given boundary assumptions, there are "{incon_rxns_cnt}" infeasible reactions in the ' +
+    print(('Under given boundary assumptions, there are "{}" infeasible reactions in the ' +
            'reference model.\n').format(str(incon_rxns_cnt)))
-    print('These reactions will not be considered active in context specific model contstruction. If any infeasible ' +
+    print('These reactions will not be considered active in context specific model construction. If any infeasible ' +
           'reactions are found to be active according to expression data, or, are found in the force reactions ' +
           'list, they will be specified in "InfeasibleRxns.csv\n')
     print('Note that it is normal for this value to be very large, however, if many of these reactions are active ' +
@@ -248,7 +248,7 @@ def create_tissue_specific_model(general_model_file, gene_expression_file, recon
     incon_rxns_cnt_cs = len(incon_rxns_cs)
     del model_cobra_rm
     print('Under given boundary assumptions, with infeasible reactions from the general model not considered there ' +
-          'are "{}" new infeasible reactions in the tissue-specific model.\n'.format(incon_rxns_cnt_cs))
+          'are "{}" new infeasible reactions in the tissue-specific model.\n'.format(str(incon_rxns_cnt_cs)))
     print('These reactions will be removed from the output model to ensure the model is solvable')
     print('Note that this value should be very low compared to the reference model.')
 
@@ -361,13 +361,13 @@ def main(argv):
             found_m = True
             # output model format defaults to input model format unless otherwise specified
             if modelfile[-4:] == ".mat":
-                out_formats = [".mat"]
-            elif modelfile[-4] == ".xml":
-                out_formats = [".xml"]
+                out_formats = ["mat"]
+            elif modelfile[-4] in ["xml", ".sbml"]:
+                out_formats = ["xml"]
             elif modelfile[-5] == ".json":
-                out_formats = [".json"]
+                out_formats = ["json"]
             else:
-                print('Unsupported reference model format. Supports ".xml", ".mat", and ".json"')
+                print('Unsupported reference model format. Supports "xml", "mat", and "json"')
         elif opt in ("-g", "--gene-expression-file"):
             genefile = arg
             found_g = True
@@ -377,27 +377,30 @@ def main(argv):
             found_o = True
         elif opt in ("-b", "--boundary-reactions-file"):
             try:
+                print(f"Reading {arg} for boundary reactions")
                 df = pd.read_csv(arg, header=0, sep=",")
-                bound_rxns = df['Rxn'].to_list()
-                bound_ub = df['Upperbound'].to_list()
-                bound_lb = df['Lowerbound'].to_list()
+                bound_rxns = df['Rxn'].tolist()
+                bound_ub = df['Upperbound'].tolist()
+                bound_lb = df['Lowerbound'].tolist()
                 del df
             except BaseException:
-                print("Boundary reactions file must be a csv with three columns: Rxn Name, Lowerbound, Upperbound")
+                print("Boundary reactions file must be a csv with three columns: Rxn, Lowerbound, Upperbound")
         elif opt in ("-x", "--exclude-reactions-file"):
             try:
-                exclude_rxns = pd.read_csv(arg, header=0).to_list()
+                df = pd.read_csv(arg, header=None).values.tolist()
+                exclude_rxns = df.values.tolist()
             except BaseException:
                 print("exclude reactions file must be a csv with one column.")
                 print("This column should be populated with reaction ids in the reference model which will not be " +
                       "included in the context specific model, regardless of omics expression")
         elif opt in ("-f", "--force_reactions_file"):
             try:
-                df = pd.read_csv(arg, header=0, sep=",")
-                force_rxns = df['Rxn'].to_list()
+                print(f"Reading {arg} for force reactions")
+                df = pd.read_csv(arg, header=None,)
+                force_rxns = df.values.tolist()
                 del df
             except BaseException:
-                print("Force reactions must have three columns with one column. ")
+                print("Force reactions must be a csv with one column. ")
                 print("This column should be populated with reaction ids in the reference model which will be force " +
                       "included in the context specific model, regardless of omics expression (unless the reaction " +
                       "causes the model to be infeasible).")
@@ -411,7 +414,7 @@ def main(argv):
             except:
                 print("output model file types must be in format: \"['.extension1', 'extention2', ... etc]\"")
                 print("for example, if you want to output in all 3 accepted formats, argument -t would be:")
-                print("\"['.mat', '.xml', '.json']\"")
+                print("\"['mat', 'xml', 'json']\"")
                 print("Note the outer quotes required to be interpreted by cmd. This a string, not a python list")
 
     if found_n:
@@ -450,12 +453,12 @@ def main(argv):
     outfile_basename = tissue_name + "_SpecificModel"
 
     # check if any unsupported filetypes are specified before creating CS models
-    if any(form not in [".xml", ".json", ".mat"] for form in out_formats):
+    if any(form not in ["xml", "json", "mat"] for form in out_formats):
         print('Unsupported model format. Arg "-t or --output-model-filetypes"')
-        print('Supports ".xml", ".mat", and ".json".')
+        print('Supports "xml", "mat", and "json".')
         print("output model file types must be in format: \"['.extension1', 'extention2', ... etc]\"")
         print("for example, if you want to output in all 3 accepted formats, argument -t would be:")
-        print("\"['.mat', '.xml', '.json']\"")
+        print("\"['mat', 'xml', 'json']\"")
         print("Note the outer quotes required to be interpreted by cmd. This a string, not a python list")
 
     # check if any unsupported algorithms are specified before creating CS models
@@ -477,19 +480,19 @@ def main(argv):
         pd.DataFrame(core_list).to_csv(os.path.join(configs.rootdir, "data", "results", tissue_name,
                                                     tissue_name + "_core_rxns.csv"),
                                        index=False)
-    if ".mat" in out_formats:
+    if "mat" in out_formats:
         outputfile = outfile_basename + ".mat"
         print('Output file is "{}"'.format(outputfile))
         # cobra.io.mat.save_matlab_model(tissue_model, os.path.join(configs.rootdir, 'data', outputfile))
         cobra.io.save_matlab_model(tissue_model, os.path.join(configs.rootdir, "data",
                                                               "results", tissue_name, outputfile))
-    if ".xml" in out_formats:
+    if "xml" in out_formats:
         outputfile = outfile_basename + ".xml"
         print('Output file is "{}"'.format(outputfile))
         print('**Note cobrapy only supports level 2 SBML model, while this model is level 3')
         cobra.io.write_sbml_model(tissue_model, os.path.join(configs.rootdir, 'data',
                                                              "results", tissue_name, outputfile))
-    if ".json" in out_formats:
+    if "json" in out_formats:
         outputfile = outfile_basename + ".json"
         print('Output file is "{}"'.format(outputfile))
         cobra.io.save_json_model(tissue_model, os.path.join(configs.rootdir, 'data',
