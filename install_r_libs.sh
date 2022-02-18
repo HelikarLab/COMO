@@ -9,6 +9,7 @@ R -e 'BiocManager::install("genefilter", dep=TRUE, ask=FALSE)'
 #R -e 'BiocManager::install("biomaRt", dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install("edgeR", dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install("DESeq2", dep=TRUE, ask=FALSE)'
+R -e 'BiocManager::install("zFPKM", dep=TRUE, ask=FALSE)'
 
 #mkdir /home/"${NB_USER}"/rlibs
 #chown -R "${NB_USER}" /home/"${NB_USER}"/rlibs

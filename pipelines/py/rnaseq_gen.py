@@ -19,6 +19,7 @@ genefilter = importr("genefilter")
 biomaRt = importr("biomaRt")
 sjmisc = importr("sjmisc")
 openxlsx = importr("openxlsx")
+zfpkm = importr("zFPKM")
 
 # read and translate R functions
 f = open("/home/jupyteruser/work/py/rscripts/rnaseq.R", "r")
@@ -132,7 +133,7 @@ def main(argv):
         usage="python3 $(prog)s [options]"
     )
 
-    parser.add_argument("-c", "--config_file",
+    parser.add_argument("-c", "--config-file",
                         type=str,
                         required=True,
                         dest="config_filename",
