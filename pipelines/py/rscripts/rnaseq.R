@@ -8,6 +8,7 @@ library(edgeR)
 library(genefilter)
 library(biomaRt)
 library(sjmisc)
+library(zFPKM)
 
 
 read_counts_matrix <- function(counts_matrix_file, config_file, info_file, model_name) {
@@ -44,7 +45,7 @@ read_counts_matrix <- function(counts_matrix_file, config_file, info_file, model
         SampMetrics[[group]][["CountMatrix"]] <- genes
         SampMetrics[[group]][["FragmentLengths"]] <- c()
         SampMetrics[[group]][["SampNames"]] <- c()
-        SampMetrics[[group]][["Layouts"]] <- c()
+        SampMetrics[[group]][["Layout"]] <- c()
     }
     # add to group count matrices and insert lists
     for ( i in 1:length(conf$SampleName) ) {
@@ -57,7 +58,7 @@ read_counts_matrix <- function(counts_matrix_file, config_file, info_file, model
             samp_mat <- SampMetrics[[group]][["CountMatrix"]]
             fragment_lengths <- SampMetrics[[group]][["FragmentLengths"]]
             samp_names <- SampMetrics[[group]][["SampNames"]]
-            layouts <- SampMetrics[[group]][["Layouts"]]
+            layouts <- SampMetrics[[group]][["Layout"]]
 
             # add replicate to values
             samp_mat <- cbind(samp_mat, cmat_whole[,entry])
@@ -69,7 +70,7 @@ read_counts_matrix <- function(counts_matrix_file, config_file, info_file, model
             samp_mat <- SampMetrics[[group]][["CountMatrix"]] <- samp_mat
             SampMetrics[[group]][["FragmentLengths"]] <- fragment_lengths
             SampMetrics[[group]][["SampNames"]] <-  samp_names
-            SampMetrics[[group]][["Layouts"]] <- layouts
+            SampMetrics[[group]][["Layout"]] <- layouts
 
         } else {
             print(paste(c(entry, " not found in count matrix."),collapse="")) # inform that a sample is missing
@@ -110,34 +111,36 @@ calculate_tpm <- function(SampMetrics) {
 }
 
 
-calculate_rpkm <- function(SampMetrics) {
-
-    for ( i in 1:length(SampMetrics) ) {
-        count_matrix <- SampMetrics[[i]][["CountMatrix"]]
-        gene_size <- SampMetrics[[i]][["GeneSizes"]]
-        rpkm_matrix <- do.call(cbind, lapply(1:ncol(count_matrix), function(j) {
-            rate = log(count_matrix[,j]) - log(gene_size[j])
-            exp(rate - log(sum(count_matrix[,j])) + log(10e9))
-        }))
-        colnames(rpkm_matrix) <- colnames(count_matrix)
-        SampMetrics[[i]][["FPKM_Matrix"]] <- rpkm_matrix
-    }
-
-    return(SampMetrics)
-}
-
-
 calculate_fpkm <- function(SampMetrics) {
 
     for ( i in 1:length(SampMetrics) ) {
-        count_matrix <- SampMetrics[[i]][["CountMatrix"]]
-        gene_size <- SampMetrics[[i]][["GeneSizes"]]
-        mean_fragment_lengths <- SampMetrics[[i]][["FragmentLengths"]]
-        fpkm_matrix <- do.call(cbind, lapply(1:ncol(count_matrix), function(j) {
-            fpkm(count_matrix[,j], gene_size[j], mean_fragment_lengths[j])
-        }))
-        colnames(fpkm_matrix) <- colnames(count_matrix)
-        SampMetrics[[i]][["FPKM_Matrix"]] <- fpkm_matrix
+
+        layout = SampMetrics[[i]][["Layout"]] # get layout
+
+        # normalize wiht fpkm if paired, rpkm if single end, kill if something else is specified
+        print(layout)
+        stopifnot( layout == "paired-end" || layout == "single-end" )
+        if ( layout == "paired-end" ) { # fpkm
+            count_matrix <- SampMetrics[[i]][["CountMatrix"]]
+            gene_size <- SampMetrics[[i]][["GeneSizes"]]
+            mean_fragment_lengths <- SampMetrics[[i]][["FragmentLengths"]]
+            fpkm_matrix <- do.call(cbind, lapply(1:ncol(count_matrix), function(j) {
+                fpkm(count_matrix[,j], gene_size[j], mean_fragment_lengths[j])
+            }))
+            colnames(fpkm_matrix) <- colnames(count_matrix)
+            SampMetrics[[i]][["FPKM_Matrix"]] <- fpkm_matrix
+
+        } else { # rpkm
+            count_matrix <- SampMetrics[[i]][["CountMatrix"]]
+            gene_size <- SampMetrics[[i]][["GeneSizes"]]
+            rpkm_matrix <- do.call(cbind, lapply(1:ncol(count_matrix), function(j) {
+                rate = log(count_matrix[,j]) - log(gene_size[j])
+                exp(rate - log(sum(count_matrix[,j])) + log(10e9))
+            }))
+            colnames(rpkm_matrix) <- colnames(count_matrix)
+            SampMetrics[[i]][["FPKM_Matrix"]] <- rpkm_matrix
+
+        }
     }
 
     return(SampMetrics)
@@ -223,7 +226,7 @@ TPM_quant_filter <- function(SampMetrics, filt_options, model_name) {
         ent <- SampMetrics[[i]][["Entrez"]]
         size <- SampMetrics[[i]][["GeneSizes"]]
         tpm <- SampMetrics[[i]][["TPM_Matrix"]]
-        tpm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/TPM_Matrix"),collapse="")
+        tpm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/TPM_Matrix_S", i, ".csv"),collapse="")
         write_tpm <- cbind(ent, tpm)
         write.csv(write_tpm, tpm_fname)
 
@@ -265,31 +268,23 @@ TPM_quant_filter <- function(SampMetrics, filt_options, model_name) {
 }
 
 
-zfpkm_filter <- function(SampMetrics, filt_options) {
+zfpkm_filter <- function(SampMetrics, filt_options, model_name) {
 
     N_exp <- filt_options$replicate_ratio # ratio replicates for active
     N_top <- filt_options$replicate_ratio_high # ratio of replicates for high-confidence
     cutoff <- -3
-    layout = SampMetrics[[i]][[1]][["Layout"]] # all should be same layout
 
-    # normalize wiht fpkm if paired, rpkm if single end, kill if something else is specified
-    stopifnot( layout == "paired-end" || layout == "single-end" )
-    if ( layout == "paired-end" ) {
-        SampMetrics <- calculate_fpkm(SampMetrics)
-    } else {
-        SampMetrics <- calculate_rpkm(SampMetrics)
-    }
+    calculate_fpkm(SampMetrics)
 
     for ( i in 1:length(SampMetrics) ) {
-        cmat <- SampMetrics[[i]][["CountMatrix"]] # get counts matrix
-        layout = SampMetrics[[i]][[1]][["Layout"]] # all should be same layout
-        #rownames(cmat) <- make.names(gnames, unique = TRUE)
-
         fmat <- SampMetrics[[i]][["FPKM_Matrix"]] # get fpkm matrix
         fdf <- data.frame(fmat) # convert to df
         ent <- SampMetrics[[i]][["Entrez"]] # get entrez ids
         size <- SampMetrics[[i]][["GenesSizes"]] # get gene sizes
         zmat <- zFPKM(fdf, assayName="FPKM") # calculate zFPKM
+        zfpkm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/zFPKM_Matrix_S", i, ".csv"),collapse="")
+        write_zfpkm <- cbind(ent, zfpkm)
+        write.csv(write_zfpkm, zfpkm_fname)
 
         #inames <- rownames(zmat)
     
@@ -317,7 +312,7 @@ filter_counts <- function(SampMetrics, technique, filt_options, mart, model_name
 
     switch(technique,
          cpm = cpm_filter(SampMetrics, filt_options),
-         zFPKM = zfpkm_filter(SampMetrics, filt_options, mart),
+         zfpkm = zfpkm_filter(SampMetrics, filt_options, model_name),
          quantile = TPM_quant_filter(SampMetrics, filt_options, model_name))
 }
 
