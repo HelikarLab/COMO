@@ -10,6 +10,9 @@ R -e 'BiocManager::install("genefilter", dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install("edgeR", dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install("DESeq2", dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install("zFPKM", dep=TRUE, ask=FALSE)'
+R -e 'BiocManager::install("ComplexHeatmap", dep=TRUE, ask=FALSE)'
+R -e  'install.packages("countToFPKM", dependencies=TRUE, repos="'"${CRAN_MIRROR}"'")'
+
 
 #mkdir /home/"${NB_USER}"/rlibs
 #chown -R "${NB_USER}" /home/"${NB_USER}"/rlibs
