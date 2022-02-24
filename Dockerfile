@@ -1,7 +1,8 @@
 ARG UBUNTU_RELEASE=20.04
 ARG RPY2_VERSION=master
 
-FROM babessell/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
+#FROM babessell/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
+FROM babessell/base-ubuntu
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV CRAN_MIRROR=https://cloud.r-project.org \
