@@ -9,6 +9,7 @@ library(genefilter)
 library(biomaRt)
 library(sjmisc)
 library(zFPKM)
+library(countToFPKM)
 
 
 read_counts_matrix <- function(counts_matrix_file, config_file, info_file, model_name) {
