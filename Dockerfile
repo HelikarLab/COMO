@@ -1,7 +1,7 @@
 ARG UBUNTU_RELEASE=20.04
 ARG RPY2_VERSION=master
 
-FROM rpy2/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
+FROM babessell/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV CRAN_MIRROR=https://cloud.r-project.org \
@@ -31,6 +31,8 @@ RUN apt-get update \
     && rm -f gurobi${GRB_VERSION}_linux64.tar.gz \
     && mv -f gurobi* gurobi \
     && rm -rf gurobi/linux64/docs
+	
+#### Update R in case rpy2 does not give most up to date version ####
 	
 #### Bioconductor dependencies ####
 
