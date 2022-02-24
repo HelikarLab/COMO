@@ -1,0 +1,24 @@
+MADRID CHANGES
+
+biomass_reaction as an input not a fixed variable
+
+Line 740 cobamp/models.py
+
+		for id, lb in zip(objective_ids, objective_lbs):   # cut
+
+lbs_id = objective_lbs[objective_ids] # replace
+for id, lb in zip(objective_ids, lbs_id):
+
+
+  && #sed -z 's/\t\tfor id, lb in zip(objective_ids, objective_lbs):/\t\tlbs_id = objective_lbs[objective_ids]\n\t\tfor id, lb in zip(objective_ids, lbs_id):/' /usr/local/lib/python3.8/dist-packages/cobamp/core/models.py \
+  && #sed -n p740,741 /usr/local/lib/python3.8/dist-packages/cobamp/core/models.py \
+  
+  
+  
+  
+  
+  
+  		objective_ids = nonzero(objective_lbs)[0]
+        lbs_id = objective_lbs[objective_ids]
+        for id, lb in zip(objective_ids, lbs_id):
+            self.set_reaction_bounds(id, lb=lb, temporary=True)

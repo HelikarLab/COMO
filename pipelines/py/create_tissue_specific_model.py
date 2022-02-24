@@ -320,6 +320,9 @@ def map_expression_to_rxn(model_cobra, gene_expression_file):
 
 
 def main(argv):
+    """
+    Seed a context-specific model from a list of expressed genes, a reference
+    """
     # default arguments, all other args are required for script to run
     exclude_rxns = []
     force_rxns = []
