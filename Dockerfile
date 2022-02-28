@@ -2,20 +2,32 @@ ARG UBUNTU_RELEASE=20.04
 ARG RPY2_VERSION=master
 
 #FROM babessell/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
-FROM babessell/rpy2-41:latest
+FROM r-base:4.1.2
+FROM python:3.9-slim-buster
+#FROM babessell/rpy2-41:latest
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV CRAN_MIRROR=https://cloud.r-project.org \
-    CRAN_MIRROR_TAG=-cran35
+    CRAN_MIRROR_TAG=-cran41
+	
 ENV JUPYTER_ENABLE_LAB=1
+
 ARG TINI_VERSION=v0.19.0
+
 ENV SHELL=/bin/bash \
     NB_USER=jupyteruser \
     NB_UID=1000
-
+	
 USER root
 
-#### Gurobi Install #####
+#### Install RPY2 #####
+
+ARG RPY2_VERSION=RELEASE_3_4_5
+RUN \
+  python3 -m pip --no-cache-dir install https://github.com/rpy2/rpy2/archive/"${RPY2_VERSION}".zip && \
+  rm -rf /root/.cache
+
+#### Install Gurobi #####
 # https://github.com/Gurobi/docker-optimizer/blob/master/9.5.0/Dockerfile
 
 ARG GRB_VERSION=9.5.0
@@ -33,7 +45,6 @@ RUN apt-get update \
     && mv -f gurobi* gurobi \
     && rm -rf gurobi/linux64/docs
 	
-#### Update R in case rpy2 does not give most up to date version ####
 	
 #### Bioconductor dependencies ####
 
@@ -42,14 +53,14 @@ RUN \
   && apt-get install -y libssl-dev \
   && apt-get install -y libxml2-dev
 
-#### Copy install scripts ####
+#### Copy Install Scripts ####
 
 COPY install_py_libs.sh /opt/
 COPY install_r_libs.sh /opt/
 COPY install_jupyter.sh /opt/install_jupyter.sh
 COPY setup_jupyter.sh /opt/setup_jupyter.sh
 
-#### Juypter and Python lib install ####
+#### Install Juypter and Python Libraries ####
 
 RUN apt-get update -qq \
   && apt-get install -y curl \
@@ -103,7 +114,7 @@ ENV GUROBI_HOME /opt/gurobi/linux64
 ENV PATH $PATH:$GUROBI_HOME/bin
 ENV LD_LIBRARY_PATH $GUROBI_HOME/lib
   
-#### R lib install ####
+#### Install R Libraries ####
   
 RUN sh /opt/install_r_libs.sh 
 
