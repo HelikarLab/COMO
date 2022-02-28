@@ -8,7 +8,7 @@ FROM python:3.9-slim-buster
 #### Install RPY2 #####
 ARG RPY2_CFFI_MODE=BOTH
 ARG RPY2_VERSION=RELEASE_3_4_5
-ARG R_HOME=/usr/lib/R/
+ARG R_HOME=/usr/local/lib/R/
 RUN \
   python3 -m pip --no-cache-dir install rpy2
  
