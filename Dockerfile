@@ -6,6 +6,14 @@ FROM r-base:4.1.2
 FROM python:3.9-slim-buster
 #FROM babessell/rpy2-41:latest
 
+#### Install RPY2 #####
+ARG RPY2_CFFI_MODE=BOTH
+ARG RPY2_VERSION=RELEASE_3_4_5
+RUN \
+  python3 -m pip --no-cache-dir install rpy2
+ 
+#### Set Args ####
+
 ARG DEBIAN_FRONTEND=noninteractive
 ENV CRAN_MIRROR=https://cloud.r-project.org \
     CRAN_MIRROR_TAG=-cran41
@@ -20,11 +28,6 @@ ENV SHELL=/bin/bash \
 	
 USER root
 
-#### Install RPY2 #####
-
-ARG RPY2_VERSION=RELEASE_3_4_5
-RUN \
-  python3 -m pip --no-cache-dir install rpy2
 
 #### Install Gurobi #####
 # https://github.com/Gurobi/docker-optimizer/blob/master/9.5.0/Dockerfile
