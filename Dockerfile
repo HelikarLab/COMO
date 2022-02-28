@@ -1,18 +1,11 @@
+#### Base Image ####
+
 ARG UBUNTU_RELEASE=20.04
-
 #FROM babessell/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
-FROM r-base:4.1.2
-FROM python:3.9-slim-buster
-#FROM babessell/rpy2-41:latest
+FROM babessell/rpy2-41:latest
 
-#### Install RPY2 #####
-ARG RPY2_CFFI_MODE=BOTH
-ARG RPY2_VERSION=RELEASE_3_4_5
-ARG R_HOME=/usr/local/lib/R/
-RUN \
-  python3 -m pip --no-cache-dir install rpy2
- 
-#### Set Args ####
+
+#### Set Container Args ####
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV CRAN_MIRROR=https://cloud.r-project.org \
@@ -30,7 +23,7 @@ USER root
 
 
 #### Install Gurobi #####
-# https://github.com/Gurobi/docker-optimizer/blob/master/9.5.0/Dockerfile
+# from https://github.com/Gurobi/docker-optimizer/blob/master/9.5.0/Dockerfile
 
 ARG GRB_VERSION=9.5.0
 ARG GRB_SHORT_VERSION=9.5
@@ -64,6 +57,8 @@ COPY setup_jupyter.sh /opt/setup_jupyter.sh
 
 #### Install Juypter and Python Libraries ####
 
+# TODO: Split this into multiples parts that are more readable
+
 RUN apt-get update -qq \
   && apt-get install -y curl \
   && apt-get remove -y --purge nodejs npm \
@@ -94,6 +89,7 @@ RUN apt-get update -qq \
   && cp jupyter_server_config.py /etc/jupyter/ \
   && rm -rf /tmp/docker-stacks
   
+  
 #### Gurobi Setup ####
 
 LABEL vendor="Gurobi"
@@ -116,9 +112,11 @@ ENV GUROBI_HOME /opt/gurobi/linux64
 ENV PATH $PATH:$GUROBI_HOME/bin
 ENV LD_LIBRARY_PATH $GUROBI_HOME/lib
   
+  
 #### Install R Libraries ####
   
 RUN sh /opt/install_r_libs.sh 
+
 
 #### Ownership ####  
 
@@ -128,7 +126,8 @@ RUN chown -R "${NB_USER}" /home/"${NB_USER}"/work/data/
 RUN chown -R "${NB_USER}" /usr/local/lib/R/site-library
 #RUN chmod 755 /usr/local/bin/start-notebook.sh
 
-#### change to work directory and run Juypterlab ####
+
+#### Set workspace and run Juypterlab ####
 
 USER $NB_USER
 
