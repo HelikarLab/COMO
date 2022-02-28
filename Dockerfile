@@ -24,8 +24,7 @@ USER root
 
 ARG RPY2_VERSION=RELEASE_3_4_5
 RUN \
-  python3 -m pip --no-cache-dir install https://github.com/rpy2/rpy2/archive/"${RPY2_VERSION}".zip && \
-  rm -rf /root/.cache
+  python3 -m pip --no-cache-dir install rpy2
 
 #### Install Gurobi #####
 # https://github.com/Gurobi/docker-optimizer/blob/master/9.5.0/Dockerfile
