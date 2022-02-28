@@ -1,5 +1,4 @@
 ARG UBUNTU_RELEASE=20.04
-ARG RPY2_VERSION=master
 
 #FROM babessell/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
 FROM r-base:4.1.2
@@ -9,6 +8,7 @@ FROM python:3.9-slim-buster
 #### Install RPY2 #####
 ARG RPY2_CFFI_MODE=BOTH
 ARG RPY2_VERSION=RELEASE_3_4_5
+ARG R_HOME=/usr/lib/R/
 RUN \
   python3 -m pip --no-cache-dir install rpy2
  
