@@ -34,38 +34,61 @@ def load_rnaseq_tests(filename, model_name):
     Load rnaseq results returning a dictionary of test (context, tissue, cell, etc ) names and rnaseq expression data
     """
 
-    if not filename or filename=="None":
+    if not filename or filename == "None":
         tests = ["dummy"]
         fullsavepath = os.path.join(configs.rootdir, 'data', 'config_sheets', 'dummy_rnaseq_data.csv')
         data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
         datas = [data]
-        rnaseq_dict = dict(zip(tests, datas))
+        rnaseq_dict_total = dict(zip(tests, datas))
+        rnaseq_dict_mrna = rnaseq_dict_total
+        rnaseq_dict_sc = rnaseq_dict_total
 
-        return rnaseq_dict
+        return rnaseq_dict_total, rnaseq_dict_mrna, rnaseq_dict_sc
 
     inqueryFullPath = os.path.join(configs.rootdir, 'data', 'config_sheets', filename)
     if not os.path.isfile(inqueryFullPath):
         print('Error: file not found {}'.format(inqueryFullPath))
+        sys.exit()
 
-        return None
+    tests_total = []
+    datas_total = []
+    filename_total = 'rnaseq_total_{}.csv'.format(model_name)
+    fullsavepath_total = os.path.join(configs.rootdir, 'data', 'results', model_name, filename_total)
+    if os.path.isfile(fullsavepath_total):
+        data_total = pd.read_csv(fullsavepath_total, index_col='ENTREZ_GENE_ID')
+        print('Read from {}'.format(fullsavepath_total))
+        datas_total.append(data_total)
+        tests_total.append(model_name)
 
-    tests = []
-    datas = []
+    tests_mrna = []
+    datas_mrna = []
+    filename_mrna = 'rnaseq_mrna_{}.csv'.format(model_name)
+    fullsavepath_mrna = os.path.join(configs.rootdir, 'data', 'results', model_name, filename_mrna)
+    if os.path.isfile(fullsavepath_mrna):
+        data_mrna = pd.read_csv(fullsavepath_mrna, index_col='ENTREZ_GENE_ID')
+        print('Read from {}'.format(fullsavepath_mrna))
+        datas_mrna.append(data_mrna)
+        tests_mrna.append(model_name)
 
-    filename = 'rnaseq_{}.csv'.format(model_name)
-    fullsavepath = os.path.join(configs.rootdir, 'data', 'results', model_name, filename)
-    data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
-    print('Read from {}'.format(fullsavepath))
-    datas.append(data)
-    tests.append(model_name)
+    tests_sc = []
+    datas_sc = []
+    filename_sc = 'rnaseq_sc_{}.csv'.format(model_name)
+    fullsavepath_sc = os.path.join(configs.rootdir, 'data', 'results', model_name, filename_sc)
+    if os.path.isfile(fullsavepath_sc):
+        data_sc = pd.read_csv(fullsavepath_sc, index_col='ENTREZ_GENE_ID')
+        print('Read from {}'.format(fullsavepath_sc))
+        datas_sc.append(data_sc)
+        tests_sc.append(model_name)
 
-    rnaseq_dict = dict(zip(tests, datas))
+    rnaseq_dict_total = dict(zip(tests_total, datas_total))
+    rnaseq_dict_mrna = dict(zip(tests_mrna, datas_mrna))
+    rnaseq_dict_sc = dict(zip(tests_sc, datas_sc))
 
-    return rnaseq_dict
+    return rnaseq_dict_total, rnaseq_dict_mrna, rnaseq_dict_sc
 
 
 def handle_tissue_batch(config_filename, replicate_ratio, sample_ratio, replicate_ratio_high,
-                        sample_ratio_high, technique, quantile, min_count):
+                        sample_ratio_high, technique, quantile, min_count, prep):
     """
     Handle iteration through each tissue type and create rnaseq expression file by calling rnaseq.R
     """
@@ -76,10 +99,10 @@ def handle_tissue_batch(config_filename, replicate_ratio, sample_ratio, replicat
 
     for model_name in sheet_names:
         print("model: ", model_name)
-        rnaseq_output_file = "".join(["rnaseq_", model_name, ".csv"])
+        rnaseq_output_file = "".join(["rnaseq_", prep, "_", model_name, ".csv"])
         rnaseq_output_filepath = os.path.join(configs.rootdir, "data", "results",
                                               model_name, rnaseq_output_file)
-        rnaseq_input_file = "".join(["gene_counts_matrix_", model_name, ".csv"])
+        rnaseq_input_file = "".join(["gene_counts_matrix_", prep, "_", model_name, ".csv"])
         rnaseq_input_filepath = os.path.join(configs.rootdir, "data", "data_matrices",
                                              model_name, rnaseq_input_file)
         gene_info_file = "".join(["gene_info_", model_name, ".csv"])
@@ -94,8 +117,8 @@ def handle_tissue_batch(config_filename, replicate_ratio, sample_ratio, replicat
                                     rnaseq_output_filepath, gene_info_filepath,
                                     replicate_ratio=replicate_ratio, sample_ratio=sample_ratio,
                                     replicate_ratio_high=replicate_ratio_high, sample_ratio_high=sample_ratio_high,
-                                    technique=technique, quantile=quantile,
-                                    min_count=min_count, model_name=model_name)
+                                    technique=technique, quantile=quantile, min_count=min_count,
+                                    model_name=model_name)
 
         print("Test data saved to " + rnaseq_output_filepath)
 
@@ -210,6 +233,14 @@ def main(argv):
                              "use 'default' to use method outlined in CITATION NEEDED"
                         )
 
+    parser.add_argument("-p", "--library-prep",
+                        required=False,
+                        default="",
+                        dest="prep",
+                        help="Library preparation used, will separate samples into groups to only compare similarly "
+                             "prepared libraries. For example, mRNA, total-rna, scRNA, etc"
+                        )
+
     args = parser.parse_args(argv)
 
     config_filename = args.config_filename
@@ -220,6 +251,7 @@ def main(argv):
     technique = args.technique
     quantile = args.quantile
     min_count = args.min_count
+    prep = args.prep
 
     if re.search("tpm", technique.lower()) or re.search("quantile", technique.lower()):
         technique = "quantile"
@@ -234,10 +266,12 @@ def main(argv):
     if int(quantile) > 100 or int(quantile) < 1:
         print("Quantile must be between 1 - 100")
 
+    prep = prep.replace(" ", "")
+
     print('Config file is "{}"'.format(config_filename))
 
     handle_tissue_batch(config_filename, replicate_ratio, sample_ratio, replicate_ratio_high,
-                        sample_ratio_high, technique, quantile, min_count)
+                        sample_ratio_high, technique, quantile, min_count, prep)
 
     return
 
