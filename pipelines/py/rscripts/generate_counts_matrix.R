@@ -47,7 +47,7 @@ organize_gene_counts_files <- function(data_dir) {
         entry[["CountFiles"]] <- counts_files # assign gene count file paths to study entry
         entry[["NumSamples"]] <- n_replicates # assign number of replicates to study entry
         entry[["SampleNames"]] <- replicate_names # assign sample names to study entry
-        entry[["StrandFiles"]] <- strandedness_files # assign strandednes files
+        entry[["StrandFiles"]] <- strandedness_files # assign strandedness files
         study_metrics[[sname]] <- entry # assign study entry to the list of studies
 
       }
@@ -225,7 +225,7 @@ generate_counts_matrix_main <- function(data_dir, out_dir) {
     full_count_matrix["genes"] <- sub("\\.\\d+", "", full_count_matrix$genes)
     file_split <- unlist(strsplit(data_dir, "/"))
     file_name <- paste(c(
-    out_dir, "/", "gene_counts_matrix_", file_split[length(file_split)], ".csv"),collapse="")
+    out_dir, "/", "gene_counts_matrix_full_", file_split[length(file_split)], ".csv"),collapse="")
     write.csv(full_count_matrix, file_name, row.names=FALSE)
     cat("Count Matrix written at ", file_name, "\n")
 
