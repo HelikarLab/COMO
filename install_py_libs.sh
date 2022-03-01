@@ -7,6 +7,7 @@ python3 -m pip --no-cache-dir install \
 	cobra \
 	GEOparse \
 	lxml \
+	memote \ 
 	numpy \
 	pandas \
 	scipy \
