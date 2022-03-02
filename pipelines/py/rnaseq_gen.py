@@ -20,7 +20,6 @@ biomaRt = importr("biomaRt")
 sjmisc = importr("sjmisc")
 openxlsx = importr("openxlsx")
 zfpkm = importr("zFPKM")
-countToFPKM = importr("countToFPKM")
 
 # read and translate R functions
 f = open("/home/jupyteruser/work/py/rscripts/rnaseq.R", "r")
@@ -29,62 +28,41 @@ f.close()
 rnaseq_io = SignatureTranslatedAnonymousPackage(string, "rnaseq_io")
 
 
-def load_rnaseq_tests(filename, model_name):
+def load_rnaseq_tests(filename, model_name, lib_type):
     """
     Load rnaseq results returning a dictionary of test (context, tissue, cell, etc ) names and rnaseq expression data
     """
+    def load_dummy_dict():
+        savepath = os.path.join(configs.rootdir, "data", "data_matrices", "dummy", "dummy_rnaseq_data.csv")
+        dat = pd.read_csv(savepath, index_col="ENTREZ_GENE_ID")
+        return "dummy", dat
 
-    if not filename or filename == "None":
-        tests = ["dummy"]
-        fullsavepath = os.path.join(configs.rootdir, 'data', 'config_sheets', 'dummy_rnaseq_data.csv')
-        data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
-        datas = [data]
-        rnaseq_dict_total = dict(zip(tests, datas))
-        rnaseq_dict_mrna = rnaseq_dict_total
-        rnaseq_dict_sc = rnaseq_dict_total
+    if not filename or filename == "None": # not using this data type, use empty dummy data matrix
+        return load_dummy_dict()
 
-        return rnaseq_dict_total, rnaseq_dict_mrna, rnaseq_dict_sc
-
-    inqueryFullPath = os.path.join(configs.rootdir, 'data', 'config_sheets', filename)
-    if not os.path.isfile(inqueryFullPath):
-        print('Error: file not found {}'.format(inqueryFullPath))
+    inquiry_full_path = os.path.join(configs.rootdir, "data", "config_sheets", filename)
+    if not os.path.isfile(inquiry_full_path): # check that config file exist (isn't needed to load, but helps user)
+        print(f"Error: Config file not found at {inquiry_full_path}")
         sys.exit()
 
-    tests_total = []
-    datas_total = []
-    filename_total = 'rnaseq_total_{}.csv'.format(model_name)
-    fullsavepath_total = os.path.join(configs.rootdir, 'data', 'results', model_name, filename_total)
-    if os.path.isfile(fullsavepath_total):
-        data_total = pd.read_csv(fullsavepath_total, index_col='ENTREZ_GENE_ID')
-        print('Read from {}'.format(fullsavepath_total))
-        datas_total.append(data_total)
-        tests_total.append(model_name)
+    if lib_type == "total": # if using total RNA-seq library prep
+        filename = f"rnaseq_total_{model_name}.csv"
+    elif lib_type == "mrna": # if using mRNA-seq library prep
+        filename = f"rnaseq_mrna_{model_name}.csv"
+    elif lib_type == "sc": # if using single-cell RNA-seq
+        filename = f"rnaseq_sc_{model_name}.csv"
+    else:
+        print(f"Unsupported RNA-seq library type: {lib_type}. Must be one of 'total', 'mrna', 'sc'.")
+        sys.exit()
 
-    tests_mrna = []
-    datas_mrna = []
-    filename_mrna = 'rnaseq_mrna_{}.csv'.format(model_name)
-    fullsavepath_mrna = os.path.join(configs.rootdir, 'data', 'results', model_name, filename_mrna)
-    if os.path.isfile(fullsavepath_mrna):
-        data_mrna = pd.read_csv(fullsavepath_mrna, index_col='ENTREZ_GENE_ID')
-        print('Read from {}'.format(fullsavepath_mrna))
-        datas_mrna.append(data_mrna)
-        tests_mrna.append(model_name)
-
-    tests_sc = []
-    datas_sc = []
-    filename_sc = 'rnaseq_sc_{}.csv'.format(model_name)
-    fullsavepath_sc = os.path.join(configs.rootdir, 'data', 'results', model_name, filename_sc)
-    if os.path.isfile(fullsavepath_sc):
-        data_sc = pd.read_csv(fullsavepath_sc, index_col='ENTREZ_GENE_ID')
-        print('Read from {}'.format(fullsavepath_sc))
-        datas_sc.append(data_sc)
-        tests_sc.append(model_name)
-
-    rnaseq_dict_total = dict(zip(tests_total, datas_total))
-    rnaseq_dict_mrna = dict(zip(tests_mrna, datas_mrna))
-    rnaseq_dict_sc = dict(zip(tests_sc, datas_sc))
-
-    return rnaseq_dict_total, rnaseq_dict_mrna, rnaseq_dict_sc
+    fullsavepath = os.path.join(configs.rootdir, 'data', 'results', model_name, filename)
+    if os.path.isfile(fullsavepath):
+        data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
+        print(f"Read from {fullsavepath}")
+        return model_name, data
+    else:
+        print(f"Gene expression file not found at {fullsavepath}. This may be intentional.")
+        return load_dummy_dict()
 
 
 def handle_tissue_batch(config_filename, replicate_ratio, sample_ratio, replicate_ratio_high,

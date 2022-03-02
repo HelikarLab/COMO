@@ -210,7 +210,8 @@ def mergeLogicalTable(df_results):
             rows = df_results.loc[df_results['ENTREZ_GENE_ID']==entrez_id].copy()
             rows['ENTREZ_GENE_ID'] = eid
             dup_rows.append(rows)
-        df_results = df_results.append(dup_rows,ignore_index=True)
+        df_results = pd.concat([df_results, pd.DataFrame(dup_rows)], ignore_index=True)
+        # df_results = df_results.append(dup_rows,ignore_index=True)
         df_results.drop(df_results[df_results['ENTREZ_GENE_ID']==entrez_id].index, inplace=True)
 
     # step 2: print out information about merge
@@ -271,34 +272,29 @@ def mergeLogicalTable(df_results):
     return df_output
 
 
-def load_microarray_tests(filename):
-    if not filename or filename=="None":
-        tests = ["dummy"]
-        fullsavepath = os.path.join(configs.rootdir, 'data', 'data_matrices', 'dummy', 'dummy_microarray_data.csv')
-        data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
-        datas = [data]
-        microarray_dict = dict(zip(tests, datas))
-        return microarray_dict
+def load_microarray_tests(filename, model_name):
+    def load_empty_dict():
+        savepath = os.path.join(configs.rootdir, 'data', 'data_matrices', 'dummy', 'dummy_microarray_data.csv')
+        dat = pd.read_csv(savepath, index_col='ENTREZ_GENE_ID')
+        return "dummy", dat
 
-    inqueryFullPath = os.path.join(configs.rootdir, 'data', 'config_sheets', filename)
-    if not os.path.isfile(inqueryFullPath):
-        print('Error: file not found {}'.format(inqueryFullPath))
-        return None
-    xl = pd.ExcelFile(inqueryFullPath)
-    sheet_names = xl.sheet_names
+    if not filename or filename == "None":  # if not using microarray as a data source use empty dummy matrix
+        return load_empty_dict()
 
-    tests = []
-    datas = []
-    for model_name in sheet_names:
-        # print(list(inqueries[i]))
-        filename = 'Microarray_{}.csv'.format(model_name)
-        fullsavepath = os.path.join(configs.rootdir, 'data', 'results', model_name, filename)
+    inquiry_full_path = os.path.join(configs.rootdir, 'data', 'config_sheets', filename)
+    if not os.path.isfile(inquiry_full_path):  # do not need to load but check to help user figure out why not working
+        print('Error: file not found {}'.format(inquiry_full_path))
+        sys.exit()
+
+    filename = 'Microarray_{}.csv'.format(model_name)
+    fullsavepath = os.path.join(configs.rootdir, 'data', 'results', model_name, filename)
+    if os.path.isfile(fullsavepath):
         data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
         print('Read from {}'.format(fullsavepath))
-        datas.append(data)
-        tests.append(model_name)
-    microarray_dict = dict(zip(tests, datas))
-    return microarray_dict
+        return model_name, data
+    else:
+        print(f"Gene expression file not found at {fullsavepath}. This may be intentional")
+        return load_empty_dict()
 
 
 def main(argv):
