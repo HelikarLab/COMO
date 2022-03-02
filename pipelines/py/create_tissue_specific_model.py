@@ -266,7 +266,7 @@ def split_gene_expression_data(expression_data):
     """
     Splits genes that have mapped to multiple Entrez IDs are formated as "gene12//gene2//gene3"
     """
-    expression_data.rename(columns={'ENTREZ_GENE_ID': 'Gene', 'Express': 'Data'}, inplace=True)
+    expression_data.rename(columns={'ENTREZ_GENE_ID': 'Gene', 'Active': 'Data'}, inplace=True)
     expression_data = expression_data.loc[:, ['Gene', 'Data']]
     expression_data['Gene'] = expression_data['Gene'].astype(str)
     single_gene_names = expression_data[~expression_data.Gene.str.contains('//')].reset_index(drop=True)
