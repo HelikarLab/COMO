@@ -38,7 +38,7 @@ def load_proteomics_data(datafilename, model_name):
             rowcopy['Gene names'] = name
             rows.append(rowcopy)
         proteomics_data.drop(index=idx,inplace=True)
-        proteomics_data.append(rows, ignore_index=True)
+        proteomics_data = pd.concat([proteomics_data, pd.DataFrame(rows)], ignore_index=True)
 
     proteomics_data.rename(columns={'Gene names':'Gene Symbol'}, inplace=True)
     return proteomics_data
@@ -108,7 +108,9 @@ def load_proteomics_tests(filename, model_name):
         print('Read from {}'.format(fullsavepath))
         return model_name, data
     else:
-        print(f"Gene expression file not found at {fullsavepath}. This may be intentional")
+        print(f"Microarray gene expression file for {model_name} was not found at {fullsavepath}. This may be "
+              f"intentional. Contexts where microarray data can be found in /work/data/results/{model_name}/ will "
+              f"still be used for other contexts if found.")
         return load_empty_dict()
 
 

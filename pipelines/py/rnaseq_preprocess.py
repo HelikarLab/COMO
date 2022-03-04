@@ -50,28 +50,28 @@ def fetch_gene_info(input_values, input_db="Ensembl Gene ID",
     return df_maps
 
 
-def create_counts_matrix(tissue_name):
+def create_counts_matrix(context_name):
     """
-    Create a counts matrix by reading gene counts tables in MADRID_inputs/<tissue name>/<study number>/geneCounts/
+    Create a counts matrix by reading gene counts tables in MADRID_inputs/<context name>/<study number>/geneCounts/
     Uses R in backend (generate_counts_matrix.R)
     """
-    input_dir = os.path.join(configs.rootdir, 'data', 'MADRID_input', tissue_name)
+    input_dir = os.path.join(configs.rootdir, 'data', 'MADRID_input', context_name)
     print(f"Looking for STAR gene count tables in '{input_dir}'")
-    matrix_output_dir = os.path.join(configs.rootdir, 'data', 'data_matrices', tissue_name)
-    print(f"Creating Counts Matrix for '{tissue_name}'")
+    matrix_output_dir = os.path.join(configs.rootdir, 'data', 'data_matrices', context_name)
+    print(f"Creating Counts Matrix for '{context_name}'")
     # call generate_counts_matrix.R to create count matrix from MADRID_input folder
     generate_counts_matrix_io.generate_counts_matrix_main(input_dir, matrix_output_dir)
 
     return
 
 
-def create_config_df(tissue_name):
+def create_config_df(context_name):
     """
     Create configuration sheet at /work/data/config_sheets/rnaseq_data_inputs_auto.xlsx
     based on the gene counts matrix. If using zFPKM normalization technique, fetch mean fragment lengths from
-    /work/data/MADRID_inputs/<tissue name>/<study number>/fragmentSizes/
+    /work/data/MADRID_inputs/<context name>/<study number>/fragmentSizes/
     """
-    gene_counts_glob = os.path.join(configs.rootdir, "data", "MADRID_input", tissue_name, "geneCounts", "*", "*.tab")
+    gene_counts_glob = os.path.join(configs.rootdir, "data", "MADRID_input", context_name, "geneCounts", "*", "*.tab")
     gene_counts_files = glob.glob(gene_counts_glob, recursive=True)
 
     out_df = pd.DataFrame(columns=['SampleName', 'FragmentLength', 'Layout', 'Strand', 'Group'])
@@ -81,7 +81,7 @@ def create_config_df(tissue_name):
             label = re.findall(r"S[1-999]R[1-999]r?[1-999]?", gcfilename)[0]
 
         except IndexError:
-            print(f"\nfilename of {gcfilename} is not valid. Should be 'tissueName_SXRYrZ.tab', where X is the "
+            print(f"\nfilename of {gcfilename} is not valid. Should be 'contextName_SXRYrZ.tab', where X is the "
                   "study/batch number, Y is the replicate number, and Z is the run number. If not a multi-run sample, "
                   "exclude 'rZ' from the filename.")
             sys.exit()
@@ -102,20 +102,20 @@ def create_config_df(tissue_name):
                 for r in runs:
                     r_label = re.findall(r"r?[1-999]?", r)[0]
                     R_label = re.findall(r"R?[1-999]?", r)[0]
-                    frag_filename = "".join([tissue_name, "_", study_number, R_label, r_label, "_fragment_size.txt"])
-                    frag_files.append(os.path.join(configs.rootdir, "data", "MADRID_input", tissue_name,
+                    frag_filename = "".join([context_name, "_", study_number, R_label, r_label, "_fragment_size.txt"])
+                    frag_files.append(os.path.join(configs.rootdir, "data", "MADRID_input", context_name,
                                                    "fragmentSizes", study_number, frag_filename))
 
-        layout_file = tissue_name + "_" + label + "_layout.txt"
-        strand_file = tissue_name + "_" + label + "_strandedness.txt"
-        frag_file = tissue_name + "_" + label + "_fragment_size.txt"
-        prep_file = tissue_name + "_" + label + "_prep_method.txt"
+        layout_file = context_name + "_" + label + "_layout.txt"
+        strand_file = context_name + "_" + label + "_strandedness.txt"
+        frag_file = context_name + "_" + label + "_fragment_size.txt"
+        prep_file = context_name + "_" + label + "_prep_method.txt"
 
-        tissue_path = os.path.join(configs.rootdir, "data", "MADRID_input", tissue_name)
-        layout_path = os.path.join(tissue_path, "layouts", "*", layout_file)
-        strand_path = os.path.join(tissue_path, "strandedness", "*", strand_file)
-        frag_path = os.path.join(tissue_path, "fragmentSizes", "*", frag_file)
-        prep_path = os.path.join(tissue_path, "prepMethods", "*", prep_file)
+        context_path = os.path.join(configs.rootdir, "data", "MADRID_input", context_name)
+        layout_path = os.path.join(context_path, "layouts", "*", layout_file)
+        strand_path = os.path.join(context_path, "strandedness", "*", strand_file)
+        frag_path = os.path.join(context_path, "fragmentSizes", "*", frag_file)
+        prep_path = os.path.join(context_path, "prepMethods", "*", prep_file)
 
         layout_glob = glob.glob(layout_path, recursive=False)
         strand_glob = glob.glob(strand_path, recursive=False)
@@ -195,7 +195,7 @@ def create_config_df(tissue_name):
 
                     mean_fragment_size = sum(mean_fragment_sizes * library_sizes) / sum(library_sizes)
 
-        label = "_".join([tissue_name, re.findall(r"S[1-999]R[1-999]", label)[0]])  # remove run number if there
+        label = "_".join([context_name, re.findall(r"S[1-999]R[1-999]", label)[0]])  # remove run number if there
 
         new_row = pd.DataFrame({'SampleName': [label],
                                 'FragmentLength': [mean_fragment_size],
@@ -232,10 +232,10 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     return matrix_total, matrix_mrna
 
 
-def create_gene_info_file(tissue_name, count_matrix_file, form, taxon_id, gene_output_dir, prep="total"):
+def create_gene_info_file(context_name, count_matrix_file, form, taxon_id, gene_output_dir, prep="total"):
     """
-    Create gene info file for specified tissue by reading first column in it's count matrix file at
-     /work/data/results/<tissue name>/gene_info_<tissue name>.csv
+    Create gene info file for specified context by reading first column in it's count matrix file at
+     /work/data/results/<context name>/gene_info_<context name>.csv
     """
 
     print(f"Fetching gene info using genes in '{count_matrix_file}'")
@@ -248,16 +248,16 @@ def create_gene_info_file(tissue_name, count_matrix_file, form, taxon_id, gene_o
     gene_info.index.rename("ensembl_gene_id", inplace=True)
     gene_info.rename(columns={"Gene Symbol": "hgnc_symbol", "Gene ID": "entrezgene_id"}, inplace=True)
     gene_info.drop(['Chromosomal Location'], axis=1, inplace=True)
-    gene_info_file = os.path.join(gene_output_dir, ("gene_info_" + prep + "_" + tissue_name + ".csv"))
+    gene_info_file = os.path.join(gene_output_dir, ("gene_info_" + prep + "_" + context_name + ".csv"))
     gene_info.to_csv(gene_info_file)
     print(f"Gene Info file written at '{gene_info_file}'")
 
     return
 
 
-def handle_tissue_batch(tissue_names, mode, form, taxon_id, provided_matrix_file):
+def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_file):
     """
-    Handle iteration through each tissue type and create files according to flag used (config, matrix, info)
+    Handle iteration through each context type and create files according to flag used (config, matrix, info)
     """
     trnaseq_config_filename = os.path.join(configs.rootdir, "data", "config_sheets", "trnaseq_data_inputs_auto.xlsx")
     mrnaseq_config_filename = os.path.join(configs.rootdir, "data", "config_sheets", "mrnaseq_data_inputs_auto.xlsx")
@@ -265,42 +265,41 @@ def handle_tissue_batch(tissue_names, mode, form, taxon_id, provided_matrix_file
         twriter = pd.ExcelWriter(trnaseq_config_filename)
         mwriter = pd.ExcelWriter(mrnaseq_config_filename)
 
-    for tissue_name in tissue_names:
-        tissue_name = tissue_name.strip(" ")
-        print(f"Preprocessing {tissue_name}")
-        gene_output_dir = os.path.join(configs.rootdir, "data", "results", tissue_name)
-        matrix_output_dir = os.path.join(configs.rootdir, "data", "data_matrices", tissue_name)
+    for context_name in context_names:
+        context_name = context_name.strip(" ")
+        print(f"Preprocessing {context_name}")
+        gene_output_dir = os.path.join(configs.rootdir, "data", "results", context_name)
+        matrix_output_dir = os.path.join(configs.rootdir, "data", "data_matrices", context_name)
         os.makedirs(gene_output_dir, exist_ok=True)
         os.makedirs(matrix_output_dir, exist_ok=True)
         print('Gene info output directory is "{}"'.format(gene_output_dir))
 
-        matrix_path_all = os.path.join(matrix_output_dir, ("gene_counts_matrix_full_" + tissue_name + ".csv"))
-        matrix_path_total = os.path.join(matrix_output_dir, ("gene_counts_matrix_total_" + tissue_name + ".csv"))
-        matrix_path_mrna = os.path.join(matrix_output_dir, ("gene_counts_matrix_mrna_" + tissue_name + ".csv"))
+        matrix_path_all = os.path.join(matrix_output_dir, ("gene_counts_matrix_full_" + context_name + ".csv"))
+        matrix_path_total = os.path.join(matrix_output_dir, ("gene_counts_matrix_total_" + context_name + ".csv"))
+        matrix_path_mrna = os.path.join(matrix_output_dir, ("gene_counts_matrix_mrna_" + context_name + ".csv"))
         matrix_path_prov = os.path.join(matrix_output_dir, provided_matrix_file)
 
         if mode == "make":
-            create_counts_matrix(tissue_name)
-            df = create_config_df(tissue_name)
+            create_counts_matrix(context_name)
+            df = create_config_df(context_name)
 
             df_t, df_m = split_config_df(df)
             if not df_t.empty:
-                df_t.to_excel(twriter, sheet_name=tissue_name, header=True, index=False)
+                df_t.to_excel(twriter, sheet_name=context_name, header=True, index=False)
             if not df_m.empty:
-                df_m.to_excel(mwriter, sheet_name=tissue_name, header=True, index=False)
+                df_m.to_excel(mwriter, sheet_name=context_name, header=True, index=False)
 
             tmatrix, mmatrix = split_counts_matrices(matrix_path_all, df_t, df_m)
-            print(tmatrix.head())
             if not tmatrix.empty:
                 tmatrix.to_csv(matrix_path_total, header=True, index=False)
             if not mmatrix.empty:
                 mmatrix.to_csv(matrix_path_mrna, header=True, index=False)
 
-            create_gene_info_file(tissue_name, matrix_path_total, form, taxon_id, gene_output_dir, prep="total")
-            create_gene_info_file(tissue_name, matrix_path_mrna, form, taxon_id, gene_output_dir, prep="mrna")
+            create_gene_info_file(context_name, matrix_path_total, form, taxon_id, gene_output_dir, prep="total")
+            create_gene_info_file(context_name, matrix_path_mrna, form, taxon_id, gene_output_dir, prep="mrna")
         
         else:
-            create_gene_info_file(tissue_name, matrix_path_prov, form, taxon_id, gene_output_dir)
+            create_gene_info_file(context_name, matrix_path_prov, form, taxon_id, gene_output_dir)
 
     if mode == "make":
         twriter.close()
@@ -311,16 +310,15 @@ def handle_tissue_batch(tissue_names, mode, form, taxon_id, provided_matrix_file
 
 def main(argv):
     """
-    Parse arguments to rnaseq_preprocess.py, create a gene info files for each provided tissue at:
-    /work/data/results/<tissue name>/gene_info_<tissue name>.csv.
+    Parse arguments to rnaseq_preprocess.py, create a gene info files for each provided context at:
+    /work/data/results/<context name>/gene_info_<context name>.csv.
 
      If using --info-matrix or --info-matrix-config:
-    create gene count matrix file at /work/data/data_matrices/<tissue name>/gene_counts_matrix_<tissue name>.csv,
+    create gene count matrix file at /work/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv,
 
     If using --info-matrix-config:
     create config file at /work/data/config_sheets/rnaseq_data_inputs_auto.xlsx
     """
-
     parser = argparse.ArgumentParser(
         prog="rnaseq_preprocess.py",
         description="""
@@ -333,18 +331,17 @@ def main(argv):
         epilog="""
             For additional help, please post questions/issues in the MADRID GitHub repo at
             https://github.com/HelikarLab/MADRID or email babessell@gmail.com""",
-        usage="python3 $(prog)s [options]"
     )
 
-    parser.add_argument("-n", "--tissue-name",
+    parser.add_argument("-n", "--context-names",
                         type=str,
                         required=True,
-                        dest="tissue_names",
+                        dest="context_names",
                         help="""Tissue/cell name of models to generate. These names should correspond to the folders
                              in 'MADRID_inputs/' if creating count matrix files, or to
-                             'work/data/data_matrices/<tissue name>/gene_counts_matrix_<tissue name>.csv' if supplying
+                             'work/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv' if supplying
                              the count matrix as an imported .csv file. If making multiple models in a batch, then
-                             use the format: \"['tissue1', 'tissue2', ... etc]\". Note the outer double-quotes and the 
+                             use the format: \"['context1', 'context2', ... etc]\". Note the outer double-quotes and the 
                              inner single-quotes are required to be interpreted. This a string, not a python list"""
                         )
 
@@ -371,7 +368,7 @@ def main(argv):
                        default=False,
                        dest="provide_matrix",
                        help="Provide your own count matrix. Requries additon argument '--matrix' which is .csv file "
-                            "where colnames are sample names (in tissueName_SXRY format) and rownames are genes in "
+                            "where colnames are sample names (in contextName_SXRY format) and rownames are genes in "
                             "in format specified by --gene-format"
                        )
 
@@ -380,29 +377,28 @@ def main(argv):
                        required=False,
                        default=False,
                        dest="make_matrix",
-                       help="""Flag for if you want to make a counts matrix, but not a config file.
-                            Requires a correctly structured MADRID_input folder in /work/data/. Can make one using: 
-                            https://github.com/HelikarLab/FastqToGeneCounts"""
+                       help="Flag for if you want to make a counts matrix, but not a config file. "
+                            "Requires a correctly structured MADRID_input folder in /work/data/. Can make one using: "
+                            "https://github.com/HelikarLab/FastqToGeneCounts"
                        )
 
     parser.add_argument("-m", "--matrix",
-                 required="--provide-matrix" in argv, # require if using --provide-matrix flag,
-                 dest="provided_matrix_fname",
-                 default="SKIP",
-                 help="Name of provided counts matrix in "
-                      "/work/data/data_matrices/<tissue name>/<NAME OF FILE>.csv"
-                 )
-
+                        required="--provide-matrix" in argv,  # require if using --provide-matrix flag,
+                        dest="provided_matrix_fname",
+                        default="SKIP",
+                        help="Name of provided counts matrix in "
+                              "/work/data/data_matrices/<context name>/<NAME OF FILE>.csv"
+                        )
 
     args = parser.parse_args(argv)
-    tissue_names = args.tissue_names
+    context_names = args.context_names
     gene_format = args.gene_format
     taxon_id = args.taxon_id
     provide_matrix = args.provide_matrix
     make_matrix = args.make_matrix
     provided_matrix_fname = args.provided_matrix_fname
 
-    tissue_names = tissue_names.strip("[").strip("]").replace("'", "").replace(" ", "").split(",") # convert to py list
+    context_names = context_names.strip("[").strip("]").replace("'", "").replace(" ", "").split(",") # convert to py list
 
     if gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
         form = "Ensembl Gene ID"
@@ -437,7 +433,7 @@ def main(argv):
     elif make_matrix:
         mode = "make"
 
-    handle_tissue_batch(tissue_names, mode, form, taxon_id, provided_matrix_fname)
+    handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fname)
 
     return
 
