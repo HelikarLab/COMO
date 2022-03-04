@@ -205,26 +205,26 @@ def mergeLogicalTable(df_results):
         entrez_ids = entrez_id.split("//")
         id_list.extend(entrez_ids)
         df_dups = pd.DataFrame([], columns=list(df_results), index=list(range(len(entrez_ids))))
-        dup_rows = []
+        dup_rows = pd.DataFrame([])
         for eid in entrez_ids:
-            rows = df_results.loc[df_results['ENTREZ_GENE_ID']==entrez_id].copy()
+            rows = df_results.loc[df_results['ENTREZ_GENE_ID'] == entrez_id].copy()
             rows['ENTREZ_GENE_ID'] = eid
-            dup_rows.append(rows)
-        df_results = pd.concat([df_results, pd.DataFrame(dup_rows)], ignore_index=True)
+            dup_rows = pd.concat([dup_rows, rows], axis=0)
+        df_results = pd.concat([df_results, pd.DataFrame(dup_rows)], axis=0, ignore_index=True)
         # df_results = df_results.append(dup_rows,ignore_index=True)
-        df_results.drop(df_results[df_results['ENTREZ_GENE_ID']==entrez_id].index, inplace=True)
+        df_results.drop(df_results[df_results['ENTREZ_GENE_ID'] == entrez_id].index, inplace=True)
 
     # step 2: print out information about merge
     common_elements = list(set(entrez_single_id_list).intersection(set(id_list)))
     # information of merge
-    print('{} single ENTREZ_GENE_IDs to merge'.format(len(common_elements)))
-    print('id_list: {}, set: {}'.format(len(id_list),len(set(id_list))))
-    print('entrez_single_id_list: {}, set: {}'.format(len(entrez_single_id_list),len(set(entrez_single_id_list))))
-    print('entrez_id_list: {}, set: {}'.format(len(entrez_id_list),len(set(entrez_id_list))))
+    #print('{} single ENTREZ_GENE_IDs to merge'.format(len(common_elements)))
+    #print('id_list: {}, set: {}'.format(len(id_list),len(set(id_list))))
+    #print('entrez_single_id_list: {}, set: {}'.format(len(entrez_single_id_list),len(set(entrez_single_id_list))))
+    #print('entrez_id_list: {}, set: {}'.format(len(entrez_id_list),len(set(entrez_id_list))))
 
     dups = [x for x in id_list if id_list.count(x) > 1]
     # dups = list(set(id_list))
-    print('dups: {}, set: {}'.format(len(dups),len(set(dups))))
+    #print('dups: {}, set: {}'.format(len(dups),len(set(dups))))
 
     full_entre_id_sets = []
     cnt = 0
@@ -255,7 +255,7 @@ def mergeLogicalTable(df_results):
         entrez_dups_list.append(singles)
         cnt += 1
 
-    print('{} id merged'.format(cnt))
+    #print('{} id merged'.format(cnt))
     entrez_dups_dict = dict(zip(full_entre_id_sets,entrez_dups_list))
     # full_entre_id_sets = list(set(full_entre_id_sets))
 
@@ -269,7 +269,7 @@ def mergeLogicalTable(df_results):
 
     df_output = df_results.fillna(-1).groupby(level=0).max()
     df_output.replace(-1, np.nan, inplace=True)
-    return df_output
+    return df_output.astype(int)
 
 
 def load_microarray_tests(filename, model_name):
@@ -293,7 +293,9 @@ def load_microarray_tests(filename, model_name):
         print('Read from {}'.format(fullsavepath))
         return model_name, data
     else:
-        print(f"Gene expression file not found at {fullsavepath}. This may be intentional")
+        print(f"Microarray gene expression file for {model_name} was not found at {fullsavepath}. This may be "
+              f"intentional. Contexts where microarray data can be found in /work/data/results/{model_name}/ will "
+              f"still be used for other contexts if found.")
         return load_empty_dict()
 
 

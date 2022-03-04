@@ -12,7 +12,8 @@ from project import configs
 from microarray_gen import *
 from proteomics_gen import *
 from rnaseq_gen import *
-from create_tissue_specific_model import split_gene_expression_data
+from create_context_specific_model import split_gene_expression_data
+from warnings import warn
 
 
 def merge_xomics(sheet,
@@ -21,7 +22,9 @@ def merge_xomics(sheet,
                  proteomics_file=None,
                  trnaseq_file=None,
                  mrnaseq_file=None,
-                 scrnaseq_file=None):
+                 scrnaseq_file=None,
+                 no_hc=False,
+                 no_na=False):
     """
     Merges microarray, rnaseq, and/or proteomics active gene logicals from outputs of their respective "_gen.py"
     scripts.
@@ -31,10 +34,12 @@ def merge_xomics(sheet,
     :param trnaseq_file: filename of Total RNA-seq config file in /work/data/config_sheets/
     :param mrnaseq_file: filename of mRNA-seq config file in /work/data/config_sheets/
     :param scrnaseq_file: filename of single-cell RNA-seq config file in /work/data/config_sheets/
-    :param sheet: sheet name to use, should be context, tissue, cell type, etc
+    :param no_hc: True if not adjusting for NA values (happens when gene missing from data source)
+    :param no_na: filename of single-cell RNA-seq config file in /work/data/config_sheets/
+    :param sheet: sheet name to use, should be context, context, cell type, etc
     :param expression_requirement: integer, minimum number of provided sources with active gene for a it to be in model
 
-    :return: dictionary where keys are contexts, (tissue name, etc) and values are expression tables
+    :return: dictionary where keys are contexts, (context name, etc) and values are expression tables
     """
     print(f"Merging data for {sheet}")
     # load data for each source if it exists. IF not load an empty dummy dataset
@@ -45,12 +50,6 @@ def merge_xomics(sheet,
     scrnaseq = load_rnaseq_tests(filename=scrnaseq_file, model_name=sheet, lib_type="sc")  # Single-cell RNA-seq
 
     files_dict = dict()
-
-    print(microarray[0])
-    print(proteomics[0])
-    print(trnaseq[0])
-    print(mrnaseq[0])
-    print(scrnaseq[0])
 
     exp_list = []
     top_list = []
@@ -107,15 +106,28 @@ def merge_xomics(sheet,
     num_sources = len(exp_list)
     merge_data["Active"] = 0
     merge_data["Required"] = 0
-    merge_data.loc[:, "Required"] = merge_data[exp_list].apply(  # subtract one from requirement per NA
-        lambda x: expression_requirement-(num_sources-x.count())
-        if (expression_requirement-(num_sources-x.count()) > 0)
-        else 1,
-        axis=1)
 
+    if no_na:  # dont adjust for na values
+        merge_data.loc[:, "Required"] = merge_data[exp_list].apply(
+            lambda x: expression_requirement
+            if (expression_requirement - (num_sources - x.count()) > 0)
+            else 1,
+            axis=1)
+    else:  # subtract one from requirement per NA
+        merge_data.loc[:, "Required"] = merge_data[exp_list].apply(
+            lambda x: expression_requirement-(num_sources-x.count())
+            if (expression_requirement-(num_sources-x.count()) > 0)
+            else 1,
+            axis=1)
+
+    # count number of sources gene is active in. Set to active in final output if at least adjusted expression reqirmnt
     merge_data["TotalExpressed"] = merge_data[exp_list].sum(axis=1)
     merge_data.loc[merge_data[exp_list].sum(axis=1) >= merge_data['Required'], 'Active'] = 1
-    merge_data.loc[merge_data[top_list].sum(axis=1) > 0, 'Active'] = 1
+
+    if not no_hc:  # set genes that are high-confidence in at least one data source to active
+        merge_data.loc[merge_data[top_list].sum(axis=1) > 0, 'Active'] = 1
+
+    merge_data = merge_data.astype(int)
 
     filepath = os.path.join(configs.rootdir, "data", "results", sheet, f"merged_{sheet}.csv")
     merge_data.to_csv(filepath, index_label='ENTREZ_GENE_ID')
@@ -133,52 +145,64 @@ def merge_xomics(sheet,
     return files_dict
 
 
-def handle_tissue_batch(microarray_file, trnaseq_file, mrnaseq_file, scrnaseq_file,
-                        proteomics_file, expression_requirement, adjust_method):
+def handle_context_batch(microarray_file, trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file,
+                         expression_requirement, adjust_method, no_hc, no_na, custom_df):
     """
-    Handle merging of different data sources for each tissue type
+    Handle merging of different data sources for each context type
     """
 
     sheet_names = []
     for file in [microarray_file, trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file]:
         if file is not None:
-            print(file)
             config_filepath = os.path.join(configs.rootdir, "data", "config_sheets", file)
             xl = pd.ExcelFile(config_filepath)
             sheet_names += xl.sheet_names
 
     counts = Counter(sheet_names)
+    print(counts)
     sheet_names = sorted(list(set(sheet_names)))
     print(f"Will merge data for: {sheet_names}")
     dict_list = {}
 
     max_inputs = max(counts.values())
     min_inputs = min(counts.values())
-    diff_inputs_max = max_inputs - expression_requirement # get difference between expression requirement and max input
-    diff_inputs_min = expression_requirement - min_inputs # get difference between expression requirement and min input
 
     files_json = os.path.join(configs.rootdir, "data", "results", "step1_results_files.json")
-    for tissue_name in sheet_names:
-
+    for context_name in sheet_names:
+        num_sources = counts[context_name]
         if adjust_method == "progressive":
-            exp_req = counts[tissue_name] - diff_inputs_max
-            print("progressive: ", exp_req)
+            exp_req = (num_sources - min_inputs) + expression_requirement
         elif adjust_method == "regressive":
-            exp_req = counts[tissue_name] + diff_inputs_min
-            print("regressive: ", exp_req)
-        else:
+            exp_req = expression_requirement - (max_inputs - num_sources)
+        elif adjust_method == "flat":
             exp_req = expression_requirement
+        else:
+            exp_req = int(custom_df.iloc[custom_df["context"] == context_name, "req"].iloc[0])
 
-        if exp_req < 1:  # never allow expression requirement less than one
+        print(f"Expression requirement of {expression_requirement} adjusted to {exp_req} using {adjust_method} "
+              f"adjustment method for {context_name}.")
+
+        if exp_req > num_sources:
+            warn(f"Expression requirement for {context_name} was calculated to be greater than max number of input "
+                 f"data sources. Will be force changed to {num_sources} to prevent output from having 0 active genes. "
+                 f"Consider lowering the expression requirement or changing the adjustment method.")
+            exp_req = num_sources
+
+
+        if exp_req < 1:  # never allow expression requirement to be less than one
+            warn(f"Expression requirement for {context_name} was calculated to be lower than 1. Will be force changed "
+                 f"to 1 to prevent every gene being active.")
             exp_req = 1
 
-        files_dict = merge_xomics(tissue_name,
+        files_dict = merge_xomics(context_name,
                                   expression_requirement=exp_req,
                                   microarray_file=microarray_file,
                                   proteomics_file=proteomics_file,
                                   trnaseq_file=trnaseq_file,
                                   mrnaseq_file=mrnaseq_file,
-                                  scrnaseq_file=scrnaseq_file)
+                                  scrnaseq_file=scrnaseq_file,
+                                  no_hc=no_hc,
+                                  no_na=no_na)
 
         dict_list.update(files_dict)
 
@@ -196,15 +220,12 @@ def main(argv):
     Otherwise, it defaults to the number of sources provided. High-confidence genes from any source will be considered
     active in the model, regardless of agreement with other sources.
     """
-
     parser = argparse.ArgumentParser(
         prog="merge_xomics.py",
         description="Merge expression tables of multiple sources, microarray, RNA-seq, and/or proteomics into one",
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
                "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
-        usage="python3 $(prog)s [options]"
     )
-
 
     parser.add_argument("-a", "--microarray-config-file",
                         type=str,
@@ -264,6 +285,32 @@ def main(argv):
                              "data source types."
                         )
 
+    parser.add_argument("-c", "--custom-requirement-file",
+                        required="custom" in argv,  # required if --requriement-adjust is "custom",
+                        dest="custom_file",
+                        default="SKIP",
+                        help="Name of .xlsx file where first column is context names and second column is expression "
+                             "requirement for that context, in /work/data/"
+                        )
+
+    parser.add_argument('-hc', "--no-hc",
+                        action="store_true",
+                        required=False,
+                        default=False,
+                        dest="no_hc",
+                        help="Flag to prevent high-confidence genes forcing a gene to be used in final model "
+                            "irrespective of other other data sources"
+                        )
+
+    parser.add_argument('-na', "--no-na-adjustment",
+                        action="store_true",
+                        required=False,
+                        default=False,
+                        dest="no_na",
+                        help="Flag to prevent genes missing in a data source library, but present in others from "
+                            "subtracting 1 from the expression requirement per data source that gene is missing in"
+                        )
+
     args = parser.parse_args(argv)
 
     microarray_file = args.microarray_file
@@ -273,6 +320,17 @@ def main(argv):
     scrnaseq_file = args.scrnaseq_file
     expression_requirement = args.expression_requirement
     adjust_method = args.adjust_method.lower()
+    custom_file = args.custom_file
+    no_hc = args.no_hc
+    no_na = args.no_na
+
+    # read custom expression requirment file if used
+    if custom_file != "SKIP":
+        custom_filepath = os.path.join(configs.datadir, custom_file)
+        custom_df = pd.read_excel(custom_filepath, sheet_name=0)
+        custom_df.columns = ["context", "req"]
+    else:
+        custom_df = pd.DataFrame([])
 
     def_exp_req = sum([
         1 for test in [microarray_file, trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file] if test is None])
@@ -290,12 +348,12 @@ def main(argv):
             print("Expression requirement must be able to be converted to an integer!")
             sys.out()
 
-    if adjust_method not in ["progressive", "regressive", "flat"]:
-        print("Adjust method must be either 'progressive', 'regressive', or 'flat'")
+    if adjust_method not in ["progressive", "regressive", "flat", "custom"]:
+        print("Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'")
         sys.exit()
 
-    handle_tissue_batch(microarray_file, trnaseq_file, mrnaseq_file, scrnaseq_file,
-                        proteomics_file, expression_requirement, adjust_method)
+    handle_context_batch(microarray_file, trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file,
+                         expression_requirement, adjust_method, no_hc, no_na, custom_df)
 
     return
 

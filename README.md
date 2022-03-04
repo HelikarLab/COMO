@@ -22,7 +22,7 @@ This is the home page for MADRID pipeline.
 
 
 ## Flow Charts
-![1](./doc/IMG_1.jpg)
+![1](./doc/flowchart1.png)
 
 ![2](./doc/IMG_2.jpg)
 
