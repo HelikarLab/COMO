@@ -30,7 +30,7 @@ rnaseq_io = SignatureTranslatedAnonymousPackage(string, "rnaseq_io")
 
 def load_rnaseq_tests(filename, model_name, lib_type):
     """
-    Load rnaseq results returning a dictionary of test (context, tissue, cell, etc ) names and rnaseq expression data
+    Load rnaseq results returning a dictionary of test (context, context, cell, etc ) names and rnaseq expression data
     """
     def load_dummy_dict():
         savepath = os.path.join(configs.rootdir, "data", "data_matrices", "dummy", "dummy_rnaseq_data.csv")
@@ -61,14 +61,16 @@ def load_rnaseq_tests(filename, model_name, lib_type):
         print(f"Read from {fullsavepath}")
         return model_name, data
     else:
-        print(f"Gene expression file not found at {fullsavepath}. This may be intentional.")
+        print(f"{lib_type} gene expression file for {model_name} was not found at {fullsavepath}. This may be "
+              f"intentional. Contexts where {lib_type} data can be found in /work/data/results/{model_name}/ will "
+              "still be used if found for other contexts.")
         return load_dummy_dict()
 
 
-def handle_tissue_batch(config_filename, replicate_ratio, sample_ratio, replicate_ratio_high,
+def handle_context_batch(config_filename, replicate_ratio, sample_ratio, replicate_ratio_high,
                         sample_ratio_high, technique, quantile, min_count, prep):
     """
-    Handle iteration through each tissue type and create rnaseq expression file by calling rnaseq.R
+    Handle iteration through each context type and create rnaseq expression file by calling rnaseq.R
     """
 
     rnaseq_config_filepath = os.path.join(configs.rootdir, "data", "config_sheets", config_filename)
@@ -83,7 +85,7 @@ def handle_tissue_batch(config_filename, replicate_ratio, sample_ratio, replicat
         rnaseq_input_file = "".join(["gene_counts_matrix_", prep, "_", model_name, ".csv"])
         rnaseq_input_filepath = os.path.join(configs.rootdir, "data", "data_matrices",
                                              model_name, rnaseq_input_file)
-        gene_info_file = "".join(["gene_info_", model_name, ".csv"])
+        gene_info_file = "".join(["gene_info_", prep, "_", model_name, ".csv"])
         gene_info_filepath = os.path.join(configs.rootdir, "data", "results",
                                           model_name, gene_info_file)
 
@@ -106,7 +108,7 @@ def handle_tissue_batch(config_filename, replicate_ratio, sample_ratio, replicat
 def main(argv):
     """
     Generate a list of active and high-confidence genes from a counts matrix using a user defined
-    at normalization-technique at /work/data/results/<tissue name>/rnaseq_<tissue_name>.csv
+    at normalization-technique at /work/data/results/<context name>/rnaseq_<context_name>.csv
 
     Currently, can filter raw RNA-seq counts using three normalization techniques. Which are defined in rnaseq.R
 
@@ -128,12 +130,11 @@ def main(argv):
     parser = argparse.ArgumentParser(
         prog="rnaseq_gen.py",
         description="Generate a list of active and high-confidence genes from a counts matrix using a user defined "
-                    "at normalization-technique at /work/data/results/<tissue name>/rnaseq_<tissue_name>.csv: "
+                    "at normalization-technique at /work/data/results/<context name>/rnaseq_<context_name>.csv: "
                     "https://github.com/HelikarLab/FastqToGeneCounts",
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
                "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
-        usage="python3 $(prog)s [options]"
-    )
+        )
 
     parser.add_argument("-c", "--config-file",
                         type=str,
@@ -248,7 +249,7 @@ def main(argv):
 
     print('Config file is "{}"'.format(config_filename))
 
-    handle_tissue_batch(config_filename, replicate_ratio, sample_ratio, replicate_ratio_high,
+    handle_context_batch(config_filename, replicate_ratio, sample_ratio, replicate_ratio_high,
                         sample_ratio_high, technique, quantile, min_count, prep)
 
     return
