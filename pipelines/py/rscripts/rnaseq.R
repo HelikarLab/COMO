@@ -280,22 +280,18 @@ zfpkm_filter <- function(SampMetrics, filt_options, model_name) {
 
     for ( i in 1:length(SampMetrics) ) {
         study_number <- str_extract_all(SampMetrics[[i]][["SampleNames"]][1][1], "S\\d+")
+        ent <- SampMetrics[[i]][["Entrez"]] # get entrez ids
         fmat <- SampMetrics[[i]][["FPKM_Matrix"]] # get fpkm matrix
         fdf <- data.frame(fmat) # convert to df
-        ent <- SampMetrics[[i]][["Entrez"]] # get entrez ids
-        samp <- SampMetrics[[i]][["SampleNames"]] # get sample names
-        print(samp)
-        print(ncol(fdf))
+        fpkm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/FPKM_Matrix_", study_number, ".csv"),collapse="")
+        write_fpkm <- cbind(ent, fdf)
+        write.csv(write_fpkm, fpkm_fname)
         missing_vals <- is.na(fdf) # get NA values from fdf
         fdf[missing_vals] <- 0 # set NA values to zero to prevent error in zfpkm calculation
         zmat <- zFPKM(fdf, assayName="FPKM") # calculate zFPKM
-        print("zmat")
         zmat[missing_vals] <- NA # set NA values back to NA
-        print(head(zmat))
-        print("na")
-        zfpkm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/zFPKM_Matrix_S", i, ".csv"),collapse="")
+        zfpkm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/zFPKM_Matrix_", study_number, ".csv"),collapse="")
         write_zfpkm <- cbind(ent, zmat)
-        print("bind")
         write.csv(write_zfpkm, zfpkm_fname)
         zfpkm_plot_dir <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/figures/"),collapse="")
         if ( !file.exists(zfpkm_plot_dir) ) {
@@ -304,9 +300,7 @@ zfpkm_filter <- function(SampMetrics, filt_options, model_name) {
         study_number <- str_extract_all(SampMetrics[[i]][["SampleNames"]][1][1], "S\\d+")
         zfpkm_plotname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/figures/zFPKM_plot_", study_number, ".pdf"),collapse="")
         pdf(zfpkm_plotname)
-        print("preplot")
         zFPKMPlot(fdf, assayName="FPKM")
-        print("postplot")
         dev.off()
 
 
