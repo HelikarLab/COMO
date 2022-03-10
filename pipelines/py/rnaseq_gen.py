@@ -20,6 +20,7 @@ biomaRt = importr("biomaRt")
 sjmisc = importr("sjmisc")
 openxlsx = importr("openxlsx")
 zfpkm = importr("zFPKM")
+stringr = importr("stringr")
 
 # read and translate R functions
 f = open("/home/jupyteruser/work/py/rscripts/rnaseq.R", "r")
