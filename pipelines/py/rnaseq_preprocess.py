@@ -90,7 +90,7 @@ def create_config_df(context_name):
         run = re.findall(r"r[1-999]", label)
         multi_flag = 0
 
-        if len(run) > 1:
+        if len(run) > 0:
             if run[0] != "r1":
                 continue
             else:
@@ -205,6 +205,7 @@ def create_config_df(context_name):
                                 'LibraryPrep': [prep]})
 
         out_df = pd.concat([out_df, new_row], sort=True)
+        out_df.sort_values('SampleName', inplace=True)
 
     return out_df
 
@@ -226,8 +227,6 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     matrix_all = pd.read_csv(count_matrix_all)
     matrix_total = matrix_all[["genes"] + [n for n in matrix_all.columns if n in df_total["SampleName"].tolist()]]
     matrix_mrna = matrix_all[["genes"] + [n for n in matrix_all.columns if n in df_mrna["SampleName"].tolist()]]
-
-    print(matrix_mrna.head())
 
     return matrix_total, matrix_mrna
 
@@ -299,7 +298,7 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
             create_gene_info_file(context_name, matrix_path_mrna, form, taxon_id, gene_output_dir, prep="mrna")
         
         else:
-            create_gene_info_file(context_name, matrix_path_prov, form, taxon_id, gene_output_dir)
+            create_gene_info_file(context_name, matrix_path_prov, form, taxon_id, gene_output_dir, prep="provided")
 
     if mode == "make":
         twriter.close()

@@ -1,4 +1,5 @@
 R -e 'if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")'
+R -e 'install.packages("devtools", dependencies=TRUE, repos="'"${CRAN_MIRROR}"'")'
 R -e 'BiocManager::install("affy", dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install("agilp", dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install("limma", dep=TRUE, ask=FALSE)'
@@ -9,9 +10,10 @@ R -e 'BiocManager::install("genefilter", dep=TRUE, ask=FALSE)'
 #R -e 'BiocManager::install("biomaRt", dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install("edgeR", dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install("DESeq2", dep=TRUE, ask=FALSE)'
-R -e 'BiocManager::install("zFPKM", dep=TRUE, ask=FALSE)'
+#R -e 'BiocManager::install("zFPKM", dep=TRUE, ask=FALSE)'
+R -e 'devtools::install_github("babessell1/zFPKM")'
 R -e 'BiocManager::install("ComplexHeatmap", dep=TRUE, ask=FALSE)'
-R -e  'install.packages("countToFPKM", dependencies=TRUE, repos="'"${CRAN_MIRROR}"'")'
+R -e 'install.packages("countToFPKM", dependencies=TRUE, repos="'"${CRAN_MIRROR}"'")'
 
 
 #mkdir /home/"${NB_USER}"/rlibs
