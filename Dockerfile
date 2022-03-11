@@ -1,7 +1,8 @@
 #### Base Image ####
-
 ARG UBUNTU_RELEASE=20.04
-FROM babessell/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
+ARG RPY2_VERSION=master
+ARG UBUNTU_RELEASE=20.04
+FROM rpy2/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
 #FROM babessell/rpy2-41:latest
 
 
