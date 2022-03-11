@@ -1,8 +1,8 @@
 #### Base Image ####
 
 ARG UBUNTU_RELEASE=20.04
-#FROM babessell/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
-FROM babessell/rpy2-41:latest
+FROM babessell/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
+#FROM babessell/rpy2-41:latest
 
 
 #### Set Container Args ####
