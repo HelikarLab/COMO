@@ -1,6 +1,6 @@
 R -e 'if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")'
-R -e 'install.packages("devtools", dependencies=TRUE, repos="'"${CRAN_MIRROR}"'")'
 R -e 'BiocManager::install("edgeR", dep=TRUE, ask=FALSE)'
+R -e 'install.packages("devtools", dependencies=TRUE, repos="'"${CRAN_MIRROR}"'")'
 R -e 'devtools::install_github("babessell1/zFPKM", dependencies=TRUE, repos="'"${CRAN_MIRROR}"'")'
 R -e 'BiocManager::install("affy", dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install("agilp", dep=TRUE, ask=FALSE)'
