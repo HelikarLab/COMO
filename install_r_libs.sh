@@ -10,7 +10,7 @@ R -e 'BiocManager::install("hgu133acdf", dep=TRUE, ask=FALSE)'
 R -e 'install.packages(c("rzmq","repr","IRkernel","IRdisplay"), repos = c("http://irkernel.github.io/", getOption("repos")), type = "source")'
 R -e 'BiocManager::install("genefilter", dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install("DESeq2", dep=TRUE, ask=FALSE)'
-R -e 'devtools:install_github("husson/FactoMineR", dependencies=TRUE)'
+R -e 'devtools::install_github("husson/FactoMineR", dependencies=TRUE)'
 R -e 'devtools::install_github("kassambara/factoextra", dependencies=TRUE)'
 
 
