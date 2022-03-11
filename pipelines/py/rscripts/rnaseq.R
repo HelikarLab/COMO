@@ -175,38 +175,46 @@ calculate_z_score <- function(SampMetrics, norm_tech) {
 }
 
 
-cpm_filter <- function(SampMetrics, filt_options) {
+cpm_filter <- function(SampMetrics, filt_options, model_name) {
 
     N_exp <- filt_options$replicate_ratio
     N_top <- filt_options$replicate_ratio_high
     min.count <- filt_options$min_count
     for ( i in 1:length(SampMetrics) ) {
+        study_number <- str_extract_all(SampMetrics[[i]][["SampleNames"]][1][1], "S\\d+")
         counts <- SampMetrics[[i]][["CountMatrix"]]
         ent <- SampMetrics[[i]][["Entrez"]]
         size <- SampMetrics[[i]][["GeneSizes"]]
         lib.size <- colSums(counts)
-        MedianLibSize <- median(lib.size)
-        if ( min.count=="default" ) {
-            CPM.Cutoff <- 10000000/(median(colSums(counts))) # cite paper!!
-        } else {
-            CPM.Cutoff <- min.count/MedianLibSize*1e6
-        }
         CPM <- cpm(counts,lib.size=lib.size)
+        cpm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/CPM_Matrix_", study_number, ".csv"),collapse="")
+        write_cpm <- cbind(ent, CPM)
+        write.csv(write_cpm, cpm_fname, row.names=FALSE)
+
         min.samples <- round(N_exp * ncol(counts))
         top.samples <- round(N_top * ncol(counts))
+        test_bools <- data.frame(gene=ent)
 
-        f1 <- genefilter::kOverA(min.samples, CPM.Cutoff)
+        for ( j in 1:ncol(CPM) ) {
+            cutoff <- ifelse( min.count=="default",
+                     10e6/(median(sum(counts[,j]))),
+                     1e6*min.count/(median(sum(counts[,j]))) )
+            test_bools <- cbind(test_bools, as.integer(CPM[,j]>cutoff))
+        }
+
+        test_bools["gene"] <- NULL
+        f1 <- genefilter::kOverA(min.samples, 0.9)
         flist <- genefilter::filterfun(f1)
-        keep <- genefilter::genefilter(CPM, flist)
+        keep <- genefilter::genefilter(test_bools, flist)
         SampMetrics[[i]][["Entrez"]] <- ent[keep]
         SampMetrics[[i]][["GeneSizes"]] <- size[keep]
         SampMetrics[[i]][["CountMatrix"]] <- counts[keep,]
         SampMetrics[[i]][["CPM_Matrix"]] <- CPM[keep,]
 
-        # top percentile genes
-        f1_top <- genefilter::kOverA(top.samples, CPM.Cutoff)
+        f1_top <- genefilter::kOverA(top.samples, 0.9)
         flist_top <- genefilter::filterfun(f1_top)
-        keep_top <- genefilter::genefilter(CPM, flist_top)
+        keep_top <- genefilter::genefilter(test_bools, flist_top)
+
         SampMetrics[[i]][["Entrez_top"]] <- ent[keep_top]
     }
 
@@ -224,18 +232,18 @@ TPM_quant_filter <- function(SampMetrics, filt_options, model_name) {
     SampMetrics <- calculate_tpm(SampMetrics)
 
     for ( i in 1:length(SampMetrics) ) {
+        study_number <- str_extract_all(SampMetrics[[i]][["SampleNames"]][1][1], "S\\d+")
         counts <- SampMetrics[[i]][["CountMatrix"]]
         ent <- SampMetrics[[i]][["Entrez"]]
         size <- SampMetrics[[i]][["GeneSizes"]]
         tpm <- SampMetrics[[i]][["TPM_Matrix"]]
-        tpm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/TPM_Matrix_S", i, ".csv"),collapse="")
+        tpm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/TPM_Matrix_", study_number, ".csv"),collapse="")
         write_tpm <- cbind(ent, tpm)
-        write.csv(write_tpm, tpm_fname)
+        write.csv(write_tpm, tpm_fname, row.names=FALSE)
 
         min.samples <- round(N_exp * ncol(tpm))
         top.samples <- round(N_top * ncol(tpm))
         test_bools <- data.frame(gene=ent)
-        test_bools_top <- test_bools
 
         for ( j in 1:ncol(tpm) ) {
             tpm_q <- tpm[,j]
@@ -285,14 +293,14 @@ zfpkm_filter <- function(SampMetrics, filt_options, model_name) {
         fdf <- data.frame(fmat) # convert to df
         fpkm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/FPKM_Matrix_", study_number, ".csv"),collapse="")
         write_fpkm <- cbind(ent, fdf)
-        write.csv(write_fpkm, fpkm_fname)
+        write.csv(write_fpkm, fpkm_fname, row.names=FALSE)
         missing_vals <- is.na(fdf) # get NA values from fdf
         fdf[missing_vals] <- 0 # set NA values to zero to prevent error in zfpkm calculation
         zmat <- zFPKM(fdf, assayName="FPKM") # calculate zFPKM
         zmat[missing_vals] <- NA # set NA values back to NA
         zfpkm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/zFPKM_Matrix_", study_number, ".csv"),collapse="")
         write_zfpkm <- cbind(ent, zmat)
-        write.csv(write_zfpkm, zfpkm_fname)
+        write.csv(write_zfpkm, zfpkm_fname, row.names=FALSE)
         zfpkm_plot_dir <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/figures/"),collapse="")
         if ( !file.exists(zfpkm_plot_dir) ) {
             dir.create(zfpkm_plot_dir)
@@ -329,7 +337,7 @@ zfpkm_filter <- function(SampMetrics, filt_options, model_name) {
 filter_counts <- function(SampMetrics, technique, filt_options, mart, model_name) {
 
     switch(technique,
-         cpm = cpm_filter(SampMetrics, filt_options),
+         cpm = cpm_filter(SampMetrics, filt_options, model_name),
          zfpkm = zfpkm_filter(SampMetrics, filt_options, model_name),
          quantile = TPM_quant_filter(SampMetrics, filt_options, model_name))
 }
