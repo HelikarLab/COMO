@@ -6,7 +6,7 @@ This is the home page for MADRID pipeline.
 - [Install Docker](https://docs.docker.com/install/)
 - `docker login`
 - `sudo docker pull babessell/madrid:development`
-- `sudo docker run --cpus=2 -p 4000:8888 --rm -it babessell/madrid:development` Run docker image and assign 2 CPUs to it.
+- `sudo docker run --cpus=4 -p 4000:8888 --volume=$HOME/gurobi.lic:/opt/gurobi/gurobi.lic:ro  -v /$HOME/saghamiri/Desktop/LocalMadrid:/home/jupyteruser/work/data/local_files --rm --name jupyteruser --rm -it babessell/madrid:development` Run docker image and assign 2 CPUs to it.
 - Open [http://127.0.0.1:4000](http://127.0.0.1:4000) from your Browser, input token shown in command line terminal from previous step
 - Alternatively, you can copy and paste the command under the prompt "or copy and paste one of these URLs:" and replace the "8888" port with "4000"
 - In your jupyter notebook, open `/work/py/pipeline.ipynb`
