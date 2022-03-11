@@ -1,5 +1,4 @@
 #### Base Image ####
-ARG UBUNTU_RELEASE=20.04
 ARG RPY2_VERSION=master
 ARG UBUNTU_RELEASE=20.04
 FROM rpy2/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
@@ -8,9 +7,9 @@ FROM rpy2/base-ubuntu:$RPY2_VERSION-$UBUNTU_RELEASE
 
 #### Set Container Args ####
 
-ARG DEBIAN_FRONTEND=noninteractive
-ENV CRAN_MIRROR=https://cloud.r-project.org \
-    CRAN_MIRROR_TAG=-cran41
+#ARG DEBIAN_FRONTEND=noninteractive
+ENV CRAN_MIRROR=https://cloud.r-project.org
+#    CRAN_MIRROR_TAG=-cran41
 	
 ENV JUPYTER_ENABLE_LAB=1
 
