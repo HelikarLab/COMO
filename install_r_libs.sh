@@ -11,8 +11,9 @@ R -e 'install.packages(c("rzmq","repr","IRkernel","IRdisplay"), repos = c("http:
 R -e 'BiocManager::install("genefilter", dep=TRUE, ask=FALSE)'
 R -e 'BiocManager::install("DESeq2", dep=TRUE, ask=FALSE)'
 R -e 'devtools::install_github("husson/FactoMineR", dependencies=TRUE)'
-R -e 'devtools::install_github("kassambara/factoextra", dependencies=TRUE)'
+#R -e 'devtools::install_github("kassambara/factoextra", dependencies=TRUE)'
 R -e 'devtools::install_github("slowkow/ggrepel", dependencies=TRUE)'
+R -e 'install.packages("uwot", dependencies=TRUE, repos="'"${CRAN_MIRROR}"'")'
 
 
 #mkdir /home/"${NB_USER}"/rlibs
