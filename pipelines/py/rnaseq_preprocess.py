@@ -169,6 +169,7 @@ def create_config_df(context_name):
             print(f"\nNo fragment file found for {label}, writing as 'UNKNOWN' This must be defined by the user in "
                   "order to use zFPKM normalization")
             strand = "UNKNOWN"
+            mean_fragment_size = 100
         elif len(frag_glob) > 1:
             print(f"\nMultiple matching fragment length files for {label}, make sure there is only one copy for each "
                   "replicate in MADRID_input")
@@ -231,14 +232,25 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     return matrix_total, matrix_mrna
 
 
-def create_gene_info_file(context_name, count_matrix_file, form, taxon_id, gene_output_dir, prep="total"):
+
+def create_gene_info_file(matrix_file_list, form, taxon_id):
     """
     Create gene info file for specified context by reading first column in it's count matrix file at
      /work/data/results/<context name>/gene_info_<context name>.csv
     """
 
-    print(f"Fetching gene info using genes in '{count_matrix_file}'")
-    genes = pd.read_csv(count_matrix_file)['genes'].to_list()
+    print(f"Fetching gene info")
+    gene_info_file = os.path.join(configs.datadir, "gene_info.csv")
+    if os.path.exists(gene_info_file):
+        current_df = pd.read_csv(gene_info_file)
+        genes = current_df["ensembl_gene_id"].tolist()
+    else:
+        genes = []
+
+    for mfile in matrix_file_list:
+        add_genes = pd.read_csv(mfile)["genes"].tolist()
+        genes = list(set(genes+add_genes))
+
     output_db = ['Ensembl Gene ID', 'Gene Symbol', 'Gene ID', 'Chromosomal Location']
     output_db.remove(form)
     gene_info = fetch_gene_info(genes, input_db=form, output_db=output_db, taxon_id=taxon_id)
@@ -247,7 +259,6 @@ def create_gene_info_file(context_name, count_matrix_file, form, taxon_id, gene_
     gene_info.index.rename("ensembl_gene_id", inplace=True)
     gene_info.rename(columns={"Gene Symbol": "hgnc_symbol", "Gene ID": "entrezgene_id"}, inplace=True)
     gene_info.drop(['Chromosomal Location'], axis=1, inplace=True)
-    gene_info_file = os.path.join(gene_output_dir, ("gene_info_" + prep + "_" + context_name + ".csv"))
     gene_info.to_csv(gene_info_file)
     print(f"Gene Info file written at '{gene_info_file}'")
 
@@ -264,6 +275,9 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
         twriter = pd.ExcelWriter(trnaseq_config_filename)
         mwriter = pd.ExcelWriter(mrnaseq_config_filename)
 
+    tmatrix_files = []
+    mmatrix_files = []
+    pmatrix_files = []
     for context_name in context_names:
         context_name = context_name.strip(" ")
         print(f"Preprocessing {context_name}")
@@ -277,6 +291,9 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
         matrix_path_total = os.path.join(matrix_output_dir, ("gene_counts_matrix_total_" + context_name + ".csv"))
         matrix_path_mrna = os.path.join(matrix_output_dir, ("gene_counts_matrix_mrna_" + context_name + ".csv"))
         matrix_path_prov = os.path.join(matrix_output_dir, provided_matrix_file)
+
+        tmatrix_files.append(matrix_path_total)
+        mmatrix_files.append(matrix_path_mrna)
 
         if mode == "make":
             create_counts_matrix(context_name)
@@ -294,15 +311,12 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
             if not mmatrix.empty:
                 mmatrix.to_csv(matrix_path_mrna, header=True, index=False)
 
-            create_gene_info_file(context_name, matrix_path_total, form, taxon_id, gene_output_dir, prep="total")
-            create_gene_info_file(context_name, matrix_path_mrna, form, taxon_id, gene_output_dir, prep="mrna")
-        
-        else:
-            create_gene_info_file(context_name, matrix_path_prov, form, taxon_id, gene_output_dir, prep="provided")
-
     if mode == "make":
         twriter.close()
         mwriter.close()
+        create_gene_info_file(tmatrix_files + mmatrix_files, form, taxon_id)
+    else:
+        create_gene_info_file(matrix_path_prov + mmatrix_files, form, taxon_id)
 
     return
 

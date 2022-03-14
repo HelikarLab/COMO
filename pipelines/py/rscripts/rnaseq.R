@@ -10,16 +10,27 @@ library(biomaRt)
 library(sjmisc)
 library(zFPKM)
 library(stringr)
+library(readxl)
 
 
 read_counts_matrix <- function(counts_matrix_file, config_file, info_file, model_name) {
 
     print(counts_matrix_file) # print counts matrix file name
     print(model_name) # print tissue name
-    gene_info <- read.csv(info_file) # read gene info file made in rnaseq_preprocess.py
-    gene_info$size <- (gene_info$end_position-gene_info$start_position) # calculate gene size
-    conf <- read.xlsx(config_file, model_name, colNames=TRUE) # read configuration sheet
-    cmat_whole <- read.csv(counts_matrix_file, header=TRUE) # read counts matrix
+
+    conf <- read_excel(config_file, sheet=model_name)# read configuration sheet
+    cmat_whole <- read.csv(counts_matrix_file, header=TRUE) %>% arrange(., genes) # read counts matrix
+
+    gene_info <- read.csv(info_file) %>%
+        mutate(size=end_position-start_position) %>%
+        arrange(., ensembl_gene_id) %>%
+        filter(.$ensembl_gene_id %in% cmat_whole$genes)
+
+    #print(head(gene_info))
+    #print(tail(gene_info))
+    #print(head(cmat_whole))
+    #print(tail(cmat_whole))
+
     cmat_whole <- cmat_whole[(gene_info$entrezgene_id!="-"),] # remove unnamed genes
     gene_info <- gene_info[(gene_info$entrezgene_id!="-"),]  # remove unnamed genes
     genes <- gene_info$entrezgene_id  # get gene names

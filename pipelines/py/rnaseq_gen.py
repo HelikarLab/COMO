@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+
 import os, time, sys
 import pandas as pd
 from rpy2.robjects.packages import importr
@@ -7,6 +8,7 @@ from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 from project import configs
 import argparse
 import re
+
 
 # enable r to py conversion
 pandas2ri.activate()
@@ -18,7 +20,7 @@ edgeR = importr("edgeR")
 genefilter = importr("genefilter")
 biomaRt = importr("biomaRt")
 sjmisc = importr("sjmisc")
-openxlsx = importr("openxlsx")
+readxl = importr("readxl")
 zfpkm = importr("zFPKM")
 stringr = importr("stringr")
 
@@ -68,8 +70,8 @@ def load_rnaseq_tests(filename, model_name, lib_type):
         return load_dummy_dict()
 
 
-def handle_context_batch(config_filename, replicate_ratio, sample_ratio, replicate_ratio_high,
-                        sample_ratio_high, technique, quantile, min_count, prep):
+def handle_context_batch(config_filename, replicate_ratio, batch_ratio, replicate_ratio_high,
+                        batch_ratio_high, technique, quantile, min_count, prep):
     """
     Handle iteration through each context type and create rnaseq expression file by calling rnaseq.R
     """
@@ -81,14 +83,12 @@ def handle_context_batch(config_filename, replicate_ratio, sample_ratio, replica
     for model_name in sheet_names:
         print("model: ", model_name)
         rnaseq_output_file = "".join(["rnaseq_", prep, "_", model_name, ".csv"])
-        rnaseq_output_filepath = os.path.join(configs.rootdir, "data", "results",
+        rnaseq_output_filepath = os.path.join(configs.datadir, "results",
                                               model_name, rnaseq_output_file)
         rnaseq_input_file = "".join(["gene_counts_matrix_", prep, "_", model_name, ".csv"])
-        rnaseq_input_filepath = os.path.join(configs.rootdir, "data", "data_matrices",
+        rnaseq_input_filepath = os.path.join(configs.datadir, "data_matrices",
                                              model_name, rnaseq_input_file)
-        gene_info_file = "".join(["gene_info_", prep, "_", model_name, ".csv"])
-        gene_info_filepath = os.path.join(configs.rootdir, "data", "results",
-                                          model_name, gene_info_file)
+        gene_info_filepath = os.path.join(configs.datadir, "gene_info.csv")
 
         os.makedirs(os.path.dirname(rnaseq_output_filepath), exist_ok=True)
         print('Input count matrix is at "{}"'.format(rnaseq_input_filepath))
@@ -96,8 +96,8 @@ def handle_context_batch(config_filename, replicate_ratio, sample_ratio, replica
 
         rnaseq_io.save_rnaseq_tests(rnaseq_input_filepath, rnaseq_config_filepath,
                                     rnaseq_output_filepath, gene_info_filepath,
-                                    replicate_ratio=replicate_ratio, sample_ratio=sample_ratio,
-                                    replicate_ratio_high=replicate_ratio_high, sample_ratio_high=sample_ratio_high,
+                                    replicate_ratio=replicate_ratio, batch_ratio=batch_ratio,
+                                    replicate_ratio_high=replicate_ratio_high, batch_ratio_high=batch_ratio_high,
                                     technique=technique, quantile=quantile, min_count=min_count,
                                     model_name=model_name)
 
@@ -144,7 +144,7 @@ def main(argv):
                         help="Name of config .xlsx file in the /work/data/config_files/. Can be generated using "
                              "rnaseq_preprocess.py or manually created and imported into the Juypterlab"
                         )
-    
+
     parser.add_argument("-r", "--replicate-ratio",
                         type=float,
                         required=False,
@@ -154,12 +154,12 @@ def main(argv):
                              "Example: 0.7 means that for a gene to be active, at least 70% of replicates in a group "
                              "must pass the cutoff after normalization"
                         )
-    
-    parser.add_argument("-g", "--group-ratio",
+
+    parser.add_argument("-g", "--batch-ratio",
                         type=float,
                         required=False,
                         default=0.5,
-                        dest="sample_ratio",
+                        dest="batch_ratio",
                         help="Ratio of groups (studies or batches) required for a gene to be active "
                              "Example: 0.7 means that for a gene to be active, at least 70% of groups in a study must  "
                              "have passed the replicate ratio test"
@@ -176,11 +176,11 @@ def main(argv):
                              "replicates in a group must pass the cutoff after normalization"
                         )
 
-    parser.add_argument("-gh", "--high-group-ratio",
+    parser.add_argument("-gh", "--high-batch-ratio",
                         type=float,
                         required=False,
                         default=1.,
-                        dest="sample_ratio_high",
+                        dest="batch_ratio_high",
                         help="Ratio of groups (studies/batches) required for a gene to be considered high-confidence " 
                              "within that group. HHigh-confidence genes ignore consensus with other data-sources like "
                              "proteomics or microarray. Example: 0.9 means that for a gene to be high-confidence, at "
@@ -225,9 +225,9 @@ def main(argv):
 
     config_filename = args.config_filename
     replicate_ratio = args.replicate_ratio
-    sample_ratio = args.sample_ratio
+    batch_ratio = args.batch_ratio
     replicate_ratio_high = args.replicate_ratio_high
-    sample_ratio_high = args.sample_ratio_high
+    batch_ratio_high = args.batch_ratio_high
     technique = args.technique
     quantile = args.quantile
     min_count = args.min_count
@@ -250,8 +250,8 @@ def main(argv):
 
     print('Config file is "{}"'.format(config_filename))
 
-    handle_context_batch(config_filename, replicate_ratio, sample_ratio, replicate_ratio_high,
-                        sample_ratio_high, technique, quantile, min_count, prep)
+    handle_context_batch(config_filename, replicate_ratio, batch_ratio, replicate_ratio_high,
+                        batch_ratio_high, technique, quantile, min_count, prep)
 
     return
 
