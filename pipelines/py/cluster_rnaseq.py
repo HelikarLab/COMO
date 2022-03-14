@@ -107,15 +107,14 @@ def main(argv):
     min_count = args.min_count
     quantile = args.quantile
 
-
-    if type(min_count)==str and not min_count.lower() == "default":
+    if type(min_count) == str and not min_count.lower() == "default":
         try:
             min_count = int(min_count)
         except ValueError:
             print(f"--min-count must be either 'default' or an integer > 0")
             sys.exit()
 
-    if (type(quantile)==str and not quantile.lower() == "default") or 0 < quantile > 100:
+    if (type(quantile) == str and not quantile.lower() == "default") or 0 < quantile > 100:
         try:
             quantile = int(quantile)
         except ValueError:
@@ -123,7 +122,7 @@ def main(argv):
             print(f"--quantile must be either 'default' or an integer between 0 and 100")
             sys.exit()
 
-    if (type(rep_ratio)==str and not rep_ratio.lower() == "default") or 0 < rep_ratio > 1.0:
+    if (type(rep_ratio) == str and not rep_ratio.lower() == "default") or 0 < rep_ratio > 1.0:
         try:
             rep_ratio = float(rep_ratio)
         except ValueError:
