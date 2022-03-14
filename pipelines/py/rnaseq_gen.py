@@ -251,7 +251,7 @@ def main(argv):
     print('Config file is "{}"'.format(config_filename))
 
     handle_context_batch(config_filename, replicate_ratio, batch_ratio, replicate_ratio_high,
-                        batch_ratio_high, technique, quantile, min_count, prep)
+                         batch_ratio_high, technique, quantile, min_count, prep)
 
     return
 

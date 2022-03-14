@@ -12,19 +12,17 @@ library(uwot)
 
 make_logical_matrix <- function(wd, technique) {
   ### organize logical matrix
-
   if (technique=="zfpkm") {
-    files <- Sys.glob(paste0(wd, "/*/zFPKM_Matrix_*.csv"))
+    files <- Sys.glob(paste0(wd, "*/zFPKM_Matrix_*.csv"))
   } else if ( technique=="quantile" ) {
-    files <- Sys.glob(paste0(wd, "/*/TPM_Matrix_*.csv"))
+    files <- Sys.glob(paste0(wd, "*/TPM_Matrix_*.csv"))
   } else if ( technique=="cpm" ) {
-    files <- Sys.glob(paste0(wd, "/*/CPM_Matrix_*.csv"))
+    files <- Sys.glob(paste0(wd, "*/CPM_Matrix_*.csv"))
   } else {
     print("Invalid technique. Must be zfpkm, quantile, or cpm")
     stop()
   }
   cnt <- 0
-  print(files)
   for ( f in files ) {
     new_matrix <- read.csv(f)
     if ( "X" %in% colnames(new_matrix) ) {
@@ -34,11 +32,11 @@ make_logical_matrix <- function(wd, technique) {
     else { merge_matrix <- merge(merge_matrix, new_matrix, by="ent") }
     cnt <- cnt+1
   }
-
+  #stop()
   if (technique=="zfpkm") {
     cutoff = -3
     logical_matrix <- do.call(cbind, lapply(2:ncol(merge_matrix), function(j) {
-    merge_matrix[,j] >  cutoff
+    as.integer(merge_matrix[,j] >  cutoff)
     })) %>% as.data.frame(.) %>% cbind(merge_matrix["ent"], .) %>% na.omit(.)
   } else if ( technique=="quantile" ) {
     logical_matrix <- do.call(cbind, lapply(2:ncol(merge_matrix), function(j) {
@@ -51,12 +49,17 @@ make_logical_matrix <- function(wd, technique) {
                     10e6/(median(sum(merge_matrix[,j]))),
                     1e6*min_count/(median(sum(merge_matrix[,j]))) )
     merge_matrix[,j] >  cutoff
-    })) %>% as.data.frame(.) %>% cbind(merge_matrix["ent"], .) %>% na.omit(.)
+    })) %>% as.data.frame(a.) %>% cbind(merge_matrix["ent"], .) %>% na.omit(.)
   }
-
   colnames(logical_matrix) <- colnames(merge_matrix)
   rsums <- rowSums(logical_matrix[,-1])
-  logical_matrix <- logical_matrix[rsums!=(ncol(logical_matrix)-1),] # drop identical rows
+  print(nrow(logical_matrix))
+  logical_matrix <- logical_matrix %>%
+    .[rowSums(.[,-1]) < ncol(.)-1,] %>% .[rowSums(.[,-1]) > 0,]
+
+  #logical_matrix <- logical_matrix[(rsums < (ncol(logical_matrix)-1) && rsums> 0),] # drop identical rows
+  print(nrow(logical_matrix))
+
   logical_matrix <- t(logical_matrix[,-1]) # tranpose
 
   return(logical_matrix)
@@ -306,16 +309,39 @@ cluster_samples_main <- function(wd, context_names, technique, clust_algo,
                                 rep_ratio=0.5, batch_ratio=0.5, quantile=25, min_count="default") {
 
     print("Making logical matrix")
+
+    memfree <- as.numeric(system("awk '/MemFree/ {print $2}' /proc/meminfo", intern=TRUE))
+    print(memfree)
+    stop()
+
+    print()
     logical_matrix <- make_logical_matrix(wd, technique)
+
+    gc()
+
+    print(logical_matrix[1:5, 1:5])
+    stop()
+
     res <- parse_contexts(logical_matrix)
     contexts <- res[[1]]
     batches <- res[[2]]
     print("Clustering replicate level filtered data")
     plot_replicates(logical_matrix, contexts, wd, clust_algo)
+
+    gc()
+
     print("Clustering batch level filtered data")
     log_mat_batch <- make_batch_logical_matrix(logical_matrix, batches, rep_ratio)
+
+    rm(logical_matrix)
+    gc()
+
     plot_batches(log_mat_batch, batches, wd, clust_algo)
     print("Clustering context level filtered data")
     log_mat_context <- make_context_logical_matrix(log_mat_batch, contexts, batch_ratio)
+
+    rm(log_mat_batch)
+    gc()
+
     plot_contexts(log_mat_context, wd, clust_algo)
 }
