@@ -355,7 +355,7 @@ filter_counts <- function(SampMetrics, technique, filt_options, mart, model_name
 
 
 save_rnaseq_tests <- function(counts_matrix_file, config_file, out_file, info_file, model_name,
-                            replicate_ratio=0.5, sample_ratio=0.5, replicate_ratio_high=0.9, sample_ratio_high=0.9,
+                            replicate_ratio=0.5, batch_ratio=0.5, replicate_ratio_high=0.9, batch_ratio_high=0.9,
                             technique="quantile", quantile=0.9, min_count=10) {
 
       # condense filter options
@@ -365,10 +365,10 @@ save_rnaseq_tests <- function(counts_matrix_file, config_file, out_file, info_fi
       } else {
           filt_options$replicate_ratio <- 0.2
       }
-      if ( exists("sample_ratio") ) {
-          filt_options$sample_ratio <- sample_ratio
+      if ( exists("batch_ratio") ) {
+          filt_options$batch_ratio <- batch_ratio
       } else {
-          filt_options$sample_ratio <- 0.5
+          filt_options$batch_ratio <- 0.5
       }
       if ( exists("quantile") ) {
           filt_options$quantile <- quantile
@@ -385,10 +385,10 @@ save_rnaseq_tests <- function(counts_matrix_file, config_file, out_file, info_fi
       } else {
           filt_options$replicate_ratio_high <- 0.9
       }
-      if ( exists("sample_ratio_high") ) {
-          filt_options$sample_ratio_high <- sample_ratio_high
+      if ( exists("batch_ratio_high") ) {
+          filt_options$batch_ratio_high <- batch_ratio_high
       } else {
-          filt_options$sample_ratio_high <- 0.9
+          filt_options$batch_ratio_high <- 0.9
       }
 
       print("Reading Counts Matrix")
@@ -413,8 +413,8 @@ save_rnaseq_tests <- function(counts_matrix_file, config_file, out_file, info_fi
       SampMetrics[["TopMatrix"]] <- topMat # store high confidence matrix for saving
 
       # get genes which are expressed and high-confidence according to use defined ratio
-      SampMetrics[["ExpressedGenes"]] <- as.character(expMat$expressedGenes[expMat$Prop>=sample_ratio])
-      SampMetrics[["TopGenes"]] <- as.character(topMat$topGenes[topMat$Prop>=sample_ratio_high])
+      SampMetrics[["ExpressedGenes"]] <- as.character(expMat$expressedGenes[expMat$Prop>=batch_ratio])
+      SampMetrics[["TopGenes"]] <- as.character(topMat$topGenes[topMat$Prop>=batch_ratio_high])
 
       # create a table to write gene expression and high confidence to
       write_table <- data.frame(entrez_all)
