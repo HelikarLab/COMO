@@ -14,6 +14,9 @@ R -e 'devtools::install_github("husson/FactoMineR", dependencies=TRUE)'
 #R -e 'devtools::install_github("kassambara/factoextra", dependencies=TRUE)'
 R -e 'devtools::install_github("slowkow/ggrepel", dependencies=TRUE)'
 R -e 'install.packages("uwot", dependencies=TRUE, repos="'"${CRAN_MIRROR}"'")'
+R -e 'install.packages("sjmisc", dependencies=TRUE, repos="'"${CRAN_MIRROR}"'")'
+R -e 'install.packages("readxl", dependencies=TRUE, repos="'"${CRAN_MIRROR}"'")'
+
 
 
 #mkdir /home/"${NB_USER}"/rlibs
