@@ -17,6 +17,7 @@ R -e 'install.packages("uwot", dependencies=TRUE, repos="'"${CRAN_MIRROR}"'")'
 R -e 'install.packages("sjmisc", dependencies=TRUE, repos="'"${CRAN_MIRROR}"'")'
 R -e 'install.packages("readxl", dependencies=TRUE, repos="'"${CRAN_MIRROR}"'")'
 R -e 'install.packages("tidyverse", dependencies=TRUE, repos="'"${CRAN_MIRROR}"'")'
+R -e 'install.packages("zoo", dependencies=TRUE, repos="'"${CRAN_MIRROR}"'")'
 
 
 

@@ -78,7 +78,8 @@ def create_config_df(context_name):
 
     for gcfilename in gene_counts_files:
         try:
-            label = re.findall(r"S[1-999]R[1-999]r?[1-999]?", gcfilename)[0]
+            label = re.findall(r"S[1-9][0-9]?[0-9]?R[1-9][0-9]?[0-9]?r?[1-9]?[0-9]?[0-9]?", gcfilename)[0]
+            print("label: ", label)
 
         except IndexError:
             print(f"\nfilename of {gcfilename} is not valid. Should be 'contextName_SXRYrZ.tab', where X is the "
@@ -86,22 +87,23 @@ def create_config_df(context_name):
                   "exclude 'rZ' from the filename.")
             sys.exit()
 
-        study_number = re.findall(r"S[1-999]", label)[0]
-        run = re.findall(r"r[1-999]", label)
-        multi_flag = 0
+        study_number = re.findall(r"S[1-9][0-9]?[0-9]?", label)[0]
+        rep_number = re.findall(r"R[1-9][0-9]?[0-9]?", label)[0]
 
+        run = re.findall(r"r[1-9][0-9]?[0-9]?", label)
+        multi_flag = 0
         if len(run) > 0:
             if run[0] != "r1":
                 continue
             else:
-                label_glob = study_number + "R*" + "r*"
+                label_glob = study_number + "R" + str(rep_number) + "r*"
                 runs = [run for run in gene_counts_files if re.search(label_glob, run)]
                 multi_flag = 1
                 frag_files = []
 
                 for r in runs:
-                    r_label = re.findall(r"r?[1-999]?", r)[0]
-                    R_label = re.findall(r"R?[1-999]?", r)[0]
+                    r_label = re.findall(r"r[1-9][0-9]?[0-9]?", r)[0]
+                    R_label = re.findall(r"R[1-9][0-9]?[0-9]?", r)[0]
                     frag_filename = "".join([context_name, "_", study_number, R_label, r_label, "_fragment_size.txt"])
                     frag_files.append(os.path.join(configs.rootdir, "data", "MADRID_input", context_name,
                                                    "fragmentSizes", study_number, frag_filename))
@@ -196,7 +198,8 @@ def create_config_df(context_name):
 
                     mean_fragment_size = sum(mean_fragment_sizes * library_sizes) / sum(library_sizes)
 
-        label = "_".join([context_name, re.findall(r"S[1-999]R[1-999]", label)[0]])  # remove run number if there
+        #label = "_".join([context_name, re.findall(r"S[1-9][0-9]?[0-9]?R[1-9][0-9]?[0-9]?", label)[0]])  # remove run number if there
+        label = f"{context_name}_{study_number}{rep_number}"
 
         new_row = pd.DataFrame({'SampleName': [label],
                                 'FragmentLength': [mean_fragment_size],
@@ -277,7 +280,7 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
 
     tmatrix_files = []
     mmatrix_files = []
-    pmatrix_files = []
+    #pmatrix_files = []
     for context_name in context_names:
         context_name = context_name.strip(" ")
         print(f"Preprocessing {context_name}")
@@ -292,23 +295,22 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
         matrix_path_mrna = os.path.join(matrix_output_dir, ("gene_counts_matrix_mrna_" + context_name + ".csv"))
         matrix_path_prov = os.path.join(matrix_output_dir, provided_matrix_file)
 
-        tmatrix_files.append(matrix_path_total)
-        mmatrix_files.append(matrix_path_mrna)
-
         if mode == "make":
             create_counts_matrix(context_name)
             df = create_config_df(context_name)
 
             df_t, df_m = split_config_df(df)
             if not df_t.empty:
+                tmatrix_files.append(matrix_path_total)
                 df_t.to_excel(twriter, sheet_name=context_name, header=True, index=False)
             if not df_m.empty:
+                mmatrix_files.append(matrix_path_mrna)
                 df_m.to_excel(mwriter, sheet_name=context_name, header=True, index=False)
 
             tmatrix, mmatrix = split_counts_matrices(matrix_path_all, df_t, df_m)
-            if not tmatrix.empty:
+            if len(tmatrix.columns)>1:
                 tmatrix.to_csv(matrix_path_total, header=True, index=False)
-            if not mmatrix.empty:
+            if len(mmatrix.columns)>1:
                 mmatrix.to_csv(matrix_path_mrna, header=True, index=False)
 
     if mode == "make":
@@ -316,7 +318,7 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
         mwriter.close()
         create_gene_info_file(tmatrix_files + mmatrix_files, form, taxon_id)
     else:
-        create_gene_info_file(matrix_path_prov + mmatrix_files, form, taxon_id)
+        create_gene_info_file(matrix_path_prov, form, taxon_id)
 
     return
 
@@ -380,10 +382,10 @@ def main(argv):
                        required=False,
                        default=False,
                        dest="provide_matrix",
-                       help="Provide your own count matrix. Requries additon argument '--matrix' which is .csv file "
+                       help="Provide your own count matrix. Requires additional argument '--matrix' which is .csv file "
                             "where colnames are sample names (in contextName_SXRY format) and rownames are genes in "
                             "in format specified by --gene-format"
-                       )
+                       )  # would be nice if this was a directory full matrices in case you want to do in batches
 
     group.add_argument('-y', "--create-matrix",
                        action="store_true",
