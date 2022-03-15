@@ -13,26 +13,30 @@ library(uwot)
 make_logical_matrix <- function(wd, technique) {
   ### organize logical matrix
   if (technique=="zfpkm") {
-    files <- Sys.glob(paste0(wd, "*/zFPKM_Matrix_*.csv"))
+    files <- Sys.glob(paste0(wd, "/*/zFPKM_Matrix_*.csv"))
   } else if ( technique=="quantile" ) {
-    files <- Sys.glob(paste0(wd, "*/TPM_Matrix_*.csv"))
+    files <- Sys.glob(paste0(wd, "/*/TPM_Matrix_*.csv"))
   } else if ( technique=="cpm" ) {
-    files <- Sys.glob(paste0(wd, "*/CPM_Matrix_*.csv"))
+    files <- Sys.glob(paste0(wd, "/*/CPM_Matrix_*.csv"))
   } else {
     print("Invalid technique. Must be zfpkm, quantile, or cpm")
     stop()
   }
   cnt <- 0
   for ( f in files ) {
-    new_matrix <- read.csv(f)
-    if ( "X" %in% colnames(new_matrix) ) {
-      new_matrix <- new_matrix %>% select(-X)
-    }
+    new_matrix <- read.table(f, strip.white=T, header=T, sep=",", row.names=NULL) %>% # read expression matrix
+        mutate(across(colnames(.)[-1], as.numeric)) %>% # ensure expression values are numbers
+        mutate(across(colnames(.)[1], as.character)) %>% # ensure entrez IDs are character
+        group_by(ent) %>%
+        summarise_each(funs(max)) # if multiple of same entrez, take max value
+
+    #if ( "X" %in% colnames(new_matrix) ) {
+    #  new_matrix <- new_matrix %>% select(-X)
+    #}
     if (!cnt) { merge_matrix <- new_matrix }
-    else { merge_matrix <- merge(merge_matrix, new_matrix, by="ent") }
+    else { merge_matrix <- merge_matrix %>% left_join(new_matrix, by="ent") }
     cnt <- cnt+1
   }
-  #stop()
   if (technique=="zfpkm") {
     cutoff = -3
     logical_matrix <- do.call(cbind, lapply(2:ncol(merge_matrix), function(j) {
@@ -53,12 +57,8 @@ make_logical_matrix <- function(wd, technique) {
   }
   colnames(logical_matrix) <- colnames(merge_matrix)
   rsums <- rowSums(logical_matrix[,-1])
-  print(nrow(logical_matrix))
   logical_matrix <- logical_matrix %>%
     .[rowSums(.[,-1]) < ncol(.)-1,] %>% .[rowSums(.[,-1]) > 0,]
-
-  #logical_matrix <- logical_matrix[(rsums < (ncol(logical_matrix)-1) && rsums> 0),] # drop identical rows
-  print(nrow(logical_matrix))
 
   logical_matrix <- t(logical_matrix[,-1]) # tranpose
 
@@ -84,7 +84,7 @@ parse_contexts <- function(logical_matrix) {
 
 
 # MCA
-plot_MCA_replicates <- function(logical_matrix, contexts, wd) {
+plot_MCA_replicates <- function(logical_matrix, contexts, wd, label) {
   mca_results <- MCA(logical_matrix, graph=F)
   d <- as.data.frame(mca_results[["ind"]][["coord"]][,1:2])
   d["contexts"] <- as.data.frame(contexts)
@@ -97,14 +97,13 @@ plot_MCA_replicates <- function(logical_matrix, contexts, wd) {
     geom_point(alpha=0.7) +
     geom_text_repel(max.overlaps = Inf) +
     labs(x="Dim 1", y="Dim 2")
+    if ( !label ) { p <- remove_geom(p, "GeomTextRepel") }
   print(p)
   dev.off()
 }
 
 
-plot_UMAP_replicates <- function(logical_matrix, contexts, wd,
-                                 n_neigh, min_dist) {
-
+plot_UMAP_replicates <- function(logical_matrix, contexts, wd, label, n_neigh, min_dist) {
   n_neigh <- ifelse(n_neigh=="default", as.integer(length(contexts)), n_neigh)
   if ( n_neigh<2) {
     print("Cannot cluster replicates if n nearest neighbors is < 1!")
@@ -123,21 +122,25 @@ plot_UMAP_replicates <- function(logical_matrix, contexts, wd,
   if ( !file.exists(fig_path) ) { dir.create(fig_path) }
   plotname <- file.path(fig_path, "umap_plot_replicates.pdf")
   pdf(plotname)
-  p <- ggplot(coords, ggplot2::aes(x=x, y=y, label=row.names(coords), color=contexts)) +
-    geom_point(alpha=0.7) +
-    geom_text_repel(max.overlaps = Inf) +
-    labs(x="Dim 1", y="Dim 2")
+
+  if ( label ) {
+      p <- ggplot(coords, ggplot2::aes(x=x, y=y, label=row.names(coords), color=contexts)) +
+        geom_point(alpha=0.7) +
+        geom_text_repel(max.overlaps = Inf) +
+        labs(x="Dim 1", y="Dim 2")
+   } else {
+      p <- ggplot(coords, ggplot2::aes(x=x, y=y, color=contexts)) +
+        geom_point(alpha=0.7) +
+        labs(x="Dim 1", y="Dim 2")}
   print(p)
   dev.off()
 }
 
 
-plot_replicates <- function(logical_matrix, contexts, wd, clust_algo,
-                            n_neigh="default", min_dist=0.01) {
+plot_replicates <- function(logical_matrix, contexts, wd, clust_algo, label, n_neigh="default", min_dist=0.01) {
   switch(tolower(clust_algo),
-         mca = plot_MCA_replicates(logical_matrix, contexts, wd),
-         umap = plot_UMAP_replicates(logical_matrix, contexts, wd,
-                                     n_neigh, min_dist)
+         mca = plot_MCA_replicates(logical_matrix, contexts, wd, label),
+         umap = plot_UMAP_replicates(logical_matrix, contexts, wd, label, n_neigh, min_dist)
   )
 }
 
@@ -146,8 +149,12 @@ make_batch_logical_matrix <- function(logical_matrix, batches, ratio) {
   logical_matrix <- t(logical_matrix)
   log_mat_batch <- data.frame(genes=row.names(logical_matrix))
   for ( batch in batches ) {
-    batch_log_mat <- logical_matrix[,grep(batch,colnames(logical_matrix))]
-    log_mat_batch <- cbind(log_mat_batch, (rowSums(batch_log_mat)/ncol(batch_log_mat))>ratio)
+    batch_log_mat <- logical_matrix[,grep(paste0("^",batch),colnames(logical_matrix))]
+    if ( nrow(batch_log_mat) < 2 ) {
+        log_mat_batch <- cbind(log_mat_batch, batch_log_mat)
+    } else {
+        log_mat_batch <- cbind(log_mat_batch, (rowSums(batch_log_mat)/ncol(batch_log_mat))>ratio)
+    }
   }
   log_mat_batch["genes"] <- NULL
   colnames(log_mat_batch) <- batches
@@ -157,7 +164,7 @@ make_batch_logical_matrix <- function(logical_matrix, batches, ratio) {
 }
 
 
-plot_MCA_batches <- function(log_mat_batch, batches, wd) {
+plot_MCA_batches <- function(log_mat_batch, batches, wd, label) {
   contexts <- c()
   contexts <- lapply(batches, function(r) {
     c(contexts, unlist(strsplit(r, "_S"))[1])
@@ -181,8 +188,7 @@ plot_MCA_batches <- function(log_mat_batch, batches, wd) {
 }
 
 
-plot_UMAP_batches <- function(log_mat_batch, batches, wd,
-                              n_neigh, min_dist) {
+plot_UMAP_batches <- function(log_mat_batch, batches, wd, label, n_neigh, min_dist) {
 
   n_neigh <- ifelse(n_neigh=="default", as.integer(length(batches)), n_neigh)
   if ( n_neigh<2) {
@@ -216,12 +222,10 @@ plot_UMAP_batches <- function(log_mat_batch, batches, wd,
 }
 
 
-plot_batches <- function(log_mat_batch, batches, wd, clust_algo,
-                         n_neigh="default", min_dist=0.01) {
+plot_batches <- function(log_mat_batch, batches, wd, clust_algo, label, n_neigh="default", min_dist=0.01) {
   switch(tolower(clust_algo),
-         mca = plot_MCA_batches(log_mat_batch, batches, wd),
-         umap = plot_UMAP_batches(log_mat_batch, batches, wd,
-                                  n_neigh, min_dist)
+         mca = plot_MCA_batches(log_mat_batch, batches, wd, label),
+         umap = plot_UMAP_batches(log_mat_batch, batches, wd, label, n_neigh, min_dist)
   )
 }
 
@@ -231,9 +235,12 @@ make_context_logical_matrix <- function(log_mat_batch, contexts, ratio) {
   log_mat_batch <- t(log_mat_batch)
   log_mat_context <- data.frame(genes=row.names(log_mat_batch))
   for ( context in contexts ) {
-    context_log_mat <- log_mat_batch[,grep(context,colnames(log_mat_batch))]
-    log_mat_context <- cbind(log_mat_context, (
-      rowSums(context_log_mat)/ncol(context_log_mat))>ratio)
+    context_log_mat <- as.data.frame(log_mat_batch[,grep(paste0("^",context),colnames(log_mat_batch))])
+    if ( nrow(context_log_mat) < 2 ) {
+        log_mat_context <- cbind(log_mat_context, context_log_mat)
+    } else {
+        log_mat_context <- cbind(log_mat_context, (rowSums(context_log_mat)/ncol(context_log_mat))>ratio)
+    }
   }
   log_mat_context["genes"] <- NULL
   colnames(log_mat_context) <- contexts
@@ -263,8 +270,7 @@ plot_MCA_contexts <- function(log_mat_context, contexts, wd) {
 }
 
 
-plot_UMAP_contexts <- function(log_mat_context, contexts, wd,
-                               n_neigh, min_dist) {
+plot_UMAP_contexts <- function(log_mat_context, contexts, wd, label, n_neigh, min_dist) {
   contexts <- unique(contexts)
   n_neigh <- ifelse(n_neigh=="default", as.integer(length(contexts)), n_neigh)
   if ( n_neigh<2) {
@@ -282,7 +288,6 @@ plot_UMAP_contexts <- function(log_mat_context, contexts, wd,
   if ( !file.exists(fig_path) ) { dir.create(fig_path) }
   plotname <- file.path(fig_path, "umap_plot_contexts.pdf")
   pdf(plotname)
-  print(contexts)
   p <- ggplot(coords, ggplot2::aes(x=x, y=y, label=row.names(coords), color=contexts)) +
     geom_point(alpha=0.7) +
     geom_text_repel(max.overlaps = Inf) +
@@ -294,54 +299,35 @@ plot_UMAP_contexts <- function(log_mat_context, contexts, wd,
 }
 
 
-plot_contexts <- function(log_mat_context, wd, clust_algo,
+plot_contexts <- function(log_mat_context, wd, clust_algo, contexts, label,
                           n_neigh="default", min_dist=0.01) {
   switch(tolower(clust_algo),
-         mca = plot_MCA_contexts(log_mat_context, contexts, wd),
-         umap = plot_UMAP_contexts(log_mat_context, contexts, wd,
-                                   n_neigh, min_dist)
+         mca = plot_MCA_contexts(log_mat_context, contexts, wd, label),
+         umap = plot_UMAP_contexts(log_mat_context, contexts, wd, label, n_neigh, min_dist)
   )
 }
 
 
-cluster_samples_main <- function(wd, context_names, technique, clust_algo,
-                                n_neigh_rep="default", n_neigh_batch="default", n_neigh_context="default",
+cluster_samples_main <- function(wd, context_names, technique, clust_algo, label, min_dist=0.01,
+                                n_neigh_rep="default", n_neigh_batch="default", n_neigh_cont="default",
                                 rep_ratio=0.5, batch_ratio=0.5, quantile=25, min_count="default") {
 
     print("Making logical matrix")
-
-    memfree <- as.numeric(system("awk '/MemFree/ {print $2}' /proc/meminfo", intern=TRUE))
-    print(memfree)
-    stop()
-
-    print()
     logical_matrix <- make_logical_matrix(wd, technique)
-
-    gc()
-
-    print(logical_matrix[1:5, 1:5])
-    stop()
 
     res <- parse_contexts(logical_matrix)
     contexts <- res[[1]]
     batches <- res[[2]]
     print("Clustering replicate level filtered data")
-    plot_replicates(logical_matrix, contexts, wd, clust_algo)
-
-    gc()
+    plot_replicates(logical_matrix, contexts, wd, clust_algo, label, n_neigh=n_neigh_rep, min_dist=min_dist)
 
     print("Clustering batch level filtered data")
     log_mat_batch <- make_batch_logical_matrix(logical_matrix, batches, rep_ratio)
-
     rm(logical_matrix)
-    gc()
+    plot_batches(log_mat_batch, batches, wd, clust_algo, label, n_neigh=n_neigh_batch, min_dist=min_dist)
 
-    plot_batches(log_mat_batch, batches, wd, clust_algo)
     print("Clustering context level filtered data")
     log_mat_context <- make_context_logical_matrix(log_mat_batch, contexts, batch_ratio)
-
     rm(log_mat_batch)
-    gc()
-
-    plot_contexts(log_mat_context, wd, clust_algo)
+    plot_contexts(log_mat_context, wd, clust_algo, contexts, label, n_neigh=n_neigh_cont, min_dist=min_dist)
 }
