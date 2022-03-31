@@ -1,5 +1,5 @@
 # prevent messy messages from repeatedly writing to juypter
-zz <- file("/home/jupyteruser/work/py/rlogs/generate_counts_matrix.Rout", open="wt")
+zz <- file(file.path("/home", "jupyteruser", "work", "py", "rlogs", "generate_counts_matrix.Rout"), open="wt")
 sink(zz, type="message")
 
 library(tidyverse)
@@ -18,7 +18,7 @@ organize_gene_counts_files <- function(data_dir) {
     count_dir <- list.dirs(path = count_dir_i, full.names = TRUE, recursive = FALSE) %>%
       Filter(function(x) !any(grepl(".ipynb_checkpoints", x)), .) # MADRID_inputs/tissueName/geneCounts/SX
 
-    strand_dir_i <- file.path(data_dir, "/strandedness") # MADRID_inputs/tissueName/strandedness
+    strand_dir_i <- file.path(data_dir, "strandedness") # MADRID_inputs/tissueName/strandedness
     strand_dir <- list.dirs(path = strand_dir_i, full.names = TRUE, recursive = FALSE) # tissueName/strandedness/SX
 
     # for each study, collect gene count files, frag files, insert size files, layouts, and strand info
@@ -28,7 +28,8 @@ organize_gene_counts_files <- function(data_dir) {
         entry <- list() # list specific to a study, top level of SampleMetrics
         str_d <- file.path(data_dir, "strandedness", sname) # strandedness file directory
 
-        counts_glob <- paste(c(cnt_d, "/*.tab"), collapse="")
+        #counts_glob <- paste(c(cnt_d, "/*.tab"), collapse="")
+        counts_glob <- file.path(cnt_d, "*.tab")
         counts_files <- Sys.glob(counts_glob) # outputs of STAR
 
         n_replicates <- length(counts_files) # number of replicates for this study
@@ -39,7 +40,7 @@ organize_gene_counts_files <- function(data_dir) {
             replicate_file <- str_match(counts_files[i], "geneCounts/\\s*(.*?)\\s*.tab")[,2] # file path
             replicate_names[i] <- basename(replicate_file) # file name only
             rname <- sub(pattern = "(.*)\\..*$", replacement = "\\1", basename(replicate_file)) # rem file extension
-            strandedness_file <- paste(c(rname, "_strandedness.txt"),collapse="") # use rep name to get matching strand
+            strandedness_file <- paste0(rname, "_strandedness.txt") # use rep name to get matching strand
             strandedness_files[i] <- file.path(str_d, strandedness_file) # path to strand files
 
         }
@@ -64,7 +65,7 @@ prepare_sample_counts <- function(counts_file, counts_files, strand_file) {
         #split_directory <- unlist(strsplit(rm_run_number, "/")) # split from path
         #basename <- split_directory[length(split_directory)] # get sample id
         bname <- basename(rm_run_number)
-        search_str <- paste(c(bname, "r\\d+"),collapse="")
+        search_str <- paste0(bname, "r\\d+")
         run_files <- counts_files[grepl(search_str, counts_files)] # search for other files that are part of same run
         samp_count <- NULL
 
@@ -224,8 +225,7 @@ generate_counts_matrix_main <- function(data_dir, out_dir) {
 
     full_count_matrix["genes"] <- sub("\\.\\d+", "", full_count_matrix$genes)
     file_split <- unlist(strsplit(data_dir, "/"))
-    file_name <- paste(c(
-    out_dir, "/", "gene_counts_matrix_full_", file_split[length(file_split)], ".csv"),collapse="")
+    file_name <- file.path(out_dir, paste0("gene_counts_matrix_full_", file_split[length(file_split)], ".csv"))
     write.csv(full_count_matrix, file_name, row.names=FALSE)
     cat("Count Matrix written at ", file_name, "\n")
 

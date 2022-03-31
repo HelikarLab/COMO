@@ -1,5 +1,5 @@
 # prevent messy messages from repeatedly writing to juypter
-zz <- file("/home/jupyteruser/work/py/rlogs/rnaseq.Rout", open="wt")
+zz <- file(file.path("/home", "jupyteruser", "work", "py", "rlogs", "rnaseq.Rout"), open="wt")
 sink(zz, type="message")
 
 library(tidyverse)
@@ -9,17 +9,20 @@ library(genefilter)
 library(biomaRt)
 library(sjmisc)
 library(zFPKM)
+library(zFPKM)
 library(stringr)
 library(readxl)
 
 
 read_counts_matrix <- function(counts_matrix_file, config_file, info_file, model_name) {
 
-    print(counts_matrix_file) # print counts matrix file name
+    #print(counts_matrix_file) # print counts matrix file name
     print(model_name) # print tissue name
 
     conf <- read_excel(config_file, sheet=model_name)# read configuration sheet
     cmat_whole <- read.csv(counts_matrix_file, header=TRUE) %>% arrange(., genes) # read counts matrix
+
+    #print(head(cmat_whole))
 
     gene_info <- read.csv(info_file) %>%
         mutate(size=end_position-start_position) %>%
@@ -34,6 +37,7 @@ read_counts_matrix <- function(counts_matrix_file, config_file, info_file, model
     cmat_whole <- cmat_whole[(gene_info$entrezgene_id!="-"),] # remove unnamed genes
     gene_info <- gene_info[(gene_info$entrezgene_id!="-"),]  # remove unnamed genes
     genes <- gene_info$entrezgene_id  # get gene names
+    #print(genes)
 
     # remove version numbers from ensembl id
     for ( j in 1:length(genes) ) {
@@ -139,7 +143,7 @@ calculate_fpkm <- function(SampMetrics) {
                 eff_len = gene_size - mean_fragment_lengths[j] + 1 # plus one to prevent div by 0
                 N = sum(count_matrix[,j])
                 exp( log(count_matrix[,j]) + log(1e9) - log(eff_len) - log(N) )
-            }))
+            })) + 1e-9
             colnames(fpkm_matrix) <- colnames(count_matrix)
             SampMetrics[[i]][["FPKM_Matrix"]] <- fpkm_matrix
 
@@ -149,7 +153,7 @@ calculate_fpkm <- function(SampMetrics) {
             rpkm_matrix <- do.call(cbind, lapply(1:ncol(count_matrix), function(j) {
                 rate = log(count_matrix[,j]) - log(gene_size[j])
                 exp(rate - log(sum(count_matrix[,j])) + log(1e9))
-            }))
+            })) + 1e-9
             colnames(rpkm_matrix) <- colnames(count_matrix)
             SampMetrics[[i]][["FPKM_Matrix"]] <- rpkm_matrix
 
@@ -158,7 +162,6 @@ calculate_fpkm <- function(SampMetrics) {
 
     return(SampMetrics)
 }
-
 
 calculate_z_score <- function(SampMetrics, norm_tech) {
 
@@ -198,7 +201,8 @@ cpm_filter <- function(SampMetrics, filt_options, model_name) {
         size <- SampMetrics[[i]][["GeneSizes"]]
         lib.size <- colSums(counts)
         CPM <- cpm(counts,lib.size=lib.size)
-        cpm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/CPM_Matrix_", study_number, ".csv"),collapse="")
+        cpm_fname <- file.path("home", "jupyteruser", "work", "data", "results",
+                                model_name, paste0("CPM_Matrix_", study_number, ".csv"))
         write_cpm <- cbind(ent, CPM)
         write.csv(write_cpm, cpm_fname, row.names=FALSE)
 
@@ -226,7 +230,7 @@ cpm_filter <- function(SampMetrics, filt_options, model_name) {
         flist_top <- genefilter::filterfun(f1_top)
         keep_top <- genefilter::genefilter(test_bools, flist_top)
 
-        SampMetrics[[i]][["Entrez_top"]] <- ent[keep_top]
+        SampMetrics[[i]][["Entrez_hc"]] <- ent[keep_top]
     }
 
     SampMetrics <- calculate_z_score(SampMetrics, "CPM")
@@ -248,7 +252,8 @@ TPM_quant_filter <- function(SampMetrics, filt_options, model_name) {
         ent <- SampMetrics[[i]][["Entrez"]]
         size <- SampMetrics[[i]][["GeneSizes"]]
         tpm <- SampMetrics[[i]][["TPM_Matrix"]]
-        tpm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/TPM_Matrix_", study_number, ".csv"),collapse="")
+        tpm_fname <- file.path("home", "jupyteruser", "work", "data", "results",
+                        model_name, paste0("TPM_Matrix_", study_number, ".csv"))
         write_tpm <- cbind(ent, tpm)
         write.csv(write_tpm, tpm_fname, row.names=FALSE)
 
@@ -280,13 +285,14 @@ TPM_quant_filter <- function(SampMetrics, filt_options, model_name) {
         flist_top <- genefilter::filterfun(f1_top)
         keep_top <- genefilter::genefilter(test_bools, flist_top)
 
-        SampMetrics[[i]][["Entrez_top"]] <- ent[keep_top]
+        SampMetrics[[i]][["Entrez_hc"]] <- ent[keep_top]
     }
 
     SampMetrics <- calculate_z_score(SampMetrics, "TPM")
 
     return(SampMetrics)
 }
+
 
 
 zfpkm_filter <- function(SampMetrics, filt_options, model_name) {
@@ -308,16 +314,21 @@ zfpkm_filter <- function(SampMetrics, filt_options, model_name) {
         missing_vals <- is.na(fdf) # get NA values from fdf
         fdf[missing_vals] <- 0 # set NA values to zero to prevent error in zfpkm calculation
         zmat <- zFPKM(fdf, assayName="FPKM") # calculate zFPKM
+        #SampMetrics[[i]][["zFPKM_Matrix"]] <- zmat
         zmat[missing_vals] <- NA # set NA values back to NA
-        zfpkm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/zFPKM_Matrix_", study_number, ".csv"),collapse="")
+        zfpkm_fname <- file.path("/home", "jupyteruser", "work", "data", "results",
+                                 model_name, paste0("zFPKM_Matrix_", study_number, ".csv"))
         write_zfpkm <- cbind(ent, zmat)
         write.csv(write_zfpkm, zfpkm_fname, row.names=FALSE)
-        zfpkm_plot_dir <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/figures/"),collapse="")
+
+        zfpkm_plot_dir <- file.path("/home", "jupyteruser", "work", "data", "results",
+                                    model_name, "figures")
+
         if ( !file.exists(zfpkm_plot_dir) ) {
             dir.create(zfpkm_plot_dir)
         }
         study_number <- str_extract_all(SampMetrics[[i]][["SampleNames"]][1][1], "S\\d+")
-        zfpkm_plotname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/figures/zFPKM_plot_", study_number, ".pdf"),collapse="")
+        zfpkm_plotname <- file.path(zfpkm_plot_dir, paste0("zFPKM_plot_", study_number, ".pdf"))
         pdf(zfpkm_plotname)
         zFPKMPlot(fdf, assayName="FPKM")
         dev.off()
@@ -331,21 +342,22 @@ zfpkm_filter <- function(SampMetrics, filt_options, model_name) {
         f1 <- genefilter::kOverA(min.samples, cutoff)
         flist <- genefilter::filterfun(f1)
         keep <- genefilter::genefilter(zmat, flist)
-        SampMetrics[[i]][["zFPKM_Matrix"]] <- zmat[keep,]
+        SampMetrics[[i]][["Entrez"]] <- ent[keep]
 
         # top percentile genes
         f1_top <- genefilter::kOverA(top.samples, cutoff)
         flist_top <- genefilter::filterfun(f1_top)
         keep_top <- genefilter::genefilter(zmat, flist_top)
 
-        SampMetrics[[i]][["Entrez_top"]] <- ent[keep_top]
+        SampMetrics[[i]][["Entrez_hc"]] <- ent[keep_top]
+
     }
 
     return(SampMetrics)
 }
 
 
-filter_counts <- function(SampMetrics, technique, filt_options, mart, model_name) {
+filter_counts <- function(SampMetrics, technique, filt_options, model_name) {
 
     switch(technique,
          cpm = cpm_filter(SampMetrics, filt_options, model_name),
@@ -395,13 +407,13 @@ save_rnaseq_tests <- function(counts_matrix_file, config_file, out_file, info_fi
       SampMetrics <- read_counts_matrix(counts_matrix_file, config_file, info_file, model_name) # read count matrix
       entrez_all <- SampMetrics[[1]][["Entrez"]] #get entrez ids
       print("Filtering Counts")
-      SampMetrics <- filter_counts(SampMetrics, technique, filt_options, mart, model_name) # normalize and filter count
+      SampMetrics <- filter_counts(SampMetrics, technique, filt_options, model_name) # normalize and filter count
       expressedGenes <- c()
       topGenes <- c()
 
       for ( i in 1:length(SampMetrics) ) { # get high confidence and expressed genes for each study/batch number
           expressedGenes <- c(expressedGenes, SampMetrics[[i]][["Entrez"]])
-          topGenes <- c(topGenes, SampMetrics[[i]][["Entrez_top"]])
+          topGenes <- c(topGenes, SampMetrics[[i]][["Entrez_hc"]])
       }
 
       expMat <- as.data.frame(table(expressedGenes)) # convert expression to df
