@@ -17,5 +17,6 @@ python3 -m pip --no-cache-dir install \
 	openpyxl \
 	git+git://github.com/babessell1/cobamp.git@master#egg=cobamp \
 	unidecode \
-	troppo
+	troppo \
+	escher
 rm -rf /root/.cache
