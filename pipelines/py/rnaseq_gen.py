@@ -25,7 +25,7 @@ zfpkm = importr("zFPKM")
 stringr = importr("stringr")
 
 # read and translate R functions
-f = open("/home/jupyteruser/work/py/rscripts/rnaseq.R", "r")
+f = open(os.path.join(configs.rootdir, "py", "rscripts", "rnaseq.R"), "r")
 string = f.read()
 f.close()
 rnaseq_io = SignatureTranslatedAnonymousPackage(string, "rnaseq_io")

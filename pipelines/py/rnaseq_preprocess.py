@@ -8,12 +8,13 @@ import os, time, sys
 import argparse
 from rpy2.robjects.packages import importr, SignatureTranslatedAnonymousPackage
 import glob
+import numpy as np
 
 # import R libraries
 tidyverse = importr("tidyverse")
 
 # read and translate R functions
-f = open(os.path.join("rscripts", "generate_counts_matrix.R"), "r")
+f = open(os.path.join(configs.rootdir, "py", "rscripts", "generate_counts_matrix.R"), "r")
 string = f.read()
 f.close()
 generate_counts_matrix_io = SignatureTranslatedAnonymousPackage(string, 'generate_counts_matrix_io')
@@ -29,7 +30,6 @@ def fetch_gene_info(input_values, input_db="Ensembl Gene ID",
     ond returns dataframe with specified columns as 'output_db' (default is HUGO symbol, Entrez ID, and chromosome
     chromosomal start and end positions).
     """
-
     s = BioDBNet()
     df_maps = pd.DataFrame([], columns=output_db)
     df_maps.index.name = input_db
@@ -79,7 +79,6 @@ def create_config_df(context_name):
     for gcfilename in gene_counts_files:
         try:
             label = re.findall(r"S[1-9][0-9]?[0-9]?R[1-9][0-9]?[0-9]?r?[1-9]?[0-9]?[0-9]?", gcfilename)[0]
-            print("label: ", label)
 
         except IndexError:
             print(f"\nfilename of {gcfilename} is not valid. Should be 'contextName_SXRYrZ.tab', where X is the "
@@ -96,7 +95,7 @@ def create_config_df(context_name):
             if run[0] != "r1":
                 continue
             else:
-                label_glob = study_number + "R" + str(rep_number) + "r*"
+                label_glob = study_number + rep_number + "r*"
                 runs = [run for run in gene_counts_files if re.search(label_glob, run)]
                 multi_flag = 1
                 frag_files = []
@@ -190,11 +189,12 @@ def create_config_df(context_name):
                     mean_fragment_sizes = np.array([])
                     library_sizes = np.array([])
                     for ff in frag_files:
-                        frag_df = pd.read_table(ff, low_memory=False)
+                        print(ff)
+                        frag_df = pd.read_table(ff, low_memory=False, sep="\t", on_bad_lines="skip")
                         frag_df['meanxcount'] = frag_df['frag_mean']*frag_df['frag_count']
                         mean_fragment_size = sum(frag_df['meanxcount']/sum(frag_df['frag_count']))
-                        mean_fragment_sizes.append(mean_fragment_size)
-                        library_sizes.append(sum(frag_df['frag_count']))
+                        mean_fragment_sizes = np.append(mean_fragment_sizes, mean_fragment_size)
+                        library_sizes = np.append(library_sizes, sum(frag_df['frag_count']))
 
                     mean_fragment_size = sum(mean_fragment_sizes * library_sizes) / sum(library_sizes)
 
@@ -274,9 +274,9 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
     """
     trnaseq_config_filename = os.path.join(configs.rootdir, "data", "config_sheets", "trnaseq_data_inputs_auto.xlsx")
     mrnaseq_config_filename = os.path.join(configs.rootdir, "data", "config_sheets", "mrnaseq_data_inputs_auto.xlsx")
-    if mode == "make":
-        twriter = pd.ExcelWriter(trnaseq_config_filename)
-        mwriter = pd.ExcelWriter(mrnaseq_config_filename)
+
+    tflag = False  # turn on when any total set is found to prevent writer from being init multiple times or empty
+    mflag = False  # turn on when any mrna set is found to prevent writer from being init multiple times or empty
 
     tmatrix_files = []
     mmatrix_files = []
@@ -297,26 +297,40 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
 
         if mode == "make":
             create_counts_matrix(context_name)
+            # TODO: warn user or remove samples that are all 0 to prevent density plot error in zFPKM
             df = create_config_df(context_name)
-
             df_t, df_m = split_config_df(df)
+
             if not df_t.empty:
+                if not tflag:
+                    tflag = True
+                    twriter = pd.ExcelWriter(trnaseq_config_filename)
+
                 tmatrix_files.append(matrix_path_total)
                 df_t.to_excel(twriter, sheet_name=context_name, header=True, index=False)
+
             if not df_m.empty:
+                if not mflag:
+                    mflag = True
+                    mwriter = pd.ExcelWriter(mrnaseq_config_filename)
+
                 mmatrix_files.append(matrix_path_mrna)
                 df_m.to_excel(mwriter, sheet_name=context_name, header=True, index=False)
 
             tmatrix, mmatrix = split_counts_matrices(matrix_path_all, df_t, df_m)
-            if len(tmatrix.columns)>1:
+            if len(tmatrix.columns) > 1:
                 tmatrix.to_csv(matrix_path_total, header=True, index=False)
-            if len(mmatrix.columns)>1:
+            if len(mmatrix.columns) > 1:
                 mmatrix.to_csv(matrix_path_mrna, header=True, index=False)
 
     if mode == "make":
-        twriter.close()
-        mwriter.close()
+        if tflag:
+            twriter.close()
+        if mflag:
+            mwriter.close()
+
         create_gene_info_file(tmatrix_files + mmatrix_files, form, taxon_id)
+
     else:
         create_gene_info_file(matrix_path_prov, form, taxon_id)
 

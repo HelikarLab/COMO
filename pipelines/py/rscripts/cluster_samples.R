@@ -1,5 +1,5 @@
 # prevent messy messages from repeatedly writing to juypter
-zz <- file("/home/jupyteruser/work/py/rlogs/rnaseq.Rout", open="wt")
+zz <- file(file.path("home", "jupyteruser". "work", "rlogs", "rnaseq.Rout"), open="wt")
 sink(zz, type="message")
 
 
@@ -10,17 +10,20 @@ library(tidyverse)
 library(uwot)
 
 
-make_logical_matrix <- function(wd, technique) {
+make_logical_matrix <- function(wd, technique, context_names) {
   ### organize logical matrix
-  if (technique=="zfpkm") {
-    files <- Sys.glob(paste0(wd, "/*/zFPKM_Matrix_*.csv"))
-  } else if ( technique=="quantile" ) {
-    files <- Sys.glob(paste0(wd, "/*/TPM_Matrix_*.csv"))
-  } else if ( technique=="cpm" ) {
-    files <- Sys.glob(paste0(wd, "/*/CPM_Matrix_*.csv"))
-  } else {
-    print("Invalid technique. Must be zfpkm, quantile, or cpm")
-    stop()
+  files <- c()
+  for ( context in context_names ) {
+      if (technique=="zfpkm") {
+          files <- c(files, Sys.glob(file.path(wd, context, "zFPKM_Matrix_*.csv")))
+      } else if ( technique=="quantile" ) {
+          files <- c(files, Sys.glob(file.path(wd, context, "TPM_Matrix_*.csv")))
+      } else if ( technique=="cpm" ) {
+          files <- c(files, Sys.glob(file.path(wd, context, "CPM_Matrix_*.csv")))
+      } else {
+          print("Invalid technique. Must be zfpkm, quantile, or cpm")
+          stop()
+      }
   }
   cnt <- 0
   for ( f in files ) {
@@ -310,10 +313,11 @@ plot_contexts <- function(log_mat_context, wd, clust_algo, contexts, label,
 
 cluster_samples_main <- function(wd, context_names, technique, clust_algo, label, min_dist=0.01,
                                 n_neigh_rep="default", n_neigh_batch="default", n_neigh_cont="default",
-                                rep_ratio=0.5, batch_ratio=0.5, quantile=25, min_count="default") {
+                                rep_ratio=0.5, batch_ratio=0.5, quantile=25, min_count="default", seed=12345) {
+    set.seed(seed)
 
     print("Making logical matrix")
-    logical_matrix <- make_logical_matrix(wd, technique)
+    logical_matrix <- make_logical_matrix(wd, technique, context_names)
 
     res <- parse_contexts(logical_matrix)
     contexts <- res[[1]]

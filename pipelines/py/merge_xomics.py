@@ -14,17 +14,27 @@ from proteomics_gen import *
 from rnaseq_gen import *
 from create_context_specific_model import split_gene_expression_data
 from warnings import warn
+from rpy2.robjects.packages import importr
+from rpy2.robjects import r, pandas2ri
+from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 
 
-def merge_xomics(sheet,
-                 expression_requirement,
-                 microarray_file=None,
-                 proteomics_file=None,
-                 trnaseq_file=None,
-                 mrnaseq_file=None,
-                 scrnaseq_file=None,
-                 no_hc=False,
-                 no_na=False):
+# enable r to py conversion
+pandas2ri.activate()
+
+# import R libraries
+ggplot2 = importr("ggplot2")
+tidyverse = importr("tidyverse")
+
+# read and translate R functions
+f = open(os.path.join(configs.rootdir, "py", "rscripts", "combine_distributions.R"), "r")
+string = f.read()
+f.close()
+combine_dist_io = SignatureTranslatedAnonymousPackage(string, "combine_dist_io")
+
+
+def merge_xomics(sheet, expression_requirement, microarray_file=None, proteomics_file=None, trnaseq_file=None,
+                         mrnaseq_file=None, scrnaseq_file=None, no_hc=False, no_na=False):
     """
     Merges microarray, rnaseq, and/or proteomics active gene logicals from outputs of their respective "_gen.py"
     scripts.
@@ -39,7 +49,7 @@ def merge_xomics(sheet,
     :param sheet: sheet name to use, should be context, context, cell type, etc
     :param expression_requirement: integer, minimum number of provided sources with active gene for a it to be in model
 
-    :return: dictionary where keys are contexts, (context name, etc) and values are expression tables
+    :return: dictionary where keys are contexts, (tissue name, control type etc) and values are expression tables
     """
     print(f"Merging data for {sheet}")
     # load data for each source if it exists. IF not load an empty dummy dataset
@@ -146,11 +156,10 @@ def merge_xomics(sheet,
 
 
 def handle_context_batch(microarray_file, trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file,
-                         expression_requirement, adjust_method, no_hc, no_na, custom_df):
+                         expression_requirement, adjust_method, no_hc, no_na, custom_df, merge_distro=False):
     """
     Handle merging of different data sources for each context type
     """
-
     sheet_names = []
     for file in [microarray_file, trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file]:
         if file is not None:
@@ -166,6 +175,9 @@ def handle_context_batch(microarray_file, trnaseq_file, mrnaseq_file, scrnaseq_f
 
     max_inputs = max(counts.values())
     min_inputs = min(counts.values())
+
+    if merge_distro:
+        combine_dist_io.combine_zscores_main(os.path.join(configs.datadir, "results"), sheet_names)
 
     files_json = os.path.join(configs.rootdir, "data", "results", "step1_results_files.json")
     for context_name in sheet_names:
@@ -226,6 +238,17 @@ def main(argv):
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
                "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
     )
+
+    parser.add_argument("-d", "--merge-distribution",
+                        action="store_true",
+                        required=False,
+                        default=False,
+                        dest="merge_distro",
+                        help="Flag to merge zFPKM distributions. Required if using iMAT reconstruction algorithm in "
+                             "create_context_specific_model.py. Must have run rnaseq_gen.py with 'zFPKM' as "
+                             "'--technique'. If --proteomics-config-file is given will merge proteomics distributions "
+                             "with zFPKM distributions using a weighted scheme."
+                        )
 
     parser.add_argument("-a", "--microarray-config-file",
                         type=str,
@@ -323,6 +346,7 @@ def main(argv):
     custom_file = args.custom_file
     no_hc = args.no_hc
     no_na = args.no_na
+    merge_distro = args.merge_distro
 
     # read custom expression requirment file if used
     if custom_file != "SKIP":
@@ -353,7 +377,7 @@ def main(argv):
         sys.exit()
 
     handle_context_batch(microarray_file, trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file,
-                         expression_requirement, adjust_method, no_hc, no_na, custom_df)
+                         expression_requirement, adjust_method, no_hc, no_na, custom_df, merge_distro)
 
     return
 

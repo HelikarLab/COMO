@@ -21,7 +21,7 @@ tidyverse = importr("tidyverse")
 uwot = importr("uwot")
 
 # read and translate R functions
-f = open("/home/jupyteruser/work/py/rscripts/cluster_samples.R", "r")
+f = open(os.path.join(configs.rootdir, "py", "rscripts", "cluster_samples.R"), "r")
 string = f.read()
 f.close()
 cluster_io = SignatureTranslatedAnonymousPackage(string, "cluster_io")
@@ -135,6 +135,12 @@ def main(argv):
                         dest="quantile",
                         help="""Ratio of genes active in a batch/study to be active in the context"""
                         )
+    parser.add_argument("-s", "--seed",
+                        type=int,
+                        required=False,
+                        default=12345,
+                        dest="seed",
+                        help="""Random seed for clustering algorithm initialization""")
 
     args = parser.parse_args(argv)
 
@@ -151,6 +157,7 @@ def main(argv):
     n_neigh_rep = args.n_neigh_rep
     n_neigh_batch = args.n_neigh_batch
     n_neigh_cont = args.n_neigh_cont
+    seed = args.seed
 
     if type(min_count) == str and not min_count.lower() == "default":
         try:
@@ -243,7 +250,7 @@ def main(argv):
     cluster_io.cluster_samples_main(wd, context_names, technique, clust_algo, label, min_dist=min_dist,
                                     n_neigh_rep=n_neigh_rep, n_neigh_batch=n_neigh_batch, n_neigh_cont=n_neigh_cont,
                                     rep_ratio=rep_ratio, batch_ratio=batch_ratio,
-                                    quantile=quantile, min_count=min_count)
+                                    quantile=quantile, min_count=min_count, seed=seed)
     return
 
 
