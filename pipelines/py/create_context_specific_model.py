@@ -393,7 +393,7 @@ def create_context_specific_model(general_model_file, gene_expression_file, reco
     elif recon_algorithm == "FASTCORE":
         context_model_cobra = seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver)
     elif recon_algorithm == "IMAT":
-        context_model_cobra = seed_imat(cobra_model, s_matrix, lb, ub, exp_idx_list, exp_thresh, idx_force)
+        context_model_cobra = seed_imat(cobra_model, s_matrix, lb, ub, exp_idx_list, exp_thresh, idx_force.append(idx_obj))
     elif recon_algorithm == "TINIT":
         context_model_cobra = seed_tinit(cobra_model, s_matrix, lb, ub, expr_vector, solver, idx_force)
     else:
@@ -674,7 +674,6 @@ def main(argv):
     if "xml" in output_filetypes:
         outputfile = outfile_basename + ".xml"
         print(f"Output file is '{outputfile}'")
-        print("**Note cobrapy only supports level 2 SBML model, while this model is level 3")
         cobra.io.write_sbml_model(context_model, os.path.join(configs.datadir, "results", context_name, outputfile))
     if "json" in output_filetypes:
         outputfile = outfile_basename + ".json"
