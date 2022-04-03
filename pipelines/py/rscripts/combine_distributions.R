@@ -145,7 +145,7 @@ combine_context_zdistro <- function(wd, context, n_reps, zmat) {
 
     } else {
         combine_z <- zmat
-        colnames(combine_z)[1] <- "ENTREZ_GENE_ID"
+        colnames(combine_z) <- c("ENTREZ_GENE_ID", "combine_z")
     }
 
     return(combine_z)
