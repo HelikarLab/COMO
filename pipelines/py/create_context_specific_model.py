@@ -205,11 +205,12 @@ def seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
     return context_cobra_model
 
 
-def seed_imat(cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force):
+def seed_imat(cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force, context_name):
     expr_vector = np.array(expr_vector)
     properties = IMATProperties(exp_vector=expr_vector,
                                 exp_thresholds=expr_thesh,
-                                core=idx_force)
+                                core=idx_force,
+                                epsilon=0.01)
     algorithm = IMAT(s_matrix, lb, ub, properties)
     context_rxns = algorithm.run()
     fluxes = algorithm.sol.to_series()
@@ -218,13 +219,16 @@ def seed_imat(cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force)
     pd.DataFrame({"rxns": r_ids}).to_csv(os.path.join(configs.datadir, "rxns_test.csv"))
     remove_rxns = [r_ids[int(i)] for i in range(s_matrix.shape[1]) if not np.isin(i, context_rxns)]
     fluxes.to_csv(os.path.join(configs.datadir, "flux_test.csv"))
+    flux_df = pd.DataFrame(columns=["rxn", "flux"])
     for idx, (_, val) in enumerate(fluxes.iteritems()):
         if idx <= len(cobra_model.reactions)-1:
+
             r_id = str(context_cobra_model.reactions.get_by_id(r_ids[idx])).split(":")[0]
             getattr(context_cobra_model.reactions, r_id).fluxes = val
+            flux_df.loc[len(flux_df.index)] = [idx, val]
 
     context_cobra_model.remove_reactions(remove_rxns, True)
-
+    flux_df.to_csv(os.path.join(configs.datadir, "results", context_name, "iMAT_flux.csv"))
     return context_cobra_model
 
 
@@ -244,7 +248,7 @@ def seed_unsupported(recon_algorithm):
     sys.exit()
 
 
-def split_gene_expression_data(expression_data,recon_algorithm):
+def split_gene_expression_data(expression_data, recon_algorithm="GIMME"):
     """
     Splits genes that have mapped to multiple Entrez IDs are formated as "gene12//gene2//gene3"
     """
@@ -277,13 +281,14 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm):
     which are defined in general genome-scale metabolic model
     """
     expression_data = pd.read_csv(gene_expression_file)
-    gene_expressions = split_gene_expression_data(expression_data, recon_algorithm)
+    gene_expressions = split_gene_expression_data(expression_data, recon_algorithm=recon_algorithm)
     expression_rxns = collections.OrderedDict()
     # expr_vector = []
     cnt = 0
     if recon_algorithm in ["IMAT", "TINIT"]:
         print(gene_expressions["Data"].tolist()[0:20])
-        unknown_val = min(gene_expressions["Data"].tolist())
+        #unknown_val = min(gene_expressions["Data"].tolist())
+        unknown_val = -2.9
     else:
         unknown_val = -1
 
@@ -315,7 +320,7 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm):
 
 
 def create_context_specific_model(general_model_file, gene_expression_file, recon_algorithm, objective,
-                                 exclude_rxns, force_rxns, bound_rxns, bound_lb, bound_ub, solver):
+                                 exclude_rxns, force_rxns, bound_rxns, bound_lb, bound_ub, solver, context_name):
     """
     Seed a context specific model. Core reactions are determined from GPR associations with gene expression logicals.
     Core reactions that do not necessarily meet GPR association requirements can be forced if in the force reaction
@@ -393,7 +398,8 @@ def create_context_specific_model(general_model_file, gene_expression_file, reco
     elif recon_algorithm == "FASTCORE":
         context_model_cobra = seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver)
     elif recon_algorithm == "IMAT":
-        context_model_cobra = seed_imat(cobra_model, s_matrix, lb, ub, exp_idx_list, exp_thresh, idx_force.append(idx_obj))
+        context_model_cobra = seed_imat(cobra_model, s_matrix, lb, ub, exp_idx_list, exp_thresh,
+                                        idx_force.append(idx_obj), context_name)
     elif recon_algorithm == "TINIT":
         context_model_cobra = seed_tinit(cobra_model, s_matrix, lb, ub, expr_vector, solver, idx_force)
     else:
@@ -657,7 +663,8 @@ def main(argv):
 
     context_model, core_list, infeas_df = create_context_specific_model(reference_model, genefile, recon_alg,
                                                                         objective, exclude_rxns, force_rxns,
-                                                                        bound_rxns, bound_lb, bound_ub, solver)
+                                                                        bound_rxns, bound_lb, bound_ub, solver,
+                                                                        context_name)
 
     infeas_df.to_csv(os.path.join(configs.rootdir, "data", "results", context_name,
                                   context_name + "_infeasible_rxns.csv"),
