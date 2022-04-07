@@ -12,3 +12,4 @@ xlrd
 cobamp
 unidecode
 troppo
+rpy2
