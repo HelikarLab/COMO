@@ -28,10 +28,7 @@ WORKDIR /opt
 USER root
 
 #### Copy Install Scripts ####
-COPY install_py_libs.sh /opt/
-COPY install_jupyter.sh /opt/
-COPY setup_jupyter.sh /opt/
-COPY ${APT_INSTALLATION_FILE} /opt
+COPY build_scripts/* /opt/
 
 # Download TINI
 # From: https://github.com/krallin/tini#using-tini
@@ -69,7 +66,7 @@ RUN ( R -e "devtools::install_github('babessell1/zFPKM', dependencies=TRUE)" & )
 # Install required packages
 # First insall wget & curl
 RUN apt update -qq \
-    && apt install -y wget curl gpg-agent software-properties-common \
+    && apt install -y wget curl gpg-agent software-properties-common libssl-dev libxml2-dev\
     #Add yarn repository
     && wget -O - https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
     # Add node apt repository
