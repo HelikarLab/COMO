@@ -1,0 +1,6 @@
+# A list of items to ignore when building the docker image
+/Dockerfile_test
+/doc
+/docker_bind
+/testing
+/docker_old
