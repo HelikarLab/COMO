@@ -249,7 +249,7 @@ def seed_imat(
     ]
     fluxes.to_csv(os.path.join(configs.datadir, "flux_test.csv"))
     flux_df = pd.DataFrame(columns=["rxn", "flux"])
-    for idx, (_, val) in enumerate(fluxes.iteritems()):
+    for idx, (_, val) in enumerate(fluxes.items()):
         if idx <= len(cobra_model.reactions) - 1:
 
             r_id = str(context_cobra_model.reactions.get_by_id(r_ids[idx])).split(":")[
