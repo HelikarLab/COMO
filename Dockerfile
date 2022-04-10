@@ -2,7 +2,7 @@
 # From: https://medium.com/nexton/how-to-optimize-docker-images-using-dive-dc590f45dbf5
 # https://stackoverflow.com/questions/58597728
 
-FROM rocker/r-ubuntu:20.04
+FROM rocker/r-ubuntu:20.04 as stage1
 
 #### Set Container Args ####
 ARG APT_INSTALLATION_FILE=apt_installation_requirements.txt
@@ -156,3 +156,7 @@ WORKDIR ${HOME}
 EXPOSE 8888
 ENTRYPOINT ["/usr/local/bin/tini", "--"]
 CMD ["start-notebook.sh"]
+
+
+FROM rocker/r-ubuntu:20.04 as stage2
+COPY
