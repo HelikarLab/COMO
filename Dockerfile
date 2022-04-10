@@ -1,5 +1,6 @@
 # TODO: Use multistage builds to reduce image size
 # From: https://medium.com/nexton/how-to-optimize-docker-images-using-dive-dc590f45dbf5
+# https://stackoverflow.com/questions/58597728
 
 FROM rocker/r-ubuntu:20.04
 
