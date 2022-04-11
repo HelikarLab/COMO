@@ -8,26 +8,6 @@ from rpy2.robjects.conversion import localconverter
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 from bioservices import BioDBNet
 
-# enable R to py conversions
-pandas2ri.activate()
-
-# import R libraries
-affy = importr("affy")
-limma = importr("limma")
-
-# read and translate R functions for handling affy
-f = open("/home/jupyteruser/work/py/rscripts/fitAffy.R", "r")
-string = f.read()
-f.close()
-affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
-
-# read and translate R functions for handling agilent
-f = open("/home/jupyteruser/work/py/rscripts/fitAgilent.R", "r")
-agilentstring = f.read()
-f.close()
-agilentio = SignatureTranslatedAnonymousPackage(agilentstring, "agilentio")
-
-
 # setup agilent df
 def agilent_raw(datadir, gsms):
     files = os.listdir(datadir)
@@ -119,3 +99,23 @@ def fetch_entrez_gene_id(
             continue
         i += 500
     return df_maps
+
+if __name__ == '__main__':
+    # enable R to py conversions
+    pandas2ri.activate()
+
+    # import R libraries
+    affy = importr("affy")
+    limma = importr("limma")
+
+    # read and translate R functions for handling affy
+    f = open("/home/jupyteruser/work/py/rscripts/fitAffy.R", "r")
+    string = f.read()
+    f.close()
+    affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
+
+    # read and translate R functions for handling agilent
+    f = open("/home/jupyteruser/work/py/rscripts/fitAgilent.R", "r")
+    agilentstring = f.read()
+    f.close()
+    agilentio = SignatureTranslatedAnonymousPackage(agilentstring, "agilentio")
