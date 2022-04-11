@@ -1,0 +1,27 @@
+git+https://github.com/babessell1/cobamp.git@master#egg=cobamp
+git+https://github.com/cokelaer/bioservices.git@master#egg=bioservices
+argparse
+bioservices
+bokeh
+cobra
+escher
+framed
+GEOparse
+ipywidgets
+jupyter
+jupyterhub
+jupyterlab
+lxml
+# If version 2.0.1 is not locked, jupyter installation fails
+markupsafe==2.0.1
+memote
+notebook
+numpy
+openpyxl
+pandas
+rpy2
+scipy
+SQLAlchemy
+troppo
+unidecode
+xlrd
