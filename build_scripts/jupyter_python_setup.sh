@@ -6,6 +6,7 @@ mkdir /home/"${NB_USER}"/.jupyter
 mkdir /home/"${NB_USER}"/.local
 echo "cacert=/etc/ssl/certs/ca-certificates.crt" > /home/"${NB_USER}"/.curlrc
 echo "c.NotebookApp.ip = '0.0.0.0'" >> /home/"${NB_USER}"/.jupyter/jupyter_notebook_config.py
+echo "c.NotebookApp.notebook_dir = '/home/${NB_USER}/work'" >> "/home/${NB_USER}/.jupyter/jupyter_notebook_config.py"
 # --- End virtual environment setup ---
 
 # --- Install Jupyter/Python libraries into virtual environment ---
@@ -20,23 +21,25 @@ jupyter labextension install @jupyter-widgets/jupyterlab-manager escher
 # Install python libraries
 # Use maximum cores available, from: https://stackoverflow.com/a/32598533
 python3 -m pip --no-cache-dir --install-option="--jobs=$(nproc)" install \
+  "git+https://github.com/babessell1/cobamp.git@master#egg=cobamp" \
 	"git+https://github.com/cokelaer/bioservices.git@master#egg=bioservices" \
-	argparse \
-	cobra \
-	GEOparse \
-	lxml \
-	memote \
-	numpy \
-	pandas \
-	scipy \
-	SQLAlchemy \
-	framed \
-	xlrd \
-	openpyxl \
-	git+https://github.com/babessell1/cobamp.git@master#egg=cobamp \
-	unidecode \
-	troppo \
-	escher
+  argparse \
+  bioservices \
+  cobra \
+  escher \
+  framed \
+  GEOparse \
+  lxml \
+  memote \
+  numpy \
+  openpyxl \
+  pandas \
+  rpy2 \
+  scipy \
+  SQLAlchemy \
+  troppo \
+  unidecode \
+  xlrd
 
 # Delete cache, it is not required
 rm -rf /root/.cache/pip
