@@ -526,6 +526,16 @@ def create_context_specific_model(
     return context_model_cobra, exp_idx_list, infeasible_df
 
 
+def print_filetype_help():
+    print("Unsupported model format. Supports 'xml', 'mat', and 'json''.")
+    print("Or use multiple with: \"['.extension1', 'extention2', ... etc]\"")
+    print("For example, if you want to output in all 3 accepted formats:")
+    print("\"['mat', 'xml', 'json']\"")
+    print(
+        "Note the outer quotes required to be interpreted by cmd. This a string, not a python list"
+    )
+
+
 def main(argv):
     """
     Seed a context-specific model from a list of expressed genes, a reference
@@ -783,15 +793,6 @@ def main(argv):
     else:
         force_rxns = []
 
-    def print_filetype_help():
-        print("Unsupported model format. Supports 'xml', 'mat', and 'json''.")
-        print("Or use multiple with: \"['.extension1', 'extention2', ... etc]\"")
-        print("For example, if you want to output in all 3 accepted formats:")
-        print("\"['mat', 'xml', 'json']\"")
-        print(
-            "Note the outer quotes required to be interpreted by cmd. This a string, not a python list"
-        )
-
     if output_filetypes not in ["xml", "mat", "json"]:
         try:
             output_filetypes = (
@@ -810,7 +811,9 @@ def main(argv):
         output_filetypes = [output_filetypes]
 
     if recon_alg not in ["FASTCORE", "GIMME", "IMAT"]:
-        print(f"Algorithm {recon_alg} not supported. Please use 'GIMME' or 'FASTCORE'")
+        print(
+            f"Algorithm {recon_alg} not supported. Please use one of: GIMME, FASTCORE, or IMAT"
+        )
         sys.exit(2)
 
     if solver not in ["GUROBI", "GLPK"]:
