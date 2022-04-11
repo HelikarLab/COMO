@@ -24,11 +24,11 @@ This is the home page for MADRID pipeline.
 ## Flow Charts
 ![1](./doc/flowchart1.png)
 
-![2](./doc/IMG_2.jpg)
+![2](./doc/step_2.jpg)
 
-![3](./doc/IMG_3.jpg)
+![3](./doc/step_3.jpg)
 
-![4](./doc/IMG_4.jpg)
+![4](./doc/step_4.jpg)
 
 
 
