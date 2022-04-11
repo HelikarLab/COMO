@@ -3,14 +3,11 @@
 import argparse
 import os
 import sys
-import getopt
 import time
 import unidecode
 import pandas as pd
 import numpy as np
-
-# from bioservices import BioDBNet
-from microarray_gen import *
+import instruments
 from project import configs
 
 
@@ -61,7 +58,7 @@ def load_gene_symbol_map(gene_symbols, filename="proteomics_entrez_map.csv"):
     if os.path.isfile(filepath):
         sym2id = pd.read_csv(filepath, index_col="Gene Symbol")
     else:
-        sym2id = fetch_entrez_gene_id(gene_symbols, input_db="Gene Symbol")
+        sym2id = instruments.fetch_entrez_gene_id(gene_symbols, input_db="Gene Symbol")
         sym2id.loc[sym2id["Gene ID"] == "-", ["Gene ID"]] = np.nan
         sym2id.to_csv(filepath, index_label="Gene Symbol")
     return sym2id[~sym2id.index.duplicated()]
