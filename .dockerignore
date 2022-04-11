@@ -1,0 +1,8 @@
+# A list of items to ignore when building the docker image
+/.github
+/doc
+/docker_old
+/.gitattributes
+/Dockerfile_test
+/.gitignore
+/README.md

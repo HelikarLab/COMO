@@ -1,6 +1,6 @@
-python3 -m pip --no-cache-dir install pip --upgrade
-python3 -m pip --no-cache-dir install setuptools==58.0.1 --upgrade
-python3 -m pip --no-cache-dir install wheel --upgrade
+source /home/"${NB_USER}"/py3_env/bin/activate
+
+python3 -m pip --no-cache-dir install pip setuptools wheel --upgrade
 python3 -m pip --no-cache-dir install \
 	git+https://github.com/cokelaer/bioservices.git@master#egg=bioservices \
 	argparse \
