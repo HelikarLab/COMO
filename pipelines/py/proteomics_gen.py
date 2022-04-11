@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import argparse
 import os
 import sys
 import getopt
@@ -16,7 +17,7 @@ from project import configs
 # Load Proteomics
 def load_proteomics_data(datafilename, model_name):
     """
-    TODO: Add a description
+    Add description......
     """
     dataFullPath = os.path.join(
         configs.rootdir, "data", "data_matrices", model_name, datafilename
@@ -150,14 +151,14 @@ def proteomics_gen(temp):
 
 def main(argv):
     """
-    TODO: Add a description
+    Description
     """
     suppfile = "proteomics_data_inputs.xlsx"
     expr_prop = 0.5
     top_prop = 0.9
     percentile = 25
 
-    # TODO: Fix the description and help sections of these arguments
+    # TODO: Fix this description
     parser = argparse.ArgumentParser(
         prog="proteomics_gen.py",
         description="Description goes here",
@@ -172,6 +173,7 @@ def main(argv):
         dest="config_file",
         help="The path to the configuration file",
     )
+    # TODO: Fix this help section
     parser.add_argument(
         "-e",
         "--expression_proportion",
@@ -180,6 +182,7 @@ def main(argv):
         dest="expression_proportion",
         help="The path to the configuration file",
     )
+    # TODO: Fix this help section
     parser.add_argument(
         "-t",
         "--top_proportion",
@@ -188,6 +191,7 @@ def main(argv):
         dest="top_proportion",
         help="The path to the configuration file",
     )
+    # TODO: Fix this help section
     parser.add_argument(
         "-p",
         "--percentile",

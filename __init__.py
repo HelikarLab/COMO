@@ -18,6 +18,7 @@ except:
     version = __version__
 
 import colorlog
+
 logger = colorlog.getLogger("bioservices")
 
 
@@ -26,8 +27,8 @@ configuration = CustomConfig("bioservices", verbose=False)
 bspath = configuration.user_config_dir
 
 # Add bioservices.uniprot to sys.modules to prevent cycles in our imports
-#import bioservices.uniprot
-#bioservices.uniprot  # Stop flake8 error
+# import bioservices.uniprot
+# bioservices.uniprot  # Stop flake8 error
 
 from . import settings
 from .settings import *
@@ -60,8 +61,8 @@ from . import ensembl
 from .ensembl import *
 
 # moved to attic in bioservices v1.6
-#from . import geneprof
-#from .geneprof import *
+# from . import geneprof
+# from .geneprof import *
 
 from . import kegg
 from .kegg import *
@@ -118,8 +119,8 @@ from .quickgo import *
 from . import chembl
 from .chembl import *
 
-#from . import picr
-#from .picr import *
+# from . import picr
+# from .picr import *
 
 from . import psicquic
 from .psicquic import *
@@ -127,8 +128,8 @@ from .psicquic import *
 from . import ncbiblast
 from .ncbiblast import *
 
-#from . import readseq
-#from .readseq import *
+# from . import readseq
+# from .readseq import *
 
 from . import biogrid
 from .biogrid import *
@@ -159,6 +160,7 @@ from .omicsdi import OmicsDI
 
 # sub packages inside bioservices.
 
-#import mapping
+# import mapping
 from . import apps
-#import dev
+
+# import dev
