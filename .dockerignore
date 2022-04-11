@@ -6,3 +6,5 @@
 /Dockerfile_test
 /.gitignore
 /README.md
+/pipelines/py/rlogs
+/pipelines/py/.ipynb_checkpoints
