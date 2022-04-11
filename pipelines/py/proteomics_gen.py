@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 
 import argparse
-import os
 import sys
+import os
 import time
 import unidecode
 import pandas as pd
@@ -155,7 +155,7 @@ def main(argv):
     top_prop = 0.9
     percentile = 25
 
-    # TODO: Fix this description
+    # TODO: Fix the descriptions in these argument parsers
     parser = argparse.ArgumentParser(
         prog="proteomics_gen.py",
         description="Description goes here",
@@ -170,7 +170,6 @@ def main(argv):
         dest="config_file",
         help="The path to the configuration file",
     )
-    # TODO: Fix this help section
     parser.add_argument(
         "-e",
         "--expression_proportion",
@@ -179,7 +178,6 @@ def main(argv):
         dest="expression_proportion",
         help="The path to the configuration file",
     )
-    # TODO: Fix this help section
     parser.add_argument(
         "-t",
         "--top_proportion",
@@ -188,7 +186,6 @@ def main(argv):
         dest="top_proportion",
         help="The path to the configuration file",
     )
-    # TODO: Fix this help section
     parser.add_argument(
         "-p",
         "--percentile",
@@ -274,4 +271,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main(sys.argv)
