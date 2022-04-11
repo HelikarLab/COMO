@@ -141,9 +141,9 @@ RUN python3 -m venv "${VIRTUAL_ENV}" \
     && echo "c.NotebookApp.notebook_dir = '/home/${NB_USER}/work'" >> "/home/${NB_USER}/.jupyter/jupyter_notebook_config.py" \
     && echo "source ${VIRTUAL_ENV}/bin/activate" >> "/home/${NB_USER}/.bashrc"
 
-# Add virtual environment to path
+# Add virtual environment to path, then install Python/Jupyter libraries
 ENV PATH="${VIRTUAL_ENV}/bin:/home/${NB_USER}/.local/bin:$PATH"
-RUN pip install -r /opt/python_requirements.txt \
+RUN pip install --no-cache-dir -r /opt/python_requirements.txt \
     && jupyter nbextension enable --py --sys-prefix widgetsnbextension \
     && jupyter labextension install @jupyter-widgets/jupyterlab-manager escher \
     && rm -f /opt/python_requirements.txt && \
@@ -154,7 +154,8 @@ WORKDIR /opt/gurobi
 
 #### Ownership ####
 COPY pipelines/ ${HOME}/work/
-RUN chown -R "${NB_USER}" ${HOME} && \
+# Change ownership of all hidden directories, from: https://serverfault.com/a/156481
+RUN chown -R /home/"${NB_USER}"/.[^.]* && \
     chown -R "${NB_USER}" /usr/local/lib/R/site-library
 
 #### Set workspace and run Juypterlab ####
