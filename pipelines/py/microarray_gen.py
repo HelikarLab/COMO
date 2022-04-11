@@ -13,13 +13,16 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, load_only
 from sqlalchemy import create_engine
 from project import configs
-from GSEpipelineFast import *
+import GSEpipelineFast
 
 # create declarative_base instance
 Base = declarative_base()
 
 # creates a create_engine instance at the bottom of the file
 engine = create_engine("sqlite:///microarray.db")
+Base.metadata.create_all(engine)
+DBSession = sessionmaker(bind=engine)
+session = DBSession()
 
 # we'll add classes here
 class Sample(Base):
@@ -47,12 +50,6 @@ class GSEinfo(Base):
     Sample = Column(String(64), primary_key=True)
     GSE = Column(String(64))
     Platform = Column(String(64))
-
-
-Base.metadata.create_all(engine)
-
-DBSession = sessionmaker(bind=engine)
-session = DBSession()
 
 
 def lookupMicroarrayDB(gseXXX):
@@ -145,7 +142,7 @@ def queryTest(df, expression_proportion, top_proportion):
     # fetch data of each gse if it is not in the database, update database
     for gse_id in gse_ids:
         querytable = df[df["GSE ID"] == gse_id]
-        gseXXX = GSEproject(gse_id, querytable, configs.rootdir)
+        gseXXX = GSEpipelineFast.GSEproject(gse_id, querytable, configs.rootdir)
         if lookupMicroarrayDB(gseXXX):
             print("{} already in database, skip over.".format(gseXXX.gsename))
             continue

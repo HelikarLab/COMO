@@ -140,7 +140,8 @@ WORKDIR /opt/gurobi
 #### Ownership ####
 COPY pipelines/ ${HOME}/work/
 RUN chown -R "${NB_USER}" ${HOME} && \
-    chown -R "${NB_USER}" /usr/local/lib/R/site-library
+    chown -R "${NB_USER}" /usr/local/lib/R/site-library \
+    && export PATH="/home/${NB_USER}/.local/bin":$PATH
 
 #### Set workspace and run Juypterlab ####
 USER $NB_USER

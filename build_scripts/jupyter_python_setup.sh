@@ -21,23 +21,25 @@ jupyter labextension install @jupyter-widgets/jupyterlab-manager escher
 # Install python libraries
 # Use maximum cores available, from: https://stackoverflow.com/a/32598533
 python3 -m pip --no-cache-dir --install-option="--jobs=$(nproc)" install \
+  "git+https://github.com/babessell1/cobamp.git@master#egg=cobamp" \
 	"git+https://github.com/cokelaer/bioservices.git@master#egg=bioservices" \
-	argparse \
-	cobra \
-	GEOparse \
-	lxml \
-	memote \
-	numpy \
-	pandas \
-	scipy \
-	SQLAlchemy \
-	framed \
-	xlrd \
-	openpyxl \
-	git+https://github.com/babessell1/cobamp.git@master#egg=cobamp \
-	unidecode \
-	troppo \
-	escher
+  argparse \
+  bioservices \
+  cobra \
+  escher \
+  framed \
+  GEOparse \
+  lxml \
+  memote \
+  numpy \
+  openpyxl \
+  pandas \
+  rpy2 \
+  scipy \
+  SQLAlchemy \
+  troppo \
+  unidecode \
+  xlrd
 
 # Delete cache, it is not required
 rm -rf /root/.cache/pip

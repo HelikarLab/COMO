@@ -27,6 +27,7 @@ agilentstring = f.read()
 f.close()
 agilentio = SignatureTranslatedAnonymousPackage(agilentstring, "agilentio")
 
+
 # setup agilent df
 def agilent_raw(datadir, gsms):
     files = os.listdir(datadir)
@@ -90,9 +91,13 @@ def readagilent(datadir, gsms, scalefactor=1.1, quantile=0.95):
 def fetch_entrez_gene_id(
     input_values,
     input_db="Agilent ID",
-    output_db=["Gene ID", "Ensembl Gene ID"],
+    output_db: list[str] = None,
     delay=30,
 ):
+    # Set default values for list of strings
+    if output_db is None:
+        output_db: list[str] = ["Gene ID", "Ensembl Gene ID"]
+
     s = BioDBNet()
     # input_db = 'Agilent ID'
     # input_values = df_results.ProbeName.tolist()
