@@ -68,10 +68,10 @@ RUN ( R -e "devtools::install_github('babessell1/zFPKM', dependencies=TRUE)" & )
     && ( R -e "BiocManager::install('IRdisplay', dep=TRUE, ask=FALSE)" & ) \
     && wait
 
-# Install required packages
-# First insall wget & curl
+# Install available binaries
+# First, install a few required dependencies
 RUN apt update -qq \
-    && apt install -y wget curl gpg-agent software-properties-common libssl-dev libxml2-dev\
+    && apt install -y wget curl gpg-agent software-properties-common \
     #Add yarn repository
     && wget -O - https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
     # Add node apt repository
@@ -84,15 +84,15 @@ RUN apt update -qq \
     && apt update -qq \
     # We need non-interactive installation
     && DEBIAN_FRONTEND=noninteractive apt-get install -y apt-fast \
-    # Install APT items from file (to reduce visual clutter), https://askubuntu.com/a/1368083/1175774
+    # Install APT items from file (to reduce visual clutter), From: https://askubuntu.com/a/1368083
+    && apt purge -y python3.8 \
     && apt-fast install -y $(grep -o '^[^#]*' /opt/${APT_INSTALLATION_FILE}) \
     && update-ca-certificates \
     # Install node/npm packages
     && npm install -g configurable-http-proxy \
     # Install python3 pip \
     && curl --silent --show-error https://bootstrap.pypa.io/get-pip.py | python3.10 \
-    # Remove cahce items
-    && apt purge -y python3.8 apt-fast \
+    # Remove cache items
     && apt autoremove -y \
     && apt clean \
     && npm cache clean --force \
@@ -100,78 +100,6 @@ RUN apt update -qq \
     && rm -rf /var/lib/apt/lists/* \
     && rm -f /var/cache/apt/apt-fast/*.deb \
     && rm -f /opt/apt_install.txt
-
-# Install additional github-related packages & install them
-# First download gurbori and jupyter at the same time
-RUN wget --quiet https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
-    # Add jupyter scripts emerging as ad hoc interface
-    && git clone --depth=1 https://github.com/jupyter/docker-stacks.git /tmp/docker-stacks \
-    # Untar gurbori, cleanup extra files
-    && tar -xf gurobi${GRB_VERSION}_linux64.tar.gz \
-    && rm -f gurobi${GRB_VERSION}_linux64.tar.gz \
-    && mv -f gurobi* gurobi \
-    # Change 'jovyan' user to ${NB_USER}, and write the resulting file to /usr/local/bin/
-    && sed -e 's/jovyan/'"${NB_USER}"'/g' /tmp/docker-stacks/base-notebook/start.sh > /usr/local/bin/start.sh \
-    # Copy jupyter installation scripts
-    && cp /tmp/docker-stacks/base-notebook/start-notebook.sh /usr/local/bin \
-    && cp /tmp/docker-stacks/base-notebook/start-singleuser.sh /usr/local/bin \
-    && mkdir -p /etc/jupyter \
-    && cp /tmp/docker-stacks/base-notebook/jupyter_server_config.py /etc/jupyter \
-    # Remove extra files
-    && rm -rf /tmp/docker-stacks \
-    && rm -rf gurobi/linux64/docs
-
-# Make installation scripts executable, then execute
-RUN chmod +x /usr/local/bin/tini \
-    && chmod +x /usr/local/bin/start-notebook.sh \
-    && chmod +x /usr/local/bin/start.sh \
-    # Link python3.10
-    && unlink `which python3` \
-    && ln -s `which python3.10` /usr/local/bin/python3 \
-    && ln -s `which python3.10` /usr/local/bin/python
-# Install BiocManager & GitHub packages
-RUN ( R -e "devtools::install_github('babessell1/zFPKM', dependencies=TRUE)" & ) \
-    && ( R -e "devtools::install_github('husson/FactoMineR', dependencies=TRUE)" & ) \
-    && ( R -e "BiocManager::install('DESeq2', dep=TRUE, ask=FALSE)" & ) \
-    && ( R -e "BiocManager::install('agilp', dep=TRUE, ask=FALSE)" & ) \
-    && ( R -e "BiocManager::install('hgu133acdf', dep=TRUE, ask=FALSE)" & ) \
-    && ( R -e "BiocManager::install('uwot', dep=TRUE, ask=FALSE)" & ) \
-    && ( R -e "BiocManager::install('IRkernel', dep=TRUE, ask=FALSE)" & ) \
-    && ( R -e "BiocManager::install('IRdisplay', dep=TRUE, ask=FALSE)" & ) \
-    && wait
-
-# Install required packages
-# First insall wget & curl
-RUN apt update -qq \
-    && apt install -y wget curl gpg-agent software-properties-common libssl-dev libxml2-dev\
-    #Add yarn repository
-    && wget -O - https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - \
-    # Add node apt repository
-    && curl -sL https://deb.nodesource.com/setup_14.x | bash - \
-    # Add R APT repo, python repo, and apt-fast repo
-    && add-apt-repository ppa:c2d4u.team/c2d4u4.0+ \
-    && add-apt-repository ppa:deadsnakes/ppa \
-    && add-apt-repository ppa:apt-fast/stable  \
-    # Update to install required packages
-    && apt update -qq \
-    # We need non-interactive installation
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y apt-fast \
-    # Install APT items from file (to reduce visual clutter), https://askubuntu.com/a/1368083/1175774
-    && apt-fast install -y $(grep -o '^[^#]*' /opt/${APT_INSTALLATION_FILE}) \
-    && update-ca-certificates \
-    # Install node/npm packages
-    && npm install -g configurable-http-proxy \
-    # Install python3 pip \
-    && curl --silent --show-error https://bootstrap.pypa.io/get-pip.py | python3.10 \
-    # Remove cahce items
-    && apt purge -y python3.8 apt-fast \
-    && apt autoremove -y \
-    && apt clean \
-    && npm cache clean --force \
-    && rm -rf /tmp/npm* \
-    && rm -rf /var/lib/apt/lists/* \
-    && rm -f /var/cache/apt/apt-fast/*.deb \
-    && rm -f /opt/${APT_INSTALLATION_FILE}
 
 # Install additional github-related packages & install them
 # First download gurbori and jupyter at the same time
@@ -212,7 +140,8 @@ WORKDIR /opt/gurobi
 #### Ownership ####
 COPY pipelines/ ${HOME}/work/
 RUN chown -R "${NB_USER}" ${HOME} && \
-    chown -R "${NB_USER}" /usr/local/lib/R/site-library
+    chown -R "${NB_USER}" /usr/local/lib/R/site-library \
+    && export PATH="/home/${NB_USER}/.local/bin":$PATH
 
 #### Set workspace and run Juypterlab ####
 USER $NB_USER
