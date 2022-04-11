@@ -200,7 +200,6 @@ def handle_context_batch(microarray_file, trnaseq_file, mrnaseq_file, scrnaseq_f
                  f"Consider lowering the expression requirement or changing the adjustment method.")
             exp_req = num_sources
 
-
         if exp_req < 1:  # never allow expression requirement to be less than one
             warn(f"Expression requirement for {context_name} was calculated to be lower than 1. Will be force changed "
                  f"to 1 to prevent every gene being active.")
@@ -322,7 +321,7 @@ def main(argv):
                         default=False,
                         dest="no_hc",
                         help="Flag to prevent high-confidence genes forcing a gene to be used in final model "
-                            "irrespective of other other data sources"
+                             "irrespective of other other data sources"
                         )
 
     parser.add_argument('-na', "--no-na-adjustment",
@@ -331,7 +330,7 @@ def main(argv):
                         default=False,
                         dest="no_na",
                         help="Flag to prevent genes missing in a data source library, but present in others from "
-                            "subtracting 1 from the expression requirement per data source that gene is missing in"
+                             "subtracting 1 from the expression requirement per data source that gene is missing in"
                         )
 
     args = parser.parse_args(argv)
