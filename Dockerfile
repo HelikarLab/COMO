@@ -2,6 +2,7 @@
 # From: https://medium.com/nexton/how-to-optimize-docker-images-using-dive-dc590f45dbf5
 # https://stackoverflow.com/questions/58597728
 
+
 FROM rocker/r-ubuntu:20.04 as stage1
 
 #### Set Container Args ####
@@ -32,7 +33,8 @@ WORKDIR /opt
 USER root
 
 #### Copy Install Scripts ####
-COPY build_scripts/* /opt/
+COPY build_scripts/jupyter_python_setup.sh /opt/
+COPY build_scripts/apt_installation_requirements.txt /opt/
 
 # Download TINI
 # From: https://github.com/krallin/tini#using-tini
@@ -50,7 +52,7 @@ RUN groupadd --gid "${NB_GID}" "${NB_USER}" \
 
 # Install R packages from source (not available on r-cran)
 # Install in background; From: # From: https://www.balena.io/docs/learn/deploy/build-optimization/#starting-long-running-tasks-together
-# Must group '&' commands with (); From: https://stackoverflow.com/a/52323968/13885200
+# Must group '&' commands with (); From: https://stackoverflow.com/a/52323968
 # Start by installing package managers
 RUN ( R -e "install.packages('devtools', dependencies=TRUE, repo='${CRAN_MIRROR}')" & ) \
     && ( R -e "if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager')" & ) \
@@ -129,17 +131,9 @@ RUN chmod +x /usr/local/bin/tini \
     && ln -s `which python3.10` /usr/local/bin/python3 \
     && ln -s `which python3.10` /usr/local/bin/python
 
-# Execute installation scripts
-# Send processes to the background, reduce build time
-# From: https://www.balena.io/docs/learn/deploy/build-optimization/#starting-long-running-tasks-together
-RUN sh /opt/install_py_libs.sh \
-    && sh /opt/install_jupyter.sh \
-    && sh /opt/setup_jupyter.sh
-
-# Remove installation scripts, no longer required
-RUN rm -f /opt/install_py_libs.sh \
-    && rm -f /opt/install_jupyter.sh \
-    && rm -f /opt/setup_jupyter.sh \
+# Set up virtual environment & install required libraries
+RUN sh /opt/virtual_env_setup.sh \
+    && rm -f /opt/virtual_env_setup.sh \
     && rm -f /opt/${APT_INSTALLATION_FILE}
 
 # Used to allow access to the gurobi installer inside MADRID
@@ -158,5 +152,4 @@ ENTRYPOINT ["/usr/local/bin/tini", "--"]
 CMD ["start-notebook.sh"]
 
 
-FROM rocker/r-ubuntu:20.04 as stage2
-COPY
+# FROM rocker/r-ubuntu:20.04 as stage2
