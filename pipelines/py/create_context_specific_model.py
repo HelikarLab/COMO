@@ -225,10 +225,10 @@ def seed_imat(cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force,
 
             r_id = str(context_cobra_model.reactions.get_by_id(r_ids[idx])).split(":")[0]
             getattr(context_cobra_model.reactions, r_id).fluxes = val
-            flux_df.loc[len(flux_df.index)] = [idx, val]
+            flux_df.loc[len(flux_df.index)] = [r_id, val]
 
     context_cobra_model.remove_reactions(remove_rxns, True)
-    flux_df.to_csv(os.path.join(configs.datadir, "results", context_name, "iMAT_flux.csv"))
+    flux_df.to_csv(os.path.join(configs.datadir, "results", context_name, "".join([context_name, "_iMAT_flux.csv"])))
     return context_cobra_model
 
 
@@ -240,7 +240,6 @@ def seed_tinit(cobra_model, s_matrix, lb, ub, expr_vector, solver, idx_force):
     algorithm = tINIT(s_matrix, lb, ub, properties)
     algorithm.preprocessing()
     algorithm.build_problem()
-
 
 
 def seed_unsupported(recon_algorithm):
@@ -320,7 +319,7 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm):
 
 
 def create_context_specific_model(general_model_file, gene_expression_file, recon_algorithm, objective,
-                                 exclude_rxns, force_rxns, bound_rxns, bound_lb, bound_ub, solver, context_name):
+                                  exclude_rxns, force_rxns, bound_rxns, bound_lb, bound_ub, solver, context_name):
     """
     Seed a context specific model. Core reactions are determined from GPR associations with gene expression logicals.
     Core reactions that do not necessarily meet GPR association requirements can be forced if in the force reaction
@@ -339,7 +338,8 @@ def create_context_specific_model(general_model_file, gene_expression_file, reco
     cobra_model.objective = {getattr(cobra_model.reactions, objective): 1}  # set objective
 
     # set boundaries
-    cobra_model = set_boundaries(cobra_model, bound_rxns, bound_lb, bound_ub)
+    if len(bound_rxns) > 0:
+        cobra_model = set_boundaries(cobra_model, bound_rxns, bound_lb, bound_ub)
 
     # set solver
     cobra_model.solver = solver.lower()
