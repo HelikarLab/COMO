@@ -155,7 +155,7 @@ WORKDIR /opt/gurobi
 #### Ownership ####
 COPY pipelines/ ${HOME}/work/
 # Change ownership of all hidden directories, from: https://serverfault.com/a/156481
-RUN chown -R /home/"${NB_USER}"/.[^.]* && \
+RUN chown -R "${NB_USER}" /home/"${NB_USER}"/.[^.]* && \
     chown -R "${NB_USER}" /usr/local/lib/R/site-library
 
 #### Set workspace and run Juypterlab ####
