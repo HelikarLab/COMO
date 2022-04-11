@@ -1,1 +1,10 @@
 docker_old/*
+# JetBrains project files, these are user-specific
+.idea
+# Jupyter checkpoints
+/pipelines/py/.ipynb_checkpoints/
+# R logs
+/pipelines/py/rlogs/
+*.Rhistory
+# Microsoft temporary files
+~$*
