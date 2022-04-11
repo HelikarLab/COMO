@@ -6,6 +6,7 @@ mkdir /home/"${NB_USER}"/.jupyter
 mkdir /home/"${NB_USER}"/.local
 echo "cacert=/etc/ssl/certs/ca-certificates.crt" > /home/"${NB_USER}"/.curlrc
 echo "c.NotebookApp.ip = '0.0.0.0'" >> /home/"${NB_USER}"/.jupyter/jupyter_notebook_config.py
+echo "c.NotebookApp.notebook_dir = '/home/${NB_USER}/work'" >> "/home/${NB_USER}/.jupyter/jupyter_notebook_config.py"
 # --- End virtual environment setup ---
 
 # --- Install Jupyter/Python libraries into virtual environment ---
