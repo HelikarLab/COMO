@@ -1,5 +1,5 @@
 # prevent messy messages from repeatedly writing to juypter
-zz <- file(file.path("home", "jupyteruser". "work", "rlogs", "rnaseq.Rout"), open="wt")
+zz <- file(file.path("home", "jupyteruser", "work", "rlogs", "rnaseq.Rout"), open="wt")
 sink(zz, type="message")
 
 
