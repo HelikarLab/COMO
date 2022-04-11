@@ -24,7 +24,8 @@ ENV SHELL=/bin/bash
 # Set potentially dynamic environment variables
 ENV LD_LIBRARY_PATH $GUROBI_HOME/lib
 ENV PATH $PATH:$GUROBI_HOME/bin
-ENV HOME /home/${NB_USER}
+ENV VIRTUAL_ENV=/home/${NB_USER}/py3_env
+
 
 LABEL vendor="Gurobi"
 LABEL version=${GRB_VERSION}
@@ -130,9 +131,23 @@ RUN chmod +x /usr/local/bin/tini \
     && ln -s `which python3.10` /usr/local/bin/python3 \
     && ln -s `which python3.10` /usr/local/bin/python
 
-# Set up virtual environment & install required libraries
-RUN sh /opt/jupyter_python_setup.sh \
-    && rm -f /opt/jupyter_python_setup.sh
+# Create virtual environment, configure Jupyter settings
+RUN python3 -m venv "${VIRTUAL_ENV}" \
+    && mkdir "/home/${NB_USER}/work" \
+    && mkdir "/home/${NB_USER}/.jupyter" \
+    && mkdir "/home/${NB_USER}/.local" \
+    && echo "cacert=/etc/ssl/certs/ca-certificates.crt" > "/home/${NB_USER}/.curlrc" \
+    && echo "c.NotebookApp.ip = '0.0.0.0'" >> "/home/${NB_USER}/.jupyter/jupyter_notebook_config.py" \
+    && echo "c.NotebookApp.notebook_dir = '/home/${NB_USER}/work'" >> "/home/${NB_USER}/.jupyter/jupyter_notebook_config.py" \
+    && echo "source ${VIRTUAL_ENV}/bin/activate" >> "/home/${NB_USER}/.bashrc"
+
+# Add virtual environment to path
+ENV PATH="${VIRTUAL_ENV}/bin:/home/${NB_USER}/.local/bin:$PATH"
+RUN pip install -r /opt/python_requirements.txt \
+    && jupyter nbextension enable --py --sys-prefix widgetsnbextension \
+    && jupyter labextension install @jupyter-widgets/jupyterlab-manager escher \
+    && rm -f /opt/python_requirements.txt && \
+    rm -rf /root/.cache/pip
 
 # Used to allow access to the gurobi installer inside MADRID
 WORKDIR /opt/gurobi
@@ -140,14 +155,13 @@ WORKDIR /opt/gurobi
 #### Ownership ####
 COPY pipelines/ ${HOME}/work/
 RUN chown -R "${NB_USER}" ${HOME} && \
-    chown -R "${NB_USER}" /usr/local/lib/R/site-library \
-    && export PATH="/home/${NB_USER}/.local/bin":$PATH
+    chown -R "${NB_USER}" /usr/local/lib/R/site-library
 
 #### Set workspace and run Juypterlab ####
 USER $NB_USER
+ENV HOME /home/${NB_USER}
 WORKDIR ${HOME}
+
 EXPOSE 8888
 ENTRYPOINT ["/usr/local/bin/tini", "--"]
 CMD ["start-notebook.sh"]
-
-# FROM rocker/r-ubuntu:20.04 as stage2
