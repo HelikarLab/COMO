@@ -6,6 +6,7 @@ libxml2-dev
 nodejs
 python3.10-full
 python3.10-distutils
+python3.10-dev
 p7zip-full
 yarn
 zip
