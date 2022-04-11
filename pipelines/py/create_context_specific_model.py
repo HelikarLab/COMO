@@ -319,7 +319,8 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm):
 
 
 def create_context_specific_model(general_model_file, gene_expression_file, recon_algorithm, objective,
-                                  exclude_rxns, force_rxns, bound_rxns, bound_lb, bound_ub, solver, context_name):
+                                  exclude_rxns, force_rxns, bound_rxns, bound_lb, bound_ub, solver, context_name,
+                                  low_thresh=-3, high_thresh=0):
     """
     Seed a context specific model. Core reactions are determined from GPR associations with gene expression logicals.
     Core reactions that do not necessarily meet GPR association requirements can be forced if in the force reaction
@@ -380,17 +381,15 @@ def create_context_specific_model(general_model_file, gene_expression_file, reco
             infeas_force_rxns.append(rxn)
 
         # make changes to expressed reactions base on user defined force/exclude reactions
-        if rxn in force_rxns:
-            expr_vector[idx] = 1  # set force reactions to 1
+        if rxn in force_rxns or rxn == objective:
+            expr_vector[idx] = high_thresh+0.1 if recon_algorithm in ["TINIT", "IMAT"] else 1
         if rxn in incon_rxns or rxn in exclude_rxns:
-            expr_vector[idx] = 0  # set exclude and infeasible reactions to 0
-        if rxn == objective:
-            expr_vector[idx] = 1
+            expr_vector[idx] = low_thresh-0.1 if recon_algorithm in  ["TINIT", "IMAT"] else 0
 
     idx_obj = rx_names.index(objective)
     idx_force = [rx_names.index(rxn) for rxn in force_rxns if rxn in rx_names]
     exp_idx_list = [idx for (idx, val) in enumerate(expr_vector) if val > 0]
-    exp_thresh = (-3, 0)
+    exp_thresh = (low_thresh, high_thresh)
 
     # switch case dictionary runs the functions making it too slow, better solution then elif ladder?
     if recon_algorithm == "GIMME":
