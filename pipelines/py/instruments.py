@@ -82,8 +82,7 @@ def agilent_raw(datadir, gsms):
 
     targets = pd.DataFrame(gzs, columns=["FileName"], index=txts)
     df_agilent = RObject().agilent
-    df_agilent = RObject().agilent.readagilent(datadir, targets)  # Error because this is an R object
-    # df_agilent = agilentio.readagilent(datadir, targets)
+    df_agilent = RObject().agilent.readagilent(datadir, targets)  # Error shows because this is an R object, PyCharm doesn't know this
     df_agilent = ro.conversion.rpy2py(df_agilent)
     df_temp = pd.read_csv(os.path.join(datadir, "ydf_temp.csv"), header=0)
     df_agilent["ProbeName"] = df_temp["ProbeName"].to_list()
