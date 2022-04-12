@@ -1,10 +1,10 @@
 #!/usr/bin/python3
+
 import argparse
 import re
 import os
 import sys
 import getopt
-
 import pandas as pd
 import numpy as np
 from scipy import stats
@@ -13,16 +13,14 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, load_only
 from sqlalchemy import create_engine
 from project import configs
-import GSEpipelineFast
+from GSEpipelineFast import *
 
 # create declarative_base instance
 Base = declarative_base()
 
 # creates a create_engine instance at the bottom of the file
 engine = create_engine("sqlite:///microarray.db")
-Base.metadata.create_all(engine)
-DBSession = sessionmaker(bind=engine)
-session = DBSession()
+
 
 # we'll add classes here
 class Sample(Base):
@@ -50,6 +48,12 @@ class GSEinfo(Base):
     Sample = Column(String(64), primary_key=True)
     GSE = Column(String(64))
     Platform = Column(String(64))
+
+
+Base.metadata.create_all(engine)
+
+DBSession = sessionmaker(bind=engine)
+session = DBSession()
 
 
 def lookupMicroarrayDB(gseXXX):
@@ -142,7 +146,7 @@ def queryTest(df, expression_proportion, top_proportion):
     # fetch data of each gse if it is not in the database, update database
     for gse_id in gse_ids:
         querytable = df[df["GSE ID"] == gse_id]
-        gseXXX = GSEpipelineFast.GSEproject(gse_id, querytable, configs.rootdir)
+        gseXXX = GSEproject(gse_id, querytable, configs.rootdir)
         if lookupMicroarrayDB(gseXXX):
             print("{} already in database, skip over.".format(gseXXX.gsename))
             continue
@@ -339,77 +343,49 @@ def load_microarray_tests(filename, model_name):
 
 
 def main(argv):
-    input_file = "microarray_data_inputs.xlsx"
+    inputfile = "microarray_data_inputs.xlsx"
 
-    # TODO: Fix this description
     parser = argparse.ArgumentParser(
         prog="microarray_gen.py",
-        description="Description goes here",
+        description="This file is for processing microarray data",
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
         "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
     )
     parser.add_argument(
-        "-i",
-        "--input-file",
+        "-c",
+        "--config-file",
         type=str,
         required=True,
-        dest="input_file",
-        help="The path to the input file",
+        dest="config_file",
+        help="The microarray configuration file name",
     )
-    # TODO: Fix this help section
     parser.add_argument(
         "-e",
         "--expression-proportion",
         type=float,
         required=True,
         dest="expression_proportion",
-        help="The proportion of expression",
+        help="Number of sources with active gene for it to be considered active even if it is not a high confidence-gene",
     )
-    # TODO: Fix this help section
     parser.add_argument(
         "-t",
-        "--top_proportion",
-        type=float,
+        "--top-proportion",
+        type=str,
         required=True,
         dest="top_proportion",
-        help="",
+        help="Genes can be considered high confidence if they are expressed in a high proportion of samples. "
+             + "High confidence genes will be considered expressed regardless of agreement with other data sources",
     )
-
     args = parser.parse_args()
-    input_file = args.input_file
+    inputfile = args.config_file
     expression_proportion = args.expression_proportion
     top_proportion = args.top_proportion
 
-    print(f"Input file is {input_file}")
-    print(f"Expression Proportion for Gene Expression is {expression_proportion}")
-    print(f"Top proportion for high-confidence genes is {top_proportion}")
+    print("Input file is ", inputfile)
+    print("Expression Proportion for Gene Expression is ", expression_proportion)
+    print("Top proportion for high-confidence genes is ", top_proportion)
 
-    # TODO: Remove this after verifying argparse works
-    # try:
-    #     opts, args = getopt.getopt(
-    #         argv, "hi:e:t:", ["ifile=", "expression_proportion=", "top_proportion="]
-    #     )
-    # except getopt.GetoptError:
-    #     print(
-    #         "python3 microarray_gen.py -i <inputfile> -e <expression_proportion> -t <top_proportion>"
-    #     )
-    #     sys.exit(2)
-    # for opt, arg in opts:
-    #     if opt == "-h":
-    #         print(
-    #             "python3 microarray_gen.py -i <inputfile> -e <expression_proportion> -t top_proportion>"
-    #         )
-    #         sys.exit()
-    #     elif opt in ("-i", "--ifile"):
-    #         inputfile = arg
-    #     elif opt in ("-e", "--expression_proportion"):
-    #         expression_proportion = float(arg)
-    #     elif opt in ("-t", "--top_proportion"):
-    #         top_proportion = float(arg)
-    #     # elif opt in ("-o", "--ofile"):
-    #     #     outputfile = arg
-
-    inqueryFullPath = os.path.join(configs.rootdir, "data", "config_sheets", input_file)
+    inqueryFullPath = os.path.join(configs.rootdir, "data", "config_sheets", inputfile)
     xl = pd.ExcelFile(inqueryFullPath)
     sheet_names = xl.sheet_names
     inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_names, header=0)
@@ -429,4 +405,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    main(sys.argv[1:])

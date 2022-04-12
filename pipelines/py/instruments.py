@@ -8,6 +8,29 @@ from rpy2.robjects.conversion import localconverter
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 from bioservices import BioDBNet
 
+
+class AffyIO:
+    def __init__(self):
+        """
+        This class is created so GSEpipeline is able to grab the "affyio" rpy2 object
+        This allows us to reuse this section of the code, while allowing us to keep code relevant to this file in a "main" if-statement
+        """
+        # read and translate R functions for handling affy
+        # enable R to py conversions
+        pandas2ri.activate()
+
+        # import R libraries
+        self.affy_library = importr("affy")
+        self.limma_library = importr("limma")
+
+        self.affy_R_file = open("/home/jupyteruser/work/py/rscripts/fitAffy.R", "r")
+        self.affy_string = f.read()
+        self.affy_R_file.close()
+
+    def process_affyio(self):
+        affyio_object = SignatureTranslatedAnonymousPackage(self.affy_string, "affyio")
+
+
 # setup agilent df
 def agilent_raw(datadir, gsms):
     files = os.listdir(datadir)
@@ -100,6 +123,7 @@ def fetch_entrez_gene_id(
         i += 500
     return df_maps
 
+
 if __name__ == '__main__':
     # enable R to py conversions
     pandas2ri.activate()
@@ -108,11 +132,11 @@ if __name__ == '__main__':
     affy = importr("affy")
     limma = importr("limma")
 
-    # read and translate R functions for handling affy
-    f = open("/home/jupyteruser/work/py/rscripts/fitAffy.R", "r")
-    string = f.read()
-    f.close()
-    affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
+    # Process the affyio functions
+    # This is done using a class because the GSEpipeline also utilizes the R-affyio object
+    # This is the best method of keeping this information segregated in a "main" statement, while allowing access to other functions
+    affyio = AffyIO()
+    affyio.process_affyio()
 
     # read and translate R functions for handling agilent
     f = open("/home/jupyteruser/work/py/rscripts/fitAgilent.R", "r")
