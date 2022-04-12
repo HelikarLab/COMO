@@ -1,5 +1,6 @@
 #!/usr/bin/python3
-import os, time
+import os
+import time
 import pandas as pd
 from rpy2.robjects.packages import importr
 from rpy2.robjects import r, pandas2ri
@@ -8,6 +9,32 @@ from rpy2.robjects.conversion import localconverter
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 from bioservices import BioDBNet
 
+class RObject:
+    def __init__(self):
+        """
+        This class is used to access the R-objects located at rscripts/fitAffy.R and rscripts/fitAligent.R
+        This is done beacuse lines under the "if main. . ." were originally placed outside of this. This is not ideal
+            https://www.freecodecamp.org/news/if-name-main-python-example/
+        """
+        self._home_dir = os.path.expanduser("~")
+        pandas2ri.activate()
+
+        # Import requried R libraries
+        self._affy_library = importr("affy")
+        self._limma_library = importr("limma")
+
+        self._affy_R_file = open(f"{self._home_dir}/work/py/rscripts/fitAffy.R", "r").read()
+        self._agilent_R_file = open(f"{self._home_dir}/work/py/rscripts/fitAgilent.R", "r").read()
+
+
+    @property
+    def affyio(self):
+        return SignatureTranslatedAnonymousPackage(self._affy_R_file, "affyio")
+
+    @property
+    def agilent(self):
+        return SignatureTranslatedAnonymousPackage(self._agilent_R_file, "agilentio")
+
 
 class AffyIO:
     def __init__(self):
@@ -15,6 +42,8 @@ class AffyIO:
         This class is created so GSEpipeline is able to grab the "affyio" rpy2 object
         This allows us to reuse this section of the code, while allowing us to keep code relevant to this file in a "main" if-statement
         """
+        # Get the current user
+        home_dir = os.path.expanduser("~")
         # read and translate R functions for handling affy
         # enable R to py conversions
         pandas2ri.activate()
@@ -23,12 +52,12 @@ class AffyIO:
         self.affy_library = importr("affy")
         self.limma_library = importr("limma")
 
-        self.affy_R_file = open("/home/jupyteruser/work/py/rscripts/fitAffy.R", "r")
-        self.affy_string = f.read()
-        self.affy_R_file.close()
+        self.affy_R_file = open(f"{home_dir}/work/py/rscripts/fitAffy.R", "r").read()
 
-    def process_affyio(self):
-        affyio_object = SignatureTranslatedAnonymousPackage(self.affy_string, "affyio")
+    @property
+    def affyio(self):
+        affyio_object = SignatureTranslatedAnonymousPackage(self.affy_R_file, "affyio")
+        return affyio_object
 
 
 # setup agilent df
@@ -52,7 +81,9 @@ def agilent_raw(datadir, gsms):
     cols = dict(zip(txts, keys))
 
     targets = pd.DataFrame(gzs, columns=["FileName"], index=txts)
-    df_agilent = agilentio.readagilent(datadir, targets)
+    df_agilent = RObject().agilent
+    df_agilent = RObject().agilent.readagilent(datadir, targets)  # Error because this is an R object
+    # df_agilent = agilentio.readagilent(datadir, targets)
     df_agilent = ro.conversion.rpy2py(df_agilent)
     df_temp = pd.read_csv(os.path.join(datadir, "ydf_temp.csv"), header=0)
     df_agilent["ProbeName"] = df_temp["ProbeName"].to_list()
@@ -61,7 +92,7 @@ def agilent_raw(datadir, gsms):
 
 
 # read agilent outputs for each gsm
-def readagilent(datadir, gsms, scalefactor=1.1, quantile=0.95):
+def readagilent(datadir, gsms, scalefactor=1.1, quantile=0.95, ):
     df_raw = agilent_raw(datadir, gsms)
     df = df_raw.drop(columns=["Row", "Col"])
     df_negctl = df[df["ControlType"] == -1]
@@ -125,6 +156,7 @@ def fetch_entrez_gene_id(
 
 
 if __name__ == '__main__':
+    home_dir = os.path.expanduser("~")
     # enable R to py conversions
     pandas2ri.activate()
 
@@ -135,11 +167,8 @@ if __name__ == '__main__':
     # Process the affyio functions
     # This is done using a class because the GSEpipeline also utilizes the R-affyio object
     # This is the best method of keeping this information segregated in a "main" statement, while allowing access to other functions
-    affyio = AffyIO()
-    affyio.process_affyio()
+    affyio = AffyIO().affyio
 
     # read and translate R functions for handling agilent
-    f = open("/home/jupyteruser/work/py/rscripts/fitAgilent.R", "r")
-    agilentstring = f.read()
-    f.close()
-    agilentio = SignatureTranslatedAnonymousPackage(agilentstring, "agilentio")
+    fit_aligent_R = open(f"{home_dir}/work/py/rscripts/fitAgilent.R", "r").read()
+    agilentio = SignatureTranslatedAnonymousPackage(fit_aligent_R, "agilentio")

@@ -4,7 +4,6 @@ import argparse
 import re
 import os
 import sys
-import getopt
 import pandas as pd
 import numpy as np
 from scipy import stats
@@ -22,7 +21,7 @@ Base = declarative_base()
 engine = create_engine("sqlite:///microarray.db")
 
 
-# we'll add classes here
+# Add SQL table information
 class Sample(Base):
     __tablename__ = "sample"
 
@@ -54,6 +53,7 @@ Base.metadata.create_all(engine)
 
 DBSession = sessionmaker(bind=engine)
 session = DBSession()
+# --- Finish initializing database ---
 
 
 def lookupMicroarrayDB(gseXXX):
@@ -89,7 +89,6 @@ def updateMicroarrayDB(gseXXX):
     :param gseXXX: gse object
     :return:
     """
-    # df_clean = gseXXX.get_entrez_table_pipeline()
     df_clean = gseXXX.get_entrez_table_pipeline()
     if df_clean.empty:
         return None
@@ -108,7 +107,7 @@ def updateMicroarrayDB(gseXXX):
         col_val = "{}.cel.gz".format(key.lower())
         col_abs = "{}.cel.gz.1".format(key.lower())
         col_p = "{}.cel.gz.2".format(key.lower())
-        if not col_val in cols_clean:
+        if col_val not in cols_clean:
             continue
         df_s = pd.DataFrame([])
         df_s["ENTREZ_GENE_ID"] = df_clean["ENTREZ_GENE_ID"]
@@ -202,7 +201,7 @@ def fetchLogicalTable(gsm_ids):
     return df_results
 
 
-## Merge Output
+# Merge Output
 def mergeLogicalTable(df_results):
     """
     Merge the Rows of Logical Table belongs to the same ENTREZ_GENE_ID
@@ -260,7 +259,7 @@ def mergeLogicalTable(df_results):
     entrez_dups_list = []
     idx_list = list(range(len(entrez_id_list)))
     for idx1 in range(len(entrez_id_list)):
-        if not idx1 in idx_list:
+        if idx1 not in idx_list:
             continue
         set1 = set(entrez_id_list[idx1].split("//"))
         idx_list.remove(idx1)

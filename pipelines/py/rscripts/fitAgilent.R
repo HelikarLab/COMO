@@ -1,4 +1,13 @@
-zz <- file("/home/jupyteruser/work/py/rlogs/fitAgilent.Rout", open="wt")
+# Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
+library("stringr")
+username <- Sys.info()["user"]
+work_dir <- str_interp("/home/${username}/work")
+
+if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
+    dir.create(str_interp("${work_dir}/py/rlogs"))
+}
+
+zz <- file(file.path("/home", username, "work", "py", "rlogs", "fitAligent.Rout"), open="wt")
 sink(zz, type="message")
 
 readagilent <- function(addr,targets){

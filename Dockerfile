@@ -8,10 +8,14 @@ ENV HOME /home/jovyan
 COPY build_scripts/mamba_install.txt "${HOME}"/
 COPY build_scripts/pip_install.txt "${HOME}"/
 
+# Give ownership to jovyan user
+COPY --chown=1000:100 pipelines "${HOME}"/work
+
 # Install python-related items
 RUN pip install --requirement "${HOME}/pip_install.txt" \
     && mamba install --yes --channel bioconda --channel conda-forge --file "${HOME}/mamba_install.txt" \
     && mamba clean --all --force-pkgs-dirs --yes \
+    && jupyter trust "${HOME}/work/py/pipeline.ipynb" \
     && rm -f "${HOME}/pip_install.txt" \
     && rm -f "${HOME}/mamba_install.txt"
 
@@ -25,6 +29,3 @@ RUN wget --quiet https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VE
 # Update jupyter notebook configuration \
 RUN echo "c.ServerApp.ip = '0.0.0.0'" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
     && echo "c.ServerApp.root_dir = '${HOME}/work'" >> "${HOME}/.jupyter/jupyter_notebook_config.py"
-
-# Give ownership to jovyan user
-COPY --chown=1000:100 pipelines "${HOME}"/work
