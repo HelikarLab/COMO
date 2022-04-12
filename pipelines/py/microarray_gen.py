@@ -297,7 +297,19 @@ def mergeLogicalTable(df_results):
 
     df_output = df_results.fillna(-1).groupby(level=0).max()
     df_output.replace(-1, np.nan, inplace=True)
+
+    # TODO: Test if this is working properly
+    """
+    There seems to be an error when running Step 2.1 in the pipeline.ipynb file
+    The commented-out return statement tries to return the df_output dataframe values as integers, but NaN values exist
+        Because of this, it is unable to do so.
+    If we change this to simply output the database, the line "np.where(posratio >= top_proportion . . ." (line ~162)
+        Fails because it is comparing floats and strings
+    
+    I am unsure what to do in this situation
+    """
     return df_output.astype(int)
+    # return df_output
 
 
 def load_microarray_tests(filename, model_name):
