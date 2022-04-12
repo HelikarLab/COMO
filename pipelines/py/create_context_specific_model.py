@@ -347,8 +347,13 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm):
         print(gene_expressions["Data"].tolist()[0:20])
         # unknown_val = min(gene_expressions["Data"].tolist())
         unknown_val = -2.9
-    else:
+    elif recon_algorithm == "GIMME":
         unknown_val = -1
+    elif recon_algorithm == "FASTCORE":
+        unknown_val = 0
+    else:
+        unknown_val = 1
+
 
     for rxn in model_cobra.reactions:
         gene_reaction_rule = correct_bracket(
