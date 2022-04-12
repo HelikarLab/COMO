@@ -168,7 +168,7 @@ def main(argv):
         type=str,
         required=True,
         dest="config_file",
-        help="The path to the configuration file",
+        help="The configuration file for proteomics",
     )
     parser.add_argument(
         "-e",
@@ -176,7 +176,7 @@ def main(argv):
         type=float,
         required=True,
         dest="expression_proportion",
-        help="The path to the configuration file",
+        help="Ratio of replicates required for a gene to be considered active in that sampele",
     )
     parser.add_argument(
         "-t",
@@ -184,7 +184,8 @@ def main(argv):
         type=float,
         required=True,
         dest="top_proportion",
-        help="The path to the configuration file",
+        help="Genes can be considered high confidence if they are expressed in a high proportion of samples. "
+             + "High confidence genes will be considered expressed regardless of agreement with other data sources",
     )
     parser.add_argument(
         "-p",
@@ -192,7 +193,7 @@ def main(argv):
         type=float,
         required=True,
         dest="percentile",
-        help="The path to the configuration file",
+        help="The quantile/percentile of genes to accept. This should be a number from 1 to 100",
     )
     args = parser.parse_args()
 
