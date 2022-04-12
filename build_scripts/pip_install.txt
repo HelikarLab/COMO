@@ -1,0 +1,7 @@
+git+https://github.com/babessell1/cobamp.git@master#egg=cobamp
+git+https://github.com/cokelaer/bioservices.git@master#egg=bioservices
+memote
+framed
+troppo
+pytest==4.6.11
+escher
