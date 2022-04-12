@@ -441,7 +441,7 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
     return
 
 
-def main():
+def main(argv):
     """
     Parse arguments to rnaseq_preprocess.py, create a gene info files for each provided context at:
     /work/data/results/<context name>/gene_info_<context name>.csv.
