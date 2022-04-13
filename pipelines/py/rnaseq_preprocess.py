@@ -621,6 +621,5 @@ if __name__ == "__main__":
     generate_counts_matrix_io = SignatureTranslatedAnonymousPackage(
         string, "generate_counts_matrix_io"
     )
-    print(sys.argv)
 
-    main(sys.argv)
+    main(sys.argv[1:])

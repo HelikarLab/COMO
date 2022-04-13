@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 
 import argparse
-import os
 import sys
+import os
 import time
 import unidecode
 import pandas as pd
@@ -155,7 +155,7 @@ def main(argv):
     top_prop = 0.9
     percentile = 25
 
-    # TODO: Fix this description
+    # TODO: Fix the descriptions in these argument parsers
     parser = argparse.ArgumentParser(
         prog="proteomics_gen.py",
         description="Description goes here",
@@ -168,34 +168,32 @@ def main(argv):
         type=str,
         required=True,
         dest="config_file",
-        help="The path to the configuration file",
+        help="The configuration file for proteomics",
     )
-    # TODO: Fix this help section
     parser.add_argument(
         "-e",
         "--expression_proportion",
         type=float,
         required=True,
         dest="expression_proportion",
-        help="The path to the configuration file",
+        help="Ratio of replicates required for a gene to be considered active in that sampele",
     )
-    # TODO: Fix this help section
     parser.add_argument(
         "-t",
         "--top_proportion",
         type=float,
         required=True,
         dest="top_proportion",
-        help="The path to the configuration file",
+        help="Genes can be considered high confidence if they are expressed in a high proportion of samples. "
+             + "High confidence genes will be considered expressed regardless of agreement with other data sources",
     )
-    # TODO: Fix this help section
     parser.add_argument(
         "-p",
         "--percentile",
         type=float,
         required=True,
         dest="percentile",
-        help="The path to the configuration file",
+        help="The quantile/percentile of genes to accept. This should be a number from 1 to 100",
     )
     args = parser.parse_args()
 
@@ -274,4 +272,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main(sys.argv)
