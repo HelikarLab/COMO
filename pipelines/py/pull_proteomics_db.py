@@ -4,18 +4,15 @@ Setup for this file is located in Obsidian (local to my laptop)
 Additional file documentation:
 Enum information: https://stackoverflow.com/a/1695250
 """
+from enum import Enum
+import json
 import requests
+import sys
+import urllib.parse as urlparse
 from pprint import pprint
 
-import enum
-from enum import Enum
 
-import urllib.parse as urlparse
-import sys
-from collections import namedtuple
-
-
-class InputParameters:
+class _InputParameters:
     """
     These are the input parameters required for each of the API endpoints from ProteomeDB
     """
@@ -43,9 +40,8 @@ class InputParameters:
                 sys.exit(2)
 
         @property
-        def PROTEIN_FILTER(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("PROTEIN_FILTER", self._protein_filter)
+        def INPUT_PARAMETERS(self) -> str:
+            return f"PROTEINFILTER={self._protein_filter}"
 
     class ProteinsPerExperiment:
         """
@@ -58,9 +54,8 @@ class InputParameters:
             self._experiment_filter: int = experiment_filter
 
         @property
-        def EXPERIMENT_FILTER(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("EXPERIMENTFILTER", self._experiment_filter)
+        def INPUT_PARAMETERS(self) -> str:
+            return f"EXPERIMENTFILTER={self._experiment_filter}"
 
     class ProteinExpression:
         """
@@ -135,46 +130,18 @@ class InputParameters:
                 sys.exit(1)
 
         @property
-        def PROTEINFILTER(self) -> namedtuple:
-            features = namedtuple("namedtuple", ["parameter_name", "parameter_value"])
-            return features("PROTEINFILTER", self._protein_filter)
+        def INPUT_PARAMETERS(self):
 
-        @property
-        def MS_LEVEL(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("MS_LEVEL", self._ms_level)
-
-        @property
-        def TISSUE_CATEGORY_SELECTION(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features(
-                "TISSUE_CATEGORY_SELECTION", self._tissue_category_selection
+            return (
+                f"PROTEINFILTER={self._protein_filter},"
+                f"MS_LEVEL={self._ms_level},"
+                f"TISSUE_CATEGORY_SELECTION={self._tissue_category_selection},"
+                f"TISSUE_ID_SELECTION={self._tissue_id_selection},"
+                f"SCOPE_SELECTION={self._scope_selection},"
+                f"CALCULATION_METHOD={self._calculation_method},"
+                f"GROUP_BY_TISSUE={self._group_by_tissue},"
+                f"EXP_ID={self._experiment_id}"
             )
-
-        @property
-        def TISSUE_ID_SELECTION(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("TISSUE_ID_SELECTION", self._tissue_id_selection)
-
-        @property
-        def SCOPE_SELECTION(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("SCOPE_SELECTION", self._scope_selection)
-
-        @property
-        def CALCULATION_METHOD(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("CALCULATION_METHOD", self._calculation_method)
-
-        @property
-        def GROUP_BY_TISSUE(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("GROUP_BY_TISSUE", self._group_by_tissue)
-
-        @property
-        def EXP_ID(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("EXP_ID", self._experiment_id)
 
     class ProteinProteotypicityAvailableQuant(Enum):
         """
@@ -199,9 +166,8 @@ class InputParameters:
                 sys.exit(2)
 
         @property
-        def PROTEIN_FILTER(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("PROTEIN_FILTER", self._protein_filter)
+        def INPUT_PARAMETERS(self):
+            return f"PROTEINFILTER={self._protein_filter}"
 
     class ProteinProteotypicity(Enum):
         """
@@ -225,12 +191,7 @@ class InputParameters:
             self._protein_filter: str = protein_filter
             self._label_type: str = label_type
 
-            self._valid_label_types: list[str] = [
-                "SILAC",
-                "Dimethyl",
-                "iTRAQ4",
-                "iTRAQ8",
-            ]
+            self._valid_label_types: set[str] = {item.value for item in LabelTypes}
 
         def _validate_arguments(self):
             valid_arguments: bool = True
@@ -248,14 +209,11 @@ class InputParameters:
                 sys.exit(2)
 
         @property
-        def PROTEINFILTER(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("PROTEINFILTER", self._protein_filter)
-
-        @property
-        def LABEL_TYPES(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("LABEL_TYPES", self._label_type)
+        def INPUT_PARAMTERS(self):
+            return (
+                f"PROTEINFILTER={self._protein_filter},"
+                f"LABEL_TYPES={self._label_type}"
+            )
 
     class ProteinsPerTissue:
         """
@@ -306,25 +264,15 @@ class InputParameters:
             if not valid_arguments:
                 sys.exit(2)
 
-        def TISSUE_ID(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("TISSUE_ID", self._tissue_id)
-
-        def CALCULATION_METHOD(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("CALCULATION_METHOD", self._calculation_method)
-
-        def SWISSPROT_ONLY(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("SWISSPROT_ONLY", self._swissprot_only)
-
-        def NO_ISOFORM(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("NO_ISOFORM", self._no_isoform)
-
-        def TAXCODE(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("TAXCODE", self._taxcode)
+        @property
+        def INPUT_ARGUMENTS(self):
+            return (
+                f"TISSUE_ID={self._tissue_id},"
+                f"CALCULATION_METHOD={self._calculation_method},"
+                f"SWISSPROT_ONLY={self._swissprot_only},"
+                f"NO_ISOFORM={self._no_isoform},"
+                f"TAXCODE={self._taxcode}"
+            )
 
     class TissueList(Enum):
         """
@@ -370,19 +318,12 @@ class InputParameters:
                 sys.exit(2)
 
         @property
-        def PEPTIDE_SEQUENCE(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("PEPTIDE_SEQUENCE", self._peptide_sequence)
-
-        @property
-        def CUTOFF(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("Q_VALUE_CUTOFF", self._cutoff)
-
-        @property
-        def TAXCODE(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("TAXCODE", self._taxcode)
+        def INPUT_ARGUMENTS(self):
+            return (
+                f"PEPTIDE_SEQUENCE={self._peptide_sequence},"
+                f"Q_VALUE_CUTOFF={self._cutoff},"
+                f"TAXCODE={self._taxcode}"
+            )
 
     class PeptidesPerProtein(Enum):
         """
@@ -407,12 +348,11 @@ class InputParameters:
                 sys.exit(2)
 
         @property
-        def PROTEINFILTER(self):
-            features = namedtuple("DATA", ["parameter_name", "parameter_value"])
-            return features("PROTEINFILTER", self._protein_filter)
+        def INPUT_PARAMETERS(self):
+            return f"PROTEINFILTER={self._protein_filter}"
 
 
-class ReturnFormat(Enum):
+class DownloadFormat(Enum):
     """
     This is an Enum of the possible return values from ProteomicsDB API
     """
@@ -421,8 +361,20 @@ class ReturnFormat(Enum):
     XML = "xml"
 
 
+class LabelTypes(Enum):
+    SILAC = "SILAC"
+    DIMETHYL = "Dimethyl"
+    ITRAQ4 = "iTRAQ4"
+    ITRAQ8 = "iTRAQ8"
+
+
 class URLBuilder:
-    def __init__(self):
+    def __init__(
+        self,
+        save_format: DownloadFormat,
+        file_save_location: str,
+        force_download: bool,
+    ):
         """
         import urllib.parse
         url = 'https://example.com/somepage/?'
@@ -431,9 +383,18 @@ class URLBuilder:
 
         """
         self._base_url: str = "https://www.proteomicsdb.org/proteomicsdb/logic/api/"
+        self._download_format: str = save_format.name.lower()
+        self._file_save_location: str = file_save_location
+        self._force_download: bool = force_download
 
     def _download_file(self, url: str) -> requests.Response:
-        return requests.get(url)
+        # Only download the file content if we have a place to save it, OR we are going to force download
+        if self._file_save_location == "" and self._force_download == False:
+            print("No file save path provided, not downloading!")
+            request = requests.Response
+        else:
+            request = requests.get(url)
+        return request
 
     def _get_file_size(self, url: str) -> str:
         """
@@ -458,7 +419,6 @@ class URLBuilder:
         # If Content-Length is available to read
         if headers["Content-Length"]:
             file_size = float(headers["Content-Length"])
-            print(file_size)
             for suffix in suffix_dict.keys():
                 readable_file_size = file_size / suffix_dict[suffix]
 
@@ -474,13 +434,19 @@ class URLBuilder:
 
         return file_size
 
-    def _write_to_file(self, content: bytes, file_write_path: str) -> None:
+    def _write_to_file(self, request: requests.Response) -> None:
         """
         This function will write content from a requests.get() to a file
+
+        It will only write the data if the request was OK and a save location is available
         :param
         """
-        with open(file_write_path, "wb") as o_stream:
-            o_stream.write(content)
+        if self._file_save_location != "" and request.ok:
+            if self._validate_file_extension(
+                self._file_save_location, self._download_format
+            ):
+                with open(self._file_save_location, "wb") as o_stream:
+                    o_stream.write(request.content)
 
     def _validate_file_extension(self, file_path: str, expected_extension: str) -> bool:
         """
@@ -495,6 +461,12 @@ class URLBuilder:
         else:
             correct_extension = False
         return correct_extension
+
+    def _format_json(self, results: list[dict]):
+        """
+        This function will replace single quotes (') with double quotes (")
+        This is required for formatting objects as JSON
+        """
 
 
 class GetProteinPeptideResult(URLBuilder):
@@ -513,20 +485,25 @@ class GetProteinPeptideResult(URLBuilder):
     def __init__(
         self,
         protein_identifier: str,
-        save_format: ReturnFormat,
+        save_format: DownloadFormat,
         file_save_location: str = "",
+        force_download: bool = False,
     ):
         """
         :param protein_identifier: The unique protein identifier from proteomicsdb
         :param save_format: The format to download data in; possible options are JSON or XML
         :param file_save_location: The location to save the file. If no path is provided, the file will not be downladed
         """
-        super().__init__()
-        self._save_format = save_format.name.lower()
-        self._save_location = file_save_location
-        self._key = InputParameters.ProteinPeptideResult(
+        super().__init__(
+            save_format=save_format,
+            file_save_location=file_save_location,
+            force_download=force_download,
+        )
+
+        self._parameter = _InputParameters.ProteinPeptideResult(
             protein_identifier
-        ).PROTEIN_FILTER
+        ).INPUT_PARAMETERS
+
         self._selection: str = (
             "ENTRY_NAME,PROTEIN_NAME,UNIQUE_IDENTIFIER,TAXCODE,"
             "CHROMOSOME_NAME,GENE_NAME,STRAND,PEPTIDE_SEQUENCE,"
@@ -535,15 +512,14 @@ class GetProteinPeptideResult(URLBuilder):
             "ISUNIQUE_PROTEIN,PROJECT_NAME,PROJECT_DESCRIPTION,"
             "EXPERIMENT_NAME,EXPERIMENT_ID,EXPERIMENT_DESCRIPTION,PUBMEDID"
         )
-
         self._url: str = urlparse.urljoin(
             self._base_url,
-            f"proteinpeptideresult.xsodata/InputParams({self._key.parameter_name}='{self._key.parameter_value}')"
-            f"/Results?$select={self._selection}&$format={self._save_format}",
+            f"proteinpeptideresult.xsodata/InputParams({self._parameter})"
+            f"/Results?$select={self._selection}&$format={self._download_format}",
         )
 
         self._file_size = self._get_file_size(self._url)
-        if self._save_location == "":
+        if self._download_format == "":
             print(f"File size is {self._file_size}")
             print(f"No file save path provided, not downloading!")
         else:
@@ -554,33 +530,33 @@ class GetProteinPeptideResult(URLBuilder):
                 f"Valid response recieved ({self._request.status_code}). Writing content to file."
             )
             file_location = "/Users/joshl/Library/Application Support/JetBrains/PyCharm2022.1/scratches/proteomics_db.json"
-            if self._validate_file_extension(file_location, self._save_format):
+            if self._validate_file_extension(file_location, self._download_format):
                 print("Validated file extensions")
-                self._write_to_file(self._request.content, file_location)
+                self._write_to_file(self._request)
                 print("File written")
 
 
 class GetProteinsPerExperiment(URLBuilder):
     def __init__(
         self,
-        experiment_ids: int,
-        save_format: ReturnFormat,
+        experiment_id: int,
+        save_format: DownloadFormat,
         file_save_location: str = "",
         force_download: bool = False,
     ):
         """
         This class is responsible for collecting data from the ProteinsPerExperiment ProteomicsDB endpoint
-
-        It will accept a
-        :param force_download: Download the file even if no file_save_location is specified
         """
-        super().__init__()
-        self._save_format = save_format.name.lower()
-        self._save_location = file_save_location
-        self._force_download = force_download
-        self._key = InputParameters.ProteinsPerExperiment(
-            experiment_ids
-        ).EXPERIMENT_FILTER
+        super().__init__(
+            save_format=save_format,
+            file_save_location=file_save_location,
+            force_download=force_download,
+        )
+        self._request: requests.Response
+
+        self._parameters = _InputParameters.ProteinsPerExperiment(
+            experiment_id
+        ).INPUT_PARAMETERS
         self._selection: str = (  # The data to retrieve from the API
             "CHROMOSOME_NAME,COUNT_SPECTRA,DECOY,"
             "END_POSITION,ENTRY_NAME,EVIDENCE,"
@@ -596,33 +572,79 @@ class GetProteinsPerExperiment(URLBuilder):
             "STRAND,TAXCODE,UNIQUE_IDENTIFIER"
         )
 
-        # The URL to retrieve data from
         self._url: str = urlparse.urljoin(
             self._base_url,
-            f"proteinsperexperiment.xsodata/InputParams({self._key.parameter_name}={self._key.parameter_value})"
-            f"/Results?$select={self._selection}&$format={self._save_format}",
+            f"proteinsperexperiment.xsodata/InputParams({self._parameters})/Results?$select={self._selection}&$format={self._download_format}",
         )
-
-        print(self._url)
 
         # Get the file size. This is a fast operation, and may be useful for large downloads
         self._file_size = self._get_file_size(self._url)
-        print(f"File size is {self._file_size}")
+        print(f"ExperimentData file size is {self._file_size}")
+        self._request = self._download_file(self._url)
+        self._write_to_file(self._request)
 
-        # Only download the file content if we have a place to save it, OR we are going to force download
-        if self._save_location == "" and self._force_download == False:
-            print(f"No file save path provided, not downloading!")
-        else:
-            self._request = self._download_file(self._url)
-            print("Download complete")
+    @property
+    def request_content_as_json(self) -> list[dict]:
+        format = json.loads(self._request.text)
+        format = format["d"]["results"]
 
-        # We only want to write to a file if we have a place to write
-        # This does not matter about force_download - only write if a file location exists
-        if self._save_location != "" and self._request.ok:
+        return format
 
-            if self._validate_file_extension(self._save_location, self._save_format):
-                self._write_to_file(self._request.content, self._save_location)
-                print("File write complete")
+
+class GetProteinExpression(URLBuilder):
+    def __init__(
+        self,
+        protein_filter: str,
+        ms_level: int,
+        tissue_category_selection: str,
+        tissue_id_selection: str,
+        scope_selection: int,
+        calculation_method: int,
+        group_by_tissue: int,
+        experiment_id: int,
+        download_format: DownloadFormat,
+        file_save_location: str = "",
+        force_download: bool = False,
+    ):
+        """
+        This function is responsible for colleting protein expression through the proteinexpression ProteomicsDB API
+        """
+        super().__init__(
+            save_format=download_format,
+            file_save_location=file_save_location,
+            force_download=force_download,
+        )
+        self._request: requests.Response
+
+        self._parameters = _InputParameters.ProteinExpression(
+            protein_filter=protein_filter,
+            ms_level=ms_level,
+            tissue_category_selection=tissue_category_selection,
+            tissue_id_selection=tissue_id_selection,
+            scope_selection=scope_selection,
+            calculation_method=calculation_method,
+            group_by_tissue=group_by_tissue,
+            experiment_id=experiment_id,
+        ).INPUT_PARAMETERS
+
+        self._selection: str = (  # The data to retrieve from the API
+            "UNIQUE_IDENTIFIER,TISSUE_ID,TISSUE_NAME,"
+            "TISSUE_SAP_SYNONYM,SAMPLE_ID,SAMPLE_NAME,"
+            "AFFINITY_PURIFICATION,EXPERIMENT_ID,EXPERIMENT_NAME,"
+            "EXPERIMENT_SCOPE,EXPERIMENT_SCOPE_NAME,PROJECT_ID,"
+            "PROJECT_NAME,UNNORMALIZED_INTENSITY,NORMALIZED_INTENSITY,"
+            "MIN_NORMALIZED_INTENSITY,MAX_NORMALIZED_INTENSITY,"
+            "SAMPLES,PROJECT_STATUS"
+        )
+        # /proteomicsdb/logic/api/proteinexpression.xsodata/InputParams(
+        self._url: str = urlparse.urljoin(
+            self._base_url,
+            f"proteinexpression.xsodata/InputParams({self._parameters})/Results?$select={self._selection}&$format={self._download_format}",
+        )
+
+        # Get the file size
+        self._file_size = self._get_file_size(self._url)
+        print(f"ProteinExpression file size of {self._file_size}")
 
 
 def main():
@@ -637,7 +659,10 @@ def main():
     https://www.proteomicsdb.org/proteomicsdb/logic/api/proteinexpression.xsodata/InputParams(PROTEINFILTER=''P00533'',MS_LEVEL=0,TISSUE_ID_SELECTION='''',TISSUE_CATEGORY_SELECTION='''',SCOPE_SELECTION=1,GROUP_BY_TISSUE=0,CALCULATION_METHOD=0,EXP_ID=13207)/Results?$select=UNIQUE_IDENTIFIER,TISSUE_ID,TISSUE_NAME,TISSUE_SAP_SYNONYM,SAMPLE_ID,SAMPLE_NAME,AFFINITY_PURIFICATION,EXPERIMENT_ID,EXPERIMENT_NAME,EXPERIMENT_SCOPE,EXPERIMENT_SCOPE_NAME,PROJECT_ID,PROJECT_NAME,PROJECT_STATUS,UNNORMALIZED_INTENSITY,NORMALIZED_INTENSITY,MIN_NORMALIZED_INTENSITY,MAX_NORMALIZED_INTENSITY,SAMPLES&$format=json
     """
     proteins = GetProteinsPerExperiment(
-        13207, save_format=ReturnFormat.JSON, force_download=True
+        13207,
+        save_format=DownloadFormat.JSON,
+        force_download=True,
+        file_save_location="/Users/joshl/PycharmProjects/MADRID/pipelines/py/temp.json",
     )
 
 
