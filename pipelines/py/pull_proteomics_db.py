@@ -32,7 +32,7 @@ class _InputParameters:
 
             self._validate_arguments()
 
-        def _validate_arguments(self):
+        def _validate_arguments(self) -> None:
             valid_arguments: bool = True
             if len(self._protein_filter) > 64:
                 print("The length of the protein ID must be less than 64 characters")
@@ -96,7 +96,7 @@ class _InputParameters:
 
             self._validate_arguments()
 
-        def _validate_arguments(self):
+        def _validate_arguments(self) -> None:
             valid_arguments: bool = True
             if len(self._protein_filter) > 64:
                 print("protein_filter must not be greater than 64 characters")
@@ -133,7 +133,7 @@ class _InputParameters:
                 sys.exit(1)
 
         @property
-        def INPUT_PARAMETERS(self):
+        def INPUT_PARAMETERS(self) -> str:
 
             return (
                 f"PROTEINFILTER={self._protein_filter},"
@@ -146,7 +146,7 @@ class _InputParameters:
                 f"EXP_ID={self._experiment_id}"
             )
 
-    class ProteinProteotypicityAvailableQuant(Enum):
+    class ProteinProteotypicityAvailableQuant:
         """
         These are the required parameters for obtaining quantification types for a protein
 
@@ -157,7 +157,7 @@ class _InputParameters:
         def __init__(self, protein_filter: str):
             self._protein_filter: str = protein_filter
 
-        def _validate_arguments(self):
+        def _validate_arguments(self) -> None:
             valid_arguments = True
 
             if len(self._protein_filter) > 64:
@@ -169,10 +169,10 @@ class _InputParameters:
                 sys.exit(2)
 
         @property
-        def INPUT_PARAMETERS(self):
+        def INPUT_PARAMETERS(self) -> str:
             return f"PROTEINFILTER={self._protein_filter}"
 
-    class ProteinProteotypicity(Enum):
+    class ProteinProteotypicity:
         """
         These are the required parameters for obtaining experimental proteotypicity for peptides of a specific protein
 
@@ -196,7 +196,7 @@ class _InputParameters:
 
             self._valid_label_types: set[str] = {item.value for item in LabelTypes}
 
-        def _validate_arguments(self):
+        def _validate_arguments(self) -> None:
             valid_arguments: bool = True
             if len(self._protein_filter) > 64:
                 print("The length of the protein ID must be less than 64 characters")
@@ -212,7 +212,7 @@ class _InputParameters:
                 sys.exit(2)
 
         @property
-        def INPUT_PARAMTERS(self):
+        def INPUT_PARAMETERS(self) -> str:
             return (
                 f"PROTEINFILTER={self._protein_filter},"
                 f"LABEL_TYPES={self._label_type}"
@@ -245,7 +245,7 @@ class _InputParameters:
 
             self._validate_arguments()
 
-        def _validate_arguments(self):
+        def _validate_arguments(self) -> None:
             valid_arguments: bool = True
             if self._calculation_method not in [0, 1]:
                 print("calcuation_method must be 0 (iBAQ) or 1 (Top3)")
@@ -268,7 +268,7 @@ class _InputParameters:
                 sys.exit(2)
 
         @property
-        def INPUT_ARGUMENTS(self):
+        def INPUT_PARAMETERS(self) -> str:
             return (
                 f"TISSUE_ID={self._tissue_id},"
                 f"CALCULATION_METHOD={self._calculation_method},"
@@ -277,14 +277,14 @@ class _InputParameters:
                 f"TAXCODE={self._taxcode}"
             )
 
-    class TissueList(Enum):
+    class TissueList:
         """
         No input parameters are required for this API endpoint. It is defined to make sure it is not missed
         """
 
         pass
 
-    class PeptideSearch(Enum):
+    class PeptideSearch:
         """
         This is a list of required inputs to retrieve comprehensive information about a peptide
 
@@ -304,7 +304,7 @@ class _InputParameters:
 
             self._validate_arguments()
 
-        def _validate_arguments(self):
+        def _validate_arguments(self) -> None:
             valid_arguments: bool = True
 
             if len(self._peptide_sequence) > 500:
@@ -321,14 +321,14 @@ class _InputParameters:
                 sys.exit(2)
 
         @property
-        def INPUT_ARGUMENTS(self):
+        def INPUT_PARAMETERS(self) -> str:
             return (
                 f"PEPTIDE_SEQUENCE={self._peptide_sequence},"
                 f"Q_VALUE_CUTOFF={self._cutoff},"
                 f"TAXCODE={self._taxcode}"
             )
 
-    class PeptidesPerProtein(Enum):
+    class PeptidesPerProtein:
         """
         This is a list of input parameters required to get a comprehensive list of peptides and their modifications of a protein
 
@@ -340,7 +340,7 @@ class _InputParameters:
 
             self._validate_arguments()
 
-        def _validate_arguments(self):
+        def _validate_arguments(self) -> None:
             valid_arguments: bool = True
             if len(self._protein_filter) > 64:
                 print("The length of the protein ID must be less than 64 characters")
@@ -351,7 +351,7 @@ class _InputParameters:
                 sys.exit(2)
 
         @property
-        def INPUT_PARAMETERS(self):
+        def INPUT_PARAMETERS(self) -> str:
             return f"PROTEINFILTER={self._protein_filter}"
 
 
@@ -386,25 +386,25 @@ class URLBuilder:
 
         """
         self._base_url: str = "https://www.proteomicsdb.org/proteomicsdb/logic/api/"
-        self._download_format: str = save_format.name.lower()
-        self._file_save_location: str = file_save_location
         self._force_download: bool = force_download
+        self.download_format: str = save_format.name.lower()
+        self.file_save_location: str = file_save_location
 
-    def _download_file(self, url: str) -> requests.Response:
+    def _download_file(self, url: str) -> requests.Response | None:
         # Only download the file content if we have a place to save it, OR we are going to force download
-        if self._file_save_location == "" and self._force_download == False:
+        if self.file_save_location == "" and self._force_download == False:
             print("No file save path provided, not downloading!")
-            request = requests.Response
+            request = None
         else:
             request = requests.get(url)
+
         return request
 
-    def _get_file_size(self, url: str) -> str:
+    def _get_file_size(self, url) -> str:
         """
         This function will get the file size of the file to be downloaded
         It will return a string containing the size of the file with an appropriate suffix (KB, MB, etc.)
 
-        :param url: The URL that the file is located at
         :return str: The size of the file
         """
         suffix_dict: dict[str, int] = {
@@ -431,7 +431,7 @@ class URLBuilder:
                     file_size = f"{file_size} {suffix}"
                     break
 
-        # Content-Length is unavailable
+        # if Content-Length is unavailable
         else:
             file_size = None
 
@@ -444,11 +444,11 @@ class URLBuilder:
         It will only write the data if the request was OK and a save location is available
         :param
         """
-        if self._file_save_location != "" and request.ok:
+        if self.file_save_location != "" and request.ok:
             if self._validate_file_extension(
-                self._file_save_location, self._download_format
+                self.file_save_location, self.download_format
             ):
-                with open(self._file_save_location, "wb") as o_stream:
+                with open(self.file_save_location, "wb") as o_stream:
                     o_stream.write(request.content)
 
     def _validate_file_extension(self, file_path: str, expected_extension: str) -> bool:
@@ -464,12 +464,6 @@ class URLBuilder:
         else:
             correct_extension = False
         return correct_extension
-
-    def _format_json(self, results: list[dict]):
-        """
-        This function will replace single quotes (') with double quotes (")
-        This is required for formatting objects as JSON
-        """
 
 
 class GetProteinPeptideResult(URLBuilder):
@@ -518,25 +512,14 @@ class GetProteinPeptideResult(URLBuilder):
         self._url: str = urlparse.urljoin(
             self._base_url,
             f"proteinpeptideresult.xsodata/InputParams({self._parameter})"
-            f"/Results?$select={self._selection}&$format={self._download_format}",
+            f"/Results?$select={self._selection}&$format={self.download_format}",
         )
-
         self._file_size = self._get_file_size(self._url)
-        if self._download_format == "":
-            print(f"File size is {self._file_size}")
-            print(f"No file save path provided, not downloading!")
-        else:
-            self._request = requests.get(self._url)
-            print(type(self._request))
-        if self._request.ok:
-            print(
-                f"Valid response recieved ({self._request.status_code}). Writing content to file."
-            )
-            file_location = "/Users/joshl/Library/Application Support/JetBrains/PyCharm2022.1/scratches/proteomics_db.json"
-            if self._validate_file_extension(file_location, self._download_format):
-                print("Validated file extensions")
-                self._write_to_file(self._request)
-                print("File written")
+        self._request = self._download_file(self._url)
+
+    @property
+    def file_size(self) -> str:
+        return self._file_size
 
 
 class GetProteinsPerExperiment(URLBuilder):
@@ -577,21 +560,20 @@ class GetProteinsPerExperiment(URLBuilder):
 
         self._url: str = urlparse.urljoin(
             self._base_url,
-            f"proteinsperexperiment.xsodata/InputParams({self._parameters})/Results?$select={self._selection}&$format={self._download_format}",
+            f"proteinsperexperiment.xsodata/InputParams({self._parameters})/Results?$select={self._selection}&$format={self.download_format}",
         )
 
         # Get the file size. This is a fast operation, and may be useful for large downloads
-        self._file_size = self._get_file_size(self._url)
-        print(f"ExperimentData file size is {self._file_size}")
         self._request = self._download_file(self._url)
         self._write_to_file(self._request)
 
     @property
     def request_content_as_json(self) -> list[dict]:
-        format = json.loads(self._request.text)
-        format = format["d"]["results"]
+        print(type(self._request))
+        # format = json.loads(content)
+        # format = format["d"]["results"]
 
-        return format
+        return [{}]
 
 
 class GetProteinExpression(URLBuilder):
@@ -642,17 +624,22 @@ class GetProteinExpression(URLBuilder):
         # /proteomicsdb/logic/api/proteinexpression.xsodata/InputParams(
         self._url: str = urlparse.urljoin(
             self._base_url,
-            f"proteinexpression.xsodata/InputParams({self._parameters})/Results?$select={self._selection}&$format={self._download_format}",
+            f"proteinexpression.xsodata/InputParams({self._parameters})/Results?$select={self._selection}&$format={self.download_format}",
         )
+        self._file_size = self._get_file_size(self._url)
 
         # Get the file size
-        self._file_size = self._get_file_size(self._url)
         print(f"ProteinExpression file size of {self._file_size}")
+
+    @property
+    def file_size(self) -> str:
+        return self._file_size
 
 
 def read_experiment_ids(file_path: str) -> list[int]:
     """
     This function is responsible for reading experiment ID values from a file
+
     :param file_path: The full file path to the experiment IDs (/my/full/path/proteomicdb_experiment_ids.csv)
     """
     experiment_ids: list[int] = []
@@ -670,6 +657,23 @@ def read_experiment_ids(file_path: str) -> list[int]:
     return experiment_ids
 
 
+def download_controller(experiment_id: int):
+    """
+    This function is responsible for controlling the download flow of ProteinsPerExperiment -> ProteinExpression
+    """
+    file_save_dir = "/Users/joshl/Library/Application Support/JetBrains/PyCharm2022.1/scratches/proteomics"
+    experiment_file_save = (
+        f"{file_save_dir}/{experiment_id}_proteins_per_experiment.json"
+    )
+
+    proteins_per_experiment = GetProteinsPerExperiment(
+        experiment_id=experiment_id,
+        save_format=DownloadFormat.JSON,
+        force_download=True
+        # file_save_location=experiment_file_save,
+    )
+
+
 def main():
     """
     Empty values can be input for items that are not required to filter by
@@ -679,14 +683,9 @@ def main():
     config = project.configs
     experiment_file = os.path.join(config.configdir, "proteomicdb_experiment_ids.csv")
     experiment_ids = read_experiment_ids(experiment_file)
-    print(experiment_ids)
 
-    # proteins = GetProteinsPerExperiment(
-    #     13207,
-    #     save_format=DownloadFormat.JSON,
-    #     force_download=True,
-    #     file_save_location="/Users/joshl/PycharmProjects/MADRID/pipelines/py/temp.json",
-    # )
+    for i, exp_id in enumerate(experiment_ids):
+        download_controller(exp_id)
 
 
 if __name__ == "__main__":
