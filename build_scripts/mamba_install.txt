@@ -29,6 +29,7 @@ markupsafe==2.0.1
 numpy
 openpyxl
 pandas
+requests
 rpy2
 scipy
 SQLAlchemy
