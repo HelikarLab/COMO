@@ -24,8 +24,10 @@ RUN wget --quiet https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VE
     && tar -xf gurobi${GRB_VERSION}_linux64.tar.gz \
     && rm -f gurobi${GRB_VERSION}_linux64.tar.gz \
     && mv -f gurobi* gurobi \
-    && rm -rf gurobi/linux64/docs \
+    && rm -rf gurobi/linux64/docs
 
 # Update jupyter notebook configuration \
 RUN echo "c.ServerApp.ip = '0.0.0.0'" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
     && echo "c.ServerApp.root_dir = '${HOME}/work'" >> "${HOME}/.jupyter/jupyter_notebook_config.py"
+
+VOLUME /home/joyvan/work
