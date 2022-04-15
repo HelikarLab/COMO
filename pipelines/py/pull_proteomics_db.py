@@ -4,12 +4,15 @@ Setup for this file is located in Obsidian (local to my laptop)
 Additional file documentation:
 Enum information: https://stackoverflow.com/a/1695250
 """
+import csv
+import os
 from enum import Enum
 import json
 import requests
 import sys
 import urllib.parse as urlparse
 from pprint import pprint
+import project
 
 
 class _InputParameters:
@@ -647,23 +650,43 @@ class GetProteinExpression(URLBuilder):
         print(f"ProteinExpression file size of {self._file_size}")
 
 
+def read_experiment_ids(file_path: str) -> list[int]:
+    """
+    This function is responsible for reading experiment ID values from a file
+    :param file_path: The full file path to the experiment IDs (/my/full/path/proteomicdb_experiment_ids.csv)
+    """
+    experiment_ids: list[int] = []
+
+    with open(file_path, "r") as i_stream:
+        reader = csv.DictReader(i_stream, delimiter=",")
+        for row in reader:
+            try:
+                experiment_ids.append(int(row["experiment_id"]))
+            except ValueError:
+                print(
+                    f"Unable to convert experiment ID value {row['experiment_id']} to an integer!"
+                )
+
+    return experiment_ids
+
+
 def main():
-    # ProteinPeptideResult(
-    #    protein_identifier="Q92769",
-    #    format=ReturnFormat.JSON,
-    #    file_save_location="/Users/joshl/Library/Application Support/JetBrains/PyCharm2022.1/scratches/proteomics_db.json",
-    # )
     """
     Empty values can be input for items that are not required to filter by
     The following API command is able to get ALL MS_LEVEL information pertaining to Experiment ID 13207 and Protein Identifier P00533
     https://www.proteomicsdb.org/proteomicsdb/logic/api/proteinexpression.xsodata/InputParams(PROTEINFILTER=''P00533'',MS_LEVEL=0,TISSUE_ID_SELECTION='''',TISSUE_CATEGORY_SELECTION='''',SCOPE_SELECTION=1,GROUP_BY_TISSUE=0,CALCULATION_METHOD=0,EXP_ID=13207)/Results?$select=UNIQUE_IDENTIFIER,TISSUE_ID,TISSUE_NAME,TISSUE_SAP_SYNONYM,SAMPLE_ID,SAMPLE_NAME,AFFINITY_PURIFICATION,EXPERIMENT_ID,EXPERIMENT_NAME,EXPERIMENT_SCOPE,EXPERIMENT_SCOPE_NAME,PROJECT_ID,PROJECT_NAME,PROJECT_STATUS,UNNORMALIZED_INTENSITY,NORMALIZED_INTENSITY,MIN_NORMALIZED_INTENSITY,MAX_NORMALIZED_INTENSITY,SAMPLES&$format=json
     """
-    proteins = GetProteinsPerExperiment(
-        13207,
-        save_format=DownloadFormat.JSON,
-        force_download=True,
-        file_save_location="/Users/joshl/PycharmProjects/MADRID/pipelines/py/temp.json",
-    )
+    config = project.configs
+    experiment_file = os.path.join(config.configdir, "proteomicdb_experiment_ids.csv")
+    experiment_ids = read_experiment_ids(experiment_file)
+    print(experiment_ids)
+
+    # proteins = GetProteinsPerExperiment(
+    #     13207,
+    #     save_format=DownloadFormat.JSON,
+    #     force_download=True,
+    #     file_save_location="/Users/joshl/PycharmProjects/MADRID/pipelines/py/temp.json",
+    # )
 
 
 if __name__ == "__main__":
