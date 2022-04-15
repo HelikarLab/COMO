@@ -16,7 +16,7 @@ def load_gse_soft(name="GSE2770"):
     """
     Read GSE information from local soft file, otherwise read online.
     :param name: name of gse
-    :return: gse object by GEOparse
+    :return: gse object by GEOparsew
     """
     softfile = "./{}_family.soft.gz".format(name)
 

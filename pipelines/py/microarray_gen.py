@@ -173,7 +173,6 @@ def fetchLogicalTable(gsm_ids):
     df_results = pd.DataFrame([], columns=["ENTREZ_GENE_ID"])
     df_results.set_index("ENTREZ_GENE_ID", inplace=True)
     for gsm in gsm_ids:
-        # print(gsm)
         df = pd.read_sql(
             session.query(Sample)
             .filter_by(Sample=gsm)

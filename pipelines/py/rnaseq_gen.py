@@ -35,71 +35,107 @@ def load_rnaseq_tests(filename, model_name, lib_type):
     """
     Load rnaseq results returning a dictionary of test (context, context, cell, etc ) names and rnaseq expression data
     """
+
     def load_dummy_dict():
-        savepath = os.path.join(configs.rootdir, "data", "data_matrices", "dummy", "dummy_rnaseq_data.csv")
+        savepath = os.path.join(
+            configs.rootdir, "data", "data_matrices", "dummy", "dummy_rnaseq_data.csv"
+        )
         dat = pd.read_csv(savepath, index_col="ENTREZ_GENE_ID")
         return "dummy", dat
 
-    if not filename or filename == "None": # not using this data type, use empty dummy data matrix
+    if (
+        not filename or filename == "None"
+    ):  # not using this data type, use empty dummy data matrix
         return load_dummy_dict()
 
     inquiry_full_path = os.path.join(configs.rootdir, "data", "config_sheets", filename)
-    if not os.path.isfile(inquiry_full_path): # check that config file exist (isn't needed to load, but helps user)
+    if not os.path.isfile(
+        inquiry_full_path
+    ):  # check that config file exist (isn't needed to load, but helps user)
         print(f"Error: Config file not found at {inquiry_full_path}")
         sys.exit()
 
-    if lib_type == "total": # if using total RNA-seq library prep
+    if lib_type == "total":  # if using total RNA-seq library prep
         filename = f"rnaseq_total_{model_name}.csv"
-    elif lib_type == "mrna": # if using mRNA-seq library prep
+    elif lib_type == "mrna":  # if using mRNA-seq library prep
         filename = f"rnaseq_mrna_{model_name}.csv"
-    elif lib_type == "sc": # if using single-cell RNA-seq
+    elif lib_type == "sc":  # if using single-cell RNA-seq
         filename = f"rnaseq_sc_{model_name}.csv"
     else:
-        print(f"Unsupported RNA-seq library type: {lib_type}. Must be one of 'total', 'mrna', 'sc'.")
+        print(
+            f"Unsupported RNA-seq library type: {lib_type}. Must be one of 'total', 'mrna', 'sc'."
+        )
         sys.exit()
 
-    fullsavepath = os.path.join(configs.rootdir, 'data', 'results', model_name, filename)
+    fullsavepath = os.path.join(
+        configs.rootdir, "data", "results", model_name, filename
+    )
     if os.path.isfile(fullsavepath):
-        data = pd.read_csv(fullsavepath, index_col='ENTREZ_GENE_ID')
+        data = pd.read_csv(fullsavepath, index_col="ENTREZ_GENE_ID")
         print(f"Read from {fullsavepath}")
         return model_name, data
     else:
-        print(f"{lib_type} gene expression file for {model_name} was not found at {fullsavepath}. This may be "
-              f"intentional. Contexts where {lib_type} data can be found in /work/data/results/{model_name}/ will "
-              "still be used if found for other contexts.")
+        print(
+            f"{lib_type} gene expression file for {model_name} was not found at {fullsavepath}. This may be "
+            f"intentional. Contexts where {lib_type} data can be found in /work/data/results/{model_name}/ will "
+            "still be used if found for other contexts."
+        )
         return load_dummy_dict()
 
 
-def handle_context_batch(config_filename, replicate_ratio, batch_ratio, replicate_ratio_high,
-                        batch_ratio_high, technique, quantile, min_count, prep):
+def handle_context_batch(
+    config_filename,
+    replicate_ratio,
+    batch_ratio,
+    replicate_ratio_high,
+    batch_ratio_high,
+    technique,
+    quantile,
+    min_count,
+    prep,
+):
     """
     Handle iteration through each context type and create rnaseq expression file by calling rnaseq.R
     """
 
-    rnaseq_config_filepath = os.path.join(configs.rootdir, "data", "config_sheets", config_filename)
-    xl = pd.ExcelFile(rnaseq_config_filepath)
+    rnaseq_config_filepath = os.path.join(
+        configs.rootdir, "data", "config_sheets", config_filename
+    )
+    xl = pd.ExcelFile(rnaseq_config_filepath, engine="xlrd")
     sheet_names = xl.sheet_names
 
     for model_name in sheet_names:
         print("model: ", model_name)
         rnaseq_output_file = "".join(["rnaseq_", prep, "_", model_name, ".csv"])
-        rnaseq_output_filepath = os.path.join(configs.datadir, "results",
-                                              model_name, rnaseq_output_file)
-        rnaseq_input_file = "".join(["gene_counts_matrix_", prep, "_", model_name, ".csv"])
-        rnaseq_input_filepath = os.path.join(configs.datadir, "data_matrices",
-                                             model_name, rnaseq_input_file)
+        rnaseq_output_filepath = os.path.join(
+            configs.datadir, "results", model_name, rnaseq_output_file
+        )
+        rnaseq_input_file = "".join(
+            ["gene_counts_matrix_", prep, "_", model_name, ".csv"]
+        )
+        rnaseq_input_filepath = os.path.join(
+            configs.datadir, "data_matrices", model_name, rnaseq_input_file
+        )
         gene_info_filepath = os.path.join(configs.datadir, "gene_info.csv")
 
         os.makedirs(os.path.dirname(rnaseq_output_filepath), exist_ok=True)
         print('Input count matrix is at "{}"'.format(rnaseq_input_filepath))
         print('Gene info file is at "{}"'.format(gene_info_filepath))
 
-        rnaseq_io.save_rnaseq_tests(rnaseq_input_filepath, rnaseq_config_filepath,
-                                    rnaseq_output_filepath, gene_info_filepath,
-                                    replicate_ratio=replicate_ratio, batch_ratio=batch_ratio,
-                                    replicate_ratio_high=replicate_ratio_high, batch_ratio_high=batch_ratio_high,
-                                    technique=technique, quantile=quantile, min_count=min_count,
-                                    model_name=model_name)
+        rnaseq_io.save_rnaseq_tests(
+            rnaseq_input_filepath,
+            rnaseq_config_filepath,
+            rnaseq_output_filepath,
+            gene_info_filepath,
+            replicate_ratio=replicate_ratio,
+            batch_ratio=batch_ratio,
+            replicate_ratio_high=replicate_ratio_high,
+            batch_ratio_high=batch_ratio_high,
+            technique=technique,
+            quantile=quantile,
+            min_count=min_count,
+            model_name=model_name,
+        )
 
         print("Test data saved to " + rnaseq_output_filepath)
 
@@ -131,95 +167,113 @@ def main(argv):
     parser = argparse.ArgumentParser(
         prog="rnaseq_gen.py",
         description="Generate a list of active and high-confidence genes from a counts matrix using a user defined "
-                    "at normalization-technique at /work/data/results/<context name>/rnaseq_<context_name>.csv: "
-                    "https://github.com/HelikarLab/FastqToGeneCounts",
+        "at normalization-technique at /work/data/results/<context name>/rnaseq_<context_name>.csv: "
+        "https://github.com/HelikarLab/FastqToGeneCounts",
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
-               "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
-        )
+        "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
+    )
 
-    parser.add_argument("-c", "--config-file",
-                        type=str,
-                        required=True,
-                        dest="config_filename",
-                        help="Name of config .xlsx file in the /work/data/config_files/. Can be generated using "
-                             "rnaseq_preprocess.py or manually created and imported into the Juypterlab"
-                        )
+    parser.add_argument(
+        "-c",
+        "--config-file",
+        type=str,
+        required=True,
+        dest="config_filename",
+        help="Name of config .xlsx file in the /work/data/config_files/. Can be generated using "
+        "rnaseq_preprocess.py or manually created and imported into the Juypterlab",
+    )
 
-    parser.add_argument("-r", "--replicate-ratio",
-                        type=float,
-                        required=False,
-                        default=0.5,
-                        dest="replicate_ratio",
-                        help="Ratio of replicates required for a gene to be active within that study/batch group "
-                             "Example: 0.7 means that for a gene to be active, at least 70% of replicates in a group "
-                             "must pass the cutoff after normalization"
-                        )
+    parser.add_argument(
+        "-r",
+        "--replicate-ratio",
+        type=float,
+        required=False,
+        default=0.5,
+        dest="replicate_ratio",
+        help="Ratio of replicates required for a gene to be active within that study/batch group "
+        "Example: 0.7 means that for a gene to be active, at least 70% of replicates in a group "
+        "must pass the cutoff after normalization",
+    )
 
-    parser.add_argument("-g", "--batch-ratio",
-                        type=float,
-                        required=False,
-                        default=0.5,
-                        dest="batch_ratio",
-                        help="Ratio of groups (studies or batches) required for a gene to be active "
-                             "Example: 0.7 means that for a gene to be active, at least 70% of groups in a study must  "
-                             "have passed the replicate ratio test"
-                        )
+    parser.add_argument(
+        "-g",
+        "--batch-ratio",
+        type=float,
+        required=False,
+        default=0.5,
+        dest="batch_ratio",
+        help="Ratio of groups (studies or batches) required for a gene to be active "
+        "Example: 0.7 means that for a gene to be active, at least 70% of groups in a study must  "
+        "have passed the replicate ratio test",
+    )
 
-    parser.add_argument("-rh", "--high-replicate-ratio",
-                        type=float,
-                        required=False,
-                        default=1.,
-                        dest="replicate_ratio_high",
-                        help="Ratio of replicates required for a gene to be considered high-confidence. "
-                             "High-confidence genes ignore consensus with other data-sources like proteomics or "
-                             "microarray. Example: 0.9 means that for a gene to be high-confidence, at least 90% of "
-                             "replicates in a group must pass the cutoff after normalization"
-                        )
+    parser.add_argument(
+        "-rh",
+        "--high-replicate-ratio",
+        type=float,
+        required=False,
+        default=1.0,
+        dest="replicate_ratio_high",
+        help="Ratio of replicates required for a gene to be considered high-confidence. "
+        "High-confidence genes ignore consensus with other data-sources like proteomics or "
+        "microarray. Example: 0.9 means that for a gene to be high-confidence, at least 90% of "
+        "replicates in a group must pass the cutoff after normalization",
+    )
 
-    parser.add_argument("-gh", "--high-batch-ratio",
-                        type=float,
-                        required=False,
-                        default=1.,
-                        dest="batch_ratio_high",
-                        help="Ratio of groups (studies/batches) required for a gene to be considered high-confidence " 
-                             "within that group. HHigh-confidence genes ignore consensus with other data-sources like "
-                             "proteomics or microarray. Example: 0.9 means that for a gene to be high-confidence, at "
-                             "least 90% of groups in a study must have passed the replicate ratio test"
-                        )
+    parser.add_argument(
+        "-gh",
+        "--high-batch-ratio",
+        type=float,
+        required=False,
+        default=1.0,
+        dest="batch_ratio_high",
+        help="Ratio of groups (studies/batches) required for a gene to be considered high-confidence "
+        "within that group. HHigh-confidence genes ignore consensus with other data-sources like "
+        "proteomics or microarray. Example: 0.9 means that for a gene to be high-confidence, at "
+        "least 90% of groups in a study must have passed the replicate ratio test",
+    )
 
-    parser.add_argument("-t", "--filt-technique",
-                        type=str,
-                        required=False,
-                        default="quantile-tpm",
-                        dest="technique",
-                        help="Technique to normalize and filter counts with. Either 'zfpkm', 'quantile-tpm' or "  
-                             "'flat-cpm'. More info about each method is discussed in pipeline.ipynb."
-                        )
+    parser.add_argument(
+        "-t",
+        "--filt-technique",
+        type=str,
+        required=False,
+        default="quantile-tpm",
+        dest="technique",
+        help="Technique to normalize and filter counts with. Either 'zfpkm', 'quantile-tpm' or "
+        "'flat-cpm'. More info about each method is discussed in pipeline.ipynb.",
+    )
 
-    parser.add_argument("-q", "--quantile",
-                        type=int,
-                        required=False,
-                        default=25,
-                        dest="quantile",
-                        help="Cutoff used for quantile-tpm normalization and filtration technique. Example: 25 means "
-                             "that genes with TPM > 75% percentile wik=ll be considered active for that replicate."
-                        )
+    parser.add_argument(
+        "-q",
+        "--quantile",
+        type=int,
+        required=False,
+        default=25,
+        dest="quantile",
+        help="Cutoff used for quantile-tpm normalization and filtration technique. Example: 25 means "
+        "that genes with TPM > 75% percentile wik=ll be considered active for that replicate.",
+    )
 
-    parser.add_argument("-m", "--min-count",
-                        required=False,
-                        default="default",
-                        dest="min_count",
-                        help="Cutoff used for cpm. Minimum number of counts to be considered expressed, alternatively "
-                             "use 'default' to use method outlined in CITATION NEEDED"
-                        )
+    parser.add_argument(
+        "-m",
+        "--min-count",
+        required=False,
+        default="default",
+        dest="min_count",
+        help="Cutoff used for cpm. Minimum number of counts to be considered expressed, alternatively "
+        "use 'default' to use method outlined in CITATION NEEDED",
+    )
 
-    parser.add_argument("-p", "--library-prep",
-                        required=False,
-                        default="",
-                        dest="prep",
-                        help="Library preparation used, will separate samples into groups to only compare similarly "
-                             "prepared libraries. For example, mRNA, total-rna, scRNA, etc"
-                        )
+    parser.add_argument(
+        "-p",
+        "--library-prep",
+        required=False,
+        default="",
+        dest="prep",
+        help="Library preparation used, will separate samples into groups to only compare similarly "
+        "prepared libraries. For example, mRNA, total-rna, scRNA, etc",
+    )
 
     args = parser.parse_args(argv)
 
@@ -240,7 +294,9 @@ def main(argv):
     elif re.search("zfpkm", technique.lower()):
         technique = "zfpkm"
     else:
-        print("Normalization-filtration technique not recognized. Must be 'tpm-quantile', 'cpm', or 'zfpkm'.")
+        print(
+            "Normalization-filtration technique not recognized. Must be 'tpm-quantile', 'cpm', or 'zfpkm'."
+        )
         sys.exit()
 
     if int(quantile) > 100 or int(quantile) < 1:
@@ -250,11 +306,20 @@ def main(argv):
 
     print('Config file is "{}"'.format(config_filename))
 
-    handle_context_batch(config_filename, replicate_ratio, batch_ratio, replicate_ratio_high,
-                         batch_ratio_high, technique, quantile, min_count, prep)
+    handle_context_batch(
+        config_filename,
+        replicate_ratio,
+        batch_ratio,
+        replicate_ratio_high,
+        batch_ratio_high,
+        technique,
+        quantile,
+        min_count,
+        prep,
+    )
 
     return
 
 
 if __name__ == "__main__":
-   main(sys.argv)
+    main(sys.argv[1:])
