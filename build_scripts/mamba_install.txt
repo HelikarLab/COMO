@@ -1,11 +1,13 @@
 bioconductor-affy
 bioconductor-affyio
+bioconductor-biomart
 bioconductor-edger
 bioconductor-genefilter
 bioconductor-limma
 bioconductor-DESeq2
 bioconductor-agilp
 bioconductor-hgu133acdf
+bioconductor-zfpkm
 r-uwot
 r-irkernel
 r-irdisplay
