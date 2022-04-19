@@ -75,15 +75,18 @@ def pharse_configs(inqueryFullPath, sheet):
     return df, df_target
 
 
-def main(argv):
+def main():
     targetfile = "targets.txt"
     count_matrix = None
 
     # TODO: Fix this description
     parser = argparse.ArgumentParser(
         prog="disease_analysis.py",
-        description="Please update this description, I have no idea what this file does right now",
-        epilog="For additional help, please post questions/issues in the MADRID GitHub repo at https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
+        description="Performs differential gene expression analysis to find up and downregulated genes associated "
+                    "with a disease. Significant genes are ones that have an FDR adjusted P-value < 0.05 and an "
+                    "absolute fold-change greater than the threshold specified, default is 2",
+        epilog="For additional help, please post questions/issues in the MADRID GitHub repo at: "
+               "https://github.com/HelikarLab/MADRID or email babessell@gmail.com"
     )
     parser.add_argument(
         "-c",
@@ -101,74 +104,78 @@ def main(argv):
         dest="tissue_name",
         help="The type of tissue being used",
     )
+    parser.add_argument(
+        "-s",
+        "--data-source",
+        type=str,
+        required=True,
+        dest="data_source",
+        help="Source of data being used, either rnaseq or microarray"
+    )
+    parser.add_argument(
+        "-f",
+        "--minimium-fold-change",
+        type=float,
+        required=False,
+        default=1.0,
+        dest="min_fc",
+        help="Minimum absolute fold-change for significance."
+    )
+
     args = parser.parse_args()
     tissue_name = args.tissue_name
     config_file = args.config_file
+    data_source = args.data_source.upper()
 
-    # TODO: Remove this if this file works after moving to argparse
-    # try:
-    #     opts, args = getopt.getopt(argv, "ht:c:", ["tissue_name=", "config_file="])
-    # except getopt.GetoptError:
-    #     print("python3 disease_analysis.py -t <tissue name> -c <config_file>")
-    #     sys.exit(2)
-    # for opt, arg in opts:
-    #     if opt == "-h":
-    #         print("python3 disease_analysis.py -t <tissue name> -c <config_file>")
-    #         sys.exit()
-    #     elif opt in ("-t", "--tissue_name"):
-    #         tissue_name = arg
-    #     elif opt in ("-c", "--config_file"):
-    #         config_file = arg
+    if data_source == "RNASEQ":
+        config_filepath = os.path.join(configs.rootdir, "data", "config_sheets", "disease", "rnaseq", config_file)
+    elif data_source == "MICROARRAY":
+        config_filepath = os.path.join(configs.rootdir, "data", "config_sheets", "disease", "rnaseq", config_file)
+    else:
+        print(f"{data_source} is not a valid data source, must be either MICROARRAY or RNASEQ.")
+        sys.exit()
 
     try:
-        inqueryFullPath = os.path.join(
-            configs.rootdir, "data", "config_sheets", "disease", config_file
-        )
-    except:  # TODO: use "except NameError" on this try/except for less-broad exceptions?
-        print("Config file not properly defined")
-        sys.exit(2)
+        xl = pd.ExcelFile(config_filepath)
+    except FileNotFoundError:
+        print("Config File not found in /work/data/config_sheets/disease/")
+        sys.exit()
+    except ValueError:
+        print("Config file must be in xlsx format!")
+        sys.exit()
 
-    print("Config file is at ", inqueryFullPath)
-    xl = pd.ExcelFile(inqueryFullPath)
+    print("Config file is at ", config_filepath)
     sheet_names = xl.sheet_names
-    for sheet in sheet_names:
-        spl = sheet.split("_")
-        disease_name = spl[0]
-        data_source = spl[1]
-
-        targetdir = os.path.join(configs.rootdir, "data", targetfile)
-        if data_source == "microarray":
-            querytable, df_target = pharse_configs(inqueryFullPath, sheet)
-            df_target.to_csv(targetdir, index=False, sep="\t")
-            sr = querytable["GSE ID"]
+    for disease_name in sheet_names:
+        target_dir = os.path.join(configs.rootdir, "data", targetfile)
+        if data_source == "MICROARRAY":
+            query_table, df_target = pharse_configs(config_filepath, disease_name)
+            df_target.to_csv(target_dir, index=False, sep="\t")
+            sr = query_table["GSE ID"]
             gse_ids = sr[sr.str.match("GSE")].unique()
-            GSE_ID = gse_ids[0]
-            gseXXX = GSEproject(GSE_ID, querytable, configs.rootdir)
+            gse_id = gse_ids[0]
+            gseXXX = GSEproject(gse_id, query_table, configs.rootdir)
             for key, val in gseXXX.platforms.items():
-                rawdir = os.path.join(gseXXX.genedir, key)
-                print("{}:{}, {}".format(key, val, rawdir))
-                data2 = affyio.fitaffydir(rawdir, targetdir)
+                raw_dir = os.path.join(gseXXX.gene_dir, key)
+                print(f"{key}:{val}, {raw_dir}")
+                data2 = affyio.fitaffydir(raw_dir, target_dir)
                 data2 = ro.conversion.rpy2py(data2)
 
-        elif data_source == "bulk":
-            count_matrix = "".join(
-                ["BulkRNAseqDataMatrix_", disease_name, "_", tissue_name, ".csv"]
-            )
-            count_matrix_path = os.path.join(
-                configs.rootdir,
-                "data",
-                "data_matrices",
-                tissue_name,
-                "disease",
-                count_matrix,
-            )
+        elif data_source == "RNASEQ":
+            count_matrix_filename = "".join(["gene_counts_matrix_", disease_name, "_", tissue_name, ".csv"])
+            count_matrix_path = os.path.join(configs.datadir, "data_matrices", tissue_name, "disease", count_matrix)
+            if os.path.exists(count_matrix_path):
+                print("Count Matrix File is at ", count_matrix_path)
+            else:
+                print(f"No count matrix found at {count_matrix_path}. Please make sure file is in the correct location "
+                      f"with the correct name.")
+                sys.exit()
 
-            print("Count Matrix File is at ", count_matrix_path)
             data2 = DGEio.DGE_main(
-                count_matrix_path, inqueryFullPath, tissue_name, disease_name
+                count_matrix_path, config_filepath, tissue_name, disease_name
             )
             data2 = ro.conversion.rpy2py(data2)
-            GSE_ID = "bulk"
+            gse_id = "bulk"
 
         else:
             print("data_source should be either 'microarray' or 'bulk'")
@@ -187,7 +194,7 @@ def main(argv):
             "results",
             tissue_name,
             disease_name,
-            "Disease_UP_{}.txt".format(GSE_ID),
+            "Disease_UP_{}.txt".format(gse_id),
         )
         os.makedirs(os.path.dirname(up_file), exist_ok=True)
         down_file = os.path.join(
@@ -196,7 +203,7 @@ def main(argv):
             "results",
             tissue_name,
             disease_name,
-            "Disease_DOWN_{}.txt".format(GSE_ID),
+            "Disease_DOWN_{}.txt".format(gse_id),
         )
         os.makedirs(os.path.dirname(down_file), exist_ok=True)
         if data_source == "microarray":
@@ -225,7 +232,7 @@ def main(argv):
             "results",
             tissue_name,
             disease_name,
-            "Disease_FULL_{}.txt".format(GSE_ID),
+            "Disease_FULL_{}.txt".format(gse_id),
         )
         os.makedirs(os.path.dirname(all_file), exist_ok=True)
         Disease_FULL = get_entrez_id(data2, all_file, True)
@@ -238,14 +245,14 @@ def main(argv):
             "results",
             tissue_name,
             disease_name,
-            "Raw_Fit_{}.csv".format(GSE_ID),
+            "Raw_Fit_{}.csv".format(gse_id),
         )
 
         print("Raw Data saved to\n{}".format(raw_file))
         data2.to_csv(raw_file, index=False)
 
         files_dict = {
-            "GSE": GSE_ID,
+            "GSE": gse_id,
             "UP_Reg": up_file,
             "DN_Reg": down_file,
             "RAW_Data": raw_file,
@@ -263,7 +270,7 @@ def main(argv):
         with open(files_json, "w") as fp:
             json.dump(files_dict, fp)
         if data_source == "microarray":
-            os.remove(targetdir)
+            os.remove(target_dir)
 
 
 if __name__ == "__main__":
