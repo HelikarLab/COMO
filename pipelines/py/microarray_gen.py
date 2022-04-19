@@ -1,10 +1,9 @@
 #!/usr/bin/python3
+
 import argparse
 import re
 import os
 import sys
-import getopt
-
 import pandas as pd
 import numpy as np
 from scipy import stats
@@ -13,18 +12,16 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker, load_only
 from sqlalchemy import create_engine
 from project import configs
-import GSEpipelineFast
+from GSEpipelineFast import *
 
 # create declarative_base instance
 Base = declarative_base()
 
 # creates a create_engine instance at the bottom of the file
 engine = create_engine("sqlite:///microarray.db")
-Base.metadata.create_all(engine)
-DBSession = sessionmaker(bind=engine)
-session = DBSession()
 
-# we'll add classes here
+
+# Add SQL table information
 class Sample(Base):
     __tablename__ = "sample"
 
@@ -50,6 +47,13 @@ class GSEinfo(Base):
     Sample = Column(String(64), primary_key=True)
     GSE = Column(String(64))
     Platform = Column(String(64))
+
+
+Base.metadata.create_all(engine)
+
+DBSession = sessionmaker(bind=engine)
+session = DBSession()
+# --- Finish initializing database ---
 
 
 def lookupMicroarrayDB(gseXXX):
@@ -85,7 +89,6 @@ def updateMicroarrayDB(gseXXX):
     :param gseXXX: gse object
     :return:
     """
-    # df_clean = gseXXX.get_entrez_table_pipeline()
     df_clean = gseXXX.get_entrez_table_pipeline()
     if df_clean.empty:
         return None
@@ -104,7 +107,7 @@ def updateMicroarrayDB(gseXXX):
         col_val = "{}.cel.gz".format(key.lower())
         col_abs = "{}.cel.gz.1".format(key.lower())
         col_p = "{}.cel.gz.2".format(key.lower())
-        if not col_val in cols_clean:
+        if col_val not in cols_clean:
             continue
         df_s = pd.DataFrame([])
         df_s["ENTREZ_GENE_ID"] = df_clean["ENTREZ_GENE_ID"]
@@ -142,7 +145,7 @@ def queryTest(df, expression_proportion, top_proportion):
     # fetch data of each gse if it is not in the database, update database
     for gse_id in gse_ids:
         querytable = df[df["GSE ID"] == gse_id]
-        gseXXX = GSEpipelineFast.GSEproject(gse_id, querytable, configs.rootdir)
+        gseXXX = GSEproject(gse_id, querytable, configs.rootdir)
         if lookupMicroarrayDB(gseXXX):
             print("{} already in database, skip over.".format(gseXXX.gsename))
             continue
@@ -170,7 +173,6 @@ def fetchLogicalTable(gsm_ids):
     df_results = pd.DataFrame([], columns=["ENTREZ_GENE_ID"])
     df_results.set_index("ENTREZ_GENE_ID", inplace=True)
     for gsm in gsm_ids:
-        # print(gsm)
         df = pd.read_sql(
             session.query(Sample)
             .filter_by(Sample=gsm)
@@ -198,7 +200,7 @@ def fetchLogicalTable(gsm_ids):
     return df_results
 
 
-## Merge Output
+# Merge Output
 def mergeLogicalTable(df_results):
     """
     Merge the Rows of Logical Table belongs to the same ENTREZ_GENE_ID
@@ -256,7 +258,7 @@ def mergeLogicalTable(df_results):
     entrez_dups_list = []
     idx_list = list(range(len(entrez_id_list)))
     for idx1 in range(len(entrez_id_list)):
-        if not idx1 in idx_list:
+        if idx1 not in idx_list:
             continue
         set1 = set(entrez_id_list[idx1].split("//"))
         idx_list.remove(idx1)
@@ -294,7 +296,19 @@ def mergeLogicalTable(df_results):
 
     df_output = df_results.fillna(-1).groupby(level=0).max()
     df_output.replace(-1, np.nan, inplace=True)
+
+    # TODO: Test if this is working properly
+    """
+    There seems to be an error when running Step 2.1 in the pipeline.ipynb file
+    The commented-out return statement tries to return the df_output dataframe values as integers, but NaN values exist
+        Because of this, it is unable to do so.
+    If we change this to simply output the database, the line "np.where(posratio >= top_proportion . . ." (line ~162)
+        Fails because it is comparing floats and strings
+    
+    I am unsure what to do in this situation
+    """
     return df_output.astype(int)
+    # return df_output
 
 
 def load_microarray_tests(filename, model_name):
@@ -339,77 +353,49 @@ def load_microarray_tests(filename, model_name):
 
 
 def main(argv):
-    input_file = "microarray_data_inputs.xlsx"
+    inputfile = "microarray_data_inputs.xlsx"
 
-    # TODO: Fix this description
     parser = argparse.ArgumentParser(
         prog="microarray_gen.py",
-        description="Description goes here",
+        description="This file is for processing microarray data",
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
         "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
     )
     parser.add_argument(
-        "-i",
-        "--input-file",
+        "-c",
+        "--config-file",
         type=str,
         required=True,
-        dest="input_file",
-        help="The path to the input file",
+        dest="config_file",
+        help="The microarray configuration file name",
     )
-    # TODO: Fix this help section
     parser.add_argument(
         "-e",
         "--expression-proportion",
         type=float,
         required=True,
         dest="expression_proportion",
-        help="The proportion of expression",
+        help="Number of sources with active gene for it to be considered active even if it is not a high confidence-gene",
     )
-    # TODO: Fix this help section
     parser.add_argument(
         "-t",
-        "--top_proportion",
-        type=float,
+        "--top-proportion",
+        type=str,
         required=True,
         dest="top_proportion",
-        help="",
+        help="Genes can be considered high confidence if they are expressed in a high proportion of samples. "
+             + "High confidence genes will be considered expressed regardless of agreement with other data sources",
     )
-
     args = parser.parse_args()
-    input_file = args.input_file
+    inputfile = args.config_file
     expression_proportion = args.expression_proportion
     top_proportion = args.top_proportion
 
-    print(f"Input file is {input_file}")
-    print(f"Expression Proportion for Gene Expression is {expression_proportion}")
-    print(f"Top proportion for high-confidence genes is {top_proportion}")
+    print("Input file is ", inputfile)
+    print("Expression Proportion for Gene Expression is ", expression_proportion)
+    print("Top proportion for high-confidence genes is ", top_proportion)
 
-    # TODO: Remove this after verifying argparse works
-    # try:
-    #     opts, args = getopt.getopt(
-    #         argv, "hi:e:t:", ["ifile=", "expression_proportion=", "top_proportion="]
-    #     )
-    # except getopt.GetoptError:
-    #     print(
-    #         "python3 microarray_gen.py -i <inputfile> -e <expression_proportion> -t <top_proportion>"
-    #     )
-    #     sys.exit(2)
-    # for opt, arg in opts:
-    #     if opt == "-h":
-    #         print(
-    #             "python3 microarray_gen.py -i <inputfile> -e <expression_proportion> -t top_proportion>"
-    #         )
-    #         sys.exit()
-    #     elif opt in ("-i", "--ifile"):
-    #         inputfile = arg
-    #     elif opt in ("-e", "--expression_proportion"):
-    #         expression_proportion = float(arg)
-    #     elif opt in ("-t", "--top_proportion"):
-    #         top_proportion = float(arg)
-    #     # elif opt in ("-o", "--ofile"):
-    #     #     outputfile = arg
-
-    inqueryFullPath = os.path.join(configs.rootdir, "data", "config_sheets", input_file)
+    inqueryFullPath = os.path.join(configs.rootdir, "data", "config_sheets", inputfile)
     xl = pd.ExcelFile(inqueryFullPath)
     sheet_names = xl.sheet_names
     inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_names, header=0)
@@ -429,4 +415,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    main(sys.argv[1:])

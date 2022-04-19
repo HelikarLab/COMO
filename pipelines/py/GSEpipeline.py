@@ -7,7 +7,8 @@ import numpy as np
 import GEOparse
 import urllib.request
 import tarfile
-from instruments import affyio
+# from instruments import affyio
+from instruments import AffyIO
 
 
 # Input: Extract Gene Info from GEO DataSets
@@ -15,7 +16,7 @@ def load_gse_soft(name="GSE2770"):
     """
     Read GSE information from local soft file, otherwise read online.
     :param name: name of gse
-    :return: gse object by GEOparse
+    :return: gse object by GEOparsew
     """
     softfile = "./{}_family.soft.gz".format(name)
 
@@ -268,7 +269,9 @@ class GSEproject:
             platformdir = os.path.join(self.genedir, key)
             print("Affy Read Path: {}".format(platformdir))
             if os.path.exists(platformdir):
-                outputdf = affyio.readaffydir(platformdir)
+                # outputdf = affyio.readaffydir(platformdir)
+                outputdf = AffyIO().process_affyio()
+                outputdf.readaffydir(platformdir)
             else:
                 print("Path not exist: {}".format(platformdir))
             outputdf["ENTREZ_GENE_ID"] = gsm_maps[key]["ENTREZ_GENE_ID"]
