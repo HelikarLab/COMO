@@ -1,5 +1,14 @@
+# Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
+library("stringr")
+username <- Sys.info()["user"]
+work_dir <- str_interp("/home/${username}/work")
+
+if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
+    dir.create(str_interp("${work_dir}/py/rlogs"))
+}
+
 # prevent messy messages from repeatedly writing to juypter
-zz <- file(file.path("/home", "jupyteruser", "work", "py", "rlogs", "rnaseq.Rout"), open="wt")
+zz <- file(file.path("/home", username, "work", "py", "rlogs", "rnaseq.Rout"), open="wt")
 sink(zz, type="message")
 
 library(tidyverse)

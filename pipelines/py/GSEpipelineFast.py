@@ -77,7 +77,7 @@ def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
 class GSEproject:
     def __init__(self, gsename, querytable, rootdir="../"):
         self.gsename = gsename
-        ## Setup paths
+        # Setup paths
         self.querytable = querytable
         self.rootdir = rootdir
         self.datadir = os.path.join(self.rootdir, "data")
@@ -128,7 +128,6 @@ class GSEproject:
     def get_gsm_tables(self):
         """
         get gsm maps in table
-        :param gse:
         :return:
         """
         gsm_tables = {}
@@ -152,7 +151,6 @@ class GSEproject:
         """
         Classify the Samples by Platform
         get the platform of each gsm
-        :param gse: gse object
         :return: dictionary key: gsm, value: platform such as 'GEL96', 'GEL97', 'GEL8300'
         """
         keys = self.querytable["Samples"].str.upper().tolist()
@@ -175,7 +173,6 @@ class GSEproject:
     def get_entrez_table_pipeline(self, fromcsv=True):
         """
         create ENTREZ ID based table from gse
-        :param gse: gse object
         :return: pandas dataframe for table of GSE
         """
 
@@ -212,7 +209,9 @@ class GSEproject:
             print("{} Read Path: {}".format(vendor, platformdir))
             if os.path.exists(platformdir):
                 if vendor.lower() == "affy":
-                    outputdf = affyio.readaffydir(platformdir)
+                    # Get the AffyIO R-object from instruments.py
+                    outputdf = AffyIO().affyio
+                    outputdf = outputdf.readaffydir(platformdir)
                     outputdf = ro.conversion.rpy2py(outputdf)
                 elif vendor.lower() == "agilent":
 
@@ -278,7 +277,7 @@ class GSEproject:
         gsms_loaded = list(set(gsms_loaded).union(set(self.gsm_platform.keys())))
 
         # step 4: Remove duplicated items, keep largest VALUE for each GSM
-        if not "df_clean_sc500" in locals():
+        if "df_clean_sc500" not in locals():
             df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)
             df_clean_sc500 = df_clean_sc500[
                 ~df_clean_sc500.index.duplicated(keep="first")
