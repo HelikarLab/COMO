@@ -1,4 +1,14 @@
-zz <- file("/home/jupyteruser/work/py/rlogs/fitAffy.Rout", open="wt")
+# Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
+library("stringr")
+username <- Sys.info()["user"]
+work_dir <- str_interp("/home/${username}/work")
+
+if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
+    dir.create(str_interp("${work_dir}/py/rlogs"))
+}
+
+zz <- file(file.path("/home", username, "work", "py", "rlogs", "generate_counts_matrix.Rout"), open="wt")
+zz <- file(file.path("/home", username, "work", "py", "rlogs", "fitAffy.Rout"), open="wt")
 sink(zz, type="message")
 
 readaffydir <- function(addr){
@@ -14,10 +24,12 @@ readaffydir <- function(addr){
 }
 
 fitaffydir <- function(addr, target){
+    username <- SYs.info()["user"]
+    work_dir <- str_interp("/home/${username}/work")
     crd <- getwd()
     setwd(addr)
-    library(limma, lib.loc="/home/jupyteruser/rlibs/")
-    library(affy, lib.loc="/home/jupyteruser/rlibs/")
+    library(limma, lib.loc=str_interp("${work_dir}/rlibs"))
+    library(affy, lib.loc=str_interp("${work_dir}/rlibs"))
     targets = readTargets(target)
     mydata = ReadAffy()
     setwd(crd)
