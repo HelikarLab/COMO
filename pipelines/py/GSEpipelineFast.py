@@ -82,10 +82,10 @@ class GSEproject:
         self.rootdir = rootdir
         self.datadir = os.path.join(self.rootdir, "data")
         self.outputdir = os.path.join(self.rootdir, "output")
-        self.genedir = os.path.join(self.datadir, self.gsename + "_RAW")
+        self.gene_dir = os.path.join(self.datadir, self.gsename + "_RAW")
         print(
             "Initialize project ({}):\nRoot: {}\nRaw data: {}".format(
-                self.gsename, self.rootdir, self.genedir
+                self.gsename, self.rootdir, self.gene_dir
             )
         )
         self.gsm_platform = self.get_gsm_platform()
@@ -102,7 +102,7 @@ class GSEproject:
         """
         # create a folder for each platform
         for key in self.platforms.keys():
-            platformdir = os.path.join(self.genedir, key)
+            platformdir = os.path.join(self.gene_dir, key)
             if not os.path.exists(platformdir):
                 os.makedirs(platformdir)
                 print("Path created: {}".format(platformdir))
@@ -110,15 +110,15 @@ class GSEproject:
                 print("Path already exist: {}".format(platformdir))
 
         # Move Corresponding Cel files to Folders
-        onlyfiles = [f for f in os.listdir(self.genedir) if f.endswith(".gz")]
+        onlyfiles = [f for f in os.listdir(self.gene_dir) if f.endswith(".gz")]
         cnt = 0
         for file in onlyfiles:
             filelist = file.split(".")
             prefix = filelist[0]
             if prefix in self.gsm_platform:
                 platform = self.gsm_platform[prefix]
-                platformdir = os.path.join(self.genedir, platform)
-                src_path = os.path.join(self.genedir, file)
+                platformdir = os.path.join(self.gene_dir, platform)
+                src_path = os.path.join(self.gene_dir, file)
                 dst_path = os.path.join(platformdir, file)
                 os.rename(src_path, dst_path)
                 print("Move {} to {}".format(src_path, dst_path))
@@ -177,7 +177,7 @@ class GSEproject:
         """
 
         filefullpath = os.path.join(
-            self.genedir, "{}_sc500_full_table.csv".format(self.gsename)
+            self.gene_dir, "{}_sc500_full_table.csv".format(self.gsename)
         )
         if fromcsv and os.path.isfile(filefullpath):
             try:
@@ -205,7 +205,7 @@ class GSEproject:
         # step 1: Ready Affy files from folders
         gsm_tables_sc500 = {}
         for key, vendor in self.platforms.items():
-            platformdir = os.path.join(self.genedir, key)
+            platformdir = os.path.join(self.gene_dir, key)
             print("{} Read Path: {}".format(vendor, platformdir))
             if os.path.exists(platformdir):
                 if vendor.lower() == "affy":
@@ -342,21 +342,21 @@ class GSEproject:
 
     def download_raw(self, overwrite=False):
         # check if path created
-        if (not os.path.isdir(self.genedir)) or overwrite:
-            os.makedirs(self.genedir, exist_ok=True)
+        if (not os.path.isdir(self.gene_dir)) or overwrite:
+            os.makedirs(self.gene_dir, exist_ok=True)
             url = (
                 "https://www.ncbi.nlm.nih.gov/geo/download/?acc={}&format=file".format(
                     self.gsename
                 )
             )
-            filefullpath = os.path.join(self.genedir, "{}_RAW.tar".format(self.gsename))
+            filefullpath = os.path.join(self.gene_dir, "{}_RAW.tar".format(self.gsename))
             if not os.path.isfile(filefullpath):
                 print("Download Raw File: {}".format(filefullpath))
                 urllib.request.urlretrieve(url, filefullpath)
             else:
                 print("File already exist: {}".format(filefullpath))
             tfile = tarfile.open(filefullpath)
-            tfile.extractall(path=self.genedir)
+            tfile.extractall(path=self.gene_dir)
             os.remove(filefullpath)
             print("Remove Raw File: {}".format(filefullpath))
             self.organize_gse_raw_data()
@@ -364,16 +364,16 @@ class GSEproject:
             pass
 
     def download_samples(self, overwrite=False):
-        os.makedirs(self.genedir, exist_ok=True)
+        os.makedirs(self.gene_dir, exist_ok=True)
         for gsm, gpl in self.gsm_platform.items():
-            platformdir = os.path.join(self.genedir, gpl)
+            platformdir = os.path.join(self.gene_dir, gpl)
             os.makedirs(platformdir, exist_ok=True)
             sample_url = (
                 "https://www.ncbi.nlm.nih.gov/geo/download/?acc={}&format=file".format(
                     gsm
                 )
             )
-            filefullpath = os.path.join(self.genedir, "{}.tar".format(gsm))
+            filefullpath = os.path.join(self.gene_dir, "{}.tar".format(gsm))
             if (not os.path.isfile(filefullpath)) or overwrite:
                 urllib.request.urlretrieve(sample_url, filefullpath)
                 print("Retrieve Sample: {}".format(filefullpath))
@@ -395,7 +395,7 @@ class GSEproject:
                 result[col] = (score - score.mean()) / score.std(ddof=0)
         if to_csv:
             filefullpath = os.path.join(
-                self.genedir, "{}_data_z.csv".format(self.gsename)
+                self.gene_dir, "{}_data_z.csv".format(self.gsename)
             )
             result.to_csv(filefullpath)
         return result
