@@ -473,11 +473,11 @@ def main(argv):
         required=True,
         dest="context_names",
         help="""Tissue/cell name of models to generate. These names should correspond to the folders
-                             in 'MADRID_inputs/' if creating count matrix files, or to
-                             'work/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv' if supplying
-                             the count matrix as an imported .csv file. If making multiple models in a batch, then
-                             use the format: \"['context1', 'context2', ... etc]\". Note the outer double-quotes and the 
-                             inner single-quotes are required to be interpreted. This a string, not a python list""",
+             in 'MADRID_inputs/' if creating count matrix files, or to
+             'work/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv' if supplying
+             the count matrix as an imported .csv file. If making multiple models in a batch, then
+             use the format: \"['context1', 'context2', ... etc]\". Note the outer double-quotes and the 
+             inner single-quotes are required to be interpreted. This a string, not a python list""",
     )
 
     parser.add_argument(
@@ -509,8 +509,8 @@ def main(argv):
         default=False,
         dest="provide_matrix",
         help="Provide your own count matrix. Requires additional argument '--matrix' which is .csv file "
-        "where colnames are sample names (in contextName_SXRY format) and rownames are genes in "
-        "in format specified by --gene-format",
+             "where colnames are sample names (in contextName_SXRY format) and rownames are genes in "
+             "in format specified by --gene-format",
     )  # would be nice if this was a directory full matrices in case you want to do in batches
 
     group.add_argument(
@@ -521,8 +521,8 @@ def main(argv):
         default=False,
         dest="make_matrix",
         help="Flag for if you want to make a counts matrix, but not a config file. "
-        "Requires a correctly structured MADRID_input folder in /work/data/. Can make one using: "
-        "https://github.com/HelikarLab/FastqToGeneCounts",
+             "Requires a correctly structured MADRID_input folder in /work/data/. Can make one using: "
+             "https://github.com/HelikarLab/FastqToGeneCounts",
     )
 
     parser.add_argument(
@@ -532,7 +532,7 @@ def main(argv):
         dest="provided_matrix_fname",
         default="SKIP",
         help="Name of provided counts matrix in "
-        "/work/data/data_matrices/<context name>/<NAME OF FILE>.csv",
+             "/work/data/data_matrices/<context name>/<NAME OF FILE>.csv",
     )
 
     args = parser.parse_args(argv)

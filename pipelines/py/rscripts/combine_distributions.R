@@ -77,7 +77,8 @@ combine_batch_zdistro <- function(wd, context, batch, zmat) {
 
     weighted_z <- function(x) {
         x <- as.numeric(x)
-        weights = rep(1/length(x), length(x))
+        weights = rep((length(x))/length(x), length(x))
+        #weights = rep(1, length(x))
         numer = sum(weights*x)
         denom = sqrt(length(x))
         numer/denom
@@ -110,7 +111,7 @@ combine_batch_zdistro <- function(wd, context, batch, zmat) {
 
 
 combine_context_zdistro <- function(wd, context, n_reps, zmat) {
-    print(paste0("Combining ", context, "Z-score distrobutions. "))
+    print(paste0("Combining ", context, "Z-score distributions. "))
     plot_name = file.path(wd, context, "figures", paste0(
       "plot_", context, "_combine_batches_distro", ".pdf"))
 
@@ -118,7 +119,7 @@ combine_context_zdistro <- function(wd, context, n_reps, zmat) {
         x <- as.numeric(x)
         weights <- c()
         for ( i in 1:length(n_reps) ) {
-            weights <- c(weights, n_reps[i]/sum(n_reps[-i]))
+            weights <- c(weights, (n_reps[i])/sum(n_reps))
         }
         numer = sum(weights*x)
         denom = sqrt(sum(weights^2))
