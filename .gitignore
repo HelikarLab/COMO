@@ -10,3 +10,6 @@ docker_old/*
 ~$*
 # Python cache files
 *__pycache__
+
+# DO not save files in "pipelines/output"
+/pipelines/output
