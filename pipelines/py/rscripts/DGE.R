@@ -1,19 +1,23 @@
-zz <- file("/home/jupyteruser/work/py/rlogs/DGE.Rout", open="wt")
+zz <- file(file.path("/home", "jupyteruser", "work", "py", "rlogs", "DGE.Rout"), open="wt")
 sink(zz, type="message")
+
 
 library(DESeq2)
 library(edgeR)
-readCountMatrix <- function(cmat_file, config_file) {
-  conf <- read.xlsx(config_file, sheet=1, colNames=TRUE)
+library(readxl)
+
+
+readCountMatrix <- function(cmat_file, config_file, disease_name) {
+  conf <- read_excel(config_file, sheet=disease_name, col_names=TRUE)
   cmat_whole <- read.csv(cmat_file, header=TRUE)
   cmat_whole[,-1] <- lapply(cmat_whole[,-1], as.numeric)
-  #print(cmat_whole)
   cmat_whole <- cmat_whole[rowSums(cmat_whole[,-1])>0,]
-  genes <- cmat_whole$ENTREZ_GENE_ID
+  genes <- as.character(cmat_whole$genes)
   samps <- as.character(conf$Sample)
   exps <- as.character(conf$Experiment)
   if ( length(genes) == 0 | is.null(genes) ) {
-    print("disease count matrix must have a column headed 'ENTREZ_GENE_ID'")
+    print("disease count matrix must have a column headed 'genes'")
+    stop()
   }
   SampMetrics <- list()
   for ( i in 1:length(samps) ) {
@@ -22,13 +26,13 @@ readCountMatrix <- function(cmat_file, config_file) {
       counts <- cmat_whole[entry]
       group <- exps[i]
       SampMetrics[[group]][[entry]][["Counts"]] <- counts
-      SampMetrics[[group]][[entry]][["Entrez"]] <- genes
+      SampMetrics[[group]][[entry]][["Ensembl"]] <- genes
     } else if ( paste(c("X", entry),collapse="") %in% colnames(cmat_whole) ) {
       entry <- paste(c("X", entry),collapse="")
       counts <- cmat_whole[entry]
       group <- exps[i]
       SampMetrics[[group]][[entry]][["Counts"]] <- counts
-      SampMetrics[[group]][[entry]][["Entrez"]] <- genes
+      SampMetrics[[group]][[entry]][["Ensembl"]] <- genes
     } else {
       print(paste(c(entry, " not found in disease count matrix")))
     }
@@ -36,11 +40,12 @@ readCountMatrix <- function(cmat_file, config_file) {
   return(SampMetrics)
 }
 
-dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name) {
-  gene_list <- SampMetrics[[1]][[1]][["Entrez"]]
+
+dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name, min_fc) {
+  gene_list <- SampMetrics[[1]][[1]][["Ensembl"]]
   
-  df <- data.frame(Entrez=gene_list)
-  #colnames(df)[1] <- "Entrez"
+  df <- data.frame(Ensembl=gene_list)
+  #colnames(df)[1] <- "Ensembl"
   group_list <- c(rep("control", length(SampMetrics[["control"]])), rep('patient', length(SampMetrics[["patient"]])))
   for ( j in 1:length(SampMetrics[["control"]]) ) {
     df <- cbind(df, SampMetrics[["control"]][[j]][["Counts"]])
@@ -49,18 +54,25 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name) {
     df <- cbind(df, SampMetrics[["patient"]][[j]][["Counts"]])
   }
   df[is.na(df)] <- 0
-  df["Entrez"] <- NULL
+  ensembl <- df["Ensembl"]
+  df["Ensembl"] <- NULL
   df <- data.frame(sapply(df, as.numeric))
   dgList <- DGEList(counts=df, genes=gene_list, group=group_list)
   dgList$samples$group <- relevel(dgList$samples$group, ref="control")
   dgList <- calcNormFactors(dgList, method="TMM")
   
   tmm <- cpm(dgList)
-  write.csv(tmm, paste(c("/home/jupyteruser/work/data/results/", tissue_name, "/", disease_name, "/TMM_Matrix.csv"),collapse=""))
-  
+
+  dir.create(file.path("/home", "jupyteruser", "work", "data", "results", tissue_name, disease_name),
+             showWarnings = FALSE
+  )
+  write.csv(cbind(ensembl,tmm),
+            file.path("/home", "jupyteruser", "work", "data", "results", tissue_name, disease_name, "TMM_Matrix.csv")
+  )
+
   # MDS Plot
-  plotname <- paste(c("/home/jupyteruser/work/data/results/", tissue_name, "/", disease_name, "/", "MDS_plot.jpg"), collapse="")
-  title <- paste(c("DGEList Multi-Dimensional Scaling"),collapse="")
+  plotname <- file.path("/home", "jupyteruser", "work", "data", "results", tissue_name, disease_name, "MDS_plot.jpg")
+  title <- "DGEList Multi-Dimensional Scaling"
   jpeg(plotname)
   lab <- colnames(df)
   plotMDS(dgList, labels=lab, main=title)
@@ -71,8 +83,8 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name) {
   colnames(designMat) <- levels(dgList$samples$group)
   
   # BCV plot
-  plotname <- paste(c("/home/jupyteruser/work/data/results/", tissue_name, "/", disease_name, "/", "BCV_plot.jpg"), collapse="")
-  title <- paste(c("DGEList Biological Coefficient of Variation"),collapse="")
+  plotname <- file.path("/home", "jupyteruser", "work", "data", "results", tissue_name, disease_name, "BCV_plot.jpg")
+  title <- "DGEList Biological Coefficient of Variation"
   dgList <- estimateGLMCommonDisp(dgList, design=designMat)
   dgList <- estimateGLMTrendedDisp(dgList, design=designMat)
   dgList <- estimateGLMTagwiseDisp(dgList, design=designMat)
@@ -91,20 +103,21 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name) {
     con[i] <- 1
     qlf <- glmQLFTest(fit, contrast=con)
     edgeR_result <- topTags(qlf, n=65000)
-    deGenes <- decideTestsDGE(qlf, adjust.method="BH", p.value=0.05, lfc=1)
+    deGenes <- decideTestsDGE(qlf, adjust.method="BH", p.value=0.05, lfc=log(min_fc, 2))
     deGenes <- rownames(qlf)[as.logical(deGenes)]
     expTab <- edgeR_result$table
     
     # save results
     #expTab['abs_logFC'] <- abs(expTab$logFC)
     names(expTab)[names(expTab) == "PValue"] <- "P.Value"
-    names(expTab)[names(expTab) == "genes"] <- "Gene ID"
+    names(expTab)[names(expTab) == "genes"] <- "Ensembl"
     #expTab <- expTab[,deGenes==TRUE]
-    write.csv(expTab,paste(c("/home/jupyteruser/work/data/results/", tissue_name, "/", disease_name, "/", "DiffExp.csv"),collapse=""))
-    
+    #write.csv(expTab,
+    #          file.path("/home", "jupyteruser", "work", "data", "results", tissue_name, disease_name, "DiffExp.csv")
+    #)
     # smear plot
-    plotname <- paste(c("/home/jupyteruser/work/data/results/", tissue_name, "/", disease_name, "/", "smear_plot.jpg"),collapse="")
-    title <- paste(c("DGEList Smear Plot ", test_cell),collapse="")
+    plotname <- file.path("/home", "jupyteruser", "work", "data", "results", tissue_name, disease_name, "smear_plot.jpg")
+    title <- paste0("DGEList Smear Plot ", test_cell)
     jpeg(plotname)
     plotSmear(qlf, de.tags=deGenes, main=title)
     abline(h=c(-1, 1), col=2)
@@ -113,15 +126,16 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name) {
   return(expTab)
 }
 
-DGE_main <- function(cmat_file, config_file, tissue_name, disease_name) {
+
+DGE_main <- function(cmat_file, config_file, context_name, disease_name, min_fc) {
   print("Reading Counts Matrix")
   test_name <- cmat_file
   test_name <-unlist(strsplit(test_name, "_RawCounts"))[1]
   test_list <-unlist(strsplit(test_name, "/"))
   test_name <- test_list[length(test_list)]
-  SampMetrics <- readCountMatrix(cmat_file, config_file)
-  entrez_all <- SampMetrics[[1]][[1]][["Entrez"]]
+  SampMetrics <- readCountMatrix(cmat_file, config_file, disease_name)
+  ensembl_all <- SampMetrics[[1]][[1]][["Ensembl"]]
   print("Performing DGE")
-  data_table <- dgeAnalysis(SampMetrics, test_name, tissue_name, disease_name)
+  data_table <- dgeAnalysis(SampMetrics, test_name, context_name, disease_name, min_fc)
   return(data_table)
 }
