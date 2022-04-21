@@ -13,3 +13,4 @@ cobamp
 unidecode
 troppo
 rpy2
+requests
