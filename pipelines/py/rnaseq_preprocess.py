@@ -419,7 +419,7 @@ def main(argv):
                               "/work/data/data_matrices/<context name>/<NAME OF FILE>.csv"
                         )
 
-    args = parser.parse_args(argv)
+    args = parser.parse_args()
     context_names = args.context_names
     gene_format = args.gene_format
     taxon_id = args.taxon_id
