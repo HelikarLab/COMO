@@ -282,7 +282,7 @@ def write_outputs(diff_exp_df, gse_id, tissue_name, disease_name, data_source, m
         os.remove(target_path)
 
 
-def main():
+def main(argv):
     targetfile = "targets.txt"
     count_matrix = None
 
@@ -390,4 +390,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(ar)
