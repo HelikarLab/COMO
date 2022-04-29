@@ -1,18 +1,23 @@
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 import argparse
 import csv
 import endpoints
 import json
 import os
+from pathlib import Path
 import requests
 import requests.adapters
 import sys
-from .. import project
+from pprint import pprint
 
 
-class DownloadHandler:
-    def __init__(self, args: argparse.Namespace):
+# Add parent directory to path, allows us to import the "project.py" file
+# From: https://stackoverflow.com/a/30536516/13885200
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import project
+
+
+class ProteinData:
+    def __init__(self, args: argparse.Namespace, **kwargs):
         """
         This function will handle the following functions:
             - Read experiment IDs from the config_file (from 'args' function)
@@ -24,16 +29,17 @@ class DownloadHandler:
         self._config_file: str = args.config_file
         self._file_type: endpoints.DownloadFormat = args.file_type
         self._output_dir: str = args.output_dir
-        self._experiment_ids: list[int] = self.read_experiment_ids()
+        self._experiment_ids: list[int] = self._read_experiment_ids()
 
-        # Download proteins per experiment
-        self._protein_per_experiment_data: list[
-            Path
-        ] = self.save_proteins_per_experiment()
+        # fmt: off
+        # Get proteins per experiment
+        self._protein_per_experiment_data: list[endpoints.GetProteinsPerExperiment] = self._get_proteins_per_experiment(**kwargs)
 
-        self._protein_expression_data: list[Path] = self.save_protein_expression()
+        # Get protein expression
+        self._protein_expression_data: list[endpoints.GetProteinExpression] = self._get_protein_expression(**kwargs)
+        # fmt: on
 
-    def read_experiment_ids(self) -> list[int]:
+    def _read_experiment_ids(self) -> list[int]:
         """
         This function is responsible for reading experiment ID values from a file
         """
@@ -45,13 +51,11 @@ class DownloadHandler:
                 try:
                     experiment_ids.append(int(row["experiment_id"]))
                 except ValueError:
-                    print(
-                        f"Unable to convert experiment ID value {row['experiment_id']} to an integer! Validate the experiment IDs found in {self._config_file}."
-                    )
+                    print(f"Unable to convert experiment ID value {row['experiment_id']} to an integer! Validate the experiment IDs found in {self._config_file}.")  # fmt: skip
 
         return experiment_ids
 
-    def parse_experiment_json(self, experiment_path: Path) -> dict:
+    def _parse_experiment_json(self, experiment_path: Path) -> dict:
         """
         This function will accept a JSON file, and retrieve the following keys:
             - UNIQUE_IDENTIFIER (Corresponds to PROTEINFILTER in ProteomicsDB API)
@@ -70,43 +74,49 @@ class DownloadHandler:
 
         return json_data
 
-    def save_proteins_per_experiment(self) -> list[Path]:
+    def _get_proteins_per_experiment(
+        self,
+        session: requests.Session() = None,
+        **kwargs,
+    ) -> list[endpoints.GetProteinsPerExperiment]:
         """
         This function is responsible for downloading the protein data associated with each experiment ID
 
+        :param kwargs: Any additional parameters as defined by the endpoints.GetProteinsPerExperiment class
         :return list[str]: A list of file save locations
         """
-        session = requests.Session()
-        file_save_locations: list[Path] = []
+        # Define default parameters for this function
+        if session is None:
+            session = requests.Session()
+
+        experiment_data: list[endpoints.GetProteinsPerExperiment] = []
+
         for exp_id in self._experiment_ids:
+
             file_extension = str(self._file_type.value).lower()
             download_file_name = f"experiment_{exp_id}.{file_extension}"
-            save_location: Path = Path(
-                self._output_dir, "proteomics_db", "experiment_data", download_file_name
-            )
-            file_save_locations.append(save_location)
+            save_path: Path = Path(self._output_dir, "proteomics_db", "experiment_data", download_file_name)  # fmt: skip
 
             experiment_proteins = endpoints.GetProteinsPerExperiment(
                 experiment_id=exp_id,
                 download_format=self._file_type,
-                file_save_location=save_location,
+                file_save_location=save_path,
                 session=session,
-                print_file_size=False,
+                **kwargs,
             )
-
             experiment_proteins.save_data()
 
-        return file_save_locations
+            experiment_data.append(experiment_proteins)
 
-    def get_protein_expression(self, arguments):
-        return endpoints.GetProteinExpression(**arguments)
+        return experiment_data
 
-    def save_protein_expression(
+    def _get_protein_expression(
         self,
+        session: requests.Session() = None,
         **kwargs,
-    ) -> list[Path]:
+    ) -> list[endpoints.GetProteinExpression]:
         """
-        TODO: Implement multiple-downloading
+        TODO: Implement multi-threaded downloading
         https://stackoverflow.com/a/68583332/13885200
 
         This function will handle the actual download of protein expression data
@@ -115,33 +125,25 @@ class DownloadHandler:
             - Experiment ID: int,
             - Download Format (i.e. DownloadFormat.JSON)
 
-        :param kwargs: Any additional arguments as defined by the ProteomicsDB ProteinExpression API
+        :param kwargs: Any additional arguments as defined by the endpoints.GetProteinExpression class
         :return: A Path object containing the saved file location
         """
-        max_workers = os.cpu_count()
-        session: requests.Session = requests.Session()
-        session.mount(
-            "https://",
-            requests.adapters.HTTPAdapter(
-                pool_maxsize=max_workers, max_retries=3, pool_block=False
-            ),
-        )
+        if session is None:
+            session = requests.Session()
 
-        file_save_paths: list[Path] = []
-        file_extension: str = str(self._file_type.value).lower()
+        protein_expression_data: list[endpoints.GetProteinExpression] = []
 
-        multiprocess_data: list[dict] = []
-        # Build the items required for getting protein data
-        print("Building dictionary for multiprocess. . .")
-        for experiment_path in self._protein_per_experiment_data:
-            experiment_data = self.parse_experiment_json(experiment_path)
+        for experiment in self._protein_per_experiment_data:
 
+            experiment_data = self._parse_experiment_json(experiment.save_path)
+            file_extension = str(self._file_type.value).lower()
+
+            # Pair the items in each list found in experiment_data
             for i, (protein_id, experiment_id) in enumerate(
                 zip(*experiment_data.values())
             ):
-                download_file_name = (
-                    f"experiment_{experiment_id}-protein_{protein_id}.{file_extension}"
-                )
+                download_file_name = f"experiment_{experiment_id}-protein_{protein_id}.{file_extension}"  # fmt: skip
+
                 save_path = Path(
                     self._output_dir,
                     "proteomics_db",
@@ -149,34 +151,45 @@ class DownloadHandler:
                     download_file_name,
                 )
 
-                # If the save file does not exist, continue
+                # Only save data if the file does not exist
                 if not save_path.is_file():
-                    multiprocess_data.append(
-                        {
-                            "protein_filter": protein_id,
-                            "experiment_id": experiment_id,
-                            "download_format": self._file_type,
-                            "file_save_location": save_path,
-                            "session": session,
-                            "print_file_size": False,
-                        }
+                    protein_data = endpoints.GetProteinExpression(
+                        protein_filter=protein_id,
+                        experiment_id=experiment_id,
+                        file_save_location=save_path,
+                        download_format=self._file_type,
+                        **kwargs,
                     )
 
-        # Use multithreaded requests; from: https://stackoverflow.com/a/68583332/13885200
-        use_data = multiprocess_data
-        print(f"Data pieces: {len(use_data)}")
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            print("Mapping workers to data")
-            for response in list(executor.map(self.get_protein_expression, use_data)):
-                if len(response) != 0:
-                    response.save_data()
-                    file_save_paths.append(response.save_path)
-                    print(
-                        f"Saving {response.protein_id}, size of {response.file_readable_size}"
-                    )
+                else:
+                    protein_data = self._load_json_data(save_path)
 
-        # Return save location if needed for further use
-        return file_save_paths
+                # Only save protein data if data exists
+                if len(protein_data) != 0:
+                    protein_data.save_data()
+                    protein_expression_data.append(protein_data)
+
+        return protein_expression_data
+
+    def _load_json_data(self, file_path: Path) -> list[dict]:
+        """
+        This function is responsible for loading the JSON data of experiment or protein data which is already downloaded
+        """
+        lines = open(file_path, "r").read()
+        json_object = json.loads(lines)
+        return json_object
+
+    @property
+    def experiment_ids(self) -> list[int]:
+        return self._experiment_ids
+
+    @property
+    def protein_per_experiment_data(self) -> list[endpoints.GetProteinsPerExperiment]:
+        return self._protein_per_experiment_data
+
+    @property
+    def protein_expression_data(self) -> list[endpoints.GetProteinExpression]:
+        return self._protein_expression_data
 
 
 def parse_arguments(argv: list[str]) -> argparse.Namespace:
@@ -234,9 +247,7 @@ def parse_arguments(argv: list[str]) -> argparse.Namespace:
 
     # Set default config_file if none provided
     if args.config_file is None:
-        args.config_file = os.path.join(
-            project.configs.configdir, "proteomicdb_experiment_ids.csv"
-        )
+        args.config_file = os.path.join(project.configs.configdir, "proteomicdb_experiment_ids.csv")  # fmt: skip
 
     # Set default output_dir if none provided
     if args.output_dir is None:
@@ -250,11 +261,8 @@ def main(argv: list[str]):
     # Get command line arguments
     args: argparse.Namespace = parse_arguments(argv)
 
-    # Retrieve the experiment IDs from config file
-    downloads = DownloadHandler(args)
-
-    # Download proteins per experiment
-    # downloads.save_proteins_per_experiment()
+    # Gather all protein information
+    protein_data = ProteinData(args=args, print_file_size=True)
 
 
 if __name__ == "__main__":
