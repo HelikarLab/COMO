@@ -236,7 +236,7 @@ class GetProteinsPerExperiment(URLBuilder):
             sys.exit(2)
 
     @property
-    def experiment_id(self):
+    def id(self):
         return self._experiment_id
 
 

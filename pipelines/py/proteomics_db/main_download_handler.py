@@ -7,6 +7,7 @@ from pathlib import Path
 import requests
 import requests.adapters
 import sys
+from tqdm import tqdm
 from pprint import pprint
 
 
@@ -65,12 +66,15 @@ class ProteinData:
             "UNIQUE_IDENTIFIER": [],
             "EXPERIMENT_ID": [],
         }
+
         with open(experiment_path, "r") as i_stream:
             json_object = json.load(i_stream)
 
         for entry in json_object:
-            json_data["UNIQUE_IDENTIFIER"].append(str(entry["UNIQUE_IDENTIFIER"]))
-            json_data["EXPERIMENT_ID"].append(int(entry["EXPERIMENT_ID"]))
+            # Create a set of unique items
+            if entry["UNIQUE_IDENTIFIER"] not in json_data["UNIQUE_IDENTIFIER"]:
+                json_data["UNIQUE_IDENTIFIER"].append(str(entry["UNIQUE_IDENTIFIER"]))
+                json_data["EXPERIMENT_ID"].append(int(entry["EXPERIMENT_ID"]))
 
         return json_data
 
@@ -132,15 +136,19 @@ class ProteinData:
             session = requests.Session()
 
         protein_expression_data: list[endpoints.GetProteinExpression] = []
+        print(f"{len(self._protein_per_experiment_data)} experiment(s) collected")
 
         for experiment in self._protein_per_experiment_data:
+            print(f"Working on experiment ID: {experiment.id}")
 
             experiment_data = self._parse_experiment_json(experiment.save_path)
             file_extension = str(self._file_type.value).lower()
 
+            print(f"{len(experiment_data['UNIQUE_IDENTIFIER'])} proteins to get.")
+
             # Pair the items in each list found in experiment_data
-            for i, (protein_id, experiment_id) in enumerate(
-                zip(*experiment_data.values())
+            for i, (protein_id, experiment_id) in tqdm(
+                enumerate(zip(*experiment_data.values()))
             ):
                 download_file_name = f"experiment_{experiment_id}-protein_{protein_id}.{file_extension}"  # fmt: skip
 
