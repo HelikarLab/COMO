@@ -270,7 +270,7 @@ def main(argv: list[str]):
     args: argparse.Namespace = parse_arguments(argv)
 
     # Gather all protein information
-    protein_data = ProteinData(args=args, print_file_size=True)
+    protein_data = ProteinData(args=args, print_file_size=False)
 
 
 if __name__ == "__main__":
