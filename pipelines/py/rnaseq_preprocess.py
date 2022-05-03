@@ -169,7 +169,7 @@ def create_config_df(context_name):
         if len(frag_glob) < 1:
             print(f"\nNo fragment file found for {label}, writing as 'UNKNOWN' This must be defined by the user in "
                   "order to use zFPKM normalization")
-            strand = "UNKNOWN"
+            #strand = "UNKNOWN"
             mean_fragment_size = 100
         elif len(frag_glob) > 1:
             print(f"\nMultiple matching fragment length files for {label}, make sure there is only one copy for each "
