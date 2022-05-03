@@ -173,10 +173,6 @@ class URLBuilder:
         return self._request.json()["d"]["results"]
 
     @property
-    def response_object(self) -> requests.Response:
-        return self._request
-
-    @property
     def save_path(self):
         return self._file_save_location
 

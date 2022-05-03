@@ -185,7 +185,7 @@ def main(argv):
         required=True,
         dest="top_proportion",
         help="Genes can be considered high confidence if they are expressed in a high proportion of samples. "
-             + "High confidence genes will be considered expressed regardless of agreement with other data sources",
+        "High confidence genes will be considered expressed regardless of agreement with other data sources",
     )
     parser.add_argument(
         "-p",
