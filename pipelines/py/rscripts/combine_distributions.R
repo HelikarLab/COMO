@@ -32,14 +32,12 @@ parse_contexts_zscore_prot <- function(wd, contexts) {
 
     batches = list()
     for ( context in contexts ) {
-        files <- Sys.glob(file.path(wd, context, "zscore_prot_Matrix_*.csv"))
+        files <- Sys.glob(file.path(wd, context, "protein_zscore_Matrix_*.csv"))
         batches[[context]] <- unlist(lapply(files, get_batch_name))
     }
 
     return(batches)
 }
-
-
 
 
 merge_batch <- function(wd, context, batch, zmat) {
@@ -172,7 +170,49 @@ combine_context_zdistro <- function(wd, context, n_reps, zmat) {
 }
 
 
-combine_zscores_main <- function(wd, contexts, use_rna, use_proteins) {
+combine_omics_zdistros <- function(comb_batches_z_rna, comb_batches_z_prot,
+                                   rna_weight, prot_weight, keep_gene_scores) {
+
+    print(paste0("Combining -omics distributions for ", context))
+    plot_name = file.path(wd, context, "figures", paste0(
+                          "plot_", context, "_combine_omics_distro", ".pdf"))
+
+    zmat <- comb_batches_z_rna %>% inner_join(comb_batches_z_prot, by="ent")
+
+    weighted_z <- function(x) {
+        x <- as.numeric(x)
+        weights <- c(rna_weight, prot_weight)
+        weights <- weights/sum(weights)
+        numer = sum(weights*x)
+        denom = sqrt(sum(weights^2))
+        numer/denom
+    }
+
+    combine_z <- apply(zmat[,-1], 1, weighted_z)
+    merge_df <- cbind(zmat, combined=combine_z)
+    combine_z <- cbind(ENTREZ_GENE_ID=as.character(zmat[,"ent"]), combine_z)
+
+    stack_df <- do.call(rbind, lapply(2:ncol(merge_df), function(j) {
+        repz <- as.numeric(as.character(merge_df[,j]))
+        cbind(ent=merge_df[,1], zscore=repz, sample=rep(colnames(merge_df)[j],length(repz)))
+    })) %>% as.data.frame(.)
+    stack_df$zscore <- as.numeric(as.character(stack_df$zscore))
+
+    label <- colnames(stack_df)[-1]
+    pdf(plot_name)
+    p <- ggplot(stack_df, aes(zscore, color=sample)) +
+        geom_density()
+    print(p)
+    dev.off()
+
+    if ( keep_gene_scores ) {
+        combine_z <- rbind(combine_z, comb_batches_z_rna[!(comb_batches_z_rna$ent %in% combine_z$ent), "ent"])
+    }
+    return(combine_z)
+}
+
+
+combine_zscores_main <- function(wd, contexts, use_rna, use_proteins, keep_gene_scores) {
     # TODO: proteomics combine!
     fig_path <- file.path(wd, "figures")
     if ( !file.exists(fig_path) ) { dir.create(fig_path) }
@@ -234,6 +274,7 @@ combine_zscores_main <- function(wd, contexts, use_rna, use_proteins) {
     }
 
     if ( use_rna & use_proteins ) {
+        comb_omics_z <- combine_omics_zdistros(comb_batches_z_rna, comb_batches_z_prot, rna_weight, prot_weight)
         filename <- file.path(wd, context, paste0("model_scores_", context, ".csv"))
         write.csv(comb_batches_z, filename, row.names=FALSE)
 
