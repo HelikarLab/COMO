@@ -80,23 +80,23 @@ def merge_xomics(
     files_dict = dict()
 
     exp_list = []
-    top_list = []
+    high_list = []
 
     if proteomics[0] != "dummy":
         exp_list.append("prote_exp")
-        top_list.append("prote_top")
-        prote_data = proteomics[1].loc[:, ["expressed", "top"]]
+        high_list.append("prote_high")
+        prote_data = proteomics[1].loc[:, ["expressed", "high"]]
         prote_data.rename(
-            columns={"expressed": "prote_exp", "top": "prote_top"}, inplace=True
+            columns={"expressed": "prote_exp", "high": "prote_high"}, inplace=True
         )
         merge_data = prote_data
 
     if microarray[0] != "dummy":
         exp_list.append("trans_exp")
-        top_list.append("trans_top")
-        micro_data = microarray[1].loc[:, ["expressed", "top"]]
+        high_list.append("trans_high")
+        micro_data = microarray[1].loc[:, ["expressed", "high"]]
         micro_data.rename(
-            columns={"expressed": "trans_exp", "top": "trans_top"}, inplace=True
+            columns={"expressed": "trans_exp", "high": "trans_high"}, inplace=True
         )
         if "merge_data" not in locals():
             merge_data = micro_data
@@ -105,10 +105,10 @@ def merge_xomics(
 
     if trnaseq[0] != "dummy":
         exp_list.append("trnaseq_exp")
-        top_list.append("trnaseq_top")
-        trnaseq_data = trnaseq[1].loc[:, ["expressed", "top"]]
+        high_list.append("trnaseq_high")
+        trnaseq_data = trnaseq[1].loc[:, ["expressed", "high"]]
         trnaseq_data.rename(
-            columns={"expressed": "trnaseq_exp", "top": "trnaseq_top"}, inplace=True
+            columns={"expressed": "trnaseq_exp", "high": "trnaseq_high"}, inplace=True
         )
         if "merge_data" not in locals():
             merge_data = trnaseq_data
@@ -117,10 +117,10 @@ def merge_xomics(
 
     if mrnaseq[0] != "dummy":
         exp_list.append("mrnaseq_exp")
-        top_list.append("mrnaseq_top")
-        mrnaseq_data = mrnaseq[1].loc[:, ["expressed", "top"]]
+        high_list.append("mrnaseq_high")
+        mrnaseq_data = mrnaseq[1].loc[:, ["expressed", "high"]]
         mrnaseq_data.rename(
-            columns={"expressed": "mrnaseq_exp", "top": "mrnaseq_top"}, inplace=True
+            columns={"expressed": "mrnaseq_exp", "high": "mrnaseq_high"}, inplace=True
         )
         if "merge_data" not in locals():
             merge_data = mrnaseq_data
@@ -129,10 +129,10 @@ def merge_xomics(
 
     if scrnaseq[0] != "dummy":
         exp_list.append("scrnaseq_exp")
-        top_list.append("scrnaseq_top")
-        scrnaseq_data = scrnaseq[1].loc[:, ["expressed", "top"]]
+        high_list.append("scrnaseq_high")
+        scrnaseq_data = scrnaseq[1].loc[:, ["expressed", "high"]]
         scrnaseq_data.rename(
-            columns={"expressed": "scrnaseq_exp", "top": "scrnaseq_top"}, inplace=True
+            columns={"expressed": "scrnaseq_exp", "high": "scrnaseq_high"}, inplace=True
         )
         if "merge_data" not in locals():
             merge_data = scrnaseq_data
@@ -169,7 +169,7 @@ def merge_xomics(
     if (
         not no_hc
     ):  # set genes that are high-confidence in at least one data source to active
-        merge_data.loc[merge_data[top_list].sum(axis=1) > 0, "Active"] = 1
+        merge_data.loc[merge_data[high_list].sum(axis=1) > 0, "Active"] = 1
 
     merge_data = merge_data.astype(int)
 
@@ -206,25 +206,23 @@ def handle_context_batch(
     no_hc,
     no_na,
     custom_df,
-    merge_distro=False,
+    merge_distro,
+    keep_gene_score
 ):
     """
     Handle merging of different data sources for each context type
     """
     sheet_names = []
-    for file in [
-        microarray_file,
-        trnaseq_file,
-        mrnaseq_file,
-        scrnaseq_file,
-        proteomics_file,
-    ]:
+    for file in [microarray_file, trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file]:
         if file is not None:
             config_filepath = os.path.join(
                 configs.rootdir, "data", "config_sheets", file
             )
             xl = pd.ExcelFile(config_filepath)
             sheet_names += xl.sheet_names
+
+    use_rna = True if (trnaseq_file is not None) or (mrnaseq_file is not None) else False
+    use_protein = True if proteomics_file is not None else False
 
     counts = Counter(sheet_names)
     print(counts)
@@ -237,7 +235,11 @@ def handle_context_batch(
 
     if merge_distro:
         combine_dist_io.combine_zscores_main(
-            os.path.join(configs.datadir, "results"), sheet_names
+            os.path.join(configs.datadir, "results"),
+            sheet_names,
+            use_rna,
+            use_protein,
+            keep_gene_score
         )
 
     files_json = os.path.join(
@@ -252,9 +254,7 @@ def handle_context_batch(
         elif adjust_method == "flat":
             exp_req = expression_requirement
         else:
-            exp_req = int(
-                custom_df.iloc[custom_df["context"] == context_name, "req"].iloc[0]
-            )
+            exp_req = int(custom_df.iloc[custom_df["context"] == context_name, "req"].iloc[0])
 
         print(
             f"Expression requirement of {expression_requirement} adjusted to {exp_req} using {adjust_method} "
@@ -322,6 +322,18 @@ def main(argv):
         "create_context_specific_model.py. Must have run rnaseq_gen.py with 'zFPKM' as "
         "'--technique'. If --proteomics-config-file is given will merge proteomics distributions "
         "with zFPKM distributions using a weighted scheme.",
+    )
+
+    parser.add_argument(
+        "-k",
+        "--keep-gene-scores",
+        action="store_true",
+        required=False,
+        default=False,
+        dest="keep_gene_score",
+        help="When merging z-score distributions of expression, if using both protein abundance and transcipt zFPKM "
+             "flag true if you wish to keep z-score of genes with no protein data, flag false if you wish to discard "
+             "and treat as no expression"
     )
 
     parser.add_argument(
@@ -441,6 +453,7 @@ def main(argv):
     no_hc = args.no_hc
     no_na = args.no_na
     merge_distro = args.merge_distro
+    keep_gene_score = args.keep_gene_score
 
     # read custom expression requirment file if used
     if custom_file != "SKIP":
@@ -451,17 +464,12 @@ def main(argv):
         custom_df = pd.DataFrame([])
 
     def_exp_req = sum(
-        [
-            1
-            for test in [
-                microarray_file,
-                trnaseq_file,
-                mrnaseq_file,
-                scrnaseq_file,
-                proteomics_file,
-            ]
-            if test is None
-        ]
+        [1 for test in [microarray_file,
+                        trnaseq_file,
+                        mrnaseq_file,
+                        scrnaseq_file,
+                        proteomics_file]
+            if test is None]
     )
 
     if expression_requirement.lower() == "default":
@@ -495,6 +503,7 @@ def main(argv):
         no_na,
         custom_df,
         merge_distro,
+        keep_gene_score
     )
 
     return

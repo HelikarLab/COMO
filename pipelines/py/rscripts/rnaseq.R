@@ -450,7 +450,7 @@ save_rnaseq_tests <- function(counts_matrix_file, config_file, out_file, info_fi
               write_table[i,3] <- 1
           }
       }
-      header <- c("ENTREZ_GENE_ID", "expressed", "top")
+      header <- c("ENTREZ_GENE_ID", "expressed", "high")
       #write_table <- rbind(header, write_table)
       colnames(write_table) <- header
       write.csv(write_table, out_file, row.names=FALSE, col.names=FALSE)
