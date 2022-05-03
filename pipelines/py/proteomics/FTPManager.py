@@ -6,9 +6,12 @@ This includes the information as depicted in the "Database.py" file
 import aioftp
 import argparse
 import asyncio
+from enum import Enum
 import requests
 import os
+from pathlib import Path
 import sys
+import typing
 from urllib.parse import urlparse
 from urllib.parse import ParseResult
 
@@ -20,49 +23,41 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import project
 
 
+class Action(Enum):
+    """
+    This class is responsible for holding the types of action the aioftp module is able to perform
+    """
+
+    download = "download"
+    LIST = "list"
+
+
 class Download:
     def __init__(self, urls: list[str], args: argparse.Namespace):
         """
         This function is responsible for downloading items from the FTP urls passed into it
         """
+        self._output_directory: str = args.output_dir
         # self._urls: list[str] = urls
         self._urls: list[str] = [
             "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026142",
-            # "ftp://massive.ucsd.edu/MSV000087556/",
-            # "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/03/PXD029911",
-            # "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/03/PXD030463",
-            # "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/03/PXD008681",
-            # "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/03/PXD029500",
-            # "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/03/PXD008994",
-            # "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/03/PXD006541",
             "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/03/PXD009340",
             "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/03/PXD010319",
         ]
 
-        # self._invalid_urls: list[str] = self.url_validator()
-        # if len(self._invalid_urls) != 0:
-        #     print(f"The following FTP URLs are invalid. Re-enter them into the '{args.input_file}' file")  # fmt: skip
-        #     for url in self._invalid_urls:
-        #         print(url)
+        # This object will be modified by get_ftp_links()
+        self._files_to_download: dict[str, list[str]] = {
+            "raw_file_url": [],
+            "protein_groups_url": [],
+        }
 
-        asyncio.run(self.download_wrapper())
+        asyncio.run(self.get_ftp_links_wrapper())
 
-    def url_validator(self) -> list[str]:
-        """
-        This function is responsible for checking all FTP URLs passed into the Download() class are valid
-
-        It will return a list of invalid URLs, if any exist
-        """
-        invalid_url: list[str] = []
-        for url in self._urls:
-            if not requests.head(url).ok:
-                invalid_url.append(url)
-
-        return invalid_url
-
-    async def download_wrapper(self):
+    async def get_ftp_links_wrapper(self, **kwargs):
         """
         This function is responsible for asynchronously downloading FTP files from the self._urls list
+
+        :param action: The 'action' to perform. This should be a function name, such as list_ftp_files
         """
         tasks = []
         print("Starting task creation")
@@ -74,16 +69,50 @@ class Download:
             # Append tasks to complete to the "tasks" list
             tasks.append(
                 asyncio.create_task(
-                    self.get_ftp(host=parsed_url.netloc, path=parsed_url.path)
+                    self.download_ftp_data(host=parsed_url.netloc, path=parsed_url.path, **kwargs)  # fmt: skip
                 )
             )
 
         # Execute the tasks
         print(f"{len(tasks)} task(s) created, starting await. . .")
-        data = await asyncio.wait(tasks)
-        pprint(data)
+        await asyncio.wait(tasks)
 
-    async def get_ftp(
+    async def download_ftp_data(
+        self,
+        host: str,
+        path: str,
+        port: int = 21,
+        username: str = "anonymous",
+        password: str = "guest",
+        list_only: bool = False,
+    ):
+        client = aioftp.Client()
+        await client.connect(host=host, port=port)
+        await client.login(user=username, password=password)
+
+        async for path, info in client.list(path, recursive=True):
+            if list_only:
+                if info["type"] == "file":
+                    print(path)
+
+            # Test if "raw" or "proteinGroups.txt" in the file path; we want these files
+            # From: https://stackoverflow.com/a/8122096/13885200
+            if (
+                any(map(str(path).__contains__, ["raw", "proteinGroups.txt"]))
+                and not list_only
+            ):
+                # Define paths
+                download_path: str = f"ftp://{host}{path}"
+                file_name = os.path.basename(path)
+                save_path: Path = Path(self._output_directory, file_name)
+
+                # Download file
+                try:
+                    await client.download(source=download_path, destination=save_path)
+                except IndexError:
+                    print(f"Index error on file {download_path}")
+
+    async def list_ftp_files(
         self,
         host: str,
         path: str,
@@ -92,11 +121,11 @@ class Download:
         password: str = "guest",
     ):
         client = aioftp.Client()
-        await client.connect(host, port=port)
-        await client.login(username, password)
+        await client.connect(host=host, port=port)
+        await client.login(user=username, password=password)
 
         async for path, info in client.list(path, recursive=True):
-            if "proteinGroups.txt" in str(path):
+            if info["type"] == "file":
                 print(path)
 
 
