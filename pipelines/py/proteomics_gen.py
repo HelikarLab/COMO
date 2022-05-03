@@ -9,6 +9,23 @@ import pandas as pd
 import numpy as np
 import instruments
 from project import configs
+import rpy2.robjects as ro
+from rpy2.robjects.packages import importr
+from rpy2.robjects import r, pandas2ri
+from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
+from rpy2.robjects.conversion import localconverter
+
+pandas2ri.activate()
+
+# import R libraries
+tidyverse = importr("tidyverse")
+ggplot = importr("ggplot2")
+
+# read and translate R functions
+f = open(os.path.join(configs.rootdir, "py", "rscripts", "protein_transform.R"), "r")
+string = f.read()
+f.close()
+protein_transform_io = SignatureTranslatedAnonymousPackage(string, "protein_transform_io")
 
 
 # Load Proteomics
@@ -64,27 +81,54 @@ def load_gene_symbol_map(gene_symbols, filename="proteomics_entrez_map.csv"):
     return sym2id[~sym2id.index.duplicated()]
 
 
-# determine expression logicals and save results
-def save_proteomics_tests(context_name, testdata, expr_prop, top_prop, percentile):
+def abundance_to_bool_group(context_name, group_name, abundance_matrix, rep_ratio, hi_rep_ratio, quantile):
     """
     Descrioption....
     """
-    # Logical Calculation
-    thresholds = testdata.quantile(1 - percentile, axis=0)
-    testbool = pd.DataFrame(0, columns=list(testdata), index=testdata.index)
-    for col in list(testdata):
-        testbool.loc[testdata[col] > thresholds[col], [col]] = 1
-
-    testdata["pos"] = (testdata > 0).sum(axis=1) / testdata.count(axis=1)
-    testdata["expressed"] = 0
-    testdata.loc[(testdata["pos"] > expr_prop), ["expressed"]] = 1
-    testdata["top"] = 0
-    testdata.loc[(testdata["pos"] > top_prop), ["top"]] = 1
     output_dir = os.path.join(configs.rootdir, "data", "results", context_name)
     os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, context_name, f"Proteomics_{context_name}.csv")
-    testdata.to_csv(output_path, index_label="ENTREZ_GENE_ID")
-    print("Test Data Saved to {}".format(output_path))
+    # write group abundances to individual files
+    abundance_filepath = os.path.join(configs.datadir,
+                                      "results",
+                                      context_name,
+                                      "_".join(["proteinAbundance_Matrix", group_name])
+                                      )
+    abundance_matrix.to_csv(abundance_filepath, index_label="ENTREZ_GENE_ID")
+    protein_transform_io.protein_transform_main(abundance_filepath, output_dir, group_name)
+    # Logical Calculation
+    thresholds = abundance_matrix.quantile(quantile, axis=0)
+    testbool = pd.DataFrame(0, columns=list(abundance_matrix), index=abundance_matrix.index)
+    for col in list(abundance_matrix):
+        testbool.loc[abundance_matrix[col] > thresholds[col], [col]] = 1
+
+    abundance_matrix["pos"] = (abundance_matrix > 0).sum(axis=1) / abundance_matrix.count(axis=1)
+    abundance_matrix["expressed"] = 0
+    abundance_matrix.loc[(abundance_matrix["pos"] > rep_ratio), ["expressed"]] = 1
+    abundance_matrix["high"] = 0
+    abundance_matrix.loc[(abundance_matrix["pos"] > hi_rep_ratio), ["high"]] = 1
+    bool_filepath = os.path.join(output_dir, context_name, f"bool_prot_Matrix_{context_name}_{group_name}.csv")
+    abundance_matrix.to_csv(bool_filepath, index_label="ENTREZ_GENE_ID")
+
+
+def to_bool_context(context_name, group_ratio, hi_group_ratio, group_names):
+    output_dir = os.path.join(configs.rootdir, "data", "results", context_name)
+    merged_df = pd.DataFrame(columns=["ENTREZ_GENE_ID"])
+    merged_hi_df = merged_df
+    for group in group_names:
+        read_filepath = os.path.join(output_dir, context_name, f"bool_prot_Matrix_{context_name}_{group}.csv")
+        read_df = pd.read_csv(read_filepath)
+        read_df.set_index("ENTREZ_GENE_ID", inplace=True)
+
+        merged_df = merged_df.merge(read_df["expressed"], how="inner")
+        merged_hi_df = merged_hi_df.merge(read_df["high"], how="inner")
+
+    merged_df.apply(lambda x: sum(x)/len(merged_df.columns)>=group_ratio, axis=1, result_type="reduce")
+    merged_hi_df.apply(lambda x: sum(x)/len(merged_hi_df.columns)>=hi_group_ratio, axis=1, result_type="reduce")
+    out_df = pd.DataFrame({"ENTREZ_GENE_D": merged_df.index})
+    out_df = out_df.merge(merged_df, how="inner").merge(merged_hi_df, how="inner")
+    out_filepath = os.path.join(output_dir, context_name, f"Proteomics_{context_name}.csv")
+    out_df.to_csv(out_filepath, index_label="ENTREZ_GENE_ID")
+    print("Test Data Saved to {}".format(out_filepath))
 
 
 # read data from csv files
@@ -133,14 +177,6 @@ def load_proteomics_tests(filename, context_name):
         return load_empty_dict()
 
 
-def calc_zscore(list):
-    mu = list.sum()
-    diffs = [(val - mu)**2 for val in list]
-    stdev = (diffs.sum() / (len(list) - 1))**0.5
-    z_score = [(val - mu)/stdev for val in list]
-    return
-
-
 def proteomics_gen(temp):
     """
     Description
@@ -152,12 +188,6 @@ def main(argv):
     """
     Description
     """
-    suppfile = "proteomics_data_inputs.xlsx"
-    expr_prop = 0.5
-    top_prop = 0.9
-    percentile = 25
-
-    # TODO: Fix the descriptions in these argument parsers
     parser = argparse.ArgumentParser(
         prog="proteomics_gen.py",
         description="Description goes here",
@@ -176,7 +206,8 @@ def main(argv):
         "-r",
         "--replicate-ratio",
         type=float,
-        required=True,
+        required=False,
+        default=0.5,
         dest="rep_ratio",
         help="Ratio of replicates required for a gene to be considered active in that group",
     )
@@ -184,7 +215,8 @@ def main(argv):
         "-b",
         "--batch-ratio",
         type=float,
-        required=True,
+        required=False,
+        default=0.5,
         dest="group_ratio",
         help="Ratio of groups (batches or studies) required for a gene to be considered active in a context",
     )
@@ -192,63 +224,40 @@ def main(argv):
         "-hr",
         "--high-replicate-ratio",
         type=float,
-        required=True,
+        required=False,
+        default=0.5,
         dest="hi_rep_ratio",
-        help="Genes can be considered high confidence if they are expressed in a high proportion of samples. "
-             + "High confidence genes will be considered expressed regardless of agreement with other data sources",
+        help="Ratio of replicates required for a gene to be considered high-confidence in that group",
     )
     parser.add_argument(
-        "-hr",
+        "-hb",
         "--high-batch-ratio",
         type=float,
-        required=True,
-        dest="hi_batch_ratio",
-        help="Genes can be considered high confidence if they are expressed in a high proportion of samples. "
-             + "High confidence genes will be considered expressed regardless of agreement with other data sources",
+        required=False,
+        default=0.5,
+        dest="hi_group_ratio",
+        help="Ratio of groups (batches or studies) required for a gene to be considered high-confidence in a context",
     )
 
     parser.add_argument(
-        "-p",
-        "--percentile",
-        type=float,
-        required=True,
-        dest="percentile",
-        help="The quantile/percentile of genes to accept. This should be a number from 1 to 100",
+        "-q",
+        "--quantile",
+        type=int,
+        required=False,
+        default=25,
+        dest="quantile",
+        help="The quantile of genes to accept. This should be an integer from 0% (no proteins pass) "
+             "to 100% (all proteins pass).",
     )
     args = parser.parse_args()
 
     suppfile = args.config_file
-    expression_proportion = args.expression_proportion
-    top_proportion = args.top_proportion
-    percentile = args.percentile / 100
+    rep_ratio = args.rep_ratio
+    group_ratio = args.group_ratio
+    hi_rep_ratio = args.hi_rep_ratio
+    hi_group_ratio = args.hi_group_ratio
+    quantile = args.quantile / 100
 
-    # TODO: Remove this after verifying argparse works
-    # try:
-    #     opts, args = getopt.getopt(
-    #         argv,
-    #         "hc:e:t:p:",
-    #         ["config_file=", "expr_proportion=", "top_proportion=", "percentile="],
-    #     )
-    # except getopt.GetoptError:
-    #     print(
-    #         "python3 proteomics_gen.py -d <config file> -s <supplementary data file> -e <expression_proportion> -t <top_proportion>"
-    #     )
-    #     sys.exit(2)
-    # for opt, arg in opts:
-    #     if opt == "-h":
-    #         print(
-    #             "python3 proteomics_gen.py -d <data file> -s <supplementary data file> -e <expression_proportion> -t <top_proportion>"
-    #         )
-    #         sys.exit()
-    #     elif opt in ("-c", "--config_file"):
-    #         suppfile = arg
-    #     elif opt in ("-e"):
-    #         expr_prop = float(arg)
-    #     elif opt in ("-t"):
-    #         top_prop = float(arg)
-    #     elif opt in ("-p"):
-    #         percentile = float(arg) / 100
-    # print('Data file is "{}"'.format(datafilename))
     prot_config_filepath = os.path.join(
         configs.rootdir, "data", "config_sheets", suppfile
     )
@@ -258,42 +267,46 @@ def main(argv):
     sheet_names = xl.sheet_names
     for context_name in sheet_names:
         datafilename = "".join(["ProteomicsDataMatrix_", context_name, ".csv"])
-        config_sheet = pd.read_excel(
-            prot_config_filepath, sheet_name=context_name, header=0
-        )
-        groups = config_sheet["Group"].unique().to_list()
+        config_sheet = pd.read_excel(prot_config_filepath, sheet_name=context_name, header=0)
+        groups = config_sheet["Group"].unique().tolist()
         for group in groups:
+            print(group)
+            print(config_sheet["SampleName"].tolist())
+            print(config_sheet["Group"].tolist())
+            print(np.where([True if g == group else False for g in config_sheet["Group"].tolist()]))
 
-        cols = config_sheet["SampleName"].to_list() + [
-            "Gene Symbol",
-            "Majority protein IDs",
-        ]
-        proteomics_data = load_proteomics_data(datafilename, context_name)
-        proteomics_data = proteomics_data.loc[:, cols]
-        sym2id = load_gene_symbol_map(
-            gene_symbols=proteomics_data["Gene Symbol"].tolist(),
-            filename="proteomics_entrez_map.csv",
-        )
+            group_idx = np.where([True if g == group else False for g in config_sheet["Group"].tolist()])
+            #cols = config_sheet["SampleName"].iloc[group_idx]
 
-        # map gene symbol to ENTREZ_GENE_ID
-        proteomics_data.dropna(subset=["Gene Symbol"], inplace=True)
-        proteomics_data.drop(columns=["Majority protein IDs"], inplace=True)
-        proteomics_data = proteomics_data.groupby(["Gene Symbol"]).agg("max")
-        # proteomics_data.set_index('Gene Symbol', inplace=True)
-        proteomics_data["ENTREZ_GENE_ID"] = sym2id["Gene ID"]
-        proteomics_data.dropna(subset=["ENTREZ_GENE_ID"], inplace=True)
-        proteomics_data.set_index("ENTREZ_GENE_ID", inplace=True)
-        z_score = proteomics_data.apply(calc_zscore, axis=0, result_type="broadcast")
-        z_score_filepath = os.path.join(configs.datadir, "results", context_name, "_".join(["zscore_prot_Matrix_", group_number]))
-        z_score.to_csv()
-        # prote_data_filepath = os.path.join(configs.rootdir, 'data', 'proteomics_data.csv')
-        # if not os.path.isfile(prote_data_filepath):
-        # proteomics_data.to_csv(prote_data_filepath, index_label='ENTREZ_GENE_ID')
+            #cols = np.take(config_sheet["SampleName"].to_numpy(), group_idx) + [["Col 1", "Col 2"]]
+            cols = np.take(config_sheet["SampleName"].to_numpy(), group_idx).ravel().tolist() + [
+                "Gene Symbol",
+                "Majority protein IDs"
+            ]
 
-        # save proteomics data by test
-        save_proteomics_tests(
-            context_name, proteomics_data, expr_prop, top_prop, percentile
-        )
+            print(cols)
+                #"Gene Symbol",
+                #"Majority protein IDs",
+
+            proteomics_data = load_proteomics_data(datafilename, context_name)
+            proteomics_data = proteomics_data.loc[:, cols]
+            sym2id = load_gene_symbol_map(gene_symbols=proteomics_data["Gene Symbol"].tolist(),
+                                          filename="proteomics_entrez_map.csv",
+                                          )
+            # map gene symbol to ENTREZ_GENE_ID
+            proteomics_data.dropna(subset=["Gene Symbol"], inplace=True)
+            proteomics_data.drop(columns=["Majority protein IDs"], inplace=True)
+            proteomics_data = proteomics_data.groupby(["Gene Symbol"]).agg("max")
+            # proteomics_data.set_index('Gene Symbol', inplace=True)
+            proteomics_data["ENTREZ_GENE_ID"] = sym2id["Gene ID"]
+            proteomics_data.dropna(subset=["ENTREZ_GENE_ID"], inplace=True)
+            proteomics_data.set_index("ENTREZ_GENE_ID", inplace=True)
+
+            # save proteomics data by test
+            abundance_to_bool_group(context_name, group, proteomics_data, rep_ratio, hi_rep_ratio, quantile)
+
+        to_bool_context(context_name, group_ratio, hi_group_ratio, groups)
+
     return True
 
 
