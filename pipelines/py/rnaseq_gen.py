@@ -101,7 +101,7 @@ def handle_context_batch(
     rnaseq_config_filepath = os.path.join(
         configs.rootdir, "data", "config_sheets", config_filename
     )
-    xl = pd.ExcelFile(rnaseq_config_filepath, engine="xlrd")
+    xl = pd.ExcelFile(rnaseq_config_filepath)
     sheet_names = xl.sheet_names
 
     for model_name in sheet_names:

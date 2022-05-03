@@ -8,7 +8,11 @@ library(readxl)
 
 
 readCountMatrix <- function(cmat_file, config_file, disease_name) {
+  print("read config")
+  print(config_file)
   conf <- read_excel(config_file, sheet=disease_name, col_names=TRUE)
+  print("read matrix")
+  print(cmat_file)
   cmat_whole <- read.csv(cmat_file, header=TRUE)
   cmat_whole[,-1] <- lapply(cmat_whole[,-1], as.numeric)
   cmat_whole <- cmat_whole[rowSums(cmat_whole[,-1])>0,]
@@ -34,14 +38,14 @@ readCountMatrix <- function(cmat_file, config_file, disease_name) {
       SampMetrics[[group]][[entry]][["Counts"]] <- counts
       SampMetrics[[group]][[entry]][["Ensembl"]] <- genes
     } else {
-      print(paste(c(entry, " not found in disease count matrix")))
+      print(paste0(entry, " not found in disease count matrix"))
     }
   }
   return(SampMetrics)
 }
 
 
-dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name, min_fc) {
+dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name, min_lfc) {
   gene_list <- SampMetrics[[1]][[1]][["Ensembl"]]
   
   df <- data.frame(Ensembl=gene_list)
@@ -103,7 +107,7 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name, min_f
     con[i] <- 1
     qlf <- glmQLFTest(fit, contrast=con)
     edgeR_result <- topTags(qlf, n=65000)
-    deGenes <- decideTestsDGE(qlf, adjust.method="BH", p.value=0.05, lfc=log(min_fc, 2))
+    deGenes <- decideTestsDGE(qlf, adjust.method="BH", p.value=0.05)
     deGenes <- rownames(qlf)[as.logical(deGenes)]
     expTab <- edgeR_result$table
     
@@ -127,7 +131,7 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name, min_f
 }
 
 
-DGE_main <- function(cmat_file, config_file, context_name, disease_name, min_fc) {
+DGE_main <- function(cmat_file, config_file, context_name, disease_name, min_lfc) {
   print("Reading Counts Matrix")
   test_name <- cmat_file
   test_name <-unlist(strsplit(test_name, "_RawCounts"))[1]
@@ -136,6 +140,6 @@ DGE_main <- function(cmat_file, config_file, context_name, disease_name, min_fc)
   SampMetrics <- readCountMatrix(cmat_file, config_file, disease_name)
   ensembl_all <- SampMetrics[[1]][[1]][["Ensembl"]]
   print("Performing DGE")
-  data_table <- dgeAnalysis(SampMetrics, test_name, context_name, disease_name, min_fc)
+  data_table <- dgeAnalysis(SampMetrics, test_name, context_name, disease_name, min_lfc)
   return(data_table)
 }
