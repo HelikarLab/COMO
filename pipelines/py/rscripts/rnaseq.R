@@ -317,7 +317,8 @@ zfpkm_filter <- function(SampMetrics, filt_options, model_name) {
         ent <- SampMetrics[[i]][["Entrez"]] # get entrez ids
         fmat <- SampMetrics[[i]][["FPKM_Matrix"]] # get fpkm matrix
         fdf <- data.frame(fmat) # convert to df
-        fpkm_fname <- paste(c("/home/jupyteruser/work/data/results/", model_name, "/FPKM_Matrix_", study_number, ".csv"),collapse="")
+        fpkm_fname <- file.path("/home", username, "work", "data", "results",
+                                 model_name, paste0("FPKM_Matrix_", study_number, ".csv"))
         write_fpkm <- cbind(ent, fdf)
         write.csv(write_fpkm, fpkm_fname, row.names=FALSE)
         missing_vals <- is.na(fdf) # get NA values from fdf
@@ -325,12 +326,12 @@ zfpkm_filter <- function(SampMetrics, filt_options, model_name) {
         zmat <- zFPKM(fdf, assayName="FPKM") # calculate zFPKM
         #SampMetrics[[i]][["zFPKM_Matrix"]] <- zmat
         zmat[missing_vals] <- NA # set NA values back to NA
-        zfpkm_fname <- file.path("/home", "jupyteruser", "work", "data", "results",
+        zfpkm_fname <- file.path("/home", username, "work", "data", "results",
                                  model_name, paste0("zFPKM_Matrix_", study_number, ".csv"))
         write_zfpkm <- cbind(ent, zmat)
         write.csv(write_zfpkm, zfpkm_fname, row.names=FALSE)
 
-        zfpkm_plot_dir <- file.path("/home", "jupyteruser", "work", "data", "results",
+        zfpkm_plot_dir <- file.path("/home", username, "work", "data", "results",
                                     model_name, "figures")
 
         if ( !file.exists(zfpkm_plot_dir) ) {

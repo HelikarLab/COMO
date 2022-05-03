@@ -6,7 +6,7 @@ library("tidyverse")
 library(ggplot2)
 
 
-parse_contexts <- function(wd, contexts) {
+parse_contexts_zfpkm <- function(wd, contexts) {
 
     get_batch_name <- function(x) {
         basename(x)
@@ -21,6 +21,25 @@ parse_contexts <- function(wd, contexts) {
 
     return(batches)
 }
+
+
+parse_contexts_zscore_prot <- function(wd, contexts) {
+
+    get_batch_name <- function(x) {
+        basename(x)
+        return(substring(basename(x), 1, nchar(basename(x))-4))
+    }
+
+    batches = list()
+    for ( context in contexts ) {
+        files <- Sys.glob(file.path(wd, context, "zscore_prot_Matrix_*.csv"))
+        batches[[context]] <- unlist(lapply(files, get_batch_name))
+    }
+
+    return(batches)
+}
+
+
 
 
 merge_batch <- function(wd, context, batch, zmat) {
@@ -153,31 +172,70 @@ combine_context_zdistro <- function(wd, context, n_reps, zmat) {
 }
 
 
-combine_zscores_main <- function(wd, contexts) {
+combine_zscores_main <- function(wd, contexts, use_rna, use_proteins) {
     # TODO: proteomics combine!
     fig_path <- file.path(wd, "figures")
     if ( !file.exists(fig_path) ) { dir.create(fig_path) }
 
-    batches <- parse_contexts(wd, contexts)
-    for ( context in contexts ) {
-        cont_batches <- batches[[context]]
-        nreps <- c()
-        cnt <- 0
-        for ( batch in cont_batches ) {
-            print(paste0("combining ", batch, " for context ", context))
-            res <- merge_batch(wd, context, batch)
-            zmat <- res[[1]]
-            nreps <- c(nreps, res[[2]])
-            comb_z <- combine_batch_zdistro(wd, context, batch, zmat)
-            #ents <- zmat$ent
-            #comb_z <- cbind(ents, comb_z)
-            colnames(comb_z) <- c("ent", batch)
-            if (!cnt) { merge_z <- comb_z }
-            else { merge_z <- merge_z %>% inner_join(comb_z, by="ent") }
-            cnt <- cnt+1
+    if ( use_rna ) {
+        batches_rna <- parse_contexts_zfpkm(wd, contexts)
+        batches_prot <- parse_contexts_zscore_prot(wd, contexts)
+        for ( context in contexts ) {
+            cont_batches <- batches_rna[[context]]
+            nreps <- c()
+            cnt <- 0
+            for ( batch in cont_batches ) {
+                print(paste0("combining ", batch, " for context ", context, "'s RNA-seq"))
+                res <- merge_batch(wd, context, batch)
+                zmat <- res[[1]]
+                nreps <- c(nreps, res[[2]])
+                comb_z <- combine_batch_zdistro(wd, context, batch, zmat)
+                colnames(comb_z) <- c("ent", batch)
+                if (!cnt) { merge_z <- comb_z }
+                else { merge_z <- merge_z %>% inner_join(comb_z, by="ent") }
+                cnt <- cnt+1
+            }
+
+            comb_batches_z_rna <- combine_context_zdistro(wd, context, nreps, merge_z)
+            filename <- file.path(wd, context, paste0("combined_zFPKM_", context, ".csv"))
+            write.csv(comb_batches_z, filename, row.names=FALSE)
+            if ( !use_proteins ) {
+                filename <- file.path(wd, context, paste0("model_scores_", context, ".csv"))
+                write.csv(comb_batches_z_rna, filename, row.names=FALSE)
+            }
         }
-        filename <- file.path(wd, context, paste0("combined_zFPKM_", context, ".csv"))
-        comb_batches_z <- combine_context_zdistro(wd, context, nreps, merge_z)
+    }
+
+    if ( use_proteins ) {
+        for ( context in contexts ) {
+            cont_batches <- batches_prot[[context]]
+            nreps <- c()
+            cnt <- 0
+            for ( batch in cont_batches ) {
+                print(paste0("combining ", batch, " for context ", context, "'s protein abundance"))
+                res <- merge_batch(wd, context, batch)
+                zmat <- res[[1]]
+                nreps <- c(nreps, res[[2]])
+                comb_z <- combine_batch_zdistro(wd, context, batch, zmat)
+                colnames(comb_z) <- c("ent", batch)
+                if (!cnt) { merge_z <- comb_z }
+                else { merge_z <- merge_z %>% inner_join(comb_z, by="ent") }
+                cnt <- cnt+1
+            }
+
+            comb_batches_z_prot <- combine_context_zdistro(wd, context, nreps, merge_z)
+            filename <- file.path(wd, context, paste0("combined_zscore_proteinAbundance_", context, ".csv"))
+            write.csv(comb_batches_z_prot, filename, row.names=FALSE)
+            if ( !use_proteins ) {
+                filename <- file.path(wd, context, paste0("model_scores_", context, ".csv"))
+                write.csv(comb_batches_z_prot, filename, row.names=FALSE)
+            }
+        }
+    }
+
+    if ( use_rna & use_proteins ) {
+        filename <- file.path(wd, context, paste0("model_scores_", context, ".csv"))
         write.csv(comb_batches_z, filename, row.names=FALSE)
+
     }
 }
