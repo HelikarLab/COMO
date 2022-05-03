@@ -179,7 +179,7 @@ def create_gene_pairs(
     return gene_pairs
 
 
-def score_gene_pairs(gene_pairs, filename):
+def score_gene_pairs(gene_pairs, filename, input_reg):
     p_model_genes = gene_pairs.Gene.unique()
     d_score = pd.DataFrame([], columns=["score"])
     for p_gene in p_model_genes:
@@ -188,14 +188,17 @@ def score_gene_pairs(gene_pairs, filename):
         total_aff = data_p["Gene IDs"].unique().size
         # print(total_aff)
         n_aff_down = (
-            data_p.loc[abs(data_p["rxn_fluxRatio"]) < 0.99, "Gene IDs"].unique().size
+            data_p.loc[abs(data_p["rxn_fluxRatio"]) < 0.9, "Gene IDs"].unique().size
         )
         # print(n_aff_down)
         n_aff_up = (
-            data_p.loc[abs(data_p["rxn_fluxRatio"]) > 1.0, "Gene IDs"].unique().size
+            data_p.loc[abs(data_p["rxn_fluxRatio"]) > 1.1, "Gene IDs"].unique().size
         )
         # print(n_aff_up)
-        d_s = (n_aff_down - n_aff_up) / total_aff
+        if input_reg == "up":
+            d_s = (n_aff_down - n_aff_up) / total_aff
+        else:
+            d_s = (n_aff_up - n_aff_down) / total_aff
         # print(d_s)
         d_score.at[p_gene, "score"] = d_s
 
@@ -246,14 +249,14 @@ def repurposing_hub_preproc(drug_file):
     drug_db = pd.read_csv(drug_file, sep="\t")
     drug_db_new = pd.DataFrame()
     for index, row in drug_db.iterrows():
-        if pd.isnull(row["Target"]):
+        if pd.isnull(row["target"]):
             continue
-        for target in row["Target"].split(","):
+        for target in row["target"].split("|"):
             drug_db_new = pd.concat(
-                [drug_db_new, pd.DataFrame([{"Name": row["Name"],
-                                             "MOA": row["MOA"],
+                [drug_db_new, pd.DataFrame([{"Name": row["pert_iname"],
+                                             "MOA": row["moa"],
                                              "Target": target.strip(),
-                                             "Phase": row["Phase"]
+                                             "Phase": row["clinical_phase"]
                                              }])],
                 ignore_index=True
             )
@@ -368,7 +371,7 @@ def main(argv):
     ref_flux_file = args.ref_flux_file
 
     output_dir = os.path.join(configs.datadir, "results", context, disease)
-    inhibitors_file = os.path.join(configs.datadir, f"{context}_{disease}_inhibitors.tsv")
+    inhibitors_file = os.path.join(output_dir, f"{context}_{disease}_inhibitors.tsv")
 
     print(f"Output directory: '{output_dir}'")
     print(f"Tissue Specific Model file is at: {tissue_spec_model_file}")
@@ -437,11 +440,11 @@ def main(argv):
     # print(HasEffects_Gene)
     # Gene_Pairs_down = load_Inhi_Fratio(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_DOWN.txt'))
     # gene_pairs_up = load_Inhi_Fratio(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_UP.txt'))
-    d_score_down = score_gene_pairs(gene_pairs_down, os.path.join(output_dir, "d_score_DOWN.csv"))
+    d_score_down = score_gene_pairs(gene_pairs_down, os.path.join(output_dir, "d_score_DOWN.csv"), input_reg="down")
     # d_score_down = score_gene_pairs_diff(Gene_Pairs_down, 'd_score_DOWN.csv')
-    d_score_up = score_gene_pairs(gene_pairs_up, os.path.join(output_dir, "d_score_UP.csv"))
+    d_score_up = score_gene_pairs(gene_pairs_up, os.path.join(output_dir, "d_score_UP.csv"), input_reg="up")
     # d_score_up = score_gene_pairs_diff(gene_pairs_up, 'd_score_UP.csv')
-    pertubation_effect_score = (d_score_up - d_score_down).sort_values(by="score", ascending=False)
+    pertubation_effect_score = (d_score_up + d_score_down).sort_values(by="score", ascending=False)
     pertubation_effect_score.to_csv(os.path.join(output_dir, "d_score.csv"))
     print(d_score_down)
     print(d_score_up)

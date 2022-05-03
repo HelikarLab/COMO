@@ -12,12 +12,12 @@ from project import configs
 
 
 # Load Proteomics
-def load_proteomics_data(datafilename, model_name):
+def load_proteomics_data(datafilename, context_name):
     """
     Add description......
     """
     dataFullPath = os.path.join(
-        configs.rootdir, "data", "data_matrices", model_name, datafilename
+        configs.rootdir, "data", "data_matrices", context_name, datafilename
     )
     print('Data matrix is at "{}"'.format(dataFullPath))
     if os.path.isfile(dataFullPath):
@@ -65,7 +65,7 @@ def load_gene_symbol_map(gene_symbols, filename="proteomics_entrez_map.csv"):
 
 
 # determine expression logicals and save results
-def save_proteomics_tests(model_name, testdata, expr_prop, top_prop, percentile):
+def save_proteomics_tests(context_name, testdata, expr_prop, top_prop, percentile):
     """
     Descrioption....
     """
@@ -80,21 +80,15 @@ def save_proteomics_tests(model_name, testdata, expr_prop, top_prop, percentile)
     testdata.loc[(testdata["pos"] > expr_prop), ["expressed"]] = 1
     testdata["top"] = 0
     testdata.loc[(testdata["pos"] > top_prop), ["top"]] = 1
-    output_dir = os.path.join(configs.rootdir, "data", "results", model_name)
+    output_dir = os.path.join(configs.rootdir, "data", "results", context_name)
     os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(
-        configs.rootdir,
-        "data",
-        "results",
-        model_name,
-        "Proteomics_{}.csv".format(model_name),
-    )
+    output_path = os.path.join(output_dir, context_name, f"Proteomics_{context_name}.csv")
     testdata.to_csv(output_path, index_label="ENTREZ_GENE_ID")
     print("Test Data Saved to {}".format(output_path))
 
 
 # read data from csv files
-def load_proteomics_tests(filename, model_name):
+def load_proteomics_tests(filename, context_name):
     """
     Description....
     """
@@ -122,21 +116,29 @@ def load_proteomics_tests(filename, model_name):
         print("Error: file not found {}".format(inquiry_full_path))
         sys.exit()
 
-    filename = "Proteomics_{}.csv".format(model_name)
+    filename = "Proteomics_{}.csv".format(context_name)
     fullsavepath = os.path.join(
-        configs.rootdir, "data", "results", model_name, filename
+        configs.rootdir, "data", "results", context_name, filename
     )
     if os.path.isfile(fullsavepath):
         data = pd.read_csv(fullsavepath, index_col="ENTREZ_GENE_ID")
         print("Read from {}".format(fullsavepath))
-        return model_name, data
+        return context_name, data
     else:
         print(
-            f"Microarray gene expression file for {model_name} was not found at {fullsavepath}. This may be "
-            f"intentional. Contexts where microarray data can be found in /work/data/results/{model_name}/ will "
+            f"Microarray gene expression file for {context_name} was not found at {fullsavepath}. This may be "
+            f"intentional. Contexts where microarray data can be found in /work/data/results/{context_name}/ will "
             f"still be used for other contexts if found."
         )
         return load_empty_dict()
+
+
+def calc_zscore(list):
+    mu = list.sum()
+    diffs = [(val - mu)**2 for val in list]
+    stdev = (diffs.sum() / (len(list) - 1))**0.5
+    z_score = [(val - mu)/stdev for val in list]
+    return
 
 
 def proteomics_gen(temp):
@@ -171,22 +173,40 @@ def main(argv):
         help="The configuration file for proteomics",
     )
     parser.add_argument(
-        "-e",
-        "--expression_proportion",
+        "-r",
+        "--replicate-ratio",
         type=float,
         required=True,
-        dest="expression_proportion",
-        help="Ratio of replicates required for a gene to be considered active in that sampele",
+        dest="rep_ratio",
+        help="Ratio of replicates required for a gene to be considered active in that group",
     )
     parser.add_argument(
-        "-t",
-        "--top_proportion",
+        "-b",
+        "--batch-ratio",
         type=float,
         required=True,
-        dest="top_proportion",
+        dest="group_ratio",
+        help="Ratio of groups (batches or studies) required for a gene to be considered active in a context",
+    )
+    parser.add_argument(
+        "-hr",
+        "--high-replicate-ratio",
+        type=float,
+        required=True,
+        dest="hi_rep_ratio",
         help="Genes can be considered high confidence if they are expressed in a high proportion of samples. "
              + "High confidence genes will be considered expressed regardless of agreement with other data sources",
     )
+    parser.add_argument(
+        "-hr",
+        "--high-batch-ratio",
+        type=float,
+        required=True,
+        dest="hi_batch_ratio",
+        help="Genes can be considered high confidence if they are expressed in a high proportion of samples. "
+             + "High confidence genes will be considered expressed regardless of agreement with other data sources",
+    )
+
     parser.add_argument(
         "-p",
         "--percentile",
@@ -236,16 +256,19 @@ def main(argv):
 
     xl = pd.ExcelFile(prot_config_filepath)
     sheet_names = xl.sheet_names
-    for model_name in sheet_names:
-        datafilename = "".join(["ProteomicsDataMatrix_", model_name, ".csv"])
+    for context_name in sheet_names:
+        datafilename = "".join(["ProteomicsDataMatrix_", context_name, ".csv"])
         config_sheet = pd.read_excel(
-            prot_config_filepath, sheet_name=model_name, header=0
+            prot_config_filepath, sheet_name=context_name, header=0
         )
+        groups = config_sheet["Group"].unique().to_list()
+        for group in groups:
+
         cols = config_sheet["SampleName"].to_list() + [
             "Gene Symbol",
             "Majority protein IDs",
         ]
-        proteomics_data = load_proteomics_data(datafilename, model_name)
+        proteomics_data = load_proteomics_data(datafilename, context_name)
         proteomics_data = proteomics_data.loc[:, cols]
         sym2id = load_gene_symbol_map(
             gene_symbols=proteomics_data["Gene Symbol"].tolist(),
@@ -260,13 +283,16 @@ def main(argv):
         proteomics_data["ENTREZ_GENE_ID"] = sym2id["Gene ID"]
         proteomics_data.dropna(subset=["ENTREZ_GENE_ID"], inplace=True)
         proteomics_data.set_index("ENTREZ_GENE_ID", inplace=True)
+        z_score = proteomics_data.apply(calc_zscore, axis=0, result_type="broadcast")
+        z_score_filepath = os.path.join(configs.datadir, "results", context_name, "_".join(["zscore_prot_Matrix_", group_number]))
+        z_score.to_csv()
         # prote_data_filepath = os.path.join(configs.rootdir, 'data', 'proteomics_data.csv')
         # if not os.path.isfile(prote_data_filepath):
         # proteomics_data.to_csv(prote_data_filepath, index_label='ENTREZ_GENE_ID')
 
         # save proteomics data by test
         save_proteomics_tests(
-            model_name, proteomics_data, expr_prop, top_prop, percentile
+            context_name, proteomics_data, expr_prop, top_prop, percentile
         )
     return True
 
