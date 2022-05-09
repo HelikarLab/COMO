@@ -236,12 +236,18 @@ def seed_imat(
     cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force, context_name
 ):
     expr_vector = np.array(expr_vector)
+    print("expr_vector:")
+    print(expr_vector[:10])
     properties = IMATProperties(
         exp_vector=expr_vector, exp_thresholds=expr_thesh, core=idx_force, epsilon=0.01
     )
+    print("Set props")
     algorithm = IMAT(s_matrix, lb, ub, properties)
+    print("set algo")
     context_rxns = algorithm.run()
+    print("run")
     fluxes = algorithm.sol.to_series()
+    print("got fluxes")
     context_cobra_model = cobra_model.copy()
     r_ids = [r.id for r in context_cobra_model.reactions]
     pd.DataFrame({"rxns": r_ids}).to_csv(os.path.join(configs.datadir, "rxns_test.csv"))
@@ -258,10 +264,12 @@ def seed_imat(
             getattr(context_cobra_model.reactions, r_id).fluxes = val
             flux_df.loc[len(flux_df.index)] = [r_id, val]
 
+    print("removing")
     context_cobra_model.remove_reactions(remove_rxns, True)
     flux_df.to_csv(
         os.path.join(configs.datadir, "results", context_name, "iMAT_flux.csv")
     )
+    print("done")
     return context_cobra_model
 
 
@@ -293,22 +301,14 @@ def split_gene_expression_data(expression_data, recon_algorithm="GIMME"):
     Splits genes that have mapped to multiple Entrez IDs are formated as "gene12//gene2//gene3"
     """
     if recon_algorithm in ["IMAT", "TINIT"]:
-        expression_data.rename(
-            columns={"ENTREZ_GENE_ID": "Gene", "combine_z": "Data"}, inplace=True
-        )
+        expression_data.rename(columns={"ENTREZ_GENE_ID": "Gene", "combine_z": "Data"}, inplace=True)
     else:
-        expression_data.rename(
-            columns={"ENTREZ_GENE_ID": "Gene", "Active": "Data"}, inplace=True
-        )
+        expression_data.rename(columns={"ENTREZ_GENE_ID": "Gene", "Active": "Data"}, inplace=True)
 
     expression_data = expression_data.loc[:, ["Gene", "Data"]]
     expression_data["Gene"] = expression_data["Gene"].astype(str)
-    single_gene_names = expression_data[
-        ~expression_data.Gene.str.contains("//")
-    ].reset_index(drop=True)
-    multiple_gene_names = expression_data[
-        expression_data.Gene.str.contains("//")
-    ].reset_index(drop=True)
+    single_gene_names = expression_data[~expression_data.Gene.str.contains("//")].reset_index(drop=True)
+    multiple_gene_names = expression_data[expression_data.Gene.str.contains("//")].reset_index(drop=True)
     breaks_gene_names = pd.DataFrame(columns=["Gene", "Data"])
 
     for index, row in multiple_gene_names.iterrows():
@@ -429,7 +429,7 @@ def create_context_specific_model(
         cobra_model.remove_reactions(imat_rm_rxns, True)
 
     # set solver
-    cobra_model.solver = solver.lower()
+    #cobra_model.solver = solver.lower()
 
     # check number of unsolvable reactions for reference model under media assumptions
     incon_rxns, cobra_model = feasibility_test(cobra_model, "before_seeding")
@@ -487,6 +487,8 @@ def create_context_specific_model(
     exp_idx_list = [idx for (idx, val) in enumerate(expr_vector) if val > 0]
     exp_thresh = (low_thresh, high_thresh)
 
+    print("build that shiz yo")
+
     # switch case dictionary runs the functions making it too slow, better solution then elif ladder?
     if recon_algorithm == "GIMME":
         context_model_cobra = seed_gimme(
@@ -513,6 +515,8 @@ def create_context_specific_model(
         )
     else:
         context_model_cobra = seed_unsupported(recon_algorithm)
+
+    print("we built it boyyyy")
 
     # check number of unsolvable reactions for seeded model under media assumptions
     incon_rxns_cs, context_model_cobra = feasibility_test(

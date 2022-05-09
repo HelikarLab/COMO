@@ -1,8 +1,16 @@
+username <- Sys.info()["user"]
+work_dir <- str_interp("/home/${username}/work")
+
+if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
+    dir.create(str_interp("${work_dir}/py/rlogs"))
+}
+
 # prevent messy messages from repeatedly writing to juypter
-zz <- file(file.path("/home", "jupyteruser", "work", "py", "rlogs", "merge_distributions.Rout"), open="wt")
+zz <- file(file.path("/home", username, "work", "py", "rlogs", "combine_distributions.Rout"), open="wt")
 sink(zz, type="message")
 
-library("tidyverse")
+
+library(tidyverse)
 library(ggplot2)
 
 
@@ -238,7 +246,7 @@ combine_zscores_main <- function(wd, contexts, use_rna, use_proteins, keep_gene_
 
             comb_batches_z_rna <- combine_context_zdistro(wd, context, nreps, merge_z)
             filename <- file.path(wd, context, paste0("combined_zFPKM_", context, ".csv"))
-            write.csv(comb_batches_z, filename, row.names=FALSE)
+            write.csv(comb_batches_z_rna, filename, row.names=FALSE)
             if ( !use_proteins ) {
                 filename <- file.path(wd, context, paste0("model_scores_", context, ".csv"))
                 write.csv(comb_batches_z_rna, filename, row.names=FALSE)

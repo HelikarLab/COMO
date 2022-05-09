@@ -1,5 +1,19 @@
+username <- Sys.info()["user"]
+work_dir <- str_interp("/home/${username}/work")
+
+if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
+    dir.create(str_interp("${work_dir}/py/rlogs"))
+}
+
+# prevent messy messages from repeatedly writing to juypter
+zz <- file(file.path("/home", username, "work", "py", "rlogs", "protein_transform.Rout"), open="wt")
+sink(zz, type="message")
+
+
 library(ggplot2)
 library(tidyverse)
+library(zoo)
+
 
 z_result <- function(z_vector, density, mu, stdev, max_y) {
     z_res <- list(
@@ -19,13 +33,23 @@ z_score_calc <- function(abundance) {
     if (!is.numeric(abundance)) {
         stop("argument 'abundance' must be numeric")
     }
-    print(abundance)
+    #print("abundance_density")
+    #print(abundance)
     log_abundance_filt <- log(abundance[abundance>0], base=2)
     log_abundance <- log(abundance, base=2)
+    #print("log abundance")
+    #print(log_abundance)
+    #print("log abundance filt")
+    #print(log_abundance_filt)
 
     d <- density(log_abundance_filt)
+    print("density")
+    #print(d[["x"]])
+    #print(d[["y"]])
     # calculate rolling average
     perc <- as.integer(0.05*length(d[["y"]]) + 1) # 10% roll avg interval
+    d[["roll_y"]] <- zoo::rollmean(d[["y"]], perc)
+
     # from https://stats.stackexchange.com/questions/22974/how-to-find-local-peaks-valleys-in-a-series-of-data
     find_maxima <- function (x, m = 1){
         shape <- diff(sign(diff(as.numeric(x), na.pad = FALSE)))
@@ -160,6 +184,7 @@ rm_infinite <- function(fpkm) {
 
 
 protein_transform_main <- function(abundance_matrix, out_dir, group_name) {
+    print(out_dir)
     dir.create(file.path(out_dir, "figures"), showWarnings = FALSE)
     prot <- read.csv(abundance_matrix)
     print(head(prot))
@@ -171,7 +196,8 @@ protein_transform_main <- function(abundance_matrix, out_dir, group_name) {
     z_transformed_abundances <- cbind(prot[,1], z_transform(prot[,c(-1)])[[2]])
     print(head(z_transformed_abundances))
     out_file <- file.path(out_dir, paste0("protein_zscore_Matrix_", group_name))
-    write.csv(z_transformed_abundances, out_file, row.names=FALSE, col.names=FALSE)
+    print(out_file)
+    write.csv(z_transformed_abundances, out_file, row.names=FALSE)
 }
 
 

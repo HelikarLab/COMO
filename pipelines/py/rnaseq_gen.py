@@ -31,7 +31,7 @@ f.close()
 rnaseq_io = SignatureTranslatedAnonymousPackage(string, "rnaseq_io")
 
 
-def load_rnaseq_tests(filename, model_name, lib_type):
+def load_rnaseq_tests(filename, context_name, lib_type):
     """
     Load rnaseq results returning a dictionary of test (context, context, cell, etc ) names and rnaseq expression data
     """
@@ -56,11 +56,11 @@ def load_rnaseq_tests(filename, model_name, lib_type):
         sys.exit()
 
     if lib_type == "total":  # if using total RNA-seq library prep
-        filename = f"rnaseq_total_{model_name}.csv"
+        filename = f"rnaseq_total_{context_name}.csv"
     elif lib_type == "mrna":  # if using mRNA-seq library prep
-        filename = f"rnaseq_mrna_{model_name}.csv"
+        filename = f"rnaseq_mrna_{context_name}.csv"
     elif lib_type == "sc":  # if using single-cell RNA-seq
-        filename = f"rnaseq_sc_{model_name}.csv"
+        filename = f"rnaseq_sc_{context_name}.csv"
     else:
         print(
             f"Unsupported RNA-seq library type: {lib_type}. Must be one of 'total', 'mrna', 'sc'."
@@ -68,16 +68,16 @@ def load_rnaseq_tests(filename, model_name, lib_type):
         sys.exit()
 
     fullsavepath = os.path.join(
-        configs.rootdir, "data", "results", model_name, filename
+        configs.rootdir, "data", "results", context_name, filename
     )
     if os.path.isfile(fullsavepath):
         data = pd.read_csv(fullsavepath, index_col="ENTREZ_GENE_ID")
         print(f"Read from {fullsavepath}")
-        return model_name, data
+        return context_name, data
     else:
         print(
-            f"{lib_type} gene expression file for {model_name} was not found at {fullsavepath}. This may be "
-            f"intentional. Contexts where {lib_type} data can be found in /work/data/results/{model_name}/ will "
+            f"{lib_type} gene expression file for {context_name} was not found at {fullsavepath}. This may be "
+            f"intentional. Contexts where {lib_type} data can be found in /work/data/results/{context_name}/ will "
             "still be used if found for other contexts."
         )
         return load_dummy_dict()
@@ -104,17 +104,17 @@ def handle_context_batch(
     xl = pd.ExcelFile(rnaseq_config_filepath)
     sheet_names = xl.sheet_names
 
-    for model_name in sheet_names:
-        print("model: ", model_name)
-        rnaseq_output_file = "".join(["rnaseq_", prep, "_", model_name, ".csv"])
+    for context_name in sheet_names:
+        print("model: ", context_name)
+        rnaseq_output_file = "".join(["rnaseq_", prep, "_", context_name, ".csv"])
         rnaseq_output_filepath = os.path.join(
-            configs.datadir, "results", model_name, rnaseq_output_file
+            configs.datadir, "results", context_name, rnaseq_output_file
         )
         rnaseq_input_file = "".join(
-            ["gene_counts_matrix_", prep, "_", model_name, ".csv"]
+            ["gene_counts_matrix_", prep, "_", context_name, ".csv"]
         )
         rnaseq_input_filepath = os.path.join(
-            configs.datadir, "data_matrices", model_name, rnaseq_input_file
+            configs.datadir, "data_matrices", context_name, rnaseq_input_file
         )
         gene_info_filepath = os.path.join(configs.datadir, "gene_info.csv")
 
@@ -134,7 +134,7 @@ def handle_context_batch(
             technique=technique,
             quantile=quantile,
             min_count=min_count,
-            model_name=model_name,
+            context_name=context_name,
         )
 
         print("Test data saved to " + rnaseq_output_filepath)
