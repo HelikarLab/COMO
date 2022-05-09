@@ -42,8 +42,10 @@ def read_uniprot_ids(input_csv_file: str) -> list[str]:
                 # Save this in the uniprot_ids dictionary
                 uniprot_data["ion_intensities"].append(line.split("\t")[7])
 
-                # We have moved to a new spectrum, add the previous UniProt IDs to the uniprot_ids dictionary
-                uniprot_data["uniprot_ids"].append(temp_uniprot_ids)
+                # If the temporary UniProt IDs list is not empty, add it to the uniprot_ids dictionary
+                if temp_uniprot_ids:
+                    uniprot_data["uniprot_ids"].append(temp_uniprot_ids)
+
                 # Clear the temporary list
                 temp_uniprot_ids = []
 
