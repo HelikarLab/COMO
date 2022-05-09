@@ -25,7 +25,7 @@ ggplot = importr("ggplot2")
 f = open(os.path.join(configs.rootdir, "py", "rscripts", "protein_transform.R"), "r")
 string = f.read()
 f.close()
-protein_transform_io = SignatureTranslatedAnonymousPackage(string, "protein_transform_io")
+protein_transform_io = SignatureTranslatedAnonymousPackage(string, "protein_transform_io")  # fmt: skip
 
 
 # Load Proteomics
@@ -81,32 +81,43 @@ def load_gene_symbol_map(gene_symbols, filename="proteomics_entrez_map.csv"):
     return sym2id[~sym2id.index.duplicated()]
 
 
-def abundance_to_bool_group(context_name, group_name, abundance_matrix, rep_ratio, hi_rep_ratio, quantile):
+def abundance_to_bool_group(
+    context_name, group_name, abundance_matrix, rep_ratio, hi_rep_ratio, quantile
+):
     """
     Descrioption....
     """
     output_dir = os.path.join(configs.rootdir, "data", "results", context_name)
     os.makedirs(output_dir, exist_ok=True)
     # write group abundances to individual files
-    abundance_filepath = os.path.join(configs.datadir,
-                                      "results",
-                                      context_name,
-                                      "_".join(["proteinAbundance_Matrix", group_name])
-                                      )
+    abundance_filepath = os.path.join(
+        configs.datadir,
+        "results",
+        context_name,
+        "_".join(["proteinAbundance_Matrix", group_name]),
+    )
     abundance_matrix.to_csv(abundance_filepath, index_label="ENTREZ_GENE_ID")
-    protein_transform_io.protein_transform_main(abundance_filepath, output_dir, group_name)
+    protein_transform_io.protein_transform_main(
+        abundance_filepath, output_dir, group_name
+    )
     # Logical Calculation
     thresholds = abundance_matrix.quantile(quantile, axis=0)
-    testbool = pd.DataFrame(0, columns=list(abundance_matrix), index=abundance_matrix.index)
+    testbool = pd.DataFrame(
+        0, columns=list(abundance_matrix), index=abundance_matrix.index
+    )
     for col in list(abundance_matrix):
         testbool.loc[abundance_matrix[col] > thresholds[col], [col]] = 1
 
-    abundance_matrix["pos"] = (abundance_matrix > 0).sum(axis=1) / abundance_matrix.count(axis=1)
+    abundance_matrix["pos"] = (abundance_matrix > 0).sum(
+        axis=1
+    ) / abundance_matrix.count(axis=1)
     abundance_matrix["expressed"] = 0
     abundance_matrix.loc[(abundance_matrix["pos"] > rep_ratio), ["expressed"]] = 1
     abundance_matrix["high"] = 0
     abundance_matrix.loc[(abundance_matrix["pos"] > hi_rep_ratio), ["high"]] = 1
-    bool_filepath = os.path.join(output_dir, context_name, f"bool_prot_Matrix_{context_name}_{group_name}.csv")
+    bool_filepath = os.path.join(
+        output_dir, context_name, f"bool_prot_Matrix_{context_name}_{group_name}.csv"
+    )
     abundance_matrix.to_csv(bool_filepath, index_label="ENTREZ_GENE_ID")
 
 
@@ -115,18 +126,30 @@ def to_bool_context(context_name, group_ratio, hi_group_ratio, group_names):
     merged_df = pd.DataFrame(columns=["ENTREZ_GENE_ID"])
     merged_hi_df = merged_df
     for group in group_names:
-        read_filepath = os.path.join(output_dir, context_name, f"bool_prot_Matrix_{context_name}_{group}.csv")
+        read_filepath = os.path.join(
+            output_dir, context_name, f"bool_prot_Matrix_{context_name}_{group}.csv"
+        )
         read_df = pd.read_csv(read_filepath)
         read_df.set_index("ENTREZ_GENE_ID", inplace=True)
 
         merged_df = merged_df.merge(read_df["expressed"], how="inner")
         merged_hi_df = merged_hi_df.merge(read_df["high"], how="inner")
 
-    merged_df.apply(lambda x: sum(x)/len(merged_df.columns)>=group_ratio, axis=1, result_type="reduce")
-    merged_hi_df.apply(lambda x: sum(x)/len(merged_hi_df.columns)>=hi_group_ratio, axis=1, result_type="reduce")
+    merged_df.apply(
+        lambda x: sum(x) / len(merged_df.columns) >= group_ratio,
+        axis=1,
+        result_type="reduce",
+    )
+    merged_hi_df.apply(
+        lambda x: sum(x) / len(merged_hi_df.columns) >= hi_group_ratio,
+        axis=1,
+        result_type="reduce",
+    )
     out_df = pd.DataFrame({"ENTREZ_GENE_D": merged_df.index})
     out_df = out_df.merge(merged_df, how="inner").merge(merged_hi_df, how="inner")
-    out_filepath = os.path.join(output_dir, context_name, f"Proteomics_{context_name}.csv")
+    out_filepath = os.path.join(
+        output_dir, context_name, f"Proteomics_{context_name}.csv"
+    )
     out_df.to_csv(out_filepath, index_label="ENTREZ_GENE_ID")
     print("Test Data Saved to {}".format(out_filepath))
 
@@ -247,7 +270,7 @@ def main(argv):
         default=25,
         dest="quantile",
         help="The quantile of genes to accept. This should be an integer from 0% (no proteins pass) "
-             "to 100% (all proteins pass).",
+        "to 100% (all proteins pass).",
     )
     args = parser.parse_args()
 
@@ -267,32 +290,43 @@ def main(argv):
     sheet_names = xl.sheet_names
     for context_name in sheet_names:
         datafilename = "".join(["ProteomicsDataMatrix_", context_name, ".csv"])
-        config_sheet = pd.read_excel(prot_config_filepath, sheet_name=context_name, header=0)
+        config_sheet = pd.read_excel(
+            prot_config_filepath, sheet_name=context_name, header=0
+        )
         groups = config_sheet["Group"].unique().tolist()
         for group in groups:
             print(group)
             print(config_sheet["SampleName"].tolist())
             print(config_sheet["Group"].tolist())
-            print(np.where([True if g == group else False for g in config_sheet["Group"].tolist()]))
+            print(
+                np.where(
+                    [
+                        True if g == group else False
+                        for g in config_sheet["Group"].tolist()
+                    ]
+                )
+            )
 
-            group_idx = np.where([True if g == group else False for g in config_sheet["Group"].tolist()])
-            #cols = config_sheet["SampleName"].iloc[group_idx]
+            group_idx = np.where(
+                [True if g == group else False for g in config_sheet["Group"].tolist()]
+            )
+            # cols = config_sheet["SampleName"].iloc[group_idx]
 
-            #cols = np.take(config_sheet["SampleName"].to_numpy(), group_idx) + [["Col 1", "Col 2"]]
-            cols = np.take(config_sheet["SampleName"].to_numpy(), group_idx).ravel().tolist() + [
-                "Gene Symbol",
-                "Majority protein IDs"
-            ]
+            # cols = np.take(config_sheet["SampleName"].to_numpy(), group_idx) + [["Col 1", "Col 2"]]
+            cols = np.take(
+                config_sheet["SampleName"].to_numpy(), group_idx
+            ).ravel().tolist() + ["Gene Symbol", "Majority protein IDs"]
 
             print(cols)
-                #"Gene Symbol",
-                #"Majority protein IDs",
+            # "Gene Symbol",
+            # "Majority protein IDs",
 
             proteomics_data = load_proteomics_data(datafilename, context_name)
             proteomics_data = proteomics_data.loc[:, cols]
-            sym2id = load_gene_symbol_map(gene_symbols=proteomics_data["Gene Symbol"].tolist(),
-                                          filename="proteomics_entrez_map.csv",
-                                          )
+            sym2id = load_gene_symbol_map(
+                gene_symbols=proteomics_data["Gene Symbol"].tolist(),
+                filename="proteomics_entrez_map.csv",
+            )
             # map gene symbol to ENTREZ_GENE_ID
             proteomics_data.dropna(subset=["Gene Symbol"], inplace=True)
             proteomics_data.drop(columns=["Majority protein IDs"], inplace=True)
@@ -303,7 +337,9 @@ def main(argv):
             proteomics_data.set_index("ENTREZ_GENE_ID", inplace=True)
 
             # save proteomics data by test
-            abundance_to_bool_group(context_name, group, proteomics_data, rep_ratio, hi_rep_ratio, quantile)
+            abundance_to_bool_group(
+                context_name, group, proteomics_data, rep_ratio, hi_rep_ratio, quantile
+            )
 
         to_bool_context(context_name, group_ratio, hi_group_ratio, groups)
 
