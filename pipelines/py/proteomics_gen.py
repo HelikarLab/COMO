@@ -196,7 +196,7 @@ def main(argv):
     )
     parser.add_argument(
         "-c",
-        "--config-file",
+        "--config_file",
         type=str,
         required=True,
         dest="config_file",
