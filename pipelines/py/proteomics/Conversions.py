@@ -8,7 +8,7 @@ import os
 from pprint import pprint
 
 
-def read_uniprot_ids(input_csv_file: str) -> list[str]:
+def read_uniprot_ids(input_csv_file: str) -> dict:
     """
     This function is responsible for collecting the UniProt IDs from the input csv file
 
@@ -31,8 +31,6 @@ def read_uniprot_ids(input_csv_file: str) -> list[str]:
 
     # Open the file
     with open(input_csv_file, "r") as i_stream:
-        # Create a temporay list to store UniProt IDs that match to a single spectrum
-        temp_uniprot_ids: list[str] = []
 
         # Iterate through the lines in the file
         for line in i_stream:
@@ -42,20 +40,14 @@ def read_uniprot_ids(input_csv_file: str) -> list[str]:
                 # Save this in the uniprot_ids dictionary
                 uniprot_data["ion_intensities"].append(line.split("\t")[7])
 
-                # If the temporary UniProt IDs list is not empty, add it to the uniprot_ids dictionary
-                if temp_uniprot_ids:
-                    uniprot_data["uniprot_ids"].append(temp_uniprot_ids)
-
-                # Clear the temporary list
-                temp_uniprot_ids = []
-
             # If line start with "L" and the second field does not start with "decoy_", collect it
             elif line.startswith("L") and not line.split("\t")[1].startswith("decoy_"):
-                # Collect the second field (index of 1)
-                temp_uniprot_ids.append(line.split("\t")[1])
+                uniprot_data["uniprot_ids"].append(line.split("\t")[1])
+
+    return uniprot_data
 
 
-def convert_ids(uniprot_ids: list[str]) -> list[str]:
+def convert_ids(uniprot_data: dict) -> list[str]:
     """
     This function is responsible for converting a list of uniprot IDs to Gene IDs
     """
@@ -63,11 +55,22 @@ def convert_ids(uniprot_ids: list[str]) -> list[str]:
     biodbnet = BioDBNet()
     # Create an empty list to store the entrez IDs
     entrez_ids: list[str] = []
+    uniprot_data["entrez_id"] = []
+
+    pprint(uniprot_data)
+    print(f"{len(uniprot_data['uniprot_ids'])} uniprot IDs")
+    print(f"{len(uniprot_data['ion_intensities'])} ion intensities")
+    exit(2)
     # Loop through the uniprot IDs
-    for uniprot_id in uniprot_ids:
+    for uniprot_id in uniprot_data:
         # Try to get the entrez ID using BioDBNet.db2db()
         try:
-            entrez_id = biodbnet.db2db(uniprot_id, "Gene ID")
+            entrez_id = biodbnet.db2db(
+                input_db="UniProt Accession",
+                output_db="Gene ID",
+                input_values=uniprot_id,
+            )
+            entrez_id = entrez_id["Gene ID"][0]
         # If there is an error, print it and continue
         except Exception as e:
             print(e)
@@ -111,12 +114,16 @@ def main():
     sqt_files: set[str] = find_sqt_file(input_dir)
 
     # Loop through the sqt files and save them to a new list
-    for sqt_file in sqt_files:
-        # Get the uniprot IDs from the sqt file
-        uniprot_ids: list[str] = read_uniprot_ids(sqt_file)
 
-        # Convert uniprot IDs to a new list of entrez IDs
-        entrez_ids: list[str] = convert_ids(uniprot_ids)
+    read_uniprot_ids(
+        "/Users/joshl/Downloads/b_cell_results/PXD026140/comet.20141016_RP-4H_15E5Bcells_120min_top2DD_HCD_01.target.sqt"
+    )
+
+    # for sqt_file in sqt_files:
+    #     # Get the uniprot IDs from the sqt file
+    #     uniprot_ids: dict = read_uniprot_ids(sqt_file)
+    #     # Convert uniprot IDs to a new list of entrez IDs
+    #     entrez_ids: list[str] = convert_ids(uniprot_ids)
 
 
 if __name__ == "__main__":
