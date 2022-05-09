@@ -65,16 +65,16 @@ def merge_xomics(
     """
     print(f"Merging data for {sheet}")
     # load data for each source if it exists. IF not load an empty dummy dataset
-    microarray = load_microarray_tests(filename=microarray_file, model_name=sheet)
-    proteomics = load_proteomics_tests(filename=proteomics_file, model_name=sheet)
+    microarray = load_microarray_tests(filename=microarray_file, context_name=sheet)
+    proteomics = load_proteomics_tests(filename=proteomics_file, context_name=sheet)
     trnaseq = load_rnaseq_tests(
-        filename=trnaseq_file, model_name=sheet, lib_type="total"
+        filename=trnaseq_file, context_name=sheet, lib_type="total"
     )  # total RNA-seq
     mrnaseq = load_rnaseq_tests(
-        filename=mrnaseq_file, model_name=sheet, lib_type="mrna"
+        filename=mrnaseq_file, context_name=sheet, lib_type="mrna"
     )  # mRNA-seq
     scrnaseq = load_rnaseq_tests(
-        filename=scrnaseq_file, model_name=sheet, lib_type="sc"
+        filename=scrnaseq_file, context_name=sheet, lib_type="sc"
     )  # Single-cell RNA-seq
 
     files_dict = dict()
