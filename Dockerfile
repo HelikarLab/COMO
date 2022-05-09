@@ -13,8 +13,8 @@ COPY --chown=1000:100 pipelines "${HOME}"/work
 
 # Install python-related items
 RUN pip install --requirement "${HOME}/pip_install.txt" \
-    && conda add --channel bioconda \
-    &&  conda add --channel conda-forge \
+    && conda config --add channels bioconda \
+    && conda config --add channels conda-forge \
     && mamba install --yes --channel bioconda --channel conda-forge --file "${HOME}/mamba_install.txt" \
     && mamba clean --all --force-pkgs-dirs --yes \
     && R -e 'devtools::install_github("babessell1/zFPKM")'\
