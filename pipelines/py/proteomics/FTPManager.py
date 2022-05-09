@@ -1,17 +1,11 @@
 """
-This file is responsible for collecting information about the URL passed into it
-
-This includes the information as depicted in the "Database.py" file
+This file is responsible for viewing and downloading information found at an FTP link
 """
 import aioftp
-import argparse
 import asyncio
-from enum import Enum
-import requests
 import os
 from pathlib import Path
 import sys
-import typing
 from urllib.parse import urlparse
 from urllib.parse import ParseResult
 
@@ -23,110 +17,149 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import project
 
 
-class Action(Enum):
-    """
-    This class is responsible for holding the types of action the aioftp module is able to perform
-    """
-
-    download = "download"
-    LIST = "list"
-
-
 class Download:
-    def __init__(self, urls: list[str], args: argparse.Namespace):
+    def __init__(
+        self,
+        ftp_links: list[str],
+        output_dir: Path,
+        print_only: bool = False,
+        preferred_extensions: list[str] = None,
+    ):
         """
         This function is responsible for downloading items from the FTP urls passed into it
-        """
-        self._output_directory: str = args.output_dir
-        # self._urls: list[str] = urls
-        self._urls: list[str] = [
-            "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026142",
-            "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/03/PXD009340",
-            "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/03/PXD010319",
-        ]
 
-        # This object will be modified by get_ftp_links()
-        self._files_to_download: dict[str, list[str]] = {
-            "raw_file_url": [],
-            "protein_groups_url": [],
-        }
+        :param ftp_links: A list of FTP links to download from
+        :param output_dir: The directory to save data into
+        :param print_only: Should the files only be printed to console? If True, nothing will be downloaded, even if an output directory is specified
+        :param preferred_extensions: The file extension to look for. If not set, it will recursively find every file
+        """
+        self._ftp_links: list[str] = ftp_links
+        self._output_dir: Path = output_dir
+        self._print_only: bool = print_only
+        self._extensions = preferred_extensions
+
+        # If no preferred extensions are passed in, we must convert it to a string before using it
+        # Without doing so, str().endswith() returns False. We want it to return True.
+        if not self._extensions:
+            self._extensions: str = ""
+        else:
+            # If extensions exist, convert it to a tuple of strings
+            self._extensions: tuple[str] = tuple(self._extensions)
 
         asyncio.run(self.get_ftp_links_wrapper())
 
-    async def get_ftp_links_wrapper(self, **kwargs):
+    async def get_ftp_links_wrapper(self):
         """
         This function is responsible for asynchronously downloading FTP files from the self._urls list
-
-        :param action: The 'action' to perform. This should be a function name, such as list_ftp_files
         """
         tasks = []
-        print("Starting task creation")
-        for url in self._urls:
+        for url in self._ftp_links:
             # Get URL components
             # From: https://stackoverflow.com/questions/9626535
             parsed_url: ParseResult = urlparse(url)
 
-            # Append tasks to complete to the "tasks" list
-            tasks.append(
-                asyncio.create_task(
-                    self.download_ftp_data(host=parsed_url.netloc, path=parsed_url.path, **kwargs)  # fmt: skip
-                )
-            )
+            # We are using "action" as a way to not repeat the asyncio.create_task call
+            if self._print_only:
+                action = self.list_ftp_files
+            else:
+                action = self.download_ftp_data
+            tasks.append(asyncio.create_task(action(host=parsed_url.netloc, folder=parsed_url.path)))  # fmt: skip
 
         # Execute the tasks
-        print(f"{len(tasks)} task(s) created, starting await. . .")
         await asyncio.wait(tasks)
 
     async def download_ftp_data(
         self,
         host: str,
-        path: str,
+        folder: str,
         port: int = 21,
         username: str = "anonymous",
         password: str = "guest",
-        list_only: bool = False,
     ):
-        client = aioftp.Client()
-        await client.connect(host=host, port=port)
-        await client.login(user=username, password=password)
+        """
+        This function is responsible for asynchronously downloading all files under the given path
 
-        async for path, info in client.list(path, recursive=True):
-            if list_only:
-                if info["type"] == "file":
-                    print(path)
+        :param host: The host to connect to
+        :param folder: The path to search under
+        :param port: The port to connect to
+        :param username: The username to use during login
+        :param password: The password to use during login
+        """
+        # Two clients are required to download multiple files at once
+        # From: https://aioftp.readthedocs.io/client_tutorial.html#listing-paths
+        list_client: aioftp.Client = aioftp.Client()
+        download_client: aioftp.Client = aioftp.Client()
 
-            # Test if "raw" or "proteinGroups.txt" in the file path; we want these files
-            # From: https://stackoverflow.com/a/8122096/13885200
-            if (
-                any(map(str(path).__contains__, ["raw", "proteinGroups.txt"]))
-                and not list_only
-            ):
-                # Define paths
-                download_path: str = f"ftp://{host}{path}"
-                file_name = os.path.basename(path)
-                save_path: Path = Path(self._output_directory, file_name)
+        # Connect "listing" client
+        await list_client.connect(host=host, port=port)
+        await list_client.login(user=username, password=password)
+        await list_client.get_passive_connection()
 
-                # Download file
-                try:
-                    await client.download(source=download_path, destination=save_path)
-                except IndexError:
-                    print(f"Index error on file {download_path}")
+        # Connect "downloading" client
+        await download_client.connect(host=host, port=port)
+        await download_client.login(user=username, password=password)
+        await download_client.get_passive_connection()
+
+        total_files: list[str] = [
+            path if str(path).endswith(self._extensions) else None
+            for path, info in (await list_client.list(folder, recursive=True))
+        ]
+
+        counter: int = 1
+        async for path, info in list_client.list(folder, recursive=True):
+            # Test if we are accessing a "raw" file
+            if str(path).endswith(self._extensions):
+
+                # Define download paths
+                file_name: str = os.path.basename(path)
+                save_path: Path = Path(self._output_dir, file_name)
+                print(f"Starting download of {file_name} ({counter} / {total_files})")  # fmt: skip
+                await download_client.download(source=path, destination=save_path, write_into=True)  # fmt: skip
+                counter += 1
+
+        await list_client.quit()
+        await download_client.quit()
 
     async def list_ftp_files(
         self,
         host: str,
-        path: str,
+        folder: str,
         port: int = 21,
         username: str = "anonymous",
         password: str = "guest",
     ):
-        client = aioftp.Client()
+        """
+        This function is responsible for printing files to the command line
+
+        :param host: The host to connect to
+        :param folder: The path of the file
+        :param port: The port to connect to
+        :param username: The username to use during login
+        :param password: The password to use during login
+        """
+        client: aioftp.Client = aioftp.Client()
         await client.connect(host=host, port=port)
         await client.login(user=username, password=password)
 
-        async for path, info in client.list(path, recursive=True):
+        async for path, info in client.list(folder, recursive=True):
+            # Only looking for files
             if info["type"] == "file":
-                print(path)
+
+                curr_path: str = str(path)
+
+                # If no preferred extensions have been passed in OR the current path does end with a preferred extension, print it
+                if (self._extensions is None) or (curr_path.endswith(self._extensions)):
+                    print(path)
+
+
+def sum_nums(nums: list[int]) -> int:
+    """
+    This function is responsible for adding an infinite number of numbers and returning the results. It should accept a single number or a list of numbers
+    """
+    if isinstance(nums, int):
+        return nums
+    else:
+        return sum(nums)
 
 
 if __name__ == "__main__":
