@@ -311,7 +311,7 @@ def mergeLogicalTable(df_results):
     # return df_output
 
 
-def load_microarray_tests(filename, model_name):
+def load_microarray_tests(filename, context_name):
     def load_empty_dict():
         savepath = os.path.join(
             configs.rootdir,
@@ -335,18 +335,18 @@ def load_microarray_tests(filename, model_name):
         print("Error: file not found {}".format(inquiry_full_path))
         sys.exit()
 
-    filename = "Microarray_{}.csv".format(model_name)
+    filename = "Microarray_{}.csv".format(context_name)
     fullsavepath = os.path.join(
-        configs.rootdir, "data", "results", model_name, filename
+        configs.rootdir, "data", "results", context_name, filename
     )
     if os.path.isfile(fullsavepath):
         data = pd.read_csv(fullsavepath, index_col="ENTREZ_GENE_ID")
         print("Read from {}".format(fullsavepath))
-        return model_name, data
+        return context_name, data
     else:
         print(
-            f"Microarray gene expression file for {model_name} was not found at {fullsavepath}. This may be "
-            f"intentional. Contexts where microarray data can be found in /work/data/results/{model_name}/ will "
+            f"Microarray gene expression file for {context_name} was not found at {fullsavepath}. This may be "
+            f"intentional. Contexts where microarray data can be found in /work/data/results/{context_name}/ will "
             f"still be used for other contexts if found."
         )
         return load_empty_dict()
@@ -400,14 +400,14 @@ def main(argv):
     sheet_names = xl.sheet_names
     inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_names, header=0)
 
-    for model_name in sheet_names:
+    for context_name in sheet_names:
         # print(list(inqueries[i]))
-        inqueries[model_name].fillna(method="ffill", inplace=True)
-        df = inqueries[model_name].loc[:, ["GSE ID", "Samples", "GPL ID", "Instrument"]]
+        inqueries[context_name].fillna(method="ffill", inplace=True)
+        df = inqueries[context_name].loc[:, ["GSE ID", "Samples", "GPL ID", "Instrument"]]
         df_output = queryTest(df, expression_proportion, top_proportion)
-        filename = "Microarray_{}.csv".format(model_name)
+        filename = "Microarray_{}.csv".format(context_name)
         fullsavepath = os.path.join(
-            configs.rootdir, "data", "results", model_name, filename
+            configs.rootdir, "data", "results", context_name, filename
         )
         os.makedirs(os.path.dirname(fullsavepath), exist_ok=True)
         df_output.to_csv(fullsavepath)
