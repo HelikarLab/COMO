@@ -1,15 +1,20 @@
 docker_old/*
+
 # JetBrains project files, these are user-specific
 .idea
+
 # Jupyter checkpoints
-/pipelines/py/.ipynb_checkpoints/
+/work/py/.ipynb_checkpoints/
+
 # R logs
-/pipelines/py/rlogs/
+/work/py/rlogs/
 *.Rhistory
+
 # Microsoft temporary files
 ~$*
+
 # Python cache files
 *__pycache__
 
-# DO not save files in "pipelines/output"
-/pipelines/output
+# Do not track output files
+/work/output
