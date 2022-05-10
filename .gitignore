@@ -1,7 +1,7 @@
 docker_old/*
 
 # JetBrains project files, these are user-specific
-.idea
+/**/.idea
 
 # Jupyter checkpoints
 /work/py/.ipynb_checkpoints/
