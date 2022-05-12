@@ -56,6 +56,7 @@ def parse_args(args: list[str]) -> argparse.Namespace:
     # Define several default values
     default_csv: Path = Path(project.configs.configdir, "proteomeXchange_urls.csv")
     default_output: Path = Path(project.configs.outputdir, "proteomics")
+    default_core_count: int = os.cpu_count() // 2
 
     parser = argparse.ArgumentParser(
         prog="main_proteomics.py",
@@ -107,6 +108,15 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         action="store_true",
         help="Should the files found within the FTP links only be printed to the console? Enabling this option will not download any files.",
     )
+    parser.add_argument(
+        "-c",
+        "--cores",
+        required=False,
+        dest="core_count",
+        metavar=str(default_core_count),
+        default=default_core_count,
+        help="This is the number of threads to use for downloading files. It will default to the minimum of: half the available CPU cores available, or the number of input files found.\nIt will not use more cores than necessary\nOptions are an integer or 'all' to use all available cores",
+    )
 
     args: argparse.Namespace = parser.parse_args(args)
     args.extensions = args.extensions.split(",")
@@ -115,6 +125,19 @@ def parse_args(args: list[str]) -> argparse.Namespace:
     if not Path(args.input_csv).is_file():
         print(f"Input file {args.input} does not exist!")
         exit(1)
+
+    try:
+        # Try to get an integer, fails if "all" input
+        args.core_count = int(args.core_count)
+        if args.core_count > os.cpu_count():
+            print(f"{args.core_count} cores not available, system only has {os.cpu_count()} cores. Setting '--cores' to {os.cpu_count()}")  # fmt: skip
+            args.core_count = os.cpu_count()
+    except ValueError:
+        if args.core_count == "all":
+            args.core_count = os.cpu_count()
+        else:
+            print(f"Invalid option '{args.core_count}' for option '--cores'. Enter an integer or 'all' to use all cores")  # fmt: skip
+            exit(2)
 
     # We have a default output directory set (default_output)
     # Because of this, even if the user inputs their own output directory, we can just make the output
@@ -132,12 +155,17 @@ def main(args: list[str]):
     """
     args: argparse.Namespace = parse_args(args)
     ftp_links: list[str] = get_ftp_urls(args.input_csv)
+
+    # Start the download of FTP data
     FTPManager.Download(
         ftp_links=ftp_links,
         output_dir=args.output_dir,
         print_only=args.print_only,
         preferred_extensions=args.extensions,
+        core_count=args.core_count,
     )
+
+    # Use Crux Comet to get SQT files from raw FTP files
 
 
 if __name__ == "__main__":
