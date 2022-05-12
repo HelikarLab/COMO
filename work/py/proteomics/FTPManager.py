@@ -1,15 +1,14 @@
 """
 This file is responsible for viewing and downloading information found at an FTP link
 """
-import aioftp
-import asyncio
+from ftplib import FTP
+import multiprocessing
+import numpy as np
 import os
 from pathlib import Path
 import sys
 from urllib.parse import urlparse
 from urllib.parse import ParseResult
-
-from pprint import pprint
 
 # Add parent directory to path, allows us to import the "project.py" file from the parent directory
 # From: https://stackoverflow.com/a/30536516/13885200
@@ -24,6 +23,7 @@ class Download:
         output_dir: Path,
         print_only: bool = False,
         preferred_extensions: list[str] = None,
+        core_count: int = 1,
     ):
         """
         This function is responsible for downloading items from the FTP urls passed into it
@@ -36,7 +36,12 @@ class Download:
         self._ftp_links: list[str] = ftp_links
         self._output_dir: Path = output_dir
         self._print_only: bool = print_only
-        self._extensions = preferred_extensions
+        self._extensions: list[str] = preferred_extensions
+        self._core_count: int = core_count
+
+        # Create a manager and lock to print values onto screen
+        self._file_lock = multiprocessing.Lock()
+        self._download_counter = multiprocessing.Value("i", 1)
 
         # If no preferred extensions are passed in, we must convert it to a string before using it
         # Without doing so, str().endswith() returns False. We want it to return True.
@@ -46,120 +51,102 @@ class Download:
             # If extensions exist, convert it to a tuple of strings
             self._extensions: tuple[str] = tuple(self._extensions)
 
-        asyncio.run(self.get_ftp_links_wrapper())
+        # These values are modified by self.get_files_to_download()
+        self._files_to_download: list[str] = []
+        self._file_sizes: list[int] = []
 
-    async def get_ftp_links_wrapper(self):
+        # Find files to download
+        self.get_files_to_download()
+        self.download_data_wrapper()
+
+    def get_files_to_download(self):
         """
         This function is responsible for asynchronously downloading FTP files from the self._urls list
         """
-        tasks = []
+
+        # Connect to the FTP server
+        print("Collecting files to download...", end=" ", flush=True)
         for url in self._ftp_links:
-            # Get URL components
-            # From: https://stackoverflow.com/questions/9626535
             parsed_url: ParseResult = urlparse(url)
+            scheme: str = parsed_url.scheme
+            host: str = parsed_url.hostname
+            folder: str = parsed_url.path
 
-            # We are using "action" as a way to not repeat the asyncio.create_task call
-            if self._print_only:
-                action = self.list_ftp_files
-            else:
-                action = self.download_ftp_data
-            tasks.append(asyncio.create_task(action(host=parsed_url.netloc, folder=parsed_url.path)))  # fmt: skip
+            client: FTP = FTP(host=host, user="anonymous", passwd="guest")
+            for file_path in client.nlst(folder):
+                if file_path.endswith(self._extensions):
+                    download_url: str = f"{scheme}://{host}{file_path}"
+                    file_size: int = client.size(file_path)
 
-        # Execute the tasks
-        await asyncio.wait(tasks)
+                    self._files_to_download.append(download_url)
+                    self._file_sizes.append(file_size)
 
-    async def download_ftp_data(
+            client.quit()
+        print(f"{len(self._files_to_download)} files found\n")
+
+    def download_data_wrapper(self):
+        """
+        This function is responsible for using multiprocessing to download as many files at once in parallel
+        """
+        # Calculate the number of cores ot use
+        # We are going to use half the number of cores, OR the number of files to download, whichever is less
+        # Otherwise if user specified the number of cores, use that
+
+        # Split list into chunks to process separately
+        file_chunks: list[str] = np.array_split(
+            self._files_to_download, self._core_count
+        )
+        file_size_chunks: list[int] = np.array_split(self._file_sizes, self._core_count)
+
+        # Create a list of jobs
+        jobs: list[multiprocessing.Process] = []
+
+        for i, (files, sizes) in enumerate(zip(file_chunks, file_size_chunks)):
+            # Append a job to the list
+            job = multiprocessing.Process(
+                target=self.download_data,
+                args=(files, sizes, self._file_lock, self._download_counter),
+            )
+            jobs.append(job)
+
+        [job.start() for job in jobs]  # Start jobs
+        [job.join() for job in jobs]  # Wait for jobs to finish
+        [job.terminate() for job in jobs]  # Terminate jobs
+
+    def download_data(
         self,
-        host: str,
-        folder: str,
-        port: int = 21,
-        username: str = "anonymous",
-        password: str = "guest",
+        files_to_download: list[str],
+        file_sizes: list[int],
+        lock,
+        download_counter,
     ):
-        """
-        This function is responsible for asynchronously downloading all files under the given path
 
-        :param host: The host to connect to
-        :param folder: The path to search under
-        :param port: The port to connect to
-        :param username: The username to use during login
-        :param password: The password to use during login
-        """
-        # Two clients are required to download multiple files at once
-        # From: https://aioftp.readthedocs.io/client_tutorial.html#listing-paths
-        list_client: aioftp.Client = aioftp.Client()
-        download_client: aioftp.Client = aioftp.Client()
+        # Start processing the files
+        for i, (file, size) in enumerate(zip(files_to_download, file_sizes)):
+            # Define FTP-related variables
+            parsed_url = urlparse(file)
+            host = parsed_url.hostname
+            path = parsed_url.path
 
-        # Connect "listing" client
-        await list_client.connect(host=host, port=port)
-        await list_client.login(user=username, password=password)
-        await list_client.get_passive_connection()
+            # Convert file_size from byte to MB
+            size_mb: int = size // (1024**2)
 
-        # Connect "downloading" client
-        await download_client.connect(host=host, port=port)
-        await download_client.login(user=username, password=password)
-        await download_client.get_passive_connection()
+            # Determine the file name using os.path.basename
+            file_name: str = os.path.basename(path)
+            save_path: Path = Path(self._output_dir, file_name)
 
-        total_files: list[str] = [
-            path if str(path).endswith(self._extensions) else None
-            for path, info in (await list_client.list(folder, recursive=True))
-        ]
+            # Connect to the host, login, and download the file
+            client: FTP = FTP(host=host, user="anonymous", passwd="guest")
 
-        counter: int = 1
-        async for path, info in list_client.list(folder, recursive=True):
-            # Test if we are accessing a "raw" file
-            if str(path).endswith(self._extensions):
+            # Get the lock and print file info
+            lock.acquire()
+            print(f"Started {download_counter.value:02d} / {len(self._files_to_download):02d} ({size_mb} MB) - {file_name}")  # fmt: skip
+            download_counter.value += 1
+            lock.release()
 
-                # Define download paths
-                file_name: str = os.path.basename(path)
-                save_path: Path = Path(self._output_dir, file_name)
-                print(f"Starting download of {file_name} ({counter} / {total_files})")  # fmt: skip
-                await download_client.download(source=path, destination=save_path, write_into=True)  # fmt: skip
-                counter += 1
-
-        await list_client.quit()
-        await download_client.quit()
-
-    async def list_ftp_files(
-        self,
-        host: str,
-        folder: str,
-        port: int = 21,
-        username: str = "anonymous",
-        password: str = "guest",
-    ):
-        """
-        This function is responsible for printing files to the command line
-
-        :param host: The host to connect to
-        :param folder: The path of the file
-        :param port: The port to connect to
-        :param username: The username to use during login
-        :param password: The password to use during login
-        """
-        client: aioftp.Client = aioftp.Client()
-        await client.connect(host=host, port=port)
-        await client.login(user=username, password=password)
-
-        async for path, info in client.list(folder, recursive=True):
-            # Only looking for files
-            if info["type"] == "file":
-
-                curr_path: str = str(path)
-
-                # If no preferred extensions have been passed in OR the current path does end with a preferred extension, print it
-                if (self._extensions is None) or (curr_path.endswith(self._extensions)):
-                    print(path)
-
-
-def sum_nums(nums: list[int]) -> int:
-    """
-    This function is responsible for adding an infinite number of numbers and returning the results. It should accept a single number or a list of numbers
-    """
-    if isinstance(nums, int):
-        return nums
-    else:
-        return sum(nums)
+            # Download the file
+            client.retrbinary(f"RETR {path}", open(save_path, "wb").write)
+            client.quit()
 
 
 if __name__ == "__main__":
