@@ -9,7 +9,7 @@ COPY build_scripts/mamba_install.txt "${HOME}"/
 COPY build_scripts/pip_install.txt "${HOME}"/
 
 # Give ownership to jovyan user
-COPY --chown=1000:100 pipelines "${HOME}"/work
+COPY --chown=1000:100 work "${HOME}"/work
 
 # Install python-related items
 RUN pip install --requirement "${HOME}/pip_install.txt" \
