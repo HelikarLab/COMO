@@ -1,19 +1,18 @@
 """
-This file is responsible for viewing and downloading information found at an FTP link
+This file is responsible downloading data found at FTP links
+
+TODO: Find a way to mark a file as "downloaded"
+    - Keep a list of file names in a ".completd" hidden folder?
+    -
 """
 from ftplib import FTP
 import multiprocessing
+from multiprocessing.sharedctypes import Synchronized
 import numpy as np
-import os
 from pathlib import Path
-import sys
+import time
 from urllib.parse import urlparse
 from urllib.parse import ParseResult
-
-# Add parent directory to path, allows us to import the "project.py" file from the parent directory
-# From: https://stackoverflow.com/a/30536516/13885200
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import project
 
 
 class Download:
@@ -21,8 +20,9 @@ class Download:
         self,
         ftp_links: list[str],
         output_dir: Path,
-        print_only: bool = False,
-        preferred_extensions: list[str] = None,
+        print_only: bool,
+        preferred_extensions: list[str],
+        skip_download: bool,
         core_count: int = 1,
     ):
         """
@@ -33,15 +33,18 @@ class Download:
         :param print_only: Should the files only be printed to console? If True, nothing will be downloaded, even if an output directory is specified
         :param preferred_extensions: The file extension to look for. If not set, it will recursively find every file
         """
+        
         self._ftp_links: list[str] = ftp_links
         self._output_dir: Path = output_dir
         self._print_only: bool = print_only
         self._extensions: list[str] = preferred_extensions
         self._core_count: int = core_count
 
-        # Create a manager and lock to print values onto screen
-        self._file_lock = multiprocessing.Lock()
-        self._download_counter = multiprocessing.Value("i", 1)
+        # Create a manager so each process can append data to variables
+        # From: https://stackoverflow.com/questions/67974054
+        self._save_locations: list[Path] = multiprocessing.Manager().list()
+        self._download_counter: Synchronized = multiprocessing.Value("i", 1)
+        self._finished_counter: Synchronized = multiprocessing.Value("i", 1)
 
         # If no preferred extensions are passed in, we must convert it to a string before using it
         # Without doing so, str().endswith() returns False. We want it to return True.
@@ -72,7 +75,27 @@ class Download:
             host: str = parsed_url.hostname
             folder: str = parsed_url.path
 
-            client: FTP = FTP(host=host, user="anonymous", passwd="guest")
+            # Attempt to connect to host
+            connection_successful: bool = False
+            max_attempts: int = 5
+            attempts: int = 1
+            while not connection_successful:
+                try:
+                    client: FTP = FTP(host=host, user="anonymous", passwd="guest")
+                    connection_successful = True
+                except ConnectionResetError:
+                    # If connection is reset, wait a bit and try again
+                    print(
+                        f"\nConnection reset. Retrying... [{max_attempts - attempts} attempt(s) remaining]",
+                        end="",
+                        flush=True,
+                    )
+                    time.sleep(1)
+                    attempts += 1
+                finally:
+                    if attempts > 5:
+                        raise ConnectionError(f"Could not connect to {host}. Please check your internet connection.")  # fmt: skip
+
             for file_path in client.nlst(folder):
                 if file_path.endswith(self._extensions):
                     download_url: str = f"{scheme}://{host}{file_path}"
@@ -105,7 +128,7 @@ class Download:
             # Append a job to the list
             job = multiprocessing.Process(
                 target=self.download_data,
-                args=(files, sizes, self._file_lock, self._download_counter),
+                args=(files,sizes,),
             )
             jobs.append(job)
 
@@ -117,8 +140,6 @@ class Download:
         self,
         files_to_download: list[str],
         file_sizes: list[int],
-        lock,
-        download_counter,
     ):
 
         # Start processing the files
@@ -131,22 +152,50 @@ class Download:
             # Convert file_size from byte to MB
             size_mb: int = size // (1024**2)
 
-            # Determine the file name using os.path.basename
-            file_name: str = os.path.basename(path)
+            # Determine the file name and save path
+            file_name: str = Path(path).name
             save_path: Path = Path(self._output_dir, file_name)
+            self._save_locations.append(save_path)
 
             # Connect to the host, login, and download the file
             client: FTP = FTP(host=host, user="anonymous", passwd="guest")
 
             # Get the lock and print file info
-            lock.acquire()
-            print(f"Started {download_counter.value:02d} / {len(self._files_to_download):02d} ({size_mb} MB) - {file_name}")  # fmt: skip
-            download_counter.value += 1
-            lock.release()
+            self._download_counter.acquire()
+            print(f"Started {self._download_counter.value:02d} / {len(self._files_to_download):02d} ({size_mb} MB) - {file_name}")  # fmt: skip
+            self._download_counter.value += 1
+            self._download_counter.release()
 
             # Download the file
             client.retrbinary(f"RETR {path}", open(save_path, "wb").write)
             client.quit()
+
+            # Show finished status
+            self._finished_counter.acquire()
+            print(f"\tFinished {self._finished_counter.value:02d} / {len(self._files_to_download):02d}")  # fmt: skip
+            self._finished_counter.value += 1
+            self._finished_counter.release()
+
+    @property
+    def ftp_links(self) -> list[str]:
+        """
+        This function returns the FTP links used to download data
+        """
+        return self._ftp_links
+
+    @property
+    def output_dir(self) -> Path:
+        """
+        This function returns the output directory used to save data
+        """
+        return self._output_dir
+
+    @property
+    def raw_files(self) -> list[Path]:
+        """
+        This function returns a list of downloaded file locations
+        """
+        return self._save_locations
 
 
 if __name__ == "__main__":
