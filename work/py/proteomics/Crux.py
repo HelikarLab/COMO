@@ -1,5 +1,10 @@
+"""
+TODO: Integrate crux percolator into this workflow
+
+TODO: Modify crux search window? (2 minute default)
+"""
+import pandas as pd
 from bioservices import BioDBNet
-import csv
 import multiprocessing
 from multiprocessing.sharedctypes import Synchronized
 import numpy as np
@@ -8,12 +13,51 @@ from pathlib import Path
 import subprocess
 
 
+class Utils:
+    @staticmethod
+    def get_cell_type(input_file: Path | str):
+        """
+        This function will return the "CellType" portion of a file name
+    
+        Example:
+            Input: naiveB_S1R1_experiment_title.raw
+            Output: naiveB
+        """
+        file_name = Path(input_file)
+        cell_type = file_name.stem.split("_")[0]
+        return cell_type
+    
+    @staticmethod
+    def get_experiment_number(input_file: Path | str):
+        """
+        This function will return the "S1R1" portion of a file name
+    
+        Example:
+            Input: naiveB_S1R1_experiment_title.raw
+            Output: S1R1
+        """
+        file_name = Path(input_file)
+        experiment = file_name.stem.split("_")[1]
+        return experiment
+    
+    @staticmethod
+    def get_replicate_number(input_file: Path | str):
+        """
+        This function will return the "CellType_S1R1" portion of a file name
+    
+        Example:
+            Input: naiveB_S1R1_experiment_title.raw
+            Output: naiveB_S1R1
+        """
+        file_name = Path(input_file)
+        prefix = file_name.stem.split("_")
+        prefix = f"{prefix[0]}_{prefix[1]}"
+        return prefix
+
+
 class RAWtoMZML:
     def __init__(
-            self,
-            raw_file_input: list[Path],
-            mzml_output_dir: Path,
-            core_count: int
+        self, raw_file_input: list[Path], mzml_output_dir: Path, core_count: int
     ):
         """
         This class is responsible for converting RAW files to mzML format
@@ -21,11 +65,11 @@ class RAWtoMZML:
         self._raw_files: list[Path] = raw_file_input
         self._mzml_output_dir: Path = mzml_output_dir
         self._core_count: int = core_count
-        
+
         # These items are used to track the progress of the conversion
         self._conversion_counter: Synchronized = multiprocessing.Value("i", 1)
         self._finished_counter: Synchronized = multiprocessing.Value("i", 1)
-        
+
         # Create a manager so each process can append data to variables
         # From: https://stackoverflow.com/questions/67974054
         self._mzml_file_paths: list[Path] = multiprocessing.Manager().list()
@@ -49,7 +93,7 @@ class RAWtoMZML:
         [job.start() for job in jobs]  # Start jobs
         [job.join() for job in jobs]  # Wait for jobs to finish
         [job.terminate() for job in jobs]  # Terminate jobs
-        
+
     def raw_to_mzml(
         self,
         files: list[Path],
@@ -80,18 +124,19 @@ class RAWtoMZML:
             )
 
             self._finished_counter.acquire()
-            print(f"\tFinished raw -> mzML conversion: {self._finished_counter.value} / {len(self._raw_files)} - {file_name}")  # fmt: skip
+            print(f"\tFinished raw -> mzML conversion: {self._finished_counter.value} / {len(self._raw_files)}")  # fmt: skip
             self._finished_counter.value += 1
             self._finished_counter.release()
 
     @property
     def mzml_file_paths(self) -> list[Path]:
         return self._mzml_file_paths
-        
-        
+
+
 class MZMLtoSQT:
     def __init__(
         self,
+        cell_types: list[str],
         mzml_file_paths: list[Path],
         fasta_database: Path,
         sqt_output_dir: Path,
@@ -107,18 +152,19 @@ class MZMLtoSQT:
         3. Save the SQT files to the default SQT output directory
         """
         # These items are passed into the class
+        self._cell_types: list[str] = cell_types
         self._mzml_files: list[Path] = mzml_file_paths
         self._fasta_database: Path = fasta_database
         self._sqt_output_dir: Path = sqt_output_dir
         self._core_count: int = core_count
-        
+
         # Create a manager so each process can append data to variables
         # From: https://stackoverflow.com/questions/67974054
         self._sqt_file_paths: list[Path] = multiprocessing.Manager().list()
 
         # ----- Function Calls -----
-        self.mzml_to_sqt()          # Analyze mzML files, creating SQT files
-        
+        self.mzml_to_sqt()  # Analyze mzML files, creating SQT files
+
     def mzml_to_sqt(self):
         """
         This function analyzes the converted mzML files and creates SQT files
@@ -126,75 +172,79 @@ class MZMLtoSQT:
         """
         for i, file_path in enumerate(self._mzml_files):
             print(f"Creating SQT: {i + 1} / {len(self._mzml_files)} - {file_path.name}")  # fmt: skip
-            
+
             # Call subprocess on command
+            # Only create the SQT file
             subprocess.run(
                 [
                     "crux",
                     "comet",
-                    "--output_sqtfile", "1",
-                    "--output_txtfile", "1",
-                    "--output_pepxmlfile", "1",
-                    f"--output-dir", self._sqt_output_dir,
-                    "--overwrite", "T",
-                    "--decoy_search", "1",
+                    "--output_sqtfile",
+                    "1",
+                    f"--output-dir",
+                    self._sqt_output_dir,
+                    "--overwrite",
+                    "T",
+                    "--decoy_search",
+                    "1",
                     "--num_threads",
                     str(self._core_count),
                     file_path,
-                    self._fasta_database
+                    self._fasta_database,
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
-            
+
             # Replace all "comet.*" in output directory with the name of the file being processed
+            index = 0
             for file in os.listdir(str(self._sqt_output_dir)):
                 if str(file).startswith("comet."):
+                    replicate_name: str = f"{self._cell_types[index]}_S1R{index + 1}"
                     # Get the old file path
                     old_file_path: Path = Path(self._sqt_output_dir, file)
-                    
+
                     # Determine the new file name and path
-                    new_file_name = str(file).replace("comet", file_path.stem)
+                    # Example: naiveB_S1R1_experiment_name.sqt
+                    new_file_name = str(file).replace("comet", f"{replicate_name}_{file_path.stem}")  # fmt: skip
                     new_file_path: Path = Path(self._sqt_output_dir, new_file_name)
-                    
+
                     # Rename the file
                     os.rename(old_file_path, new_file_path)
                     if new_file_path.suffix == ".sqt":
                         self._sqt_file_paths.append(new_file_path)
 
         print("SQT creation finished")
-    
+
     @property
     def sqt_file_paths(self) -> list[Path]:
         return self._sqt_file_paths
 
 
 class SQTtoCSV:
-    def __init__(self, sqt_input_files: list[Path], output_file: Path):
+    def __init__(self, cell_types: list[str], sqt_input_files: list[Path], output_file: Path):
         """
         This class is meant to convert UniProt IDs to Entrez IDs using BioDBNet
         """
+        self._cell_types: list[str] = cell_types
         self._sqt_input_files: list[Path] = sqt_input_files
         self._output_csv: Path = output_file
-        
-        # Create an empty dictionary to store the UniProt IDs and ion intensities
-        # uniprot_ids: dict[str, list[list[str]]
-        # ion_intensities: dict[str, list[str]]
-        self._uniprot_data: dict = {
-            "ion_intensities": [],
-            "uniprot_ids": []
-        }
-        
+        self._intensities: pd.DataFrame = pd.DataFrame(
+            columns=["uniprot", "symbol"]
+        )
+
         self.collect_uniprot_ids_and_ion_intensity()
         self.convert_ids()
         self.write_data()
-    
-    def _uniprot_from_fasta_header(self, fasta_header: str, separator: str = "|") -> str:
+
+    def _uniprot_from_fasta_header(
+        self, fasta_header: str, separator: str = "|"
+    ) -> str:
         """
         This function is responsible for collecting the first-index field from a pipe-separated string
         """
         return fasta_header.split(separator)[1]
-    
+
     def collect_uniprot_ids_and_ion_intensity(self):
         """
         This function is responsible for collecting the UniProt IDs from the input sqt files
@@ -208,63 +258,113 @@ class SQTtoCSV:
             - Collect the next line that starts with an "L". This contains the UniProt ID
         4. Repeat steps 2 and 3 until the end of the file
         """
-        
-        for file in self._sqt_input_files:
+        for i, file in enumerate(sorted(self._sqt_input_files)):
+            # Create a dictionary with strings as the keys and lists as the values
+            # uniprot_id will be a list of strings
+            # ion_intensity will be a list of floats
+            replicate_name: str = f"{Utils.get_replicate_number(file)}_intensity"  # naiveB_S1R1_intensity
+            ion_intensities: list[float] = []
+            fasta_headers: list[list[str]] = []
             
+            average_intensities_dict: dict = {"uniprot": [], replicate_name: []}
+            # average_intensities: pd.DataFrame = pd.DataFrame(columns=["uniprot", replicate_name])  # fmt: skip
+
             with open(file, "r") as i_stream:
-                for i, line in enumerate(i_stream):
-                    
+                """
+                We are going to use spectra_line_nums if the list starts with "S"
+                Beneath this, we are going to collect every locus ("L") that does not have a "decoy_" in a nested list
+                The result will be each spectra value corresponds to a list of UniProt IDs
+                """
+                for j, line in enumerate(i_stream):
+
                     # If the line starts with an "S", collect it
                     if line.startswith("S"):
-                        # Collect the 8th tab-separated field, it is the ion intensity (index of 7)
-                        # Save this in the uniprot_ids dictionary
+                        # If the length of ion_intensities is not equal to fasta_headers,
+                        #   We have added an intensity that did not have valid locus data
+                        # (i.e., it only contained "decoy_")
+                        if len(ion_intensities) != len(fasta_headers):
+                            ion_intensities.pop()
                         
-                        try:
-                            ion_intensity = line.split("\t")[7]
-                            self._uniprot_data["ion_intensities"].append(ion_intensity)
-                        except IndexError:
-                            print(f"Error on line {i} in file {file} - Crux collect_uniprot_ids_and_ion_intensity")
-                        
-                        # Find the next "Locus" line that does not start with "decoy_"
-                        locus_found = False
-                        while not locus_found:
-                            try:
-                                line = next(i_stream)
-                            except StopIteration:  # We have reached the end of the file
-                                break
-                            
-                            if line[0] == "L":
-                                # Skip line if it starts with "decoy_"
-                                fasta_header = line.split("\t")[1]
-                                if fasta_header.startswith("decoy_"):
-                                    continue
-                                else:
-                                    # Get the uniprot ID from the header
-                                    uniprot_id = self._uniprot_from_fasta_header(fasta_header)
-                                    self._uniprot_data["uniprot_ids"].append(uniprot_id)
-                                    locus_found = True
-    
+                        intensity: float = float(line.split("\t")[7])
+                        ion_intensities.append(intensity)
+                        fasta_headers.append([])
+
+                    # Get sequential lines starting with "L" and append the uniprot ID to the dataframe
+                    elif line.startswith("L"):
+                        fasta_header = line.split("\t")[1]
+                        if fasta_header.startswith("decoy_"):
+                            continue
+                        else:
+                            # Append fasta header to most recent list created
+                            fasta_headers[-1].append(fasta_header)
+
+            # Append corresponding values in ion_intensities and fasta_headers to the average_intensities list
+            # concat_dict: dict = {"uniprot": [], replicate_name: []}
+            for j in range(len(ion_intensities)):
+                current_intensity = ion_intensities[j]
+
+                for k in range(len(fasta_headers[j])):
+                    current_fasta_header = fasta_headers[j][k]
+
+                    # Get the UniProt ID from the fasta header
+                    uniprot_id = self._uniprot_from_fasta_header(current_fasta_header)
+
+                    # Create a new row in the dataframe
+                    average_intensities_dict["uniprot"].append(uniprot_id)
+                    average_intensities_dict[replicate_name].append(current_intensity)
+
+            # Group by uniprot_id and take the mean of the ion_intensities
+            average_intensities_df: pd.DataFrame = pd.DataFrame(average_intensities_dict)  # fmt: skip
+            average_intensities_df = average_intensities_df.groupby("uniprot", as_index=False).mean()  # fmt: skip
+
+            # Merge the average intensities to the dataframe
+            self._intensities = self._intensities.merge(average_intensities_df, on="uniprot", how="outer")  # fmt: skip
+            # self._intensities.join(average_intensities_df)
+            # self._intensities = pd.concat([self._intensities, average_intensities_df], axis=0)  # fmt: skip
+
     def convert_ids(self):
         """
         This function converts a list of uniprot IDs to Gene IDs
         """
         biodbnet = BioDBNet()
-        self._uniprot_data["gene_ids"] = []
-        # Create a progress bar so we know how long this takes
-        max_iteration: int = len(self._uniprot_data["uniprot_ids"])
-        # for i in tqdm.tqdm(range(0, max_iteration, step)):
-        for i in range(0, max_iteration, 500):
-            print(f"\rCollecting Gene IDs - {i} to {i + 500} of {max_iteration}", end="", flush=True)
-            # Get the next 500 UniProt IDs
-            id_lookup = self._uniprot_data["uniprot_ids"][i: i + 500]
+
+        """
+        len(DATAFRAME) / X = 500
+        X = len(DATAFRAME) / 500
+        """
+
+        # Get "chunk_sizes" rows at a time
+        # This is not perfect, as num_sections rounds up to the nearest integer
+        chunk_size: int = 500
+        num_sections: int = np.ceil(len(self._intensities) / chunk_size)
+        chunk_data: pd.DataFrame = np.array_split(self._intensities, num_sections)
+        lower_iteration: int = 0
+        upper_iteration: int = 0
+        
+        for i, chunk in enumerate(chunk_data):
+            upper_iteration += len(chunk)
+            print(f"\rCollecting Gene IDs {lower_iteration + 1} to {upper_iteration} of {len(self._intensities)}", end="", flush=True)
             
+            input_data = chunk["uniprot"].values.tolist()
+
             # Convert UniProt IDs to Gene IDs
-            gene_ids = biodbnet.db2db("UniProt Accession", "Gene ID", input_values=id_lookup)
+            gene_ids: pd.DataFrame = biodbnet.db2db("UniProt Accession", "Gene ID", input_values=input_data)
             
-            # Add values to list
-            self._uniprot_data["gene_ids"].extend(gene_ids["Gene ID"])
+            # Wrangle gene_ids into a format able to be updated with self._intensities
+            gene_ids["uniprot"] = gene_ids.index
+            gene_ids.rename(columns={"Gene ID": "symbol"}, inplace=True)
+            gene_ids.reset_index(inplace=True, drop=True)
+            
+            # Reindexing was the only way to ensure gene_ids were placed in the correct spot
+            gene_ids.index = range(lower_iteration, upper_iteration)
+            # Update intensities dataframe
+            self._intensities.update(gene_ids)
+            
+            # Update the iteration to start at
+            lower_iteration += len(chunk)
+            
         print("")  # go to next line; we have a carraige return in "for" loop
-    
+
     def write_data(self):
         """
         This function is responsible for writing a dictionary to a csv file
@@ -276,23 +376,12 @@ class SQTtoCSV:
 
         Each key has a list of values
         """
-        
-        with open(self._output_csv, "w") as o_stream:
-            writer = csv.writer(o_stream, delimiter=",")
-            writer.writerow(["uniprot_id", "gene_id", "ion_intensity"])  # header
-            
-            # Write data
-            for uniprot_id, gene_id, ion_intensity in zip(
-                    self._uniprot_data["uniprot_ids"],
-                    self._uniprot_data["gene_ids"],
-                    self._uniprot_data["ion_intensities"]
-            ):
-                writer.writerow([uniprot_id, gene_id, ion_intensity])
-    
+        self._intensities.to_csv(self._output_csv, index=False, header=True, na_rep="0")
+
     @property
     def output_csv(self):
         return self._output_csv
 
 
 if __name__ == "__main__":
-    print("Use the main_proteomics.py file")
+    print("Use the proteomics_preprocess.py file")

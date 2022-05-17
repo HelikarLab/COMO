@@ -20,7 +20,7 @@ class Download:
         self,
         ftp_links: list[str],
         output_dir: Path,
-        print_only: bool,
+        cell_types: list[str],
         preferred_extensions: list[str],
         skip_download: bool,
         core_count: int = 1,
@@ -30,29 +30,20 @@ class Download:
 
         :param ftp_links: A list of FTP links to download from
         :param output_dir: The directory to save data into
-        :param print_only: Should the files only be printed to console? If True, nothing will be downloaded, even if an output directory is specified
         :param preferred_extensions: The file extension to look for. If not set, it will recursively find every file
         """
-        
+        self._input_cell_types: list[str] = cell_types
         self._ftp_links: list[str] = ftp_links
         self._output_dir: Path = output_dir
-        self._print_only: bool = print_only
-        self._extensions: list[str] = preferred_extensions
+        self._extensions: tuple[str] = tuple(preferred_extensions)
         self._core_count: int = core_count
+        self._raw_file_cell_types: list[str] = []
 
         # Create a manager so each process can append data to variables
         # From: https://stackoverflow.com/questions/67974054
         self._save_locations: list[Path] = multiprocessing.Manager().list()
         self._download_counter: Synchronized = multiprocessing.Value("i", 1)
         self._finished_counter: Synchronized = multiprocessing.Value("i", 1)
-
-        # If no preferred extensions are passed in, we must convert it to a string before using it
-        # Without doing so, str().endswith() returns False. We want it to return True.
-        if not self._extensions:
-            self._extensions: str = ""
-        else:
-            # If extensions exist, convert it to a tuple of strings
-            self._extensions: tuple[str] = tuple(self._extensions)
 
         # These values are modified by self.get_files_to_download()
         self._files_to_download: list[str] = []
@@ -69,7 +60,7 @@ class Download:
 
         # Connect to the FTP server
         print("Collecting files to download...", end=" ", flush=True)
-        for url in self._ftp_links:
+        for cell_type, url in enumerate(self._ftp_links):
             parsed_url: ParseResult = urlparse(url)
             scheme: str = parsed_url.scheme
             host: str = parsed_url.hostname
@@ -100,11 +91,12 @@ class Download:
                 if file_path.endswith(self._extensions):
                     download_url: str = f"{scheme}://{host}{file_path}"
                     file_size: int = client.size(file_path)
-
+                    self._raw_file_cell_types.append(self._input_cell_types[cell_type])
                     self._files_to_download.append(download_url)
                     self._file_sizes.append(file_size)
-
+                    
             client.quit()
+
         print(f"{len(self._files_to_download)} files found\n")
 
     def download_data_wrapper(self):
@@ -128,7 +120,7 @@ class Download:
             # Append a job to the list
             job = multiprocessing.Process(
                 target=self.download_data,
-                args=(files,sizes,),
+                args=(files, sizes,),
             )
             jobs.append(job)
 
@@ -143,6 +135,7 @@ class Download:
     ):
 
         # Start processing the files
+        
         for i, (file, size) in enumerate(zip(files_to_download, file_sizes)):
             # Define FTP-related variables
             parsed_url = urlparse(file)
@@ -153,7 +146,8 @@ class Download:
             size_mb: int = size // (1024**2)
 
             # Determine the file name and save path
-            file_name: str = Path(path).name
+            replicate_name: str = f"{self._raw_file_cell_types[i]}_S1R{i + 1}"
+            file_name: str = f"{replicate_name}_{Path(path).name}"
             save_path: Path = Path(self._output_dir, file_name)
             self._save_locations.append(save_path)
 
@@ -196,7 +190,15 @@ class Download:
         This function returns a list of downloaded file locations
         """
         return self._save_locations
+    
+    @property
+    def collected_cell_types(self) -> list[str]:
+        """
+        This function returns a list of cell types
+        Index 0 matches Index 0 of ftp_links
+        """
+        return self._raw_file_cell_types
 
 
 if __name__ == "__main__":
-    print("Use the main_proteomics.py file!")
+    print("Use the proteomics_preprocess.py file")
