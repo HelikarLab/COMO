@@ -16,6 +16,7 @@ COPY --chown=1000:100 work "${HOME}"/work
 RUN pip install --requirement "${HOME}/pip_install.txt" \
     && conda config --add channels bioconda \
     && conda config --add channels conda-forge \
+    && conda config --add channels r \
     # Remove python from pinned versions; this allows us to update python. From: https://stackoverflow.com/a/11245372/13885200 \
     && sed -i "s/^python 3.*//" /opt/conda/conda-meta/pinned \
     && mamba install --yes --channel bioconda --channel conda-forge --file "${HOME}/mamba_install.txt" \
