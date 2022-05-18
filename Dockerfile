@@ -2,6 +2,7 @@ FROM jupyter/r-notebook:latest
 
 ARG GRB_SHORT_VERSION=9.5
 ARG GRB_VERSION=9.5.0
+ARG PYTHON_VERSION=3.10
 
 ENV HOME /home/jovyan
 
@@ -15,8 +16,8 @@ COPY --chown=1000:100 work "${HOME}"/work
 RUN pip install --requirement "${HOME}/pip_install.txt" \
     && conda config --add channels bioconda \
     && conda config --add channels conda-forge \
-    # Remove python from pinned versions; this allows us to update python \
-    && grep -v "python " > /opt/conda/conda-meta/pinned_edit && mv /opt/conda/conda-meta/pinned_edit /opt/conda/conda-meta/pinned \
+    # Remove python from pinned versions; this allows us to update python. From: https://stackoverflow.com/a/11245372/13885200 \
+    && sed -i 's/.*python 3.*/python 3.10/' /opt/conda/conda-meta/pinned \
     && mamba install --yes --channel bioconda --channel conda-forge --file "${HOME}/mamba_install.txt" \
     && mamba clean --all --force-pkgs-dirs --yes \
     && R -e 'devtools::install_github("babessell1/zFPKM")'\
