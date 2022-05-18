@@ -41,4 +41,3 @@ git
 thermorawfileparser
 crux-toolkit
 bioservices
-rpy2
