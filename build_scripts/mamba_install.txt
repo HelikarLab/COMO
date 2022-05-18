@@ -40,3 +40,4 @@ wget
 git
 thermorawfileparser
 crux-toolkit
+bioservices
