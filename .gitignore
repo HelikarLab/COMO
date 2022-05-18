@@ -1,10 +1,11 @@
 docker_old/*
+/**/.DS_Store
 
 # JetBrains project files, these are user-specific
 /**/.idea
 
 # Jupyter checkpoints
-/work/py/.ipynb_checkpoints/
+/**/.ipynb_checkpoints/
 
 # R logs
 /work/py/rlogs/

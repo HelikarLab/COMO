@@ -38,6 +38,8 @@ def fetch_gene_info(input_values, input_db="Ensembl Gene ID",
     print(f"Total Genes to Retrieve: {len(input_values)}")
     while i < len(input_values):
         upper_range = min(i + batch_len, len(input_values))
+        # TODO: Make this output more user-readable
+        # It outputs many lines due to the large number of genes to retrieve
         print(f"retrieve {i}:{upper_range}")
         df_test = s.db2db(input_db, output_db, input_values[i:upper_range], taxon_id)
         if isinstance(df_test, pd.DataFrame):

@@ -72,7 +72,8 @@ class Download:
             attempts: int = 1
             while not connection_successful:
                 try:
-                    client: FTP = FTP(host=host, user="anonymous", passwd="guest")
+                    client: FTP = FTP(host=host, user="anonymous", passwd="guest", timeout=5)
+                    client.set_pasv(False)
                     connection_successful = True
                 except ConnectionResetError:
                     # If connection is reset, wait a bit and try again
