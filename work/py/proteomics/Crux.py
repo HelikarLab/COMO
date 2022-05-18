@@ -343,7 +343,7 @@ class SQTtoCSV:
         
         for i, chunk in enumerate(chunk_data):
             upper_iteration += len(chunk)
-            print(f"\rCollecting Gene IDs {lower_iteration + 1} to {upper_iteration} of {len(self._intensities)}", end="", flush=True)
+            print(f"Converting Gene IDs {lower_iteration + 1}:{upper_iteration} of {len(self._intensities)}", end="", flush=True)
             
             input_data = chunk["uniprot"].values.tolist()
 
