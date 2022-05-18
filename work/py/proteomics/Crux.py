@@ -341,16 +341,16 @@ class SQTtoCSV:
         
         for i, chunk in enumerate(chunk_data):
             upper_iteration += len(chunk)
-            print(f"Converting Gene IDs {lower_iteration + 1}:{upper_iteration} of {len(self._intensities)}", end="", flush=True)
+            print(f"\rConverting to Gene Symbols {lower_iteration + 1}:{upper_iteration} of {len(self._intensities)}", end="", flush=True)
             
             input_data = chunk["uniprot"].values.tolist()
 
             # Convert UniProt IDs to Gene IDs
-            gene_ids: pd.DataFrame = biodbnet.db2db("UniProt Accession", "Gene ID", input_values=input_data)
+            gene_ids: pd.DataFrame = biodbnet.db2db("UniProt Accession", "Gene Symbol", input_values=input_data)
             
             # Wrangle gene_ids into a format able to be updated with self._intensities
             gene_ids["uniprot"] = gene_ids.index
-            gene_ids.rename(columns={"Gene ID": "symbol"}, inplace=True)
+            gene_ids.rename(columns={"Gene Symbol": "symbol"}, inplace=True)
             gene_ids.reset_index(inplace=True, drop=True)
             
             # Reindexing was the only way to ensure gene_ids were placed in the correct spot
