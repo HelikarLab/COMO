@@ -1,7 +1,5 @@
 """
 TODO: Integrate crux percolator into this workflow
-
-TODO: Modify crux search window? (2 minute default)
 """
 import pandas as pd
 from bioservices import BioDBNet
