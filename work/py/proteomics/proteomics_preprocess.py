@@ -247,7 +247,15 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         default=Defaults.core_count,
         help="This is the number of threads to use for downloading files. It will default to the minimum of: half the available CPU cores available, or the number of input files found.\nIt will not use more cores than necessary\nOptions are an integer or 'all' to use all available cores",
     )
-    # TODO: Add "keep" flag to optionally keep the downloaded intermediate files (raw_files, mzml, sqt)
+    parser.add_argument(
+        "--delete",
+        required=False,
+        dest="delete",
+        action="store_true",
+        default=False,
+        help="If this action is passed in, all intermediate files will be deleted. This includes: raw files, mzML files, and SQT files.\n"
+             "Only the final proteomics intensities CSV file will be kept.",
+    )
 
     args: argparse.Namespace = parser.parse_args(args)
     args.extensions = args.extensions.split(",")
@@ -278,6 +286,20 @@ def parse_args(args: list[str]) -> argparse.Namespace:
     os.makedirs(args.sqt_output_dir, exist_ok=True)
 
     return args
+
+
+def delete_intermediates():
+    """
+    This file is responsible for deleting all intermediate directories
+    This includes the folders:
+        - output/proteomics/mzml
+        - output/proteomics/raw_files
+        - output/proteomics/sqt
+    """
+    print("Deleting intermediate files...")
+    os.rmdir(Defaults.mzml_directory)
+    os.rmdir(Defaults.raw_file_directory)
+    os.rmdir(Defaults.sqt_directory)
 
 
 def main(args: list[str]):
@@ -368,7 +390,9 @@ def main(args: list[str]):
     )
 
     print(f"Gene ID output saved at {conversion_manager.output_csv}")
-
+    
+    if args.delete is True:
+        delete_intermediates()
 
 if __name__ == "__main__":
     args = sys.argv[1:]
