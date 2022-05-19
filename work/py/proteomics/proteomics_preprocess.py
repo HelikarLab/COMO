@@ -33,7 +33,7 @@ class Defaults:
     This class is responsible for holding default values for argument parsing
     """
     # TODO: Move "/work/data/{outputdir}" to "/work/data/results/CELL_TYPE/proteomics"
-    # TODO: Output "output-csv" to data-matrices/protein_abundance_matrix_CELL_TYPE.csv
+    # TODO: Output "output-csv" to data_matrices/protein_abundance_matrix_CELL_TYPE.csv
     ftp_links: Path = Path(project.configs.configdir, "proteomeXchange_urls.csv")
     output_intensity_csv: Path = Path(project.configs.outputdir, "proteomics", "proteomics_intensity.csv")  # fmt: skip
     raw_file_directory: Path = Path(project.configs.outputdir, "proteomics", "raw_files")  # fmt: skip
@@ -87,19 +87,25 @@ class ParseInputCSV:
     """
     def __init__(self, input_csv_file: Path):
         self._input_csv_file: Path = input_csv_file
-        self._proteome_urls: list[str] = []
+        self._urls: list[str] = []
         self._cell_types: list[str] = []
         
+        # Get data from CSV
         with open(self._input_csv_file, "r") as i_stream:
             reader = csv.reader(i_stream)
             header = next(reader)
             for line in reader:
-                if line[0][0]== "#":  # Skip 'comments'
+                if line[0][0] == "#":  # Skip 'comments'
                     continue
                 else:
-                    self._proteome_urls.append(line[0])
+                    self._urls.append(line[0])
                     self._cell_types.append(line[1])
 
+        # Convert from 'old' /pride/data/archive to 'new' /pride-archive
+        for i, url in enumerate(self._urls):
+            self._urls[i] = url.replace("/pride/data/archive", "/pride-archive")
+        
+        
     @property
     def ftp_urls(self) -> list[str]:
         """
@@ -107,7 +113,7 @@ class ParseInputCSV:
         
         Example: ftp://ftp.my_server.com
         """
-        return self._proteome_urls
+        return self._urls
     
     @property
     def cell_types(self) -> list[str]:
@@ -313,11 +319,13 @@ def main(args: list[str]):
     # Create variables so they are always defined
     # This is required in case a "skip-..." option is passed in
     csv_parser = ParseInputCSV(args.input_csv)
+    defaults = Defaults()
+
     ftp_links: list[str] = csv_parser.ftp_urls
     csv_cell_types: list[str] = csv_parser.cell_types
-    raw_file_paths: list[Path] = Defaults().collect_raw_files
-    sqt_file_paths = Defaults().collect_sqt_files
-    mzml_file_paths = Defaults().collect_mzml_files
+    raw_file_paths: list[Path] = defaults.collect_raw_files
+    sqt_file_paths: list[Path] = defaults.collect_sqt_files
+    mzml_file_paths: list[Path] = defaults.collect_mzml_files
     raw_file_cell_types: list[str] = []
     
     """
