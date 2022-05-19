@@ -69,23 +69,22 @@ class Download:
             # Attempt to connect to host
             connection_successful: bool = False
             max_attempts: int = 5
-            attempts: int = 1
+            attempt_num: int = 1
             while not connection_successful:
                 try:
                     client: FTP = FTP(host=host, user="anonymous", passwd="guest", timeout=5)
-                    client.set_pasv(False)
                     connection_successful = True
                 except ConnectionResetError:
                     # If connection is reset, wait a bit and try again
                     print(
-                        f"\nConnection reset. Retrying... [{max_attempts - attempts} attempt(s) remaining]",
+                        f"\nConnection reset. Retrying... [{max_attempts - attempt_num} attempt(s) remaining]",
                         end="",
                         flush=True,
                     )
                     time.sleep(1)
-                    attempts += 1
-                finally:
-                    if attempts > 5:
+                    attempt_num += 1
+                    
+                    if attempt_num > 5:
                         raise ConnectionError(f"Could not connect to {host}. Please check your internet connection.")  # fmt: skip
 
             for file_path in client.nlst(folder):
