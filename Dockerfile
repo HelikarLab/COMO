@@ -14,14 +14,13 @@ COPY --chown=1000:100 work "${HOME}"/work
 
 # Install python-related items
 RUN pip install --requirement "${HOME}/pip_install.txt" \
-    && conda config --add channels bioconda \
     && conda config --add channels conda-forge \
+    && conda config --add channels bioconda \
     && conda config --add channels r \
     # Remove python from pinned versions; this allows us to update python. From: https://stackoverflow.com/a/11245372/13885200 \
-    && sed -i "s/^python 3.*//" /opt/conda/conda-meta/pinned \
+    && sed -i "s/^python 3.*/python 3.10.*/" /opt/conda/conda-meta/pinned \
+    && mamba install --yes --channel conda-forge python=${PYTHON_VERSION} \
     && mamba install --yes --channel bioconda --channel conda-forge --file "${HOME}/mamba_install.txt" \
-    # Enter new "pinned" version of python  \
-    && echo "python ${PYTHON_VERSION}" >> /opt/conda/conda-meta/pinned \
     && mamba clean --all --force-pkgs-dirs --yes \
     && R -e 'devtools::install_github("babessell1/zFPKM")'\
     && jupyter trust "${HOME}/work/py/pipeline.ipynb" \
