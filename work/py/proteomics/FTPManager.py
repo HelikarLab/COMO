@@ -14,30 +14,80 @@ import time
 from urllib.parse import urlparse
 from urllib.parse import ParseResult
 
+# Our classes
+from FileInformation import FileInformation
+
+
+def ftp_client(host: str, folder: str, max_attempts: int = 3) -> FTP:
+    """
+    This class is responsible for creating a "client" connection
+    """
+    connection_successful: bool = False
+    max_attempts: int = max_attempts
+    attempt_num: int = 0
+    # Attempt to connect, throw error if unable to
+    while not connection_successful and attempt_num <= max_attempts:
+        try:
+            ftp_client: FTP = FTP(host, user="anonymous", passwd="guest")
+            connection_successful = True
+        except ConnectionResetError:
+            print(f"\rAttempt {attempt_num + 1} of {max_attempts} failed to connect", end="", flush=True)
+            attempt_num += 1
+            time.sleep(5)
+    if not connection_successful:
+        raise ConnectionResetError("Could not connect to FTP server")
+    
+    return ftp_client
+
+
+class Reader:
+    def __init__(self, root_link: str, file_extensions: list[str]):
+        """
+        This class is responsible for reading data about root FTP links
+        """
+        self._root_link: str = root_link
+        self._extensions: tuple[str] = tuple(file_extensions)
+        self._files: list[str] = []
+        self._file_sizes: list[int] = []
+        
+        self._get_info()
+        
+    def _get_info(self):
+        """
+        This function is responsible for getting all files under the root_link
+        """
+        scheme: str = urlparse(self._root_link).scheme
+        host = urlparse(self._root_link).hostname
+        folder = urlparse(self._root_link).path
+        
+        client: FTP = ftp_client(host=host, folder=folder)
+        
+        for file_path in client.nlst(folder):
+            if file_path.endswith(self._extensions):
+                download_url: str = f"{scheme}://{host}{file_path}"
+                self._files.append(download_url)
+                self._file_sizes.append(client.size(file_path))
+                
+    @property
+    def files(self):
+        return self._files
+    
+    @property
+    def file_sizes(self):
+        return self._file_sizes
+
 
 class Download:
     def __init__(
         self,
-        ftp_links: list[str],
-        output_dir: Path,
-        cell_types: list[str],
-        preferred_extensions: list[str],
-        skip_download: bool,
+        file_information: list[FileInformation],
         core_count: int = 1,
     ):
         """
         This function is responsible for downloading items from the FTP urls passed into it
-
-        :param ftp_links: A list of FTP links to download from
-        :param output_dir: The directory to save data into
-        :param preferred_extensions: The file extension to look for. If not set, it will recursively find every file
         """
-        self._input_cell_types: list[str] = cell_types
-        self._ftp_links: list[str] = ftp_links
-        self._output_dir: Path = output_dir
-        self._extensions: tuple[str] = tuple(preferred_extensions)
+        self._file_information: list[FileInformation] = file_information
         self._core_count: int = core_count
-        self._raw_file_cell_types: list[str] = []
 
         # Create a manager so each process can append data to variables
         # From: https://stackoverflow.com/questions/67974054
@@ -45,59 +95,8 @@ class Download:
         self._download_counter: Synchronized = multiprocessing.Value("i", 1)
         self._finished_counter: Synchronized = multiprocessing.Value("i", 1)
 
-        # These values are modified by self.get_files_to_download()
-        self._files_to_download: list[str] = []
-        self._file_sizes: list[int] = []
-
         # Find files to download
-        self.get_files_to_download()
         self.download_data_wrapper()
-
-    def get_files_to_download(self):
-        """
-        This function is responsible for asynchronously downloading FTP files from the self._urls list
-        """
-
-        # Connect to the FTP server
-        print("Collecting files to download...", end=" ", flush=True)
-        for cell_type, url in enumerate(self._ftp_links):
-            parsed_url: ParseResult = urlparse(url)
-            scheme: str = parsed_url.scheme
-            host: str = parsed_url.hostname
-            folder: str = parsed_url.path
-
-            # Attempt to connect to host
-            connection_successful: bool = False
-            max_attempts: int = 5
-            attempt_num: int = 1
-            while not connection_successful:
-                try:
-                    client: FTP = FTP(host=host, user="anonymous", passwd="guest", timeout=5)
-                    connection_successful = True
-                except ConnectionResetError:
-                    # If connection is reset, wait a bit and try again
-                    print(
-                        f"\nConnection reset. Retrying... [{max_attempts - attempt_num} attempt(s) remaining]",
-                        end="",
-                        flush=True,
-                    )
-                    time.sleep(1)
-                    attempt_num += 1
-                    
-                    if attempt_num > 5:
-                        raise ConnectionError(f"Could not connect to {host}. Please check your internet connection.")  # fmt: skip
-
-            for file_path in client.nlst(folder):
-                if file_path.endswith(self._extensions):
-                    download_url: str = f"{scheme}://{host}{file_path}"
-                    file_size: int = client.size(file_path)
-                    self._raw_file_cell_types.append(self._input_cell_types[cell_type])
-                    self._files_to_download.append(download_url)
-                    self._file_sizes.append(file_size)
-                    
-            client.quit()
-
-        print(f"{len(self._files_to_download)} files found\n")
 
     def download_data_wrapper(self):
         """
@@ -108,19 +107,17 @@ class Download:
         # Otherwise if user specified the number of cores, use that
 
         # Split list into chunks to process separately
-        file_chunks: list[str] = np.array_split(
-            self._files_to_download, self._core_count
-        )
-        file_size_chunks: list[int] = np.array_split(self._file_sizes, self._core_count)
+        file_chunks: list[str] = np.array_split(self._file_information, self._core_count)
 
         # Create a list of jobs
         jobs: list[multiprocessing.Process] = []
+        
+        for i, information in enumerate(file_chunks):
 
-        for i, (files, sizes) in enumerate(zip(file_chunks, file_size_chunks)):
             # Append a job to the list
             job = multiprocessing.Process(
                 target=self.download_data,
-                args=(files, sizes,),
+                args=(information,),
             )
             jobs.append(job)
 
@@ -130,74 +127,38 @@ class Download:
 
     def download_data(
         self,
-        files_to_download: list[str],
-        file_sizes: list[int],
+        file_information: list[FileInformation],
     ):
 
         # Start processing the files
+        for i, information in enumerate(file_information):
         
-        for i, (file, size) in enumerate(zip(files_to_download, file_sizes)):
             # Define FTP-related variables
-            parsed_url = urlparse(file)
+            parsed_url = urlparse(information.download_url)
             host = parsed_url.hostname
             path = parsed_url.path
 
             # Convert file_size from byte to MB
-            size_mb: int = size // (1024**2)
-
-            # Determine the file name and save path
-            replicate_name: str = f"{self._raw_file_cell_types[i]}_S1R{i + 1}"
-            file_name: str = f"{replicate_name}_{Path(path).name}"
-            save_path: Path = Path(self._output_dir, file_name)
-            self._save_locations.append(save_path)
+            size_mb: int = information.file_size // (1024**2)
 
             # Connect to the host, login, and download the file
             client: FTP = FTP(host=host, user="anonymous", passwd="guest")
 
             # Get the lock and print file info
             self._download_counter.acquire()
-            print(f"Started {self._download_counter.value:02d} / {len(self._files_to_download):02d} ({size_mb} MB) - {file_name}")  # fmt: skip
+            print(f"Started {self._download_counter.value:02d} / {len(self._file_information):02d} ({size_mb} MB) - {information.raw_file_name}")  # fmt: skip
             self._download_counter.value += 1
             self._download_counter.release()
 
             # Download the file
-            client.retrbinary(f"RETR {path}", open(save_path, "wb").write)
+            client.retrbinary(f"RETR {path}", open(information.raw_file_path, "wb").write)
             client.quit()
 
             # Show finished status
             self._finished_counter.acquire()
-            print(f"\tFinished {self._finished_counter.value:02d} / {len(self._files_to_download):02d}")  # fmt: skip
+            print(f"\tFinished {self._finished_counter.value:02d} / {len(self._file_information):02d}")  # fmt: skip
             self._finished_counter.value += 1
             self._finished_counter.release()
-
-    @property
-    def ftp_links(self) -> list[str]:
-        """
-        This function returns the FTP links used to download data
-        """
-        return self._ftp_links
-
-    @property
-    def output_dir(self) -> Path:
-        """
-        This function returns the output directory used to save data
-        """
-        return self._output_dir
-
-    @property
-    def raw_files(self) -> list[Path]:
-        """
-        This function returns a list of downloaded file locations
-        """
-        return self._save_locations
-    
-    @property
-    def collected_cell_types(self) -> list[str]:
-        """
-        This function returns a list of cell types
-        Index 0 matches Index 0 of ftp_links
-        """
-        return self._raw_file_cell_types
 
 
 if __name__ == "__main__":

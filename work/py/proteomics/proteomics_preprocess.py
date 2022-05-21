@@ -10,7 +10,8 @@ import sys
 # Our classes
 import Crux
 import FTPManager
-
+from Defaults import DefaultValues
+from FileInformation import FileInformation
 
 # Add parent directory to path, allows us to import the "project.py" file from the parent directory
 # From: https://stackoverflow.com/a/30536516/13885200
@@ -28,56 +29,7 @@ class ArgParseFormatter(
     pass
 
 
-class Defaults:
-    """
-    This class is responsible for holding default values for argument parsing
-    """
-    # TODO: Move "/work/data/{outputdir}" to "/work/data/results/CELL_TYPE/proteomics"
-    # TODO: Output "output-csv" to data_matrices/protein_abundance_matrix_CELL_TYPE.csv
-    ftp_links: Path = Path(project.configs.configdir, "proteomeXchange_urls.csv")
-    output_intensity_csv: Path = Path(project.configs.outputdir, "proteomics", "proteomics_intensity.csv")  # fmt: skip
-    raw_file_directory: Path = Path(project.configs.outputdir, "proteomics", "raw_files")  # fmt: skip
-    mzml_directory: Path = Path(project.configs.outputdir, "proteomics", "mzml")
-    sqt_directory: Path = Path(project.configs.outputdir, "proteomics", "sqt")
-    fasta_database_file: Path = Path(project.configs.datadir, "human_proteome_UP000005640_database.fasta")  # fmt: skip
-    core_count: int = os.cpu_count() // 2
-    
-    @property
-    def collect_raw_files(self) -> list[Path]:
-        """
-        This function is responsible for recursively collecting all RAW files from raw_file_directory
-        """
-        raw_files: list[Path] = []
-        for file in self.raw_file_directory.rglob("*"):
-            if file.suffix == ".raw":
-                raw_files.append(file)
-        return raw_files
-    
-    @property
-    def collect_sqt_files(self) -> list[Path]:
-        """
-        This function is responsible for recursively collecting all SQT files from sqt_directory
-        """
-        sqt_files: list[Path] = []
-        # Recursively collect all SQT files from sqt_directory
-        for file in self.sqt_directory.rglob("*"):
-            if file.suffix == ".sqt":
-                sqt_files.append(file)
-        return sqt_files
-    
-    @property
-    def collect_mzml_files(self) -> list[Path]:
-        """
-        This function is responsible for recursively collecting all mzML files from the mzml_directory
-        """
-        mzml_files: list[Path] = []
-        for file in self.mzml_directory.rglob("*"):
-            if file.suffix == ".mzml":
-                mzml_files.append(file)
-        return mzml_files
-
-
-class ParseInputCSV:
+class ParseCSVInput:
     """
     This class is responsible for parsing the input CSV into two fields
     1. proteomeXchange URLs
@@ -88,7 +40,7 @@ class ParseInputCSV:
     def __init__(self, input_csv_file: Path):
         self._input_csv_file: Path = input_csv_file
         self._urls: list[str] = []
-        self._cell_types: list[str] = []
+        self._input_cell_types: list[str] = []
         
         # Get data from CSV
         with open(self._input_csv_file, "r") as i_stream:
@@ -99,12 +51,11 @@ class ParseInputCSV:
                     continue
                 else:
                     self._urls.append(line[0])
-                    self._cell_types.append(line[1])
+                    self._input_cell_types.append(line[1])
 
         # Convert from 'old' /pride/data/archive to 'new' /pride-archive
         for i, url in enumerate(self._urls):
             self._urls[i] = url.replace("/pride/data/archive", "/pride-archive")
-        
         
     @property
     def ftp_urls(self) -> list[str]:
@@ -116,20 +67,45 @@ class ParseInputCSV:
         return self._urls
     
     @property
-    def cell_types(self) -> list[str]:
+    def input_cell_types(self) -> list[str]:
         """
         This will return the cell types as defined in the input CSV file
         """
-        return self._cell_types
+        return self._input_cell_types
 
 
+class PopulateInformation:
+    def __init__(
+            self,
+            file_information: list[FileInformation],
+            csv_data: ParseCSVInput
+    ):
+        self.file_information: list[FileInformation] = file_information
+        self._csv_data: ParseCSVInput = csv_data
+        
+        for i, (root_url, cell_type) in enumerate(zip(self._csv_data.ftp_urls, self._csv_data.input_cell_types)):
+            print(f"Collecting file information for cell type: {cell_type} ({i+1} / {len(self._csv_data.input_cell_types)})")
+            ftp_files: FTPManager.Reader = FTPManager.Reader(root_link=root_url, file_extensions=["raw"])
+        
+            for j, (file, size) in enumerate(zip(ftp_files.files, ftp_files.file_sizes)):
+                replicate_name: str = f"S1R{j + 1}"
+                self.file_information.append(
+                    FileInformation(
+                        cell_type=cell_type,
+                        download_url=file,
+                        file_size=size,
+                        replicate=replicate_name,
+                    )
+                )
+                
+        
 def parse_args(args: list[str]) -> argparse.Namespace:
     """
     This function is used to parse arguments from the command line
 
     :param args: The list of arguments collected from the command line
     """
-
+    
     parser = argparse.ArgumentParser(
         prog="proteomics_preprocess.py",
         description="Download and analyze proteomics data from proteomeXchange\n"
@@ -147,55 +123,17 @@ def parse_args(args: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "-i",
         "--input",
-        required=False,
+        required=True,
         dest="input_csv",
-        default=Defaults.ftp_links,
-        metavar="proteomics_urls.csv",
+        metavar="/home/USER/data/proteomics_urls.csv",
         help="The proteomeXchange CSV file location",
-    )
-    parser.add_argument(
-        "-o",
-        "--output-csv",
-        required=False,
-        default=Defaults.output_intensity_csv,
-        dest="output_csv",
-        metavar="proteomics_intensity.csv",
-        help="The location to write the output intensity CSV file",
-    )
-    parser.add_argument(
-        "-f",
-        "--ftp-out-dir",
-        required=False,
-        dest="ftp_output_dir",
-        default=Defaults.raw_file_directory,
-        metavar="ftp_directory",
-        help="The output directory to raw mass spectrometry data",
-    )
-    parser.add_argument(
-        "-m",
-        "--mzml-out-dir",
-        required=False,
-        dest="mzml_output_dir",
-        default=Defaults.mzml_directory,
-        metavar="mzml_output_dir",
-        help="The output directory to save mzML files. These are generated by converting raw files",
-    )
-    parser.add_argument(
-        "-s",
-        "--sqt-out-dir",
-        required=False,
-        dest="sqt_output_dir",
-        default=Defaults.sqt_directory,
-        metavar="sqt_output_directory",
-        help="The output directory to save SQT files. These are generated by analyzing mzML files",
     )
     parser.add_argument(
         "-d",
         "--database-search",
-        required=False,
+        required=True,
         dest="database",
-        default=Defaults.fasta_database_file,
-        metavar="database_file.fasta",
+        metavar="/home/USER/data/database_file.fasta",
         help="The fasta database to search for protein identification",
     )
     parser.add_argument(
@@ -206,14 +144,6 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         default="raw",
         help="A list of file extensions to download from the FTP server",
         metavar="raw,txt,another_extension",
-    )
-    parser.add_argument(
-        "-p",
-        "--print-only",
-        required=False,
-        dest="print_only",
-        action="store_true",
-        help="Should the files found within the FTP links only be printed to the console? Enabling this option will not download any files.",
     )
     parser.add_argument(
         "--skip-download",
@@ -250,18 +180,18 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         required=False,
         dest="core_count",
         metavar="cores",
-        default=Defaults.core_count,
+        default=os.cpu_count() // 2,
         help="This is the number of threads to use for downloading files. It will default to the minimum of: half the available CPU cores available, or the number of input files found.\nIt will not use more cores than necessary\nOptions are an integer or 'all' to use all available cores",
     )
-    parser.add_argument(
-        "--delete",
-        required=False,
-        dest="delete",
-        action="store_true",
-        default=False,
-        help="If this action is passed in, all intermediate files will be deleted. This includes: raw files, mzML files, and SQT files.\n"
-             "Only the final proteomics intensities CSV file will be kept.",
-    )
+    # parser.add_argument(
+    #     "--delete",
+    #     required=False,
+    #     dest="delete",
+    #     action="store_true",
+    #     default=False,
+    #     help="If this action is passed in, all intermediate files will be deleted. This includes: raw files, mzML files, and SQT files.\n"
+    #          "Only the final proteomics intensities CSV file will be kept.",
+    # )
 
     args: argparse.Namespace = parser.parse_args(args)
     args.extensions = args.extensions.split(",")
@@ -284,29 +214,8 @@ def parse_args(args: list[str]) -> argparse.Namespace:
             print(f"Invalid option '{args.core_count}' for option '--cores'. Enter an integer or 'all' to use all cores")  # fmt: skip
             exit(2)
 
-    # We have a default output directory set (default_output)
-    # Because of this, even if the user inputs their own output directory, we can just make the output
-    # It will be located at "pipelines/output/proteomics"
-    os.makedirs(args.ftp_output_dir, exist_ok=True)
-    os.makedirs(args.mzml_output_dir, exist_ok=True)
-    os.makedirs(args.sqt_output_dir, exist_ok=True)
-
     return args
-
-
-def delete_intermediates():
-    """
-    This file is responsible for deleting all intermediate directories
-    This includes the folders:
-        - output/proteomics/mzml
-        - output/proteomics/raw_files
-        - output/proteomics/sqt
-    """
-    print("Deleting intermediate files...")
-    os.rmdir(Defaults.mzml_directory)
-    os.rmdir(Defaults.raw_file_directory)
-    os.rmdir(Defaults.sqt_directory)
-
+        
 
 def main(args: list[str]):
     """
@@ -314,19 +223,11 @@ def main(args: list[str]):
 
     :param args: The list of arguments collected from the command line
     """
+    file_information: list[FileInformation] = []
     args: argparse.Namespace = parse_args(args)
-
-    # Create variables so they are always defined
-    # This is required in case a "skip-..." option is passed in
-    csv_parser = ParseInputCSV(args.input_csv)
-    defaults = Defaults()
-
-    ftp_links: list[str] = csv_parser.ftp_urls
-    csv_cell_types: list[str] = csv_parser.cell_types
-    raw_file_paths: list[Path] = defaults.collect_raw_files
-    sqt_file_paths: list[Path] = defaults.collect_sqt_files
-    mzml_file_paths: list[Path] = defaults.collect_mzml_files
-    raw_file_cell_types: list[str] = []
+    csv_data = ParseCSVInput(args.input_csv)
+    
+    PopulateInformation(file_information, csv_data)
     
     """
     This comment is for the logic surrounding "skipping" a step in the workflow
@@ -348,59 +249,37 @@ def main(args: list[str]):
         args.skip_download = True
     elif args.skip_mzml:
         args.skip_download = True
-        
-    # If skipping download, must define cell types
-    if args.skip_download is True:
-        for file in raw_file_paths:
-            prefix = file.stem.split("_")
-            prefix = f"{prefix[0]}_{prefix[1]}"
-            raw_file_cell_types.append(prefix)
 
     # Download data if we should not skip anything
     if args.skip_download is False:
         # Start the download of FTP data
         ftp_manager = FTPManager.Download(
-            ftp_links=ftp_links,
-            output_dir=args.ftp_output_dir,
-            cell_types=csv_cell_types,
-            preferred_extensions=args.extensions,
-            skip_download=args.skip_download,
+            file_information=file_information,
             core_count=args.core_count,
         )
-        raw_file_paths: list[Path] = ftp_manager.raw_files
-        raw_file_cell_types = ftp_manager.collected_cell_types
 
     if args.skip_mzml is False:
         # Convert raw to mzML and then create SQT files
         raw_to_mzml = Crux.RAWtoMZML(
-            raw_file_input=raw_file_paths,
-            mzml_output_dir=args.mzml_output_dir,
+            file_information=file_information,
             core_count=args.core_count,
         )
-        mzml_file_paths: list[Path] = raw_to_mzml.mzml_file_paths
 
     if args.skip_sqt is False:
         # Convert mzML to SQT
         mzml_to_sqt = Crux.MZMLtoSQT(
-            mzml_file_paths=mzml_file_paths,
+            file_information=file_information,
             fasta_database=args.database,
-            sqt_output_dir=args.sqt_output_dir,
-            cell_types=raw_file_cell_types,
             core_count=args.core_count,
         )
-        sqt_file_paths: list[Path] = mzml_to_sqt.sqt_file_paths
 
     # Create CSV file from SQT files
     conversion_manager = Crux.SQTtoCSV(
-        cell_types=raw_file_cell_types,
-        sqt_input_files=sqt_file_paths,
-        output_file=args.output_csv
+        file_information=file_information,
     )
 
-    print(f"Gene ID output saved at {conversion_manager.output_csv}")
+    print(f"Protein intensities saved")
     
-    if args.delete is True:
-        delete_intermediates()
 
 if __name__ == "__main__":
     args = sys.argv[1:]
