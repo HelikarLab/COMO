@@ -373,6 +373,10 @@ class SQTtoCSV:
         3. ion_intensities
 
         Each key has a list of values
+        
+        symbol,uniprot
+        A,123;456
+        B,789;1011
         """
         self._intensities.to_csv(self._output_csv, index=False, header=True, na_rep="0")
 

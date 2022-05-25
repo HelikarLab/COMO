@@ -26,7 +26,6 @@ class RObject:
         self._affy_R_file = open(f"{self._home_dir}/work/py/rscripts/fitAffy.R", "r").read()
         self._agilent_R_file = open(f"{self._home_dir}/work/py/rscripts/fitAgilent.R", "r").read()
 
-
     @property
     def affyio(self):
         return SignatureTranslatedAnonymousPackage(self._affy_R_file, "affyio")
