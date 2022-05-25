@@ -1,16 +1,16 @@
 """
 TODO: Integrate crux percolator into this workflow
 """
-import pandas as pd
 from bioservices import BioDBNet
+from FileInformation import FileInformation
 import multiprocessing
 from multiprocessing.sharedctypes import Synchronized
 import numpy as np
 import os
+import pandas as pd
 from pathlib import Path
 import subprocess
 
-from FileInformation import FileInformation
 
 
 class Utils:
@@ -18,7 +18,7 @@ class Utils:
     def get_cell_type(input_file: Path | str):
         """
         This function will return the "CellType" portion of a file name
-    
+
         Example:
             Input: naiveB_S1R1_experiment_title.raw
             Output: naiveB
@@ -26,12 +26,12 @@ class Utils:
         file_name = Path(input_file)
         cell_type = file_name.stem.split("_")[0]
         return cell_type
-    
+
     @staticmethod
     def get_experiment_number(input_file: Path | str):
         """
         This function will return the "S1R1" portion of a file name
-    
+
         Example:
             Input: naiveB_S1R1_experiment_title.raw
             Output: S1R1
@@ -39,12 +39,12 @@ class Utils:
         file_name = Path(input_file)
         experiment = file_name.stem.split("_")[1]
         return experiment
-    
+
     @staticmethod
     def get_replicate_number(input_file: Path | str):
         """
         This function will return the "CellType_S1R1" portion of a file name
-    
+
         Example:
             Input: naiveB_S1R1_experiment_title.raw
             Output: naiveB_S1R1
@@ -56,11 +56,7 @@ class Utils:
 
 
 class RAWtoMZML:
-    def __init__(
-            self,
-            file_information: list[FileInformation],
-            core_count: int
-    ):
+    def __init__(self, file_information: list[FileInformation], core_count: int):
         """
         This class is responsible for converting RAW files to mzML format
         """
@@ -69,7 +65,6 @@ class RAWtoMZML:
 
         # These items are used to track the progress of the conversion
         self._conversion_counter: Synchronized = multiprocessing.Value("i", 1)
-        self._finished_counter: Synchronized = multiprocessing.Value("i", 1)
 
         # ----- Function Calls -----
         self.raw_to_mzml_wrapper()  # Convert from raw files to mzML
@@ -79,7 +74,9 @@ class RAWtoMZML:
         This is a wrapper function to multiprocess converting raw files to mzML using ThermoRawFileParser
         """
         print("Starting raw -> mzML conversion")
-        file_chunks: list[Path] = np.array_split(self.file_information, self._core_count)
+        file_chunks: list[Path] = np.array_split(
+            self.file_information, self._core_count
+        )
 
         jobs: list[multiprocessing.Process] = []
         for i, information in enumerate(file_chunks):
@@ -91,10 +88,7 @@ class RAWtoMZML:
         [job.join() for job in jobs]  # Wait for jobs to finish
         [job.terminate() for job in jobs]  # Terminate jobs
 
-    def raw_to_mzml(
-        self,
-        file_information: list[FileInformation]
-    ):
+    def raw_to_mzml(self, file_information: list[FileInformation]):
         """
         This function is responsible or converting the list of raw files to mzML format
         """
@@ -115,11 +109,6 @@ class RAWtoMZML:
                 ],
                 stdout=subprocess.PIPE,
             )
-
-            self._finished_counter.acquire()
-            print(f"\tFinished raw -> mzML conversion: {self._finished_counter.value} / {len(self.file_information)}")  # fmt: skip
-            self._finished_counter.value += 1
-            self._finished_counter.release()
 
 
 class MZMLtoSQT:
@@ -179,17 +168,23 @@ class MZMLtoSQT:
 
             # Replace all "comet.*" in output directory with the name of the file being processed
             index = 0
-            comet_files = [str(file) for file in os.listdir(file_information.sqt_base_path) if str(file).startswith("comet.")]
+            comet_files = [
+                str(file)
+                for file in os.listdir(file_information.sqt_base_path)
+                if str(file).startswith("comet.")
+            ]
             current_files = os.listdir(file_information.sqt_base_path)
             for file_name in comet_files:
                 file_extension = Path(file_name).suffix
-                
+
                 # Determine the old file path
                 old_file_path: Path = Path(file_information.sqt_base_path, file_name)
-                
+
                 # Determine the new file path
-                new_file_name = file_name.replace('comet', file_information.base_name)
-                new_file_path: Path = Path(file_information.sqt_base_path, new_file_name)
+                new_file_name = file_name.replace("comet", file_information.base_name)
+                new_file_path: Path = Path(
+                    file_information.sqt_base_path, new_file_name
+                )
 
                 # Rename the file
                 os.rename(old_file_path, new_file_path)
@@ -198,15 +193,11 @@ class MZMLtoSQT:
 
 
 class SQTtoCSV:
-    def __init__(
-            self, file_information: list[FileInformation]):
+    def __init__(self, file_information: list[FileInformation]):
         """
         This class is meant to convert UniProt IDs to Entrez IDs using BioDBNet
         """
         self._file_information: list[FileInformation] = file_information
-        
-        # self._intensities: pd.DataFrame = pd.DataFrame(columns=["uniprot", "symbol"])
-
         self.collect_uniprot_ids_and_ion_intensity()
         self.convert_ids()
         self.write_data()
@@ -236,11 +227,13 @@ class SQTtoCSV:
             # Create a dictionary with strings as the keys and lists as the values
             # uniprot_id will be a list of strings
             # ion_intensity will be a list of floats
-            replicate_name: str = file_information.replicate  # naiveB_S1R1
             ion_intensities: list[float] = []
             fasta_headers: list[list[str]] = []
-            
-            average_intensities_dict: dict = {"uniprot": [], replicate_name: []}
+
+            average_intensities_dict: dict = {
+                "uniprot": [],
+                file_information.prefix: [],
+            }
             # average_intensities: pd.DataFrame = pd.DataFrame(columns=["uniprot", replicate_name])  # fmt: skip
 
             with open(file_information.sqt_file_path, "r") as i_stream:
@@ -258,7 +251,7 @@ class SQTtoCSV:
                         # (i.e., it only contained "decoy_")
                         if len(ion_intensities) != len(fasta_headers):
                             ion_intensities.pop()
-                        
+
                         intensity: float = float(line.split("\t")[7])
                         ion_intensities.append(intensity)
                         fasta_headers.append([])
@@ -285,9 +278,9 @@ class SQTtoCSV:
 
                     # Create a new row in the dataframe
                     average_intensities_dict["uniprot"].append(uniprot_id)
-                    average_intensities_dict[replicate_name].append(current_intensity)
-
-            # Group by uniprot_id and take the mean of the ion_intensities
+                    average_intensities_dict[file_information.prefix].append(
+                        current_intensity
+                    )
             average_intensities_df: pd.DataFrame = pd.DataFrame(average_intensities_dict)  # fmt: skip
             average_intensities_df = average_intensities_df.groupby("uniprot", as_index=False).mean()  # fmt: skip
 
@@ -296,9 +289,9 @@ class SQTtoCSV:
                 file_information.intensity_df,
                 average_intensities_df,
                 on="uniprot",
-                how="outer"
+                how="outer",
             )
-            
+
             # self._intensities = self._intensities.merge(average_intensities_df, on="uniprot", how="outer")  # fmt: skip
             # self._intensities.join(average_intensities_df)
             # self._intensities = pd.concat([self._intensities, average_intensities_df], axis=0)  # fmt: skip
@@ -313,75 +306,97 @@ class SQTtoCSV:
         len(DATAFRAME) / X = 500
         X = len(DATAFRAME) / 500
         """
-
-        for file_information in self._file_information:
+        current_gene_counter: int = 0
+        max_counter: int = sum(
+            [len(frame.intensity_df) for frame in self._file_information]
+        )
+        for file_index, file_information in enumerate(self._file_information):
             # Get "chunk_sizes" rows at a time
             # This is not perfect, as num_sections rounds up to the nearest integer
             chunk_size: int = 500
             num_sections: int = np.ceil(len(file_information.intensity_df) / chunk_size)
-            chunk_data: pd.DataFrame = np.array_split(file_information.intensity_df, num_sections)
+            chunk_data: pd.DataFrame = np.array_split(
+                file_information.intensity_df, num_sections
+            )
 
             lower_iteration: int = 0
             upper_iteration: int = 0
-    
-            for i, chunk in enumerate(chunk_data):
+
+            for chunk in chunk_data:
                 upper_iteration += len(chunk)
-                # TODO: Add a "1 of TOTAL_FILES" to end of print statement
-                # Optionally make XX:YY of ZZ include all data from self._file_information
-                print(
-                    f"\rConverting to Gene Symbols {lower_iteration + 1}:{upper_iteration} of {len(file_information.intensity_df)}",
-                    end="", flush=True)
+                # Line clean: https://stackoverflow.com/a/5419488/13885200
+                print(f"\rConverting to Gene Symbols: {current_gene_counter + 1} of {max_counter} (processing file {file_index + 1} / {len(self._file_information)})", end="\x1b[1K", flush=True)  # fmt: skip
+                # print(f"\rConverting to Gene Symbols {lower_iteration + 1}:{upper_iteration} of {len(file_information.intensity_df)}", end="\x1b[1K", flush=True)  # fmt: skip
 
                 input_data = chunk["uniprot"].values.tolist()
 
                 # Convert UniProt IDs to Gene IDs
 
-                gene_ids: pd.DataFrame = biodbnet.db2db("UniProt Accession", "Gene Symbol", input_values=input_data)
+                gene_ids: pd.DataFrame = biodbnet.db2db(
+                    "UniProt Accession", "Gene Symbol", input_values=input_data
+                )
 
                 # Wrangle gene_ids into a format able to be updated with self._intensities
                 gene_ids["uniprot"] = gene_ids.index
                 gene_ids.rename(columns={"Gene Symbol": "symbol"}, inplace=True)
-                
+
                 # Reindexing is the only way to ensure gene_ids are placed in the correct spot
                 gene_ids.reset_index(inplace=True, drop=True)
                 gene_ids.index = range(lower_iteration, upper_iteration)
 
                 # Update file_information.intensity_df with the new gene_ids
                 file_information.intensity_df.update(gene_ids)
-            
+
                 # Update the iteration to start at
                 lower_iteration += len(chunk)
-            
-            print("")  # go to next line; we have a carraige return in "for" loop
+                current_gene_counter += len(chunk)
 
     def write_data(self):
         """
-        This function is responsible for writing a dictionary to a csv file
+        This function creates a unique dataframe for each cell type found in the intensity dataframes
+            from the self._file_information list
+        It merges these intensity dataframes, creating a new column for each dataframe within each cell type
 
-        The dictionary has the following keys:
+        The final dataframes will have the following headers:
         1. uniprot_ids
         2. gene_ids
         3. ion_intensities
 
-        Each key has a list of values
+        It then writes the dataframes to separate CSV files, dependent on the cell type
+        This function is responsible for writing a dictionary to a csv file
+
+        The CSV will be written to the intensity_csv value within each FileInformation object
         """
-        # Create a link between cell_types, data_frames, and their output locations
-        # Then create a "master_dataframe" to hold the resulting data frame for each cell type
-        output_csv: dict[str, list[str]] = {i.cell_type : i.intensity_csv for i in self._file_information}
-        master_frames: dict[str, list[pd.DataFrame]] = {i.cell_type : pd.DataFrame() for i in self._file_information}
-        
-        # Iterate through all available data
+        # Create a dictionary containing the cell type as keys and the final dataframe as values
+        #   This will be used to write the dataframes to separate CSV files
+        master_frames: dict[str, pd.DataFrame] = {}
+
+        # Iterate through each FileInformation object
         for file_information in self._file_information:
-            
-            # Get the current cell type
-            cell_type = file_information.cell_type
-            
-            # Concatenate this to the current dataframe
-            master_frames[cell_type] = pd.concat([master_frames[cell_type], file_information.intensity_df])
-            
-        # Write all dataframes to the corresponding location
-        for i, (frame, csv) in enumerate(zip(master_frames.values())):
-            frame.to_csv(csv, index=False, header=True, na_rep="0")
+            # Create a new dataframe for each cell type
+            if file_information.cell_type not in master_frames:
+                parent_directory: Path = Path(file_information.intensity_csv).parent
+                parent_directory.mkdir(parents=True, exist_ok=True)
+
+                master_frames[file_information.cell_type] = pd.DataFrame(
+                    columns=file_information.df_columns
+                )
+
+            # Update the master frame for the current cell type
+            # The master frame should be matched by the uniprot column
+            master_frames[file_information.cell_type] = pd.merge(
+                master_frames[file_information.cell_type],
+                file_information.intensity_df,
+                on=["uniprot", "symbol"],
+                how="outer",
+            )
+
+        # Once merging is complete, write each cell type to its CSV file
+        # TODO: Gene Symbols are being repeated as a result of UniProt isoforms. Not sure how to fix this yet
+        for file_information in self._file_information:
+            master_frames[file_information.cell_type].to_csv(
+                file_information.intensity_csv, index=False, na_rep="0"
+            )
 
 
 if __name__ == "__main__":

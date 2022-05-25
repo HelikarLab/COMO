@@ -2,21 +2,13 @@
 This is the main driver-file for downloading proteomics data
 """
 import argparse
-import csv
-import os
-from pathlib import Path
-import sys
-
-# Our classes
 import Crux
-import FTPManager
-from Defaults import DefaultValues
+import csv
 from FileInformation import FileInformation
-
-# Add parent directory to path, allows us to import the "project.py" file from the parent directory
-# From: https://stackoverflow.com/a/30536516/13885200
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import project
+import FTPManager
+import os
+import sys
+from pathlib import Path
 
 
 class ArgParseFormatter(
@@ -39,8 +31,7 @@ class ParseCSVInput:
     """
     def __init__(self, input_csv_file: Path):
         self._input_csv_file: Path = input_csv_file
-        self._urls: list[str] = []
-        self._input_cell_types: list[str] = []
+        self._data: [str, list[str]] = {}
         
         # Get data from CSV
         with open(self._input_csv_file, "r") as i_stream:
@@ -50,12 +41,19 @@ class ParseCSVInput:
                 if line[0][0] == "#":  # Skip 'comments'
                     continue
                 else:
-                    self._urls.append(line[0])
-                    self._input_cell_types.append(line[1])
+                    url = line[0]
+                    cell_type = line[1]
+                    
+                    if cell_type not in self._data:
+                        self._data[cell_type] = []
+                    
+                    self._data[cell_type].append(url)
 
         # Convert from 'old' /pride/data/archive to 'new' /pride-archive
-        for i, url in enumerate(self._urls):
-            self._urls[i] = url.replace("/pride/data/archive", "/pride-archive")
+        for key in self._data:
+            urls = self._data[key]
+            for i, url in enumerate(urls):
+                urls[i] = url.replace("/pride/data/archive", "/pride-archive")
         
     @property
     def ftp_urls(self) -> list[str]:
@@ -64,14 +62,34 @@ class ParseCSVInput:
         
         Example: ftp://ftp.my_server.com
         """
-        return self._urls
+        urls: list[str] = []
+        for values in self._data.values():
+            urls.extend(values)
+        
+        return urls
     
     @property
     def input_cell_types(self) -> list[str]:
         """
         This will return the cell types as defined in the input CSV file
+        TODO: Match folder paths to correlate S1R1, S1R2, etc.?
         """
-        return self._input_cell_types
+        cell_types: list[str] = []
+        for key, values in self._data.items():
+            cell_types.extend([key] * len(values))
+        return cell_types
+    
+    @property
+    def csv_dict(self) -> dict[str, list[str]]:
+        """
+        This function returns the data dictionary
+        It contains data in the following format
+        {
+            CELL_TYPE_1: ["ftp_url_1", "ftp_url_2"]
+            CELL_TYPE_2: ["ftp_url_3", "ftp_url_4"]
+        }
+        """
+        return self._data
 
 
 class PopulateInformation:
@@ -82,23 +100,63 @@ class PopulateInformation:
     ):
         self.file_information: list[FileInformation] = file_information
         self._csv_data: ParseCSVInput = csv_data
+        self._csv_dict: dict[str, list[str]] = csv_data.csv_dict
         
-        for i, (root_url, cell_type) in enumerate(zip(self._csv_data.ftp_urls, self._csv_data.input_cell_types)):
-            print(f"Collecting file information for cell type: {cell_type} ({i+1} / {len(self._csv_data.input_cell_types)})")
-            ftp_files: FTPManager.Reader = FTPManager.Reader(root_link=root_url, file_extensions=["raw"])
-        
-            for j, (file, size) in enumerate(zip(ftp_files.files, ftp_files.file_sizes)):
-                replicate_name: str = f"S1R{j + 1}"
-                self.file_information.append(
-                    FileInformation(
-                        cell_type=cell_type,
-                        download_url=file,
-                        file_size=size,
-                        replicate=replicate_name,
-                    )
-                )
+        # Iterate through the cell type and corresponding list of URLS
+        # cell_type: naiveB
+        # ftp_urls: ["url_1", "url_2"]
+        for i, (cell_type, ftp_urls) in enumerate(self._csv_dict.items()):
+            # Print some output to the screen
+            total_ftp_links: int = len(self._csv_dict[cell_type])
+            
+            # Line clean: https://stackoverflow.com/a/5419488/13885200
+            print(f"Collecting file information for cell type: {cell_type} ({i + 1} / {len(self._csv_dict.keys())} - ", end="", flush=True)  # fmt: skip
+            if total_ftp_links == 1:
+                print(f"1 folder to navigate) ", end="", flush=True)
+            else:
+                print(f"{total_ftp_links} links to navigate) ", end="", flush=True)
+            url_count = 0
+            
+            # Iterate through the urls in ftp_urls
+            # url = "url_1"
+            for j, url in enumerate(ftp_urls):
+                ftp_data: FTPManager.Reader = FTPManager.Reader(root_link=url, file_extensions=["raw"])  # fmt: skip
                 
+                # Assuming url_1 is a directory, iterate through all files below it
+                # urls: url_1/["file_1", "file_2"]
+                # sizes: [size_1, size_2]
+                urls = [url for url in ftp_data.files]
+                sizes = [size for size in ftp_data.file_sizes]
+                url_count += len(urls)
+                
+                # Iterate through all files and sizes found for url_##
+                for k, (file, size) in enumerate(zip(urls, sizes)):
+                    replicate_name: str = f"S{j + 1}R{k + 1}"
+                    self.file_information.append(
+                        FileInformation(
+                            cell_type=cell_type,
+                            download_url=file,
+                            file_size=size,
+                            replicate=replicate_name,
+                        )
+                    )
+                    
+            # Print number of URLs found for each cell type
+            # This is done after appending because some cell types may have more than 1 root URL, and it messes up the formatting
+            if url_count == 1:
+                print(f" [1 file found]")
+            else:
+                print(f" [{url_count} files found]")
+                
+        # Print the total size to download
+        total_size: int = 0
+        for information in self.file_information:
+            total_size += information.file_size
+        # Convert to MB
+        total_size = total_size // 1024 ** 2
+        print(f"Total size to download: {total_size} MB")
         
+    
 def parse_args(args: list[str]) -> argparse.Namespace:
     """
     This function is used to parse arguments from the command line
@@ -112,10 +170,10 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         "Comments can be added to the csv file by starting a line with a '#'\n"
         "The input file should be formatted as the following example:\n"
         "\n"
-        "url\n"
+        "url,cell_type\n"
         "# This is a comment\n"
-        "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026140\n"
-        "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD017564\n",
+        "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026140,naiveB\n"
+        "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD017564,m0Macro\n",
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
         "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
         formatter_class=ArgParseFormatter,
@@ -130,7 +188,7 @@ def parse_args(args: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "-d",
-        "--database-search",
+        "--database",
         required=True,
         dest="database",
         metavar="/home/USER/data/database_file.fasta",
@@ -183,15 +241,7 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         default=os.cpu_count() // 2,
         help="This is the number of threads to use for downloading files. It will default to the minimum of: half the available CPU cores available, or the number of input files found.\nIt will not use more cores than necessary\nOptions are an integer or 'all' to use all available cores",
     )
-    # parser.add_argument(
-    #     "--delete",
-    #     required=False,
-    #     dest="delete",
-    #     action="store_true",
-    #     default=False,
-    #     help="If this action is passed in, all intermediate files will be deleted. This includes: raw files, mzML files, and SQT files.\n"
-    #          "Only the final proteomics intensities CSV file will be kept.",
-    # )
+    # TODO: Add option to delete intermediate files (raw, mzml, sqt)
 
     args: argparse.Namespace = parser.parse_args(args)
     args.extensions = args.extensions.split(",")
@@ -278,7 +328,7 @@ def main(args: list[str]):
         file_information=file_information,
     )
 
-    print(f"Protein intensities saved")
+    print(f"\nProtein intensities saved")
     
 
 if __name__ == "__main__":
