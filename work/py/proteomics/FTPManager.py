@@ -12,7 +12,7 @@ import numpy as np
 from pathlib import Path
 import time
 from urllib.parse import urlparse
-from urllib.parse import ParseResult
+
 
 # Our classes
 from FileInformation import FileInformation
@@ -25,13 +25,19 @@ def ftp_client(host: str, folder: str, max_attempts: int = 3) -> FTP:
     connection_successful: bool = False
     max_attempts: int = max_attempts
     attempt_num: int = 0
-    # Attempt to connect, throw error if unable to
+    # Attempt to connect, throw error if unable to do so
     while not connection_successful and attempt_num <= max_attempts:
         try:
             ftp_client: FTP = FTP(host, user="anonymous", passwd="guest")
             connection_successful = True
         except ConnectionResetError:
-            print(f"\rAttempt {attempt_num + 1} of {max_attempts} failed to connect", end="", flush=True)
+            
+            # Make sure this print statement is on a new line on the first error
+            if attempt_num == 0:
+                print("")
+            
+            # Line clean: https://stackoverflow.com/a/5419488/13885200
+            print(f"Attempt {attempt_num + 1} of {max_attempts} failed to connect", end="\r", flush=True)
             attempt_num += 1
             time.sleep(5)
     if not connection_successful:
@@ -67,7 +73,7 @@ class Reader:
                 download_url: str = f"{scheme}://{host}{file_path}"
                 self._files.append(download_url)
                 self._file_sizes.append(client.size(file_path))
-                
+
     @property
     def files(self):
         return self._files
@@ -87,13 +93,12 @@ class Download:
         This function is responsible for downloading items from the FTP urls passed into it
         """
         self._file_information: list[FileInformation] = file_information
-        self._core_count: int = core_count
+        self._core_count: int = min(core_count, 4)  # Limit to 4 downloads at a time
 
         # Create a manager so each process can append data to variables
         # From: https://stackoverflow.com/questions/67974054
         self._save_locations: list[Path] = multiprocessing.Manager().list()
         self._download_counter: Synchronized = multiprocessing.Value("i", 1)
-        self._finished_counter: Synchronized = multiprocessing.Value("i", 1)
 
         # Find files to download
         self.download_data_wrapper()
@@ -105,6 +110,7 @@ class Download:
         # Calculate the number of cores ot use
         # We are going to use half the number of cores, OR the number of files to download, whichever is less
         # Otherwise if user specified the number of cores, use that
+        print("Starting file download")
 
         # Split list into chunks to process separately
         file_chunks: list[str] = np.array_split(self._file_information, self._core_count)
@@ -139,26 +145,22 @@ class Download:
             path = parsed_url.path
 
             # Convert file_size from byte to MB
-            size_mb: int = information.file_size // (1024**2)
+            size_mb: int = round(information.file_size / (1024**2))
 
             # Connect to the host, login, and download the file
-            client: FTP = FTP(host=host, user="anonymous", passwd="guest")
+            client: FTP = ftp_client(host=host, folder=path)
+            # client: FTP = FTP(host=host, user="anonymous", passwd="guest")
 
             # Get the lock and print file info
             self._download_counter.acquire()
-            print(f"Started {self._download_counter.value:02d} / {len(self._file_information):02d} ({size_mb} MB) - {information.raw_file_name}")  # fmt: skip
+            print(f"Started download {self._download_counter.value:02d} / {len(self._file_information):02d} ({size_mb} MB) - {information.raw_file_name}")  # fmt: skip
             self._download_counter.value += 1
             self._download_counter.release()
 
             # Download the file
+            
             client.retrbinary(f"RETR {path}", open(information.raw_file_path, "wb").write)
             client.quit()
-
-            # Show finished status
-            self._finished_counter.acquire()
-            print(f"\tFinished {self._finished_counter.value:02d} / {len(self._file_information):02d}")  # fmt: skip
-            self._finished_counter.value += 1
-            self._finished_counter.release()
 
 
 if __name__ == "__main__":
