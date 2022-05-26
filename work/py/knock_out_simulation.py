@@ -296,10 +296,9 @@ def drug_repurposing(drug_db, d_score):
 def main(argv):
     drug_raw_file = "Repurposing_Hub_export.txt"
 
-    # TODO: Fix this description
     parser = argparse.ArgumentParser(
         prog="knock_out_simulation.py",
-        description="Description goes here",
+        description="This script is responsible for mapping drug targets in metabolic models, performing knock out simulations, and comparing simulation results with disease genes. It also identified drug targets and repurposable drugs.",
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
                "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
     )
@@ -358,7 +357,7 @@ def main(argv):
         required=False,
         default=None,
         dest="ref_flux_file",
-        help="The name of the raw drug file"
+        help="The name of the reference flux file"
     )
 
     args = parser.parse_args()

@@ -286,7 +286,6 @@ def main(argv):
     targetfile = "targets.txt"
     count_matrix = None
 
-    # TODO: Fix this description
     parser = argparse.ArgumentParser(
         prog="disease_analysis.py",
         description="Performs differential gene expression analysis to find up and downregulated genes associated "
