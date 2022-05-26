@@ -6,4 +6,3 @@ troppo
 pytest==4.6.11
 escher
 gurobipy
-bioservices
