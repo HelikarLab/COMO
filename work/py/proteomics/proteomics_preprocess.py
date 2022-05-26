@@ -96,11 +96,20 @@ class PopulateInformation:
     def __init__(
             self,
             file_information: list[FileInformation],
-            csv_data: ParseCSVInput
+            csv_data: ParseCSVInput,
+            skip_download: bool,
+            preferred_extensions: list[str] = None,
+
     ):
         self.file_information: list[FileInformation] = file_information
         self._csv_data: ParseCSVInput = csv_data
         self._csv_dict: dict[str, list[str]] = csv_data.csv_dict
+
+        # Set default value for extensions to search for
+        self._preferred_extensions: list[str] = preferred_extensions
+        
+        if self._preferred_extensions is None:
+            self._preferred_extensions = ["raw"]
         
         # Iterate through the cell type and corresponding list of URLS
         # cell_type: naiveB
@@ -109,18 +118,18 @@ class PopulateInformation:
             # Print some output to the screen
             total_ftp_links: int = len(self._csv_dict[cell_type])
             
-            # Line clean: https://stackoverflow.com/a/5419488/13885200
-            print(f"Collecting file information for cell type: {cell_type} ({i + 1} / {len(self._csv_dict.keys())} - ", end="", flush=True)  # fmt: skip
+            # Print updates to screen
+            print(f"Parsing cell type {i + 1} of {len(self._csv_dict.keys())} ({cell_type}) | ", end="", flush=True)
             if total_ftp_links == 1:
-                print(f"1 folder to navigate) ", end="", flush=True)
+                print(f" 1 folder to navigate", end="", flush=True)
             else:
-                print(f"{total_ftp_links} links to navigate) ", end="", flush=True)
+                print(f" {total_ftp_links} folders to navigate", end="", flush=True)
             url_count = 0
             
             # Iterate through the urls in ftp_urls
             # url = "url_1"
             for j, url in enumerate(ftp_urls):
-                ftp_data: FTPManager.Reader = FTPManager.Reader(root_link=url, file_extensions=["raw"])  # fmt: skip
+                ftp_data: FTPManager.Reader = FTPManager.Reader(root_link=url, file_extensions=self._preferred_extensions)  # fmt: skip
                 
                 # Assuming url_1 is a directory, iterate through all files below it
                 # urls: url_1/["file_1", "file_2"]
@@ -148,13 +157,16 @@ class PopulateInformation:
             else:
                 print(f" [{url_count} files found]")
                 
-        # Print the total size to download
-        total_size: int = 0
-        for information in self.file_information:
-            total_size += information.file_size
-        # Convert to MB
-        total_size = total_size // 1024 ** 2
-        print(f"Total size to download: {total_size} MB")
+        # Print the download size if we are not skipping the download
+        if skip_download is False:
+            # Print the total size to download if we must download data
+            total_size: int = 0
+            for information in self.file_information:
+                total_size += information.file_size
+            
+            # Convert to MB
+            total_size = total_size // 1024 ** 2
+            print(f"Total size to download: {total_size} MB")
         
     
 def parse_args(args: list[str]) -> argparse.Namespace:
@@ -276,29 +288,34 @@ def main(args: list[str]):
     file_information: list[FileInformation] = []
     args: argparse.Namespace = parse_args(args)
     csv_data = ParseCSVInput(args.input_csv)
-    
-    PopulateInformation(file_information, csv_data)
-    
+
     """
-    This comment is for the logic surrounding "skipping" a step in the workflow
-    1. skip_download (download FTP data - FTPManager)
-    2. skip_mzml_conversion (Convert raw to mzML - Crux)
-    3. skip_sqt_creation (Convert mzML to SQT - Crux)
-    
-    If args.skip_sqt is True, do not perform steps 1, 2, or 3
-    If args.skip_mzml is True, do not perform step 1 or 2
-    If args.skip_download is True, do not perform step 1
-    
-    Ultimately, this results in if-statements that look like:
-        if __ is False:
-            do_tasks
-    Because we are performing tasks if the "skip" is False
-    """
+        This comment is for the logic surrounding "skipping" a step in the workflow
+        1. skip_download (download FTP data - FTPManager)
+        2. skip_mzml_conversion (Convert raw to mzML - Crux)
+        3. skip_sqt_creation (Convert mzML to SQT - Crux)
+
+        If args.skip_sqt is True, do not perform steps 1, 2, or 3
+        If args.skip_mzml is True, do not perform step 1 or 2
+        If args.skip_download is True, do not perform step 1
+
+        Ultimately, this results in if-statements that look like:
+            if __ is False:
+                do_tasks
+        Because we are performing tasks if the "skip" is False
+        """
     if args.skip_sqt:
         args.skip_mzml = True
         args.skip_download = True
     elif args.skip_mzml:
         args.skip_download = True
+    
+    PopulateInformation(
+        file_information=file_information,
+        csv_data=csv_data,
+        skip_download=args.skip_download,
+        preferred_extensions=args.extensions
+    )
 
     # Download data if we should not skip anything
     if args.skip_download is False:
@@ -326,9 +343,12 @@ def main(args: list[str]):
     # Create CSV file from SQT files
     conversion_manager = Crux.SQTtoCSV(
         file_information=file_information,
+        core_count=args.core_count,
     )
 
-    print(f"\nProtein intensities saved")
+    # Get the root folder of output CSV file
+    output_folder = file_information[0].intensity_csv.parent
+    print(f"\nProtein intensities saved under: {output_folder}")
     
 
 if __name__ == "__main__":

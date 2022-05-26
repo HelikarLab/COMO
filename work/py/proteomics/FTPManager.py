@@ -24,7 +24,7 @@ def ftp_client(host: str, folder: str, max_attempts: int = 3) -> FTP:
     """
     connection_successful: bool = False
     max_attempts: int = max_attempts
-    attempt_num: int = 0
+    attempt_num: int = 1
     # Attempt to connect, throw error if unable to do so
     while not connection_successful and attempt_num <= max_attempts:
         try:
@@ -33,15 +33,15 @@ def ftp_client(host: str, folder: str, max_attempts: int = 3) -> FTP:
         except ConnectionResetError:
             
             # Make sure this print statement is on a new line on the first error
-            if attempt_num == 0:
+            if attempt_num == 1:
                 print("")
             
             # Line clean: https://stackoverflow.com/a/5419488/13885200
-            print(f"Attempt {attempt_num + 1} of {max_attempts} failed to connect", end="\r", flush=True)
+            print(f"Attempt {attempt_num} of {max_attempts} failed to connect", end="\r", flush=True)
             attempt_num += 1
             time.sleep(5)
     if not connection_successful:
-        raise ConnectionResetError("Could not connect to FTP server")
+        raise ConnectionResetError("\nCould not connect to FTP server")
     
     return ftp_client
 
@@ -52,7 +52,7 @@ class Reader:
         This class is responsible for reading data about root FTP links
         """
         self._root_link: str = root_link
-        self._extensions: tuple[str] = tuple(file_extensions)
+        self._extensions: list[str] = file_extensions
         self._files: list[str] = []
         self._file_sizes: list[int] = []
         
@@ -69,7 +69,7 @@ class Reader:
         client: FTP = ftp_client(host=host, folder=folder)
         
         for file_path in client.nlst(folder):
-            if file_path.endswith(self._extensions):
+            if file_path.endswith(tuple(self._extensions)):
                 download_url: str = f"{scheme}://{host}{file_path}"
                 self._files.append(download_url)
                 self._file_sizes.append(client.size(file_path))
@@ -93,7 +93,7 @@ class Download:
         This function is responsible for downloading items from the FTP urls passed into it
         """
         self._file_information: list[FileInformation] = file_information
-        self._core_count: int = min(core_count, 4)  # Limit to 4 downloads at a time
+        self._core_count: int = min(core_count, 2)  # Limit to 2 downloads at a time
 
         # Create a manager so each process can append data to variables
         # From: https://stackoverflow.com/questions/67974054
@@ -113,7 +113,7 @@ class Download:
         print("Starting file download")
 
         # Split list into chunks to process separately
-        file_chunks: list[str] = np.array_split(self._file_information, self._core_count)
+        file_chunks: list[FileInformation] = np.array_split(self._file_information, self._core_count)
 
         # Create a list of jobs
         jobs: list[multiprocessing.Process] = []
@@ -127,9 +127,9 @@ class Download:
             )
             jobs.append(job)
 
-        [job.start() for job in jobs]  # Start jobs
-        [job.join() for job in jobs]  # Wait for jobs to finish
-        [job.terminate() for job in jobs]  # Terminate jobs
+        [job.start() for job in jobs]       # Start jobs
+        [job.join() for job in jobs]        # Wait for jobs to finish
+        [job.terminate() for job in jobs]   # Terminate jobs
 
     def download_data(
         self,
