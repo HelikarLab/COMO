@@ -140,7 +140,8 @@ class MZMLtoSQT:
         This function does not use multiprocessing, as Crux Comet incorporates its own multiprocessing
         """
         for i, file_information in enumerate(self._file_information):
-            print(f"Creating SQT: {i + 1} / {len(self._file_information)} - {file_information.sqt_file_name}")  # fmt: skip
+            # Clear the previous line of output. Required if the new line is shorter than the previous line
+            print(f"Creating SQT: {i + 1} / {len(self._file_information)} - {file_information.sqt_file_name}", end="\033[K\r", flush=True)  # fmt: skip
 
             # Call subprocess on command
             # Only create the SQT file
@@ -188,22 +189,32 @@ class MZMLtoSQT:
                 # Rename the file
                 os.rename(old_file_path, new_file_path)
 
-        print("SQT creation finished")
+        print("SQT creation finished", end="\033[K")  # Clear the previous print
+        print("")
 
 
 class SQTtoCSV:
-    def __init__(self, file_information: list[FileInformation]):
+    def __init__(self, file_information: list[FileInformation], core_count: int):
         """
         This class is meant to convert UniProt IDs to Entrez IDs using BioDBNet
         """
         self._file_information: list[FileInformation] = file_information
+        self._core_count: int = min(core_count, 4)  # Maximum of 4 cores
+        
+        # Multiprocessing items
+        # File counters: Store the files processed and the total number to process
+        # Gene counters: Store the progress of overall genes converted
+        self._current_file_counter: Synchronized = multiprocessing.Value("i", 0)
+        self._max_file_count: Synchronized = multiprocessing.Value("i", len(self._file_information))
+        self._current_gene_counter: Synchronized = multiprocessing.Value("i", 0)
+        self._max_gene_count: Synchronized = multiprocessing.Value("i", 0)
+        
         self.collect_uniprot_ids_and_ion_intensity()
-        self.convert_ids()
+        self._convert_ids_wrapper()
+        self._merge_dataframes()
         self.write_data()
 
-    def _uniprot_from_fasta_header(
-        self, fasta_header: str, separator: str = "|"
-    ) -> str:
+    def _uniprot_from_fasta_header(self, fasta_header: str, separator: str = "|") -> str:
         """
         This function is responsible for collecting the first-index field from a pipe-separated string
         """
@@ -295,61 +306,136 @@ class SQTtoCSV:
             # self._intensities.join(average_intensities_df)
             # self._intensities = pd.concat([self._intensities, average_intensities_df], axis=0)  # fmt: skip
 
-    def convert_ids(self):
+    def _convert_ids_wrapper(self):
         """
-        This function converts a list of uniprot IDs to Gene IDs
+        This function is a multiprocessing wrapper around the convert_ids function
         """
-        biodbnet = BioDBNet()
-
-        """
-        len(DATAFRAME) / X = 500
-        X = len(DATAFRAME) / 500
-        """
-        current_gene_counter: int = 0
-        max_counter: int = sum(
-            [len(frame.intensity_df) for frame in self._file_information]
-        )
-        for file_index, file_information in enumerate(self._file_information):
-            # Get "chunk_sizes" rows at a time
-            # This is not perfect, as num_sections rounds up to the nearest integer
-            chunk_size: int = 500
-            num_sections: int = np.ceil(len(file_information.intensity_df) / chunk_size)
-            chunk_data: pd.DataFrame = np.array_split(
-                file_information.intensity_df, num_sections
+        print("Starting UniProt -> Gene Symbol conversion")
+        
+        # Split file information to chunks
+        information_chunks: list[FileInformation] = np.array_split(self._file_information, self._core_count)
+        
+        # Create a list of jobs
+        jobs: list[multiprocessing.Process] = []
+        
+        # Set the maximum number of genes to be processed
+        self._max_gene_count.value = sum(
+                [
+                    len(frame.intensity_df)
+                    for frame in self._file_information
+                ]
             )
+        
+        for i, information_list in enumerate(information_chunks):
+            job = multiprocessing.Process(
+                target=self.convert_ids_multiprocess,
+                args=(information_list,),
+            )
+            jobs.append(job)
+        
+        [job.start() for job in jobs]       # Start jobs
+        [job.join() for job in jobs]        # Wait for all jobs to finish
+        [job.terminate() for job in jobs]   # Terminate jobs
+        
+        # A new line is required to ensure we are on the next line after multiprocessing processing
+        print("")
 
+    def convert_ids_multiprocess(self, file_information: list[FileInformation]):
+        """
+        This function is responsible for converting UniProt IDs to Gene Symbols
+        """
+        # Create a BioDBNet object
+        # The objet must be created within each process, as BioDBNet cannot be pickled
+        biodbnet: BioDBNet = BioDBNet(verbose=False)
+        
+        # Iterate over each file information
+        for information in file_information:
+            # Create appropriate chunk sizes
+            chunk_size: int = 500
+            num_chunks: int = np.ceil(len(information.intensity_df) / chunk_size)
+            chunk_data: pd.DataFrame = np.array_split(information.intensity_df, num_chunks)
+            
             lower_iteration: int = 0
             upper_iteration: int = 0
-
+            
             for chunk in chunk_data:
                 upper_iteration += len(chunk)
-                # Line clean: https://stackoverflow.com/a/5419488/13885200
-                print(f"\rConverting to Gene Symbols: {current_gene_counter + 1} of {max_counter} (processing file {file_index + 1} / {len(self._file_information)})", end="\x1b[1K", flush=True)  # fmt: skip
-                # print(f"\rConverting to Gene Symbols {lower_iteration + 1}:{upper_iteration} of {len(file_information.intensity_df)}", end="\x1b[1K", flush=True)  # fmt: skip
-
+                
+                self._current_gene_counter.acquire
+                self._current_file_counter.acquire
+                print(f"Converting to Gene Symbols: {self._current_gene_counter.value + 1:,} of {self._max_gene_count.value:,} (processing file {self._current_file_counter.value + 1} / {self._max_file_count.value})", end="\r", flush=True)
+                self._current_gene_counter.release
+                self._current_file_counter.release
+                
                 input_data = chunk["uniprot"].values.tolist()
-
-                # Convert UniProt IDs to Gene IDs
-
-                gene_ids: pd.DataFrame = biodbnet.db2db(
-                    "UniProt Accession", "Gene Symbol", input_values=input_data
-                )
-
-                # Wrangle gene_ids into a format able to be updated with self._intensities
-                gene_ids["uniprot"] = gene_ids.index
-                gene_ids.rename(columns={"Gene Symbol": "symbol"}, inplace=True)
-
-                # Reindexing is the only way to ensure gene_ids are placed in the correct spot
-                gene_ids.reset_index(inplace=True, drop=True)
-                gene_ids.index = range(lower_iteration, upper_iteration)
-
-                # Update file_information.intensity_df with the new gene_ids
-                file_information.intensity_df.update(gene_ids)
-
-                # Update the iteration to start at
+                
+                # Convert UniProt IDs to Gene Symbols
+                gene_symbols: pd.DataFrame = biodbnet.db2db("UniProt Accession", "Gene Symbol", input_values=input_data)
+                
+                # Wrangle gene symbols into a format able to be updated with file_intensities
+                gene_symbols["uniprot"] = gene_symbols.index
+                gene_symbols.rename(columns={"Gene Symbol": "symbol"}, inplace=True)
+                
+                # Reindexing is the only way to ensure gene_ids are placed at the correct spot
+                gene_symbols.reset_index(inplace=True, drop=True)
+                gene_symbols.index = range(lower_iteration, upper_iteration)
+                
+                # Update the file_information.intensity_df with the new gene symbols
+                information.intensity_df.update(gene_symbols)
+                
+                # Update the iterations
                 lower_iteration += len(chunk)
-                current_gene_counter += len(chunk)
+                self._current_gene_counter.acquire
+                self._current_gene_counter.value += len(chunk)
+                self._current_gene_counter.release
+                
+            # Update the file counter to show the current file is done
+            self._current_file_counter.acquire
+            self._current_file_counter.value += 1
+            self._current_file_counter.release
+            
+            # Show a final print-statement with all updates
+            print(f"Converting to Gene Symbols: {self._current_gene_counter.value:,} of {self._max_gene_count.value:,} (processing file {self._current_file_counter.value} / {self._max_file_count.value})" ,end="\r", flush=True)
 
+    def _merge_dataframes(self):
+        """
+        This function is responsible for merging dataframes that have the same Gene Symbol
+        The resulting UniProt IDs will be combined into a single cell, separated by a semicolon ";"
+        The intensity values will be averaged across all UniProt IDs
+        """
+        
+        for file_information in self._file_information:
+            data_frame: pd.DataFrame = file_information.intensity_df
+            
+            # Group each dataframe by the symbol, replacing uniprot column with a semicolon separated list of uniprot IDs
+            data_frame = data_frame.groupby("symbol").apply(lambda dataframe: self._handle_merge(dataframe))
+            
+            # Reset the index to ensure the dataframe is in the correct order
+            data_frame.reset_index(inplace=True, drop=True)
+            
+            # Update the dataframe with the new merged data
+            file_information.intensity_df = data_frame
+            
+    def _handle_merge(self, data_frame: pd.DataFrame):
+        
+        # Combine all uniprot values in the incoming dataframe into a single string
+        # This only combines uniprot values that have the same symbol, as a result of the .apply() function called previously
+        uniprot_column: str = ";".join(data_frame["uniprot"].tolist())
+        
+        # Average the intensity values
+        # From: stackoverflow.com/a/32751412/
+        new_dataframe: pd.DataFrame = data_frame.groupby("symbol").mean().reset_index()
+        
+        # Drop "Unnamed: [NUMBER]" columns
+        # The "Unnamed" column is formed as a result of the .groupby() call
+        # From: https://stackoverflow.com/a/43983654/
+        new_dataframe = new_dataframe.loc[:, ~new_dataframe.columns.str.contains("^Unnamed: [0-9]+$")]
+        
+        # Add the uniprot values back to the dataframe at index 1
+        new_dataframe.insert(loc=1, column="uniprot", value=uniprot_column)
+        
+        return new_dataframe
+        
     def write_data(self):
         """
         This function creates a unique dataframe for each cell type found in the intensity dataframes
