@@ -41,7 +41,8 @@ def ftp_client(host: str, folder: str, max_attempts: int = 3) -> FTP:
             attempt_num += 1
             time.sleep(5)
     if not connection_successful:
-        raise ConnectionResetError("\nCould not connect to FTP server")
+        print("")
+        raise ConnectionResetError("Could not connect to FTP server")
     
     return ftp_client
 
