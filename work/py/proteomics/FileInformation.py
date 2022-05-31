@@ -15,6 +15,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import project
 
 
+def clear_print(message: str, end: str = "\033[K\r", flush: bool = True):
+    """
+    Pass in your message exactly as you would like it printed, and this function will clear the screen and print it.
+    """
+    print(message, end=end, flush=flush)
+
 class FileInformation:
     def __init__(
         self,

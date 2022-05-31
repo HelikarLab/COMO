@@ -5,6 +5,7 @@ import argparse
 import Crux
 import csv
 from FileInformation import FileInformation
+from FileInformation import clear_print
 import FTPManager
 import os
 import sys
@@ -117,18 +118,15 @@ class PopulateInformation:
         for i, (cell_type, ftp_urls) in enumerate(self._csv_dict.items()):
             # Print some output to the screen
             total_ftp_links: int = len(self._csv_dict[cell_type])
-            
-            # Print updates to screen
-            print(f"Parsing cell type {i + 1} of {len(self._csv_dict.keys())} ({cell_type}) | ", end="", flush=True)
-            if total_ftp_links == 1:
-                print(f" 1 folder to navigate", end="", flush=True)
-            else:
-                print(f" {total_ftp_links} folders to navigate", end="", flush=True)
             url_count = 0
             
             # Iterate through the urls in ftp_urls
             # url = "url_1"
             for j, url in enumerate(ftp_urls):
+                
+                # Print update to the screen after every FTP link is navigated
+                print(f"\rParsing cell type {i + 1} of {len(self._csv_dict.keys())} ({cell_type}) | {j + 1} of {total_ftp_links} folders navigated", end="", flush=True)
+                
                 ftp_data: FTPManager.Reader = FTPManager.Reader(root_link=url, file_extensions=self._preferred_extensions)  # fmt: skip
                 
                 # Assuming url_1 is a directory, iterate through all files below it
@@ -153,9 +151,9 @@ class PopulateInformation:
             # Print number of URLs found for each cell type
             # This is done after appending because some cell types may have more than 1 root URL, and it messes up the formatting
             if url_count == 1:
-                print(f" [1 file found]")
+                print(f" | 1 file found")
             else:
-                print(f" [{url_count} files found]")
+                print(f" | {url_count} files found")
                 
         # Print the download size if we are not skipping the download
         if skip_download is False:
