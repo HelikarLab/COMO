@@ -3,6 +3,7 @@ TODO: Integrate crux percolator into this workflow
 """
 from bioservices import BioDBNet
 from FileInformation import FileInformation
+from FileInformation import clear_print
 import multiprocessing
 from multiprocessing.sharedctypes import Synchronized
 import numpy as np
@@ -10,48 +11,6 @@ import os
 import pandas as pd
 from pathlib import Path
 import subprocess
-
-
-class Utils:
-    @staticmethod
-    def get_cell_type(input_file: Path | str):
-        """
-        This function will return the "CellType" portion of a file name
-
-        Example:
-            Input: naiveB_S1R1_experiment_title.raw
-            Output: naiveB
-        """
-        file_name = Path(input_file)
-        cell_type = file_name.stem.split("_")[0]
-        return cell_type
-
-    @staticmethod
-    def get_experiment_number(input_file: Path | str):
-        """
-        This function will return the "S1R1" portion of a file name
-
-        Example:
-            Input: naiveB_S1R1_experiment_title.raw
-            Output: S1R1
-        """
-        file_name = Path(input_file)
-        experiment = file_name.stem.split("_")[1]
-        return experiment
-
-    @staticmethod
-    def get_replicate_number(input_file: Path | str):
-        """
-        This function will return the "CellType_S1R1" portion of a file name
-
-        Example:
-            Input: naiveB_S1R1_experiment_title.raw
-            Output: naiveB_S1R1
-        """
-        file_name = Path(input_file)
-        prefix = file_name.stem.split("_")
-        prefix = f"{prefix[0]}_{prefix[1]}"
-        return prefix
 
 
 class RAWtoMZML:
@@ -63,7 +22,7 @@ class RAWtoMZML:
         self._core_count: int = core_count
 
         # These items are used to track the progress of the conversion
-        self._conversion_counter: Synchronized = multiprocessing.Value("i", 1)
+        self._conversion_counter: Synchronized = multiprocessing.Value("i", 0)
 
         # ----- Function Calls -----
         self.raw_to_mzml_wrapper()  # Convert from raw files to mzML
@@ -73,9 +32,7 @@ class RAWtoMZML:
         This is a wrapper function to multiprocess converting raw files to mzML using ThermoRawFileParser
         """
         print("Starting raw -> mzML conversion")
-        file_chunks: list[Path] = np.array_split(
-            self.file_information, self._core_count
-        )
+        file_chunks: list[Path] = np.array_split(self.file_information, self._core_count)
 
         jobs: list[multiprocessing.Process] = []
         for i, information in enumerate(file_chunks):
@@ -94,17 +51,16 @@ class RAWtoMZML:
         for information in file_information:
 
             self._conversion_counter.acquire()
-            print(f"Starting raw -> mzML conversion: {self._conversion_counter.value} / {len(self.file_information)} - {information.raw_file_name}")  # fmt: skip
             self._conversion_counter.value += 1
+            clear_print(f"Starting mzML conversion: {self._conversion_counter.value} / {len(self.file_information)} - {information.raw_file_name}")
             self._conversion_counter.release()
-
-            process = subprocess.run(
+            
+            information.mzml_base_path.mkdir(parents=True, exist_ok=True)
+            subprocess.run(
                 [
                     "thermorawfileparser",
-                    "--input",
-                    str(information.raw_file_path),
-                    "--output_file",
-                    information.mzml_file_path,
+                    f"--input={str(information.raw_file_path)}",
+                    f"--output_file={str(information.mzml_file_path)}"
                 ],
                 stdout=subprocess.PIPE,
             )
@@ -141,7 +97,7 @@ class MZMLtoSQT:
         """
         for i, file_information in enumerate(self._file_information):
             # Clear the previous line of output. Required if the new line is shorter than the previous line
-            print(f"Creating SQT: {i + 1} / {len(self._file_information)} - {file_information.sqt_file_name}", end="\033[K\r", flush=True)  # fmt: skip
+            clear_print(f"Creating SQT: {i + 1} / {len(self._file_information)} - {file_information.sqt_file_name}")
 
             # Call subprocess on command
             # Only create the SQT file
@@ -151,7 +107,7 @@ class MZMLtoSQT:
                     "comet",
                     "--output_sqtfile",
                     "1",
-                    f"--output-dir",
+                    "--output-dir",
                     file_information.sqt_base_path,
                     "--overwrite",
                     "T",
@@ -189,7 +145,7 @@ class MZMLtoSQT:
                 # Rename the file
                 os.rename(old_file_path, new_file_path)
 
-        print("SQT creation finished", end="\033[K")  # Clear the previous print
+        clear_print("SQT creation finished")
         print("")
 
 
@@ -363,7 +319,8 @@ class SQTtoCSV:
                 
                 self._current_gene_counter.acquire
                 self._current_file_counter.acquire
-                print(f"Converting to Gene Symbols: {self._current_gene_counter.value + 1:,} of {self._max_gene_count.value:,} (processing file {self._current_file_counter.value + 1} / {self._max_file_count.value})", end="\r", flush=True)
+                
+                clear_print(f"Converting to Gene Symbols: {self._current_gene_counter.value + 1:,} of {self._max_gene_count.value:,} (processing file {self._current_file_counter.value + 1} / {self._max_file_count.value})")
                 self._current_gene_counter.release
                 self._current_file_counter.release
                 
@@ -395,7 +352,7 @@ class SQTtoCSV:
             self._current_file_counter.release
             
             # Show a final print-statement with all updates
-            print(f"Converting to Gene Symbols: {self._current_gene_counter.value:,} of {self._max_gene_count.value:,} (processing file {self._current_file_counter.value} / {self._max_file_count.value})" ,end="\r", flush=True)
+            clear_print(f"Converting to Gene Symbols: {self._current_gene_counter.value:,} of {self._max_gene_count.value:,} (processing file {self._current_file_counter.value} / {self._max_file_count.value})")
 
     def _merge_dataframes(self):
         """
