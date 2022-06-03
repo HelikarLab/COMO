@@ -22,7 +22,10 @@ RUN conda config --add channels conda-forge \
     && pip install --no-cache-dir --requirement "${HOME}/pip_install.txt" \
     && mamba install --yes python=${PYTHON_VERSION} --file "${HOME}/mamba_install.txt"\
     && mamba clean --all --force-pkgs-dirs --yes \
-    && R -e 'devtools::install_github("babessell1/zFPKM")'\
+    && R -e 'devtools::install_github("babessell1/zFPKM")' \
+    # Install jupyter extensions
+    && jupyter labextension install @jupyter-widgets/jupyterlab-manager \
+    && jupyter labextension install escher \
     && jupyter trust "${HOME}/work/py/pipeline.ipynb" \
     && rm -f "${HOME}/pip_install.txt" \
     && rm -f "${HOME}/mamba_install.txt"
