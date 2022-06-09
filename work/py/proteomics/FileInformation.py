@@ -21,10 +21,11 @@ def clear_print(message: str, end: str = "\033[K\r", flush: bool = True):
     """
     print(message, end=end, flush=flush)
 
+
 class FileInformation:
     def __init__(
         self,
-        cell_type: str = None,
+        cell_type: str,
         download_url: str = None,
         replicate: str = None,
         raw_path: Path = None,
@@ -41,9 +42,20 @@ class FileInformation:
         self.prefix: str = f"{cell_type}_{replicate}"
         
         # Base file save paths
-        self.raw_base_path: Path = Path(project.configs.datadir, "results", cell_type, "proteomics", "raw")
-        self.mzml_base_path: Path = Path(project.configs.datadir, "results", cell_type, "proteomics", "mzml")
-        self.sqt_base_path: Path = Path(project.configs.datadir, "results", cell_type, "proteomics", "sqt")
+        if raw_path is None:
+            self.raw_base_path: Path = Path(project.configs.datadir, "results", cell_type, "proteomics", "raw")
+        else:
+            self.raw_base_path: Path = raw_path.parent
+        
+        if mzml_path is None:
+            self.mzml_base_path: Path = Path(project.configs.datadir, "results", cell_type, "proteomics", "mzml")
+        else:
+            self.mzml_base_path: Path = mzml_path.parent
+        
+        if sqt_path is None:
+            self.sqt_base_path: Path = Path(project.configs.datadir, "results", cell_type, "proteomics", "sqt")
+        else:
+            self.sqt_base_path: Path = sqt_path.parent
 
         # File names
         self.intensity_csv: Path = Path(project.configs.datadir, "data_matrices", cell_type, f"protein_abundance_matrix_{cell_type}.csv",)
@@ -58,7 +70,25 @@ class FileInformation:
         self.sqt_file_path: Path = Path(self.sqt_base_path, self.sqt_file_name)
         
         # Intensity dataframe
-        self.df_columns: list[str] = ["uniprot", "symbol"]
+        self.base_columns: list[str] = ["uniprot"]
+        self.df_columns: list[str] = self.base_columns + [self.prefix]
         self.intensity_df: pd.DataFrame = pd.DataFrame(columns=self.df_columns)
 
-        
+    @staticmethod
+    def intensity_file_path(cell_type: str) -> Path:
+        """
+        This function creates a single instance of the FileInformation class and returns the intensity_csv file location
+        This is useful because each cell type has a specific location all data gets written to
+        If all unique cell types are known, it is then possible to get their intensity csv file location
+        """
+        information: FileInformation = FileInformation(
+            cell_type=cell_type,
+            download_url="",
+            replicate="",
+            raw_path=Path(""),
+            intensity_csv=Path(""),
+            mzml_path=Path(""),
+            sqt_path=Path(""),
+            file_size=0,
+        )
+        return information.intensity_csv

@@ -16,6 +16,7 @@ docker_old/*
 
 # Python cache files
 /**/__pycache__
+work/py/tests/.pytest_cache
 
 # Do not track output files
 /work/output

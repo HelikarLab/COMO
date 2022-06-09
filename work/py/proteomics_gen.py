@@ -292,26 +292,23 @@ def main(argv):
             print(np.where([True if g == group else False for g in config_sheet["Group"].tolist()]))
 
             group_idx = np.where([True if g == group else False for g in config_sheet["Group"].tolist()])
-            #cols = config_sheet["SampleName"].iloc[group_idx]
-
-            #cols = np.take(config_sheet["SampleName"].to_numpy(), group_idx) + [["Col 1", "Col 2"]]
-            cols = np.take(config_sheet["SampleName"].to_numpy(), group_idx).ravel().tolist() + [
-                "Gene Symbol",
-                "uniprot"
-            ]
-
-            print(cols)
-                #"Gene Symbol",
-                #"uniprot",
+            cols = np.take(config_sheet["SampleName"].to_numpy(), group_idx).ravel().tolist() + ["Gene Symbol"]
 
             proteomics_data = load_proteomics_data(datafilename, context_name)
             proteomics_data = proteomics_data.loc[:, cols]
-            sym2id = load_gene_symbol_map(gene_symbols=proteomics_data["Gene Symbol"].tolist(),
-                                          filename="proteomics_entrez_map.csv",
-                                          )
+            
+            sym2id = load_gene_symbol_map(
+                gene_symbols=proteomics_data["Gene Symbol"].tolist(),
+                filename="proteomics_entrez_map.csv"
+            )
+            
             # map gene symbol to ENTREZ_GENE_ID
             proteomics_data.dropna(subset=["Gene Symbol"], inplace=True)
-            proteomics_data.drop(columns=["uniprot"], inplace=True)
+            try:
+                proteomics_data.drop(columns=["uniprot"], inplace=True)
+            except KeyError:
+                pass
+            
             proteomics_data = proteomics_data.groupby(["Gene Symbol"]).agg("max")
             # proteomics_data.set_index('Gene Symbol', inplace=True)
             proteomics_data["ENTREZ_GENE_ID"] = sym2id["Gene ID"]

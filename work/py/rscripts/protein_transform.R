@@ -41,7 +41,7 @@ z_score_calc <- function(abundance) {
     #print(log_abundance)
     #print("log abundance filt")
     #print(log_abundance_filt)
-
+  
     d <- density(log_abundance_filt)
     print("density")
     #print(d[["x"]])
