@@ -39,3 +39,4 @@ git
 thermorawfileparser
 crux-toolkit
 bioservices
+tqdm

@@ -345,8 +345,10 @@ def main(args: list[str]):
     )
 
     # Get the root folder of output CSV file
-    output_folder = file_information[0].intensity_csv.parent
-    print(f"\nProtein intensities saved under: {output_folder}")
+    root_folders: set[Path] = set([i.intensity_csv.parent for i in file_information])
+    print(f"\nProtein intensities saved under:")
+    for folder in root_folders:
+        print(folder)
     
 
 if __name__ == "__main__":

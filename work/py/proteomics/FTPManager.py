@@ -16,7 +16,7 @@ import time
 from urllib.parse import urlparse
 
 
-def ftp_client(host: str, folder: str, max_attempts: int = 3) -> FTP:
+def ftp_client(host: str, max_attempts: int = 3) -> FTP:
     """
     This class is responsible for creating a "client" connection
     """
@@ -65,7 +65,7 @@ class Reader:
         host = urlparse(self._root_link).hostname
         folder = urlparse(self._root_link).path
         
-        client: FTP = ftp_client(host=host, folder=folder)
+        client: FTP = ftp_client(host=host)
         
         for file_path in client.nlst(folder):
             if file_path.endswith(tuple(self._extensions)):
@@ -93,10 +93,6 @@ class Download:
         """
         self._file_information: list[FileInformation] = file_information
         self._core_count: int = min(core_count, 2)  # Limit to 2 downloads at a time
-
-        # Create a manager so each process can append data to variables
-        # From: https://stackoverflow.com/questions/67974054
-        self._save_locations: list[Path] = multiprocessing.Manager().list()
         self._download_counter: Synchronized = multiprocessing.Value("i", 1)
 
         # Find files to download
@@ -130,10 +126,7 @@ class Download:
         [job.join() for job in jobs]        # Wait for jobs to finish
         [job.terminate() for job in jobs]   # Terminate jobs
 
-    def download_data(
-        self,
-        file_information: list[FileInformation],
-    ):
+    def download_data(self, file_information: list[FileInformation]):
 
         # Start processing the files
         for i, information in enumerate(file_information):
@@ -147,7 +140,7 @@ class Download:
             size_mb: int = round(information.file_size / (1024**2))
 
             # Connect to the host, login, and download the file
-            client: FTP = ftp_client(host=host, folder=path)
+            client: FTP = ftp_client(host=host)
             # client: FTP = FTP(host=host, user="anonymous", passwd="guest")
 
             # Get the lock and print file info
