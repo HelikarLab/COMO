@@ -7,7 +7,6 @@ bioconductor-limma
 bioconductor-DESeq2
 bioconductor-agilp
 bioconductor-hgu133acdf
-bioconductor-zfpkm
 r-uwot
 r-irkernel
 r-irdisplay
@@ -37,3 +36,7 @@ unidecode
 xlrd
 wget
 git
+thermorawfileparser
+crux-toolkit
+bioservices
+tqdm
