@@ -5,3 +5,5 @@ framed
 troppo
 pytest==4.6.11
 escher
+gurobipy
+python-libsbml==5.19.4
