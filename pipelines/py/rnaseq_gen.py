@@ -59,8 +59,8 @@ def load_rnaseq_tests(filename, context_name, lib_type):
         filename = f"rnaseq_total_{context_name}.csv"
     elif lib_type == "mrna":  # if using mRNA-seq library prep
         filename = f"rnaseq_mrna_{context_name}.csv"
-    elif lib_type == "sc":  # if using single-cell RNA-seq
-        filename = f"rnaseq_sc_{context_name}.csv"
+    elif lib_type == "scrna":  # if using single-cell RNA-seq
+        filename = f"rnaseq_scrna_{context_name}.csv"
     else:
         print(
             f"Unsupported RNA-seq library type: {lib_type}. Must be one of 'total', 'mrna', 'sc'."
@@ -68,7 +68,7 @@ def load_rnaseq_tests(filename, context_name, lib_type):
         sys.exit()
 
     fullsavepath = os.path.join(
-        configs.rootdir, "data", "results", context_name, filename
+        configs.rootdir, "data", "results", context_name, lib_type, filename
     )
     if os.path.isfile(fullsavepath):
         data = pd.read_csv(fullsavepath, index_col="ENTREZ_GENE_ID")
@@ -108,7 +108,7 @@ def handle_context_batch(
         print("model: ", context_name)
         rnaseq_output_file = "".join(["rnaseq_", prep, "_", context_name, ".csv"])
         rnaseq_output_filepath = os.path.join(
-            configs.datadir, "results", context_name, rnaseq_output_file
+            configs.datadir, "results", context_name, prep, rnaseq_output_file
         )
         rnaseq_input_file = "".join(
             ["gene_counts_matrix_", prep, "_", context_name, ".csv"]
@@ -116,6 +116,11 @@ def handle_context_batch(
         rnaseq_input_filepath = os.path.join(
             configs.datadir, "data_matrices", context_name, rnaseq_input_file
         )
+        if not os.path.exists(rnaseq_input_filepath):
+            print(f"Gene counts matrix not found at {rnaseq_input_filepath}. \n"
+                  f"Skipping... ")
+            continue
+
         gene_info_filepath = os.path.join(configs.datadir, "gene_info.csv")
 
         os.makedirs(os.path.dirname(rnaseq_output_filepath), exist_ok=True)
@@ -127,14 +132,15 @@ def handle_context_batch(
             rnaseq_config_filepath,
             rnaseq_output_filepath,
             gene_info_filepath,
+            context_name,
+            prep=prep,
             replicate_ratio=replicate_ratio,
             batch_ratio=batch_ratio,
             replicate_ratio_high=replicate_ratio_high,
             batch_ratio_high=batch_ratio_high,
             technique=technique,
             quantile=quantile,
-            min_count=min_count,
-            context_name=context_name,
+            min_count=min_count
         )
 
         print("Test data saved to " + rnaseq_output_filepath)

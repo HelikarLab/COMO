@@ -29,25 +29,18 @@ z_result <- function(z_vector, density, mu, stdev, max_y) {
 }
 
 
-z_score_calc <- function(abundance) {
+z_score_calc <- function(abundance, min_thresh) {
     if (!is.numeric(abundance)) {
         stop("argument 'abundance' must be numeric")
     }
-    #print("abundance_density")
-    #print(abundance)
-    log_abundance_filt <- log(abundance[abundance>0], base=2)
+    abundance <- abundance + 1
+    log_abundance_filt <- log(abundance[abundance>min_thresh], base=2)
     log_abundance <- log(abundance, base=2)
-    #print("log abundance")
-    #print(log_abundance)
-    #print("log abundance filt")
-    #print(log_abundance_filt)
 
     d <- density(log_abundance_filt)
-    print("density")
-    #print(d[["x"]])
-    #print(d[["y"]])
+
     # calculate rolling average
-    perc <- as.integer(0.05*length(d[["y"]]) + 1) # 10% roll avg interval
+    perc <- as.integer(0.01*length(d[["y"]]) + 1) # 10% roll avg interval
     d[["roll_y"]] <- zoo::rollmean(d[["y"]], perc)
 
     # from https://stats.stackexchange.com/questions/22974/how-to-find-local-peaks-valleys-in-a-series-of-data
@@ -65,9 +58,7 @@ z_score_calc <- function(abundance) {
     }
 
     local_maxes <- find_maxima(d[["roll_y"]])
-    print(local_maxes)
     fit_max <- max(local_maxes) + as.integer(perc/2)
-    print(fit_max)
 
     #mu <- d[["x"]][which.max(d[["y"]])]
     #max_y <- max(d[["y"]])
@@ -76,6 +67,7 @@ z_score_calc <- function(abundance) {
      mu <- d[["x"]][fit_max] # get max with respect to x) local maxima of rolling
      max_y <- d[["y"]][fit_max]
      cnt <- 0
+
      while  ( (max_y < 0.5*max(d[["y"]])) && (cnt < 5) ) { # while selected local max y is less than 50% of actual maximum
         cnt <- cnt + 1
         perc <- as.integer((0.05-(cnt*0.01))*length(d[["y"]]) + 1) # rm 1 percent from roll avg interval per iteration
@@ -90,7 +82,7 @@ z_score_calc <- function(abundance) {
         max_y <- d[["y"]][fit_max]
      }
 
-     if ( (max_y < 0.5*max(d[["y"]])) ) {
+     if ( (max_y < 0.1*max(d[["y"]])) ) {
         mu <- d[["x"]][which.max(d[["y"]])]
         max_y <- max(d[["y"]]) # if doesnt work use regular zFPKM calculation
      }
@@ -155,14 +147,17 @@ plot_gaussian_fit <- function(results, FacetTitles=TRUE, PlotXfloor) {
 }
 
 
-z_transform <- function(abundance_df) {
+z_transform <- function(abundance_df, min_thresh) {
 
     abundance_df <- rm_infinite(abundance_df)
-
+    print("1")
+    #print(row.names(abundance_df))
     z_df <- data.frame(row.names=row.names(abundance_df))
+    print("2")
     outputs <- list()
     for (c in colnames(abundance_df)) {
-        output <- z_score_calc(abundance_df[, c])
+        print(c)
+        output <- z_score_calc(abundance_df[, c], min_thresh)
         z_df[, c] <- output[["z"]]
         outputs[[c]] <- output
     }
@@ -171,32 +166,42 @@ z_transform <- function(abundance_df) {
 }
 
 
-z_score_plot <- function(abundance_df, FacetTitles=FALSE, PlotXfloor=-20) {
-    plot_gaussian_fit(z_transform(abundance_df)[[1]], FacetTitles, PlotXfloor)
+z_score_plot <- function(abundance_df, min_thresh, FacetTitles=FALSE, PlotXfloor=-20) {
+    plot_gaussian_fit(z_transform(abundance_df, min_thresh)[[1]], FacetTitles, PlotXfloor)
 }
 
 
-rm_infinite <- function(fpkm) {
+rm_infinite <- function(abundance) {
     # Remove FPKM rows containing all NaN values. These are most likely a result
     # of effective lengths = 0 when calculating FPKM.
-    return(fpkm[which(!apply(fpkm, 1, function(r) all(is.nan(r) | is.infinite(r)))), ])
+    abundance <- as.data.frame(abundance)
+    print(head(abundance))
+    return(abundance[which(!apply(abundance, 1, function(r) all(is.nan(r) | is.infinite(r)))), ])
 }
 
 
 protein_transform_main <- function(abundance_matrix, out_dir, group_name) {
-    print(out_dir)
     dir.create(file.path(out_dir, "figures"), showWarnings = FALSE)
-    prot <- read.csv(abundance_matrix)
+    prot <- as.data.frame(read.csv(abundance_matrix))
+    print(head(prot))
+    prot[is.na(prot)] <- 0
+    min_thresh <- min(prot>0)
+    print("min thresh")
+    print(min_thresh)
+    #row.names(prot) <- prot$ENTREZ_GENE_ID
+    #prot["ENTREZ_GENE_ID"] <- NULL
     print(head(prot))
     pdf(file.path(out_dir, "figures", paste0("fit_proteinAbundance_", group_name, ".pdf")))
-    z_score_plot(prot[,-1], out_dir)
+    z_score_plot(prot[,-1], 0, out_dir)
     dev.off()
     #if ( i ==1 ) {stop()}
-
-    z_transformed_abundances <- cbind(prot[,1], z_transform(prot[,c(-1)])[[2]])
-    print(head(z_transformed_abundances))
-    out_file <- file.path(out_dir, paste0("protein_zscore_Matrix_", group_name))
-    print(out_file)
+    minimums <- prot == 0
+    nas <- is.na(prot)== 1
+    z_transformed_abundances <- cbind(prot[,1], z_transform(prot[,c(-1)], 0)[[2]])
+    z_transformed_abundances[minimums] <- -4
+    #z_transformed_abundances[nas] <- -4
+    colnames(z_transformed_abundances)[1] <- "ENTREZ_GENE_ID"
+    out_file <- file.path(out_dir, paste0("protein_zscore_Matrix_", group_name, ".csv"))
     write.csv(z_transformed_abundances, out_file, row.names=FALSE)
 }
 
