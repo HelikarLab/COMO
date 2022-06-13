@@ -2,6 +2,7 @@ on:
   push:
     branches:
       - 'bulk_dev'
+      - "master"
   workflow_dispatch:
   schedule:
     - cron: '0 0 * * *'
