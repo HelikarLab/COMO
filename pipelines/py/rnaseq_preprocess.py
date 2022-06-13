@@ -4,7 +4,7 @@ from bioservices import BioDBNet
 import pandas as pd
 from project import configs
 import re
-import os, time, sys
+import os, time, sys, shutil
 import argparse
 from rpy2.robjects.packages import importr, SignatureTranslatedAnonymousPackage
 import glob
@@ -268,7 +268,7 @@ def create_gene_info_file(matrix_file_list, form, taxon_id):
     return
 
 
-def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_file):
+def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_file, data_source):
     """
     Handle iteration through each context type and create files according to flag used (config, matrix, info)
     """
@@ -284,16 +284,16 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
     for context_name in context_names:
         context_name = context_name.strip(" ")
         print(f"Preprocessing {context_name}")
-        gene_output_dir = os.path.join(configs.rootdir, "data", "results", context_name)
+        #gene_output_dir = os.path.join(configs.rootdir, "data", "results", context_name)
         matrix_output_dir = os.path.join(configs.rootdir, "data", "data_matrices", context_name)
-        os.makedirs(gene_output_dir, exist_ok=True)
+        #os.makedirs(gene_output_dir, exist_ok=True)
         os.makedirs(matrix_output_dir, exist_ok=True)
-        print('Gene info output directory is "{}"'.format(gene_output_dir))
+        #print('Gene info output directory is "{}"'.format(gene_output_dir))
 
         matrix_path_all = os.path.join(matrix_output_dir, ("gene_counts_matrix_full_" + context_name + ".csv"))
         matrix_path_total = os.path.join(matrix_output_dir, ("gene_counts_matrix_total_" + context_name + ".csv"))
         matrix_path_mrna = os.path.join(matrix_output_dir, ("gene_counts_matrix_mrna_" + context_name + ".csv"))
-        matrix_path_prov = os.path.join(matrix_output_dir, provided_matrix_file)
+        matrix_path_prov = provided_matrix_file
 
         if mode == "make":
             create_counts_matrix(context_name)
@@ -332,7 +332,9 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
         create_gene_info_file(tmatrix_files + mmatrix_files, form, taxon_id)
 
     else:
-        create_gene_info_file(matrix_path_prov, form, taxon_id)
+        out_dir = os.path.join(matrix_output_dir, f"gene_counts_matrix_{data_source}_{context_name}.csv")
+        shutil.copy(matrix_path_prov, out_dir)
+        create_gene_info_file([matrix_path_prov], form, taxon_id)
 
     return
 
@@ -419,6 +421,13 @@ def main(argv):
                               "/work/data/data_matrices/<context name>/<NAME OF FILE>.csv"
                         )
 
+    parser.add_argument("-s", "--data-source",
+                        required="--provide-matrix" in argv,  # require if using --provide-matrix flag,
+                        dest="data_source",
+                        default="NA",
+                        help="Experimental source of data. Can be either 'total', 'mrna', or 'scrna'"
+                        )
+
     args = parser.parse_args()
     context_names = args.context_names
     gene_format = args.gene_format
@@ -426,6 +435,7 @@ def main(argv):
     provide_matrix = args.provide_matrix
     make_matrix = args.make_matrix
     provided_matrix_fname = args.provided_matrix_fname
+    data_source = args.data_source
 
     context_names = context_names.strip("[").strip("]").replace("'", "").replace(" ", "").split(",") # convert to py list
 
@@ -459,10 +469,14 @@ def main(argv):
     # use mutually exclusive flag to set mode which tells which files to generate
     if provide_matrix:
         mode = "provide"
+        if data_source not in ["total", "mrna", "scrna"]:
+            print("--data-source must be provided if using a premade counts matrix and must be either "
+                  "'total', 'mrna', or 'scrna'")
+            sys.exit()
     elif make_matrix:
         mode = "make"
 
-    handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fname)
+    handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fname, data_source)
 
     return
 
