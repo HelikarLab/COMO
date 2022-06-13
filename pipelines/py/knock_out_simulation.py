@@ -94,11 +94,15 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file):
     for id in has_effects_gene:
         print(f"Peforming knock-out simulation for {id}")
         model_cp = copy.deepcopy(model)
+        print("len model: ", len(model_cp.reactions))
         gene = model_cp.genes.get_by_id(id)
         gene.knock_out()
+        print("len ko model: ", len(model_cp.reactions))
         opt_model = moma(model_cp, solution=ref_sol).to_frame()
+        print("ref flux length: ", len(ref_flux))
         # opt_model = model_cp.optimize().to_frame() #FBA
-        flux_solution[id] = opt_model["fluxes"]
+        opt_model_cp = opt_model.copy()  # get defragmented
+        flux_solution[id] = opt_model_cp["fluxes"]
         del model_cp
 
     # flux_solution
@@ -182,24 +186,18 @@ def create_gene_pairs(
 def score_gene_pairs(gene_pairs, filename, input_reg):
     p_model_genes = gene_pairs.Gene.unique()
     d_score = pd.DataFrame([], columns=["score"])
+
     for p_gene in p_model_genes:
         data_p = gene_pairs.loc[gene_pairs["Gene"] == p_gene].copy()
-        # print(data_p)
         total_aff = data_p["Gene IDs"].unique().size
-        # print(total_aff)
-        n_aff_down = (
-            data_p.loc[abs(data_p["rxn_fluxRatio"]) < 0.9, "Gene IDs"].unique().size
-        )
-        # print(n_aff_down)
-        n_aff_up = (
-            data_p.loc[abs(data_p["rxn_fluxRatio"]) > 1.1, "Gene IDs"].unique().size
-        )
-        # print(n_aff_up)
+        n_aff_down = data_p.loc[abs(data_p["rxn_fluxRatio"]) < 0.9, "Gene IDs"].unique().size
+        n_aff_up = data_p.loc[abs(data_p["rxn_fluxRatio"]) > 1.1, "Gene IDs"].unique().size
+
         if input_reg == "up":
             d_s = (n_aff_down - n_aff_up) / total_aff
         else:
             d_s = (n_aff_up - n_aff_down) / total_aff
-        # print(d_s)
+
         d_score.at[p_gene, "score"] = d_s
 
     d_score.index.name = "Gene"
@@ -279,7 +277,8 @@ def drug_repurposing(drug_db, d_score):
     for index, row in d_score.iterrows():
         target = row["Gene Symbol"]
         # print(target)
-        drugs = drug_db.loc[drug_db["Target"] == target, :]
+        #drugs = drug_db.loc[drug_db["Target"] == target, :]
+        drugs = drug_db.loc[drug_db.Target == target, :]
         # print(drugs)
         drugs.is_copy = False
         drugs["d_score"] = row["score"]

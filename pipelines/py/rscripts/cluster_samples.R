@@ -15,11 +15,19 @@ make_logical_matrix <- function(wd, technique, context_names) {
   files <- c()
   for ( context in context_names ) {
       if (technique=="zfpkm") {
-          files <- c(files, Sys.glob(file.path(wd, context, "zFPKM_Matrix_*.csv")))
+          tfiles <- c(files, Sys.glob(file.path(wd, context, "total", "zFPKM_Matrix_*.csv")))
+          mfiles <- c(files, Sys.glob(file.path(wd, context, "mrna", "zFPKM_Matrix_*.csv")))
+          files <- c(tfile, mfiles)
       } else if ( technique=="quantile" ) {
-          files <- c(files, Sys.glob(file.path(wd, context, "TPM_Matrix_*.csv")))
+          tfiles <- c(files, Sys.glob(file.path(wd, context, "total", "TPM_Matrix_*.csv")))
+          mfiles <- c(files, Sys.glob(file.path(wd, context, "mrna", "TPM_Matrix_*.csv")))
+          files <- c(tfile, mfiles)
       } else if ( technique=="cpm" ) {
-          files <- c(files, Sys.glob(file.path(wd, context, "CPM_Matrix_*.csv")))
+          tfiles <- c(files, Sys.glob(file.path(wd, context, "total", "CPM_Matrix_*.csv")))
+          mfiles <- c(files, Sys.glob(file.path(wd, context, "mrna", "CPM_Matrix_*.csv")))
+          files <- c(tfile, mfiles)
+      } else if ( technique == "umi" ) {
+          files <- c(files, Sys.glob(file.path(wd, context, "scrna", "zUMI_Matrix_*.csv")))
       } else {
           print("Invalid technique. Must be zfpkm, quantile, or cpm")
           stop()

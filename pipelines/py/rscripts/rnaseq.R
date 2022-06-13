@@ -23,12 +23,12 @@ library(stringr)
 library(readxl)
 
 
-read_counts_matrix <- function(counts_matrix_file, config_file, info_file, model_name) {
+read_counts_matrix <- function(counts_matrix_file, config_file, info_file, context_name) {
 
     #print(counts_matrix_file) # print counts matrix file name
-    print(model_name) # print tissue name
+    print(context_name) # print tissue name
 
-    conf <- read_excel(config_file, sheet=model_name)# read configuration sheet
+    conf <- read_excel(config_file, sheet=context_name)# read configuration sheet
     cmat_whole <- read.csv(counts_matrix_file, header=TRUE) %>% arrange(., genes) # read counts matrix
 
     #print(head(cmat_whole))
@@ -37,11 +37,6 @@ read_counts_matrix <- function(counts_matrix_file, config_file, info_file, model
         mutate(size=end_position-start_position) %>%
         arrange(., ensembl_gene_id) %>%
         filter(.$ensembl_gene_id %in% cmat_whole$genes)
-
-    #print(head(gene_info))
-    #print(tail(gene_info))
-    #print(head(cmat_whole))
-    #print(tail(cmat_whole))
 
     cmat_whole <- cmat_whole[(gene_info$entrezgene_id!="-"),] # remove unnamed genes
     gene_info <- gene_info[(gene_info$entrezgene_id!="-"),]  # remove unnamed genes
@@ -85,6 +80,7 @@ read_counts_matrix <- function(counts_matrix_file, config_file, info_file, model
             samp_names <- SampMetrics[[group]][["SampleNames"]]
             layouts <- SampMetrics[[group]][["Layout"]]
 
+
             # add replicate to values
             samp_mat <- cbind(samp_mat, cmat_whole[,entry])
             fragment_lengths <- c(fragment_lengths, conf$FragmentLength[i])
@@ -112,6 +108,7 @@ read_counts_matrix <- function(counts_matrix_file, config_file, info_file, model
         #SampMetrics[[group]][["FragmentLengths"]] <- fragment_lengths
         SampMetrics[[group]][["Entrez"]] <- as.character(gene_info$entrezgene_id) # store entrez ids
         SampMetrics[[group]][["GeneSizes"]] <- gene_info$size # store gene size
+        SampMetrics[[group]][["StudyNumber"]] <- group
     }
 
     return(SampMetrics)
@@ -152,7 +149,9 @@ calculate_fpkm <- function(SampMetrics) {
                 eff_len = gene_size - mean_fragment_lengths[j] + 1 # plus one to prevent div by 0
                 N = sum(count_matrix[,j])
                 exp( log(count_matrix[,j]) + log(1e9) - log(eff_len) - log(N) )
-            })) + 1e-9
+            }))
+            fpkm_matrix[is.nan(fpkm_matrix)] <- 0
+            #fpkm_matrix <- fpkm_matrix + min(fpkm_matrix[fpkm_matrix>0])
             colnames(fpkm_matrix) <- colnames(count_matrix)
             SampMetrics[[i]][["FPKM_Matrix"]] <- fpkm_matrix
 
@@ -162,7 +161,9 @@ calculate_fpkm <- function(SampMetrics) {
             rpkm_matrix <- do.call(cbind, lapply(1:ncol(count_matrix), function(j) {
                 rate = log(count_matrix[,j]) - log(gene_size[j])
                 exp(rate - log(sum(count_matrix[,j])) + log(1e9))
-            })) + 1e-9
+            }))
+            rpkm_matrix[is.nan(rpkm_matrix)] <- 0
+            #rpkm_matrix <- rpkm_matrix + min(rpkm_matrix[rpkm_matrix>0])
             colnames(rpkm_matrix) <- colnames(count_matrix)
             SampMetrics[[i]][["FPKM_Matrix"]] <- rpkm_matrix
 
@@ -198,20 +199,21 @@ calculate_z_score <- function(SampMetrics, norm_tech) {
 }
 
 
-cpm_filter <- function(SampMetrics, filt_options, model_name) {
+cpm_filter <- function(SampMetrics, filt_options, context_name, prep) {
 
     N_exp <- filt_options$replicate_ratio
     N_top <- filt_options$replicate_ratio_high
     min.count <- filt_options$min_count
     for ( i in 1:length(SampMetrics) ) {
-        study_number <- str_extract_all(SampMetrics[[i]][["SampleNames"]][1][1], "S\\d+")
+        #study_number <- str_extract_all(SampMetrics[[i]][["SampleNames"]][1][1], "S\\d+")
+        study_number <- SampMetrics[[i]][["StudyNumber"]]
         counts <- SampMetrics[[i]][["CountMatrix"]]
         ent <- SampMetrics[[i]][["Entrez"]]
         size <- SampMetrics[[i]][["GeneSizes"]]
         lib.size <- colSums(counts)
         CPM <- cpm(counts,lib.size=lib.size)
         cpm_fname <- file.path("home", "jupyteruser", "work", "data", "results",
-                                model_name, paste0("CPM_Matrix_", study_number, ".csv"))
+                                context_name, prep, paste0("CPM_Matrix_", prep, "_", study_number, ".csv"))
         write_cpm <- cbind(ent, CPM)
         write.csv(write_cpm, cpm_fname, row.names=FALSE)
 
@@ -248,7 +250,7 @@ cpm_filter <- function(SampMetrics, filt_options, model_name) {
 }
 
 
-TPM_quant_filter <- function(SampMetrics, filt_options, model_name) {
+TPM_quant_filter <- function(SampMetrics, filt_options, context_name, prep) {
 
     N_exp <- filt_options$replicate_ratio
     N_top <- filt_options$replicate_ratio_high
@@ -256,13 +258,14 @@ TPM_quant_filter <- function(SampMetrics, filt_options, model_name) {
     SampMetrics <- calculate_tpm(SampMetrics)
 
     for ( i in 1:length(SampMetrics) ) {
-        study_number <- str_extract_all(SampMetrics[[i]][["SampleNames"]][1][1], "S\\d+")
+        #study_number <- str_extract_all(SampMetrics[[i]][["SampleNames"]][1][1], "S\\d+")
+        study_number <- SampMetrics[[i]][["StudyNumber"]]
         counts <- SampMetrics[[i]][["CountMatrix"]]
         ent <- SampMetrics[[i]][["Entrez"]]
         size <- SampMetrics[[i]][["GeneSizes"]]
         tpm <- SampMetrics[[i]][["TPM_Matrix"]]
         tpm_fname <- file.path("home", "jupyteruser", "work", "data", "results",
-                        model_name, paste0("TPM_Matrix_", study_number, ".csv"))
+                        context_name, prep, paste0("TPM_Matrix_", prep, "_", study_number, ".csv"))
         write_tpm <- cbind(ent, tpm)
         write.csv(write_tpm, tpm_fname, row.names=FALSE)
 
@@ -304,7 +307,7 @@ TPM_quant_filter <- function(SampMetrics, filt_options, model_name) {
 
 
 
-zfpkm_filter <- function(SampMetrics, filt_options, model_name) {
+zfpkm_filter <- function(SampMetrics, filt_options, context_name, prep) {
 
     N_exp <- filt_options$replicate_ratio # ratio replicates for active
     N_top <- filt_options$replicate_ratio_high # ratio of replicates for high-confidence
@@ -313,34 +316,44 @@ zfpkm_filter <- function(SampMetrics, filt_options, model_name) {
     SampMetrics <- calculate_fpkm(SampMetrics)
 
     for ( i in 1:length(SampMetrics) ) {
-        study_number <- str_extract_all(SampMetrics[[i]][["SampleNames"]][1][1], "S\\d+")
+        #study_number <- str_extract_all(SampMetrics[[i]][["SampleNames"]][1][1], "S\\d+")
+        study_number <- SampMetrics[[i]][["StudyNumber"]]
         ent <- SampMetrics[[i]][["Entrez"]] # get entrez ids
         fmat <- SampMetrics[[i]][["FPKM_Matrix"]] # get fpkm matrix
         fdf <- data.frame(fmat) # convert to df
+        fdf[rowSums(fdf[])>0,]
         fpkm_fname <- file.path("/home", username, "work", "data", "results",
-                                 model_name, paste0("FPKM_Matrix_", study_number, ".csv"))
+                                 context_name, prep, paste0("FPKM_Matrix_", prep, "_", study_number, ".csv"))
         write_fpkm <- cbind(ent, fdf)
+        colnames(write_fpkm)[1] <- "ENTREZ_GENE_ID"
         write.csv(write_fpkm, fpkm_fname, row.names=FALSE)
-        missing_vals <- is.na(fdf) # get NA values from fdf
-        fdf[missing_vals] <- 0 # set NA values to zero to prevent error in zfpkm calculation
-        zmat <- zFPKM(fdf, assayName="FPKM") # calculate zFPKM
+        #missing_vals <- is.na(fdf) # get NA values from fdf
+        minimums <- fdf == 0
+        nas <- is.na(fdf)==1
+        #fdf[nas] <- 0
+        #fdf[missing_vals] <- 0 # set NA values to zero to prevent error in zfpkm calculation
+        zmat <- zFPKM(fdf, min_thresh=0, assayName="FPKM") # calculate zFPKM
+        zmat[minimums] <- -4 # instead of -inf set to lower limit
+        #zmat[nas] <- -4
         #SampMetrics[[i]][["zFPKM_Matrix"]] <- zmat
-        zmat[missing_vals] <- NA # set NA values back to NA
+        #zmat[missing_vals] <- NA # set NA values back to NA
         zfpkm_fname <- file.path("/home", username, "work", "data", "results",
-                                 model_name, paste0("zFPKM_Matrix_", study_number, ".csv"))
+                                 context_name, prep, paste0("zFPKM_Matrix_", prep, "_", study_number, ".csv"))
         write_zfpkm <- cbind(ent, zmat)
+        colnames(write_zfpkm)[1] <- "ENTREZ_GENE_ID"
         write.csv(write_zfpkm, zfpkm_fname, row.names=FALSE)
 
         zfpkm_plot_dir <- file.path("/home", username, "work", "data", "results",
-                                    model_name, "figures")
+                                    context_name, prep, "figures")
 
         if ( !file.exists(zfpkm_plot_dir) ) {
             dir.create(zfpkm_plot_dir)
         }
-        study_number <- str_extract_all(SampMetrics[[i]][["SampleNames"]][1][1], "S\\d+")
+        #study_number <- str_extract_all(SampMetrics[[i]][["SampleNames"]][1][1], "S\\d+")
+        #study_number <- SampMetrics[[i]][["StudyNumber"]]
         zfpkm_plotname <- file.path(zfpkm_plot_dir, paste0("zFPKM_plot_", study_number, ".pdf"))
         pdf(zfpkm_plotname)
-        zFPKMPlot(fdf, assayName="FPKM")
+        zFPKMPlot(fdf, min_thresh=min(fdf), assayName="FPKM")
         dev.off()
 
 
@@ -367,18 +380,109 @@ zfpkm_filter <- function(SampMetrics, filt_options, model_name) {
 }
 
 
-filter_counts <- function(SampMetrics, technique, filt_options, model_name) {
+umi_filter <- function(SampMetrics, filt_options, context_name) {
+    prep <- "scrna"
+    N_exp <- filt_options$replicate_ratio # ratio replicates for active
+    N_top <- filt_options$replicate_ratio_high # ratio of replicates for high-confidence
+    cutoff <- -3
 
-    switch(technique,
-         cpm = cpm_filter(SampMetrics, filt_options, model_name),
-         zfpkm = zfpkm_filter(SampMetrics, filt_options, model_name),
-         quantile = TPM_quant_filter(SampMetrics, filt_options, model_name))
+    #SampMetrics <- calculate_fpkm(SampMetrics)
+    for ( i in 1:length(SampMetrics) ) {
+        #study_number <- str_extract_all(SampMetrics[[i]][["SampleNames"]][1][1], "S\\d+")
+        study_number <- SampMetrics[[i]][["StudyNumber"]]
+        ent <- SampMetrics[[i]][["Entrez"]] # get entrez ids
+        umat <- SampMetrics[[i]][["CountMatrix"]] # get fpkm matrix
+        udf <- data.frame(umat) # convert to df
+        udf[rowSums(udf[])>0,]
+        minimums <- udf == 0
+        nas <- is.na(udf) == 1
+        #udf[nas] <- 0
+        #fdf[missing_vals] <- 0 # set NA values to zero to prevent error in zfpkm calculation
+        zmat <- zFPKM(udf, min_thresh=0, assayName="UMI") # calculate zFPKM
+        # TODO: fix plot incorrect x-axis 
+        zmat[minimums] <- -4 # instead of -inf set to lower limit
+        #zmat[nas] <- -4
+        #SampMetrics[[i]][["zFPKM_Matrix"]] <- zmat
+        #zmat[missing_vals] <- NA # set NA values back to NA
+        zumi_fname <- file.path("/home", username, "work", "data", "results",
+                                 context_name, prep, paste0("zUMI_Matrix_", prep, "_", study_number, ".csv"))
+        write_zumi <- cbind(ent, zmat)
+        colnames(write_zumi)[1] <- "ENTREZ_GENE_ID"
+        write.csv(write_zumi, zumi_fname, row.names=FALSE)
+
+        zumi_plot_dir <- file.path("/home", username, "work", "data", "results",
+                                    context_name, prep, "figures")
+
+        if ( !file.exists(zumi_plot_dir) ) {
+            dir.create(zumi_plot_dir)
+        }
+        #study_number <- str_extract_all(SampMetrics[[i]][["SampleNames"]][1][1], "S\\d+")
+        batch_size <- 12
+        plot_batches <- ceiling(ncol(udf)/batch_size)
+        if ( plot_batches < 2 ) {
+            zumi_plotname <- file.path(zumi_plot_dir, paste0("zumi_plot_", study_number, ".pdf"))
+            pdf(zumi_plotname)
+            zFPKMPlot(udf, min_thresh=min(udf), assayName="UMI")
+            dev.off()
+        } else {
+            print(ncol(udf))
+            for ( j in 1:(plot_batches-1) ) {
+                breakout <- FALSE
+                zumi_plotname <- file.path(zumi_plot_dir, paste0("zumi_plot_", study_number, "_", j, ".pdf"))
+                pdf(zumi_plotname)
+                samps <- c()
+                jmin <- (batch_size*(j-1))+1
+                jmax <- batch_size*j
+                samps <- jmin:jmax
+
+                while ( samps[length(samps)] > ncol(udf) ) {
+                  samps <- samps[1:length(samps)-1]
+                }
+                zFPKMPlot(
+                  udf[,samps],
+                  min_thresh=0,
+                  assayName="UMI"
+                )
+                dev.off()
+            }
+        }
+
+
+        #inames <- rownames(zmat)
+        min.samples <- round(N_exp * ncol(zmat)) # min number of samples for active
+        top.samples <- round(N_top * ncol(zmat)) # top number of samples for high-confidence
+
+        f1 <- genefilter::kOverA(min.samples, cutoff)
+        flist <- genefilter::filterfun(f1)
+        keep <- genefilter::genefilter(zmat, flist)
+        SampMetrics[[i]][["Entrez"]] <- ent[keep]
+
+        # top percentile genes
+        f1_top <- genefilter::kOverA(top.samples, cutoff)
+        flist_top <- genefilter::filterfun(f1_top)
+        keep_top <- genefilter::genefilter(zmat, flist_top)
+
+        SampMetrics[[i]][["Entrez_hc"]] <- ent[keep_top]
+
+    }
+
+    return(SampMetrics)
 }
 
 
-save_rnaseq_tests <- function(counts_matrix_file, config_file, out_file, info_file, model_name,
-                            replicate_ratio=0.5, batch_ratio=0.5, replicate_ratio_high=0.9, batch_ratio_high=0.9,
-                            technique="quantile", quantile=0.9, min_count=10) {
+filter_counts <- function(SampMetrics, technique, filt_options, context_name, prep) {
+
+    switch(technique,
+         cpm = cpm_filter(SampMetrics, filt_options, context_name, prep),
+         zfpkm = zfpkm_filter(SampMetrics, filt_options, context_name, prep),
+         quantile = TPM_quant_filter(SampMetrics, filt_options, context_name, prep),
+         umi = umi_filter(SampMetrics, filt_options, context_name))
+}
+
+
+save_rnaseq_tests <- function(counts_matrix_file, config_file, out_file, info_file, context_name, prep="total",
+                              replicate_ratio=0.5, batch_ratio=0.5, replicate_ratio_high=0.9, batch_ratio_high=0.9,
+                              technique="quantile", quantile=0.9, min_count=10) {
 
       # condense filter options
       filt_options <- list()
@@ -413,11 +517,16 @@ save_rnaseq_tests <- function(counts_matrix_file, config_file, out_file, info_fi
           filt_options$batch_ratio_high <- 0.9
       }
 
+      if ( prep == "scrna" ) {
+        technique = "umi"
+        print("Note: Single cell filtration does not normalize and assumes counts are counted with UMI")
+      }
+
       print("Reading Counts Matrix")
-      SampMetrics <- read_counts_matrix(counts_matrix_file, config_file, info_file, model_name) # read count matrix
+      SampMetrics <- read_counts_matrix(counts_matrix_file, config_file, info_file, context_name) # read count matrix
       entrez_all <- SampMetrics[[1]][["Entrez"]] #get entrez ids
       print("Filtering Counts")
-      SampMetrics <- filter_counts(SampMetrics, technique, filt_options, model_name) # normalize and filter count
+      SampMetrics <- filter_counts(SampMetrics, technique, filt_options, context_name, prep) # normalize and filter count
       expressedGenes <- c()
       topGenes <- c()
 

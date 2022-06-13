@@ -15,6 +15,8 @@ from troppo.methods.reconstruction.imat import IMAT, IMATProperties
 from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
 from project import configs
 
+sys.setrecursionlimit(1500)  # for re.search
+
 
 def correct_bracket(rule, name):
     """
@@ -105,10 +107,11 @@ def gene_rule_evaluable(expression_in):
 
 def set_boundaries(model_cobra, bound_rxns, bound_lb, bound_ub):
     all_rxns = model_cobra.reactions  # get all reactions
+    bound_rm_rxns = []
 
     # get boundary reactions
     exchange_rxns = [rxn.id for rxn in all_rxns if re.search("EX_", rxn.id)]
-    sink_rxns = [rxn.id for rxn in all_rxns if re.search("SK_", rxn.id)]
+    sink_rxns = [rxn.id for rxn in all_rxns if re.search("sink_", rxn.id)]
     demand_rxns = [rxn.id for rxn in all_rxns if re.search("DM_", rxn.id)]
 
     # set flag that allows all boundary reactions to be used if none are given
@@ -121,46 +124,41 @@ def set_boundaries(model_cobra, bound_rxns, bound_lb, bound_ub):
     if not allow_all_boundary_rxns:
 
         for i, rxn in enumerate(sink_rxns):  # set sinks to 0
-            if rxn not in bound_rxns:  # exchange file
-                getattr(model_cobra.reactions, rxn).lower_bound = 0.0
-            else:
+            if rxn not in bound_rxns:  # only allow sink accumulation
+                getattr(model_cobra.reactions, rxn).lower_bound = 0
+                getattr(model_cobra.reactions, rxn).upper_bound = 1000
+            else:  # set from file
                 getattr(model_cobra.reactions, rxn).lower_bound = bound_lb[i]
                 getattr(model_cobra.reactions, rxn).upper_bound = bound_ub[i]
 
         for i, rxn in enumerate(demand_rxns):
-            if rxn not in bound_rxns:  # exchange file
-                getattr(model_cobra.reactions, rxn).upper_bound = 0.0
+            if rxn not in bound_rxns:  # demand is one way - outside the system
+                getattr(model_cobra.reactions, rxn).lower_bound = 0
+                getattr(model_cobra.reactions, rxn).upper_bound = 1000
             else:
-                getattr(model_cobra.reactions, rxn).lower_bound = bound_lb[i]
+                getattr(model_cobra.reactions, rxn).lower_bound = 0
+                getattr(model_cobra.reactions, rxn).upper_bound = bound_ub[i]
 
         # Reaction media
         medium = model_cobra.medium  # get reaction media to modify
-        for (
-            rxn
-        ) in (
-            exchange_rxns
-        ):  # open exchanges from exchange file, close unspecified exchanges
+        for (rxn) in (exchange_rxns):  # open exchanges from exchange file, close unspecified exchanges
             if rxn not in bound_rxns:
                 medium[rxn] = 0.0
             else:
                 medium[rxn] = -float(bound_lb[bound_rxns.index(rxn)])
 
         model_cobra.medium = medium  # set new media
-        imat_rm_rxns = [
-            rxn for rxn in exchange_rxns + sink_rxns if rxn not in bound_rxns
-        ]
+        #bound_rm_rxns = [
+        #    rxn for rxn in exchange_rxns + sink_rxns if rxn not in bound_rxns
+        #]
 
-        return model_cobra, imat_rm_rxns
+        return model_cobra, bound_rm_rxns
 
 
 def feasibility_test(model_cobra, step):
     # check number of unsolvable reactions for reference model under media assumptions
-    model_cobra_rm = cobra.flux_analysis.fastcc(
-        model_cobra
-    )  # create flux consistant model (rmemoves some reactions)
-    incon_rxns = set(model_cobra.reactions.list_attr("id")) - set(
-        model_cobra_rm.reactions.list_attr("id")
-    )
+    model_cobra_rm = cobra.flux_analysis.fastcc(model_cobra)  # create flux consistant model (rmemoves some reactions)
+    incon_rxns = set(model_cobra.reactions.list_attr("id")) - set(model_cobra_rm.reactions.list_attr("id"))
     incon_rxns_cnt = len(incon_rxns)
 
     if step == "before_seeding":
@@ -168,7 +166,6 @@ def feasibility_test(model_cobra, step):
             f"Under given boundary assumptions, there are {str(incon_rxns_cnt)} infeasible reactions in the "
             "reference model.\n"
         )
-
         print(
             "These reactions will not be considered active in context specific model construction. If any infeasible "
             "reactions are found to be active according to expression data, or, are found in the force reactions "
@@ -179,7 +176,6 @@ def feasibility_test(model_cobra, step):
             "according to your expression data, it is likely that you are missing some critical exchange (media) "
             "reactions.\n"
         )
-
     else:
         print(
             f"Under given boundary assumptions, with infeasible reactions from the general model not considered "
@@ -239,7 +235,10 @@ def seed_imat(
     print("expr_vector:")
     print(expr_vector[:10])
     properties = IMATProperties(
-        exp_vector=expr_vector, exp_thresholds=expr_thesh, core=idx_force, epsilon=0.01
+        exp_vector=expr_vector,
+        exp_thresholds=expr_thesh,
+        core=idx_force,
+        epsilon=0.01
     )
     print("Set props")
     algorithm = IMAT(s_matrix, lb, ub, properties)
@@ -251,26 +250,18 @@ def seed_imat(
     context_cobra_model = cobra_model.copy()
     r_ids = [r.id for r in context_cobra_model.reactions]
     pd.DataFrame({"rxns": r_ids}).to_csv(os.path.join(configs.datadir, "rxns_test.csv"))
-    remove_rxns = [
-        r_ids[int(i)] for i in range(s_matrix.shape[1]) if not np.isin(i, context_rxns)
-    ]
-    fluxes.to_csv(os.path.join(configs.datadir, "flux_test.csv"))
+    remove_rxns = [r_ids[int(i)] for i in range(s_matrix.shape[1]) if not np.isin(i, context_rxns)]
     flux_df = pd.DataFrame(columns=["rxn", "flux"])
     for idx, (_, val) in enumerate(fluxes.items()):
         if idx <= len(cobra_model.reactions) - 1:
-            r_id = str(context_cobra_model.reactions.get_by_id(r_ids[idx])).split(":")[
-                0
-            ]
+            r_id = str(context_cobra_model.reactions.get_by_id(r_ids[idx])).split(":")[0]
             getattr(context_cobra_model.reactions, r_id).fluxes = val
             flux_df.loc[len(flux_df.index)] = [r_id, val]
 
     print("removing")
     context_cobra_model.remove_reactions(remove_rxns, True)
-    flux_df.to_csv(
-        os.path.join(configs.datadir, "results", context_name, "iMAT_flux.csv")
-    )
     print("done")
-    return context_cobra_model
+    return context_cobra_model, flux_df
 
 
 def seed_tinit(cobra_model, s_matrix, lb, ub, expr_vector, solver, idx_force):
@@ -354,7 +345,9 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm):
     else:
         unknown_val = 1
 
+    test_counter = 0
     for rxn in model_cobra.reactions:
+        test_counter+=1
         gene_reaction_rule = correct_bracket(
             rxn.gene_reaction_rule, rxn.gene_name_reaction_rule
         )
@@ -373,7 +366,6 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm):
             gene_reaction_rule = gene_reaction_rule.replace(
                 " {} ".format(gid), rep_val, 1
             )
-
         try:
             gene_reaction_by_rule = gene_rule_evaluable(gene_reaction_rule)
             gene_reaction_by_rule = gene_reaction_by_rule.strip()
@@ -400,7 +392,7 @@ def create_context_specific_model(
     solver,
     context_name,
     low_thresh=-3,
-    high_thresh=0,
+    high_thresh=-1
 ):
     """
     Seed a context specific model. Core reactions are determined from GPR associations with gene expression logicals.
@@ -417,36 +409,41 @@ def create_context_specific_model(
     else:
         raise NameError("reference model format must be .xml, .mat, or .json")
 
-    cobra_model.objective = {
-        getattr(cobra_model.reactions, objective): 1
-    }  # set objective
+    cobra_model.objective = {getattr(cobra_model.reactions, objective): 1}  # set objective
+
+    if objective not in force_rxns:
+        force_rxns.append(objective)
 
     # set boundaries
-    cobra_model, imat_rm_rxns = set_boundaries(
+    cobra_model, bound_rm_rxns = set_boundaries(
         cobra_model, bound_rxns, bound_lb, bound_ub
     )
-    if len(imat_rm_rxns) > 0 and recon_algorithm == "IMAT":
-        cobra_model.remove_reactions(imat_rm_rxns, True)
+
 
     # set solver
-    #cobra_model.solver = solver.lower()
+    cobra_model.solver = solver.lower()
+
+    #if len(bound_rm_rxns) > 0:
+    #    cobra_model.remove_reactions(bound_rm_rxns, True)
+    #    print(f"Removed {len(bound_rm_rxns)} unused boundary reactions")
 
     # check number of unsolvable reactions for reference model under media assumptions
     incon_rxns, cobra_model = feasibility_test(cobra_model, "before_seeding")
 
+    print("read cobamp")
     # CoBAMP methods
-    cobamp_model = COBRAModelObjectReader(
-        cobra_model
-    )  # load model in readable format for CoBAMP
+    cobamp_model = COBRAModelObjectReader(cobra_model)  # load model in readable format for CoBAMP
+    print("Get irr")
     cobamp_model.get_irreversibilities(True)
+    print("get stoch")
     s_matrix = cobamp_model.get_stoichiometric_matrix()
+    print("get bounds")
     lb, ub = cobamp_model.get_model_bounds(False, True)
+    print("get rx names")
     rx_names = cobamp_model.get_reaction_and_metabolite_ids()[0]
-
+    print("map")
     # get expressed reactions
-    expression_rxns, expr_vector = map_expression_to_rxn(
-        cobra_model, gene_expression_file, recon_algorithm
-    )
+    expression_rxns, expr_vector = map_expression_to_rxn(cobra_model, gene_expression_file, recon_algorithm)
 
     # expressed_rxns = list({k: v for (k, v) in expression_rxns.items() if v > 0}.keys())
 
@@ -473,7 +470,9 @@ def create_context_specific_model(
             infeas_force_rxns.append(rxn)
 
         # make changes to expressed reactions base on user defined force/exclude reactions
-        if rxn in force_rxns or rxn == objective:
+        #TODO: if not using bound reactions file, add two sets of exchange reactoins to be put in either low or mid bin
+
+        if rxn in force_rxns:
             expr_vector[idx] = (
                 high_thresh + 0.1 if recon_algorithm in ["TINIT", "IMAT"] else 1
             )
@@ -484,10 +483,17 @@ def create_context_specific_model(
 
     idx_obj = rx_names.index(objective)
     idx_force = [rx_names.index(rxn) for rxn in force_rxns if rxn in rx_names]
+    print("idx_force")
+    print(idx_force)
     exp_idx_list = [idx for (idx, val) in enumerate(expr_vector) if val > 0]
     exp_thresh = (low_thresh, high_thresh)
 
     print("build that shiz yo")
+    print("length:")
+    print("ub: ", len(ub))
+    print("lb: ", len(lb))
+    print("exp_vec: ", len(expr_vector))
+    print("reactoins in model: ", len(cobra_model.reactions))
 
     # switch case dictionary runs the functions making it too slow, better solution then elif ladder?
     if recon_algorithm == "GIMME":
@@ -499,14 +505,14 @@ def create_context_specific_model(
             cobra_model, s_matrix, lb, ub, exp_idx_list, solver
         )
     elif recon_algorithm == "IMAT":
-        context_model_cobra = seed_imat(
+        context_model_cobra, flux_df = seed_imat(
             cobra_model,
             s_matrix,
             lb,
             ub,
-            exp_idx_list,
+            expr_vector,
             exp_thresh,
-            idx_force.append(idx_obj),
+            idx_force,
             context_name,
         )
     elif recon_algorithm == "TINIT":
@@ -522,6 +528,14 @@ def create_context_specific_model(
     incon_rxns_cs, context_model_cobra = feasibility_test(
         context_model_cobra, "after_seeding"
     )
+    if recon_algorithm == "IMAT":
+        final_rxns = [rxn.id for rxn in context_model_cobra.reactions]
+        imat_rxns = flux_df.rxn
+        for rxn in imat_rxns:
+            if rxn not in final_rxns:
+                flux_df = flux_df[flux_df.rxn != rxn]
+
+        flux_df.to_csv(os.path.join(configs.datadir, "results", context_name, "iMAT_flux.csv"))
 
     incon_df = pd.DataFrame({"general_infeasible_rxns": list(incon_rxns)})
     infeas_exp_df = pd.DataFrame({"expressed_infeasible_rxns": infeas_exp_rxns})
@@ -692,6 +706,8 @@ def main():
     if not os.path.exists(genefile):
         raise FileNotFoundError(f"Active genes file not found at {genefile}")
 
+    print(f"Active genes file found at {genefile}")
+
     if bound_rxns_file:
         try:
             print(f"Reading {bound_rxns_file} for boundary reactions")
@@ -832,7 +848,6 @@ def main():
     print(
         f"Constructing model of {context_name} with {recon_alg} reconstruction algorithm using {solver} solver"
     )
-    outfile_basename = context_name + "_SpecificModel"
 
     context_model, core_list, infeas_df = create_context_specific_model(
         reference_model,
@@ -871,7 +886,7 @@ def main():
             index=False,
         )
     if "mat" in output_filetypes:
-        outputfile = outfile_basename + ".mat"
+        outputfile = f"{context_name}_SpecificModel_{recon_alg}.mat"
         print(f"Output file is '{outputfile}'")
         # cobra.io.mat.save_matlab_model(context_model, os.path.join(configs.rootdir, 'data', outputfile))
         cobra.io.save_matlab_model(
@@ -879,14 +894,14 @@ def main():
             os.path.join(configs.datadir, "results", context_name, outputfile),
         )
     if "xml" in output_filetypes:
-        outputfile = outfile_basename + ".xml"
+        outputfile = f"{context_name}_SpecificModel_{recon_alg}.xml"
         print(f"Output file is '{outputfile}'")
         cobra.io.write_sbml_model(
             context_model,
             os.path.join(configs.datadir, "results", context_name, outputfile),
         )
     if "json" in output_filetypes:
-        outputfile = outfile_basename + ".json"
+        outputfile = f"{context_name}_SpecificModel_{recon_alg}.json"
         print(f"Output file is '{outputfile}'")
         cobra.io.save_json_model(
             context_model,
@@ -898,6 +913,7 @@ def main():
     print("Number of Reactions: " + str(len(context_model.reactions)))
     print(context_model.objective._get_expression())
     print(context_model.optimize())
+    print("len rxns: ", len(context_model.reactions))
     return None
 
 

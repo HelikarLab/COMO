@@ -288,9 +288,7 @@ def mergeLogicalTable(df_results):
 
     # df_results.reset_index(inplace=True)
     for merged_entrez_id, entrez_dups_list in entrez_dups_dict.items():
-        df_results["ENTREZ_GENE_ID"].replace(
-            to_replace=entrez_dups_list, value=merged_entrez_id, inplace=True
-        )
+        df_results["ENTREZ_GENE_ID"].replace(to_replace=entrez_dups_list, value=merged_entrez_id, inplace=True)
     # df_results.drop_duplicates(subset=['ENTREZ_GENE_ID'], keep='first', inplace=True)
     df_results.set_index("ENTREZ_GENE_ID", inplace=True)
 
@@ -307,8 +305,8 @@ def mergeLogicalTable(df_results):
     
     I am unsure what to do in this situation
     """
-    return df_output.astype(int)
-    # return df_output
+    #return df_output.astype(int)
+    return df_output
 
 
 def load_microarray_tests(filename, context_name):
@@ -337,7 +335,7 @@ def load_microarray_tests(filename, context_name):
 
     filename = "Microarray_{}.csv".format(context_name)
     fullsavepath = os.path.join(
-        configs.rootdir, "data", "results", context_name, filename
+        configs.rootdir, "data", "results", context_name, "microarray", filename
     )
     if os.path.isfile(fullsavepath):
         data = pd.read_csv(fullsavepath, index_col="ENTREZ_GENE_ID")

@@ -22,7 +22,7 @@ dirlist = currentdir.split("/")
 # Find the "pipelines" directory
 split_index = 1
 for directory in dirlist:
-    if directory != "pipelines":
+    if directory != "work":
         split_index += 1
     else:
         break

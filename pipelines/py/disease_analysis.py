@@ -153,21 +153,20 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
     return diff_exp_df, gse_id
 
 
-def get_rnaseq_diff_gene_exp(config_filepath, disease_name, tissue_name, min_lfc, taxon_id):
+def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_id):
     """
     Get differential gene expression for RNA-seq data
     
     param: config_filepath - string, path to microarray formatted disease configuration xlsx file
     param: disease_name - string, disease name which should correspond to sheet name in disease config xlsx file
-    param: tissue_name - string, tissue name which should correspond to folder in 'results' folder
-    param: min_lfc - float, minimum fold-change for significance
+    param: context_name - string, context name which should correspond to folder in 'results' folder
     
     return: dataframe with fold changes, FDR adjusted p-values, 
     """
-    count_matrix_filename = "".join(["gene_counts_matrix_", disease_name, "_", tissue_name, ".csv"])
+    count_matrix_filename = "".join(["gene_counts_matrix_", disease_name, "_", context_name, ".csv"])
     count_matrix_path = os.path.join(configs.datadir,
                                      "data_matrices",
-                                     tissue_name,
+                                     context_name,
                                      "disease",
                                      count_matrix_filename
                                      )
@@ -179,7 +178,7 @@ def get_rnaseq_diff_gene_exp(config_filepath, disease_name, tissue_name, min_lfc
               f"with the correct name.")
         sys.exit()
 
-    diff_exp_df = DGEio.DGE_main(count_matrix_path, config_filepath, tissue_name, disease_name, min_lfc)
+    diff_exp_df = DGEio.DGE_main(count_matrix_path, config_filepath, context_name, disease_name)
     diff_exp_df = ro.conversion.rpy2py(diff_exp_df)
     gse_id = "rnaseq"
 
@@ -198,7 +197,7 @@ def get_rnaseq_diff_gene_exp(config_filepath, disease_name, tissue_name, min_lfc
     return diff_exp_df, gse_id
 
 
-def write_outputs(diff_exp_df, gse_id, tissue_name, disease_name, data_source, min_lfc, target_path):
+def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, target_path):
     search_col = "Ensembl" if data_source == "RNASEQ" else "Affy"
     diff_exp_df["logFC"].astype(float)
     diff_exp_df["abs_logFC"] = diff_exp_df["logFC"].abs()
@@ -207,8 +206,7 @@ def write_outputs(diff_exp_df, gse_id, tissue_name, disease_name, data_source, m
     print(diff_exp_df.head())
 
     diff_exp_df.sort_values(by="abs_logFC", ascending=False, inplace=True)
-    regulated = diff_exp_df[diff_exp_df["abs_logFC"] >= min_lfc]
-    regulated = regulated[regulated["FDR"] < 0.05]
+    regulated = diff_exp_df[diff_exp_df["FDR"] < 0.05]
     down_regulated = regulated[regulated["logFC"] < 0]
     up_regulated = regulated[regulated["logFC"] > 0]
     diff_exp_df["regulated"] = [
@@ -221,7 +219,7 @@ def write_outputs(diff_exp_df, gse_id, tissue_name, disease_name, data_source, m
         configs.rootdir,
         "data",
         "results",
-        tissue_name,
+        context_name,
         disease_name,
         f"Disease_UP_{gse_id}.txt"
     )
@@ -231,7 +229,7 @@ def write_outputs(diff_exp_df, gse_id, tissue_name, disease_name, data_source, m
         configs.rootdir,
         "data",
         "results",
-        tissue_name,
+        context_name,
         disease_name,
         f"Disease_DOWN_{gse_id}.txt"
     )
@@ -249,7 +247,7 @@ def write_outputs(diff_exp_df, gse_id, tissue_name, disease_name, data_source, m
         configs.rootdir,
         "data",
         "results",
-        tissue_name,
+        context_name,
         disease_name,
         f"Raw_Fit_{gse_id}.csv",
     )
@@ -269,7 +267,7 @@ def write_outputs(diff_exp_df, gse_id, tissue_name, disease_name, data_source, m
         configs.rootdir,
         "data",
         "results",
-        tissue_name,
+        context_name,
         disease_name,
         "step2_results_files.json",
     )
@@ -305,11 +303,11 @@ def main(argv):
     )
     parser.add_argument(
         "-t",
-        "--tissue-name",
+        "--context-name",
         type=str,
         required=True,
-        dest="tissue_name",
-        help="The type of tissue being used",
+        dest="context_name",
+        help="The type of context being used",
     )
     parser.add_argument(
         "-s",
@@ -318,15 +316,6 @@ def main(argv):
         required=True,
         dest="data_source",
         help="Source of data being used, either rnaseq or microarray"
-    )
-    parser.add_argument(
-        "-f",
-        "--min-log-fold-change",
-        type=float,
-        required=False,
-        default=1.0,
-        dest="min_lfc",
-        help="Minimum absolute fold-change for significance."
     )
     parser.add_argument(
         "-i",
@@ -338,10 +327,9 @@ def main(argv):
     )
 
     args = parser.parse_args()
-    tissue_name = args.tissue_name
+    context_name = args.context_name
     config_file = args.config_file
     data_source = args.data_source.upper()
-    min_lfc = args.min_lfc
     taxon_id = args.taxon_id
 
     if data_source == "RNASEQ":
@@ -381,12 +369,12 @@ def main(argv):
         if data_source == "MICROARRAY":
             diff_exp_df, gse_id = get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, taxon_id)
         elif data_source == "RNASEQ":
-            diff_exp_df, gse_id = get_rnaseq_diff_gene_exp(config_filepath, disease_name, tissue_name, min_lfc, taxon_id)
+            diff_exp_df, gse_id = get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_id)
         else:
             print("data_source should be either 'microarray' or 'rnaseq'")
             print("Refer to example config file for either type for formatting")
             sys.exit(2)
-        write_outputs(diff_exp_df, gse_id, tissue_name, disease_name, data_source, min_lfc, target_path)
+        write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, target_path)
 
 
 if __name__ == "__main__":

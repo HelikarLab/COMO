@@ -1,4 +1,12 @@
-zz <- file(file.path("/home", "jupyteruser", "work", "py", "rlogs", "DGE.Rout"), open="wt")
+# Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
+username <- Sys.info()["user"]
+work_dir <- str_interp("/home/${username}/work")
+
+if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
+    dir.create(str_interp("${work_dir}/py/rlogs"))
+}
+
+zz <- file(file.path("/home", username, "work", "py", "rlogs", "DGE.Rout"), open="wt")
 sink(zz, type="message")
 
 
@@ -45,7 +53,7 @@ readCountMatrix <- function(cmat_file, config_file, disease_name) {
 }
 
 
-dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name, min_lfc) {
+dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name) {
   gene_list <- SampMetrics[[1]][[1]][["Ensembl"]]
   
   df <- data.frame(Ensembl=gene_list)
@@ -67,15 +75,15 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name, min_l
   
   tmm <- cpm(dgList)
 
-  dir.create(file.path("/home", "jupyteruser", "work", "data", "results", tissue_name, disease_name),
+  dir.create(file.path("/home", username, "work", "data", "results", tissue_name, disease_name),
              showWarnings = FALSE
   )
   write.csv(cbind(ensembl,tmm),
-            file.path("/home", "jupyteruser", "work", "data", "results", tissue_name, disease_name, "TMM_Matrix.csv")
+            file.path("/home", username, "work", "data", "results", tissue_name, disease_name, "TMM_Matrix.csv")
   )
 
   # MDS Plot
-  plotname <- file.path("/home", "jupyteruser", "work", "data", "results", tissue_name, disease_name, "MDS_plot.jpg")
+  plotname <- file.path("/home", username, "work", "data", "results", tissue_name, disease_name, "MDS_plot.jpg")
   title <- "DGEList Multi-Dimensional Scaling"
   jpeg(plotname)
   lab <- colnames(df)
@@ -87,7 +95,7 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name, min_l
   colnames(designMat) <- levels(dgList$samples$group)
   
   # BCV plot
-  plotname <- file.path("/home", "jupyteruser", "work", "data", "results", tissue_name, disease_name, "BCV_plot.jpg")
+  plotname <- file.path("/home", username, "work", "data", "results", tissue_name, disease_name, "BCV_plot.jpg")
   title <- "DGEList Biological Coefficient of Variation"
   dgList <- estimateGLMCommonDisp(dgList, design=designMat)
   dgList <- estimateGLMTrendedDisp(dgList, design=designMat)
@@ -117,10 +125,10 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name, min_l
     names(expTab)[names(expTab) == "genes"] <- "Ensembl"
     #expTab <- expTab[,deGenes==TRUE]
     #write.csv(expTab,
-    #          file.path("/home", "jupyteruser", "work", "data", "results", tissue_name, disease_name, "DiffExp.csv")
+    #          file.path("/home", username, "work", "data", "results", tissue_name, disease_name, "DiffExp.csv")
     #)
     # smear plot
-    plotname <- file.path("/home", "jupyteruser", "work", "data", "results", tissue_name, disease_name, "smear_plot.jpg")
+    plotname <- file.path("/home", username, "work", "data", "results", tissue_name, disease_name, "smear_plot.jpg")
     title <- paste0("DGEList Smear Plot ", test_cell)
     jpeg(plotname)
     plotSmear(qlf, de.tags=deGenes, main=title)
@@ -131,7 +139,7 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name, min_l
 }
 
 
-DGE_main <- function(cmat_file, config_file, context_name, disease_name, min_lfc) {
+DGE_main <- function(cmat_file, config_file, context_name, disease_name) {
   print("Reading Counts Matrix")
   test_name <- cmat_file
   test_name <-unlist(strsplit(test_name, "_RawCounts"))[1]
@@ -140,6 +148,6 @@ DGE_main <- function(cmat_file, config_file, context_name, disease_name, min_lfc
   SampMetrics <- readCountMatrix(cmat_file, config_file, disease_name)
   ensembl_all <- SampMetrics[[1]][[1]][["Ensembl"]]
   print("Performing DGE")
-  data_table <- dgeAnalysis(SampMetrics, test_name, context_name, disease_name, min_lfc)
+  data_table <- dgeAnalysis(SampMetrics, test_name, context_name, disease_name)
   return(data_table)
 }
