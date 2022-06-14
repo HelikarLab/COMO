@@ -5,7 +5,6 @@ import argparse
 import Crux
 import csv
 from FileInformation import FileInformation
-from FileInformation import clear_print
 import FTPManager
 import os
 import sys
@@ -27,32 +26,50 @@ class ParseCSVInput:
     This class is responsible for parsing the input CSV into two fields
     1. proteomeXchange URLs
     2. Cell Type
+    3. Replicate (optional)
     
     This class is meant to make it easier to access each of these things
+    
+    
+    {
+        "naiveB": {
+            "url": [one, two, three],
+            "replicate": [A, B, C],
+        },
+        "nucleophile": {
+            "url": [four, five, six],
+            "replicate": [D, E, F],
+        }
+    }
     """
     def __init__(self, input_csv_file: Path):
         self._input_csv_file: Path = input_csv_file
-        self._data: [str, list[str]] = {}
+        self._data: [str, dict[str, list[str]]] = {}
         
         # Get data from CSV
         with open(self._input_csv_file, "r") as i_stream:
             reader = csv.reader(i_stream)
-            header = next(reader)
+            next(reader)
             for line in reader:
-                if line[0][0] == "#":  # Skip 'comments'
+                if line == "" or line[0][0] == "#":  # Skip 'comments' and empty lines
                     continue
                 else:
                     url = line[0]
                     cell_type = line[1]
+                    try:
+                        study = line[2]
+                    except IndexError:
+                        study = ""
                     
                     if cell_type not in self._data:
-                        self._data[cell_type] = []
+                        self._data[cell_type] = {"url": [], "study": []}
                     
-                    self._data[cell_type].append(url)
+                    self._data[cell_type]["url"].append(url)
+                    self._data[cell_type]["study"].append(study)
 
         # Convert from 'old' /pride/data/archive to 'new' /pride-archive
         for key in self._data:
-            urls = self._data[key]
+            urls = self._data[key]["url"]
             for i, url in enumerate(urls):
                 urls[i] = url.replace("/pride/data/archive", "/pride-archive")
         
@@ -63,9 +80,10 @@ class ParseCSVInput:
         
         Example: ftp://ftp.my_server.com
         """
-        urls: list[str] = []
-        for values in self._data.values():
-            urls.extend(values)
+        master_urls: list[str] = []
+        for cell_type in self._data.keys():
+            urls = self._data[cell_type]["url"]
+            master_urls.extend(urls)
         
         return urls
     
@@ -76,22 +94,40 @@ class ParseCSVInput:
         TODO: Match folder paths to correlate S1R1, S1R2, etc.?
         """
         cell_types: list[str] = []
-        for key, values in self._data.items():
-            cell_types.extend([key] * len(values))
+        for key in self._data.keys():
+            # Get the number of URLs per cell type to find the amount of cell types input
+            num_urls: int = len(self._data[key]["url"])
+            cell_types.extend([key] * num_urls)
         return cell_types
     
     @property
-    def csv_dict(self) -> dict[str, list[str]]:
+    def studies(self) -> list[str]:
+        """
+        This will return the replicates as defined in the input CSV file
+        """
+        master_studies: list[str] = []
+        for cell_type in self._data.keys():
+            replicates = self._data[cell_type]["replicate"]
+            master_studies.extend(replicates)
+        return master_studies
+    
+    @property
+    def csv_dict(self) -> dict[str, dict[str, list[str]]]:
         """
         This function returns the data dictionary
         It contains data in the following format
         {
-            CELL_TYPE_1: ["ftp_url_1", "ftp_url_2"]
-            CELL_TYPE_2: ["ftp_url_3", "ftp_url_4"]
+            CELL_TYPE_1: {
+                "url": ["url_one", "url_two", 'url_three', "url_four"],
+                "replicate": ["S1R1", "S1R2", "S2R1", "S3R1"]
+            },
+            CELL_TYPE_2: {
+                "url": ["url_five", "url_six", 'url_seven', "url_eight"],
+                "replicate": ["S1R1", "S1R2", "S2R1", "S2R2"]
+            }
         }
         """
         return self._data
-
 
 class PopulateInformation:
     def __init__(
@@ -104,68 +140,146 @@ class PopulateInformation:
     ):
         self.file_information: list[FileInformation] = file_information
         self._csv_data: ParseCSVInput = csv_data
-        self._csv_dict: dict[str, list[str]] = csv_data.csv_dict
+        self._csv_data: dict[str, dict[str, list[str]]] = csv_data.csv_dict
+        self._skip_download: bool = skip_download
 
         # Set default value for extensions to search for
         self._preferred_extensions: list[str] = preferred_extensions
-        
         if self._preferred_extensions is None:
             self._preferred_extensions = ["raw"]
         
+        self._gather_data()
+        self._new_set_replicate_numbers()
+        
+        if self._skip_download is False:
+            self.print_download_size()
+            
+    def _gather_data(self):
         # Iterate through the cell type and corresponding list of URLS
         # cell_type: naiveB
         # ftp_urls: ["url_1", "url_2"]
-        for i, (cell_type, ftp_urls) in enumerate(self._csv_dict.items()):
-            # Print some output to the screen
-            total_ftp_links: int = len(self._csv_dict[cell_type])
+        for i, cell_type in enumerate(self._csv_data.keys()):
+            ftp_urls: list[str] = self._csv_data[cell_type]["url"]
+            studies: list[str] = self._csv_data[cell_type]["study"]
             url_count = 0
+        
+            # Iterate through the URLs available
+            for j, (url, study) in enumerate(zip(ftp_urls, studies)):
             
-            # Iterate through the urls in ftp_urls
-            # url = "url_1"
-            for j, url in enumerate(ftp_urls):
+                # Print updates to he screen
+                print(
+                    f"\rParsing cell type {i + 1} of {len(self._csv_data.keys())} ({cell_type}) | {j + 1} of {len(ftp_urls)} folders navigated",
+                    end="",
+                    flush=True
+                )
                 
-                # Print update to the screen after every FTP link is navigated
-                print(f"\rParsing cell type {i + 1} of {len(self._csv_dict.keys())} ({cell_type}) | {j + 1} of {total_ftp_links} folders navigated", end="", flush=True)
-                
-                ftp_data: FTPManager.Reader = FTPManager.Reader(root_link=url, file_extensions=self._preferred_extensions)  # fmt: skip
-                
-                # Assuming url_1 is a directory, iterate through all files below it
-                # urls: url_1/["file_1", "file_2"]
-                # sizes: [size_1, size_2]
+                ftp_data: FTPManager.Reader = FTPManager.Reader(
+                    root_link=url,
+                    file_extensions=self._preferred_extensions
+                )
+            
                 urls = [url for url in ftp_data.files]
                 sizes = [size for size in ftp_data.file_sizes]
                 url_count += len(urls)
-                
+            
                 # Iterate through all files and sizes found for url_##
                 for k, (file, size) in enumerate(zip(urls, sizes)):
-                    replicate_name: str = f"S{j + 1}R{k + 1}"
+                    # Set the study if it was not set in the input CSV
+                    if study == "":
+                        replicate_name: str = f"S{j + 1}R{k + 1}"
+                    else:
+                        replicate_name: str = f"{study}R{k + 1}"
+                
                     self.file_information.append(
                         FileInformation(
                             cell_type=cell_type,
                             download_url=file,
                             file_size=size,
-                            replicate=replicate_name,
+                            study=study
                         )
                     )
-                    
+        
             # Print number of URLs found for each cell type
             # This is done after appending because some cell types may have more than 1 root URL, and it messes up the formatting
             if url_count == 1:
                 print(f" | 1 file found")
             else:
                 print(f" | {url_count} files found")
-                
-        # Print the download size if we are not skipping the download
-        if skip_download is False:
-            # Print the total size to download if we must download data
-            total_size: int = 0
-            for information in self.file_information:
-                total_size += information.file_size
             
-            # Convert to MB
-            total_size = total_size // 1024 ** 2
-            print(f"Total size to download: {total_size} MB")
+    def print_download_size(self):
+        # Print the total size to download if we must download data
+        total_size: int = 0
+        for information in self.file_information:
+            total_size += information.file_size
         
+        # Convert to MB
+        total_size = total_size // 1024 ** 2
+        print(f"Total size to download: {total_size} MB")
+        
+    def _set_replicate_numbers(self):
+        """
+        This function is responsible for setting the "R#" portion of each "S#R#" batch
+        This is done after all the data is gathered so each batch can be collated together
+        """
+        replicate_num: int = 1
+        for i, information in enumerate(self.file_information):
+            current_info = information
+            previous_info = self.file_information[i - 1] if i > 0 else None
+            
+            if i > 0:
+                print(f"Testing: {current_info.cell_type}_{current_info.study} - {previous_info.cell_type}_{previous_info.study}")
+            # Set the initial current_info replicate to 1
+            if i == 0:
+                replicate_value = f"R{replicate_num}"
+            # If the current info cell type and study match the previous, increment the replicate by one. Otherwise reset it to 1
+            elif current_info.cell_type == previous_info.cell_type and current_info.study == previous_info.study:
+                replicate_num += 1
+                replicate_value = f"R{replicate_num}"
+            else:
+                replicate_num = 1
+                replicate_value = f"R{replicate_num}"
+            
+            current_info.set_replicate(replicate_value)
+            
+    def _new_set_replicate_numbers(self):
+        instances: dict[str, list[FileInformation]] = {}
+        for information in self.file_information:
+            if information.cell_type not in instances.keys():
+                instances[information.cell_type] = FileInformation.filter_instances(information.cell_type)
+        
+        for cell_type in instances.keys():
+
+            replicate_num: int = 1
+            for i, file_information in enumerate(instances[cell_type]):
+                current_info: FileInformation = file_information
+                previous_info: FileInformation = instances[cell_type][i - 1] if i > 0 else None
+                
+                if i > 0:
+                    print(f"Testing: {current_info.cell_type}_{current_info.study} - {previous_info.cell_type}_{previous_info.study}")
+                
+                # Do not modify the replicate value if we are on the very first iteration of this cell type
+                if i == 0:
+                    pass
+                # If the current_info cell type and study match the previous, increment the replicate_num by one
+                elif current_info.cell_type == previous_info.cell_type and current_info.study == previous_info.study:
+                    replicate_num += 1
+                else:
+                    replicate_num: int = 1
+                    
+                replicate_value: str = f"R{replicate_num}"
+                current_info.set_replicate(replicate_value)
+                
+    def _collect_cell_type_information(self, cell_type: str) -> list[FileInformation]:
+        """
+        This function is responsible for collecting all FileInformation objects of a given cell type
+        """
+        file_information_list: list[FileInformation] = []
+        for information in self.file_information:
+            if information.cell_type == cell_type:
+                file_information_list.append(information)
+                
+        return file_information_list
+            
     
 def parse_args(args: list[str]) -> argparse.Namespace:
     """
@@ -318,28 +432,28 @@ def main(args: list[str]):
     # Download data if we should not skip anything
     if args.skip_download is False:
         # Start the download of FTP data
-        ftp_manager = FTPManager.Download(
+        FTPManager.Download(
             file_information=file_information,
             core_count=args.core_count,
         )
 
     if args.skip_mzml is False:
         # Convert raw to mzML and then create SQT files
-        raw_to_mzml = Crux.RAWtoMZML(
+        Crux.RAWtoMZML(
             file_information=file_information,
             core_count=args.core_count,
         )
 
     if args.skip_sqt is False:
         # Convert mzML to SQT
-        mzml_to_sqt = Crux.MZMLtoSQT(
+        Crux.MZMLtoSQT(
             file_information=file_information,
             fasta_database=args.database,
             core_count=args.core_count,
         )
 
     # Create CSV file from SQT files
-    conversion_manager = Crux.SQTtoCSV(
+    Crux.SQTtoCSV(
         file_information=file_information,
         core_count=args.core_count,
     )
