@@ -14,13 +14,6 @@ This is the home page for MADRID pipeline.
 - Run the notebook step by step, or run the step(s) by your needs
 
 
-
-
-
-
-
-
-
 ## Flow Charts
 ![1](./doc/flowchart1.png)
 
@@ -29,7 +22,6 @@ This is the home page for MADRID pipeline.
 ![3](./doc/step_3.jpg)
 
 ![4](./doc/step_4.jpg)
-
 
 
 ## Running pipeline: Example
