@@ -11,7 +11,6 @@ from ftplib import FTP
 import multiprocessing
 from multiprocessing.sharedctypes import Synchronized
 import numpy as np
-from pathlib import Path
 import time
 from urllib.parse import urlparse
 

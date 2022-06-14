@@ -240,7 +240,7 @@ class SQTtoCSV:
 
                     # Create a new row in the dataframe
                     average_intensities_dict["uniprot"].append(uniprot_id)
-                    average_intensities_dict[file_information.prefix].append(current_intensity)
+                    average_intensities_dict[file_information.batch].append(current_intensity)
             
             # Fill the "symbol" list with NA, as they are not converted yet
             average_intensities_dict["symbol"] = [np.nan] * len(average_intensities_dict["uniprot"])
@@ -292,7 +292,7 @@ class SQTtoCSV:
             # Create a new "index" column to reset the index of gene_symbols
             gene_symbols["index"] = range(lower_iteration, upper_iteration)
             gene_symbols.set_index("index", inplace=True, drop=True)
-            gene_symbols = pd.merge(gene_symbols, chunk[[file_information.prefix]], left_index=True, right_index=True)
+            gene_symbols = pd.merge(gene_symbols, chunk[[file_information.batch]], left_index=True, right_index=True)
             
             lower_iteration += len(chunk)
             file_information.intensity_df.update(gene_symbols)
