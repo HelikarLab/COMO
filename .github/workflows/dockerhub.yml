@@ -1,12 +1,14 @@
 name: Continuous Integration
 on:
-  push:
-    branches:
-      - 'bulk_dev'
-      - "master"
+# Remove "push" and instead build every day at midnight - this allows for multiple pushes to happen before building the image
+# Manually building the image is possible inside GitHub if needed
+#  push:
+#    branches:
+#      - 'bulk_dev'
+#      - "master"
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 0 * * *'  # Every day at midnight
 
 jobs:
   dockerhub:
