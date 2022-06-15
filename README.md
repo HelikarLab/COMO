@@ -1,5 +1,7 @@
 # MADRID: a pipeline for MetAbolic Drug Repurposing IDentification
 
+[![Continuous Integration](https://github.com/HelikarLab/MADRID/actions/workflows/dockerhub.yml/badge.svg)](https://github.com/HelikarLab/MADRID/actions/workflows/dockerhub.yml)
+
 This is the home page for MADRID pipeline.
 
 ## How To Run application
