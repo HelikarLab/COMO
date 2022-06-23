@@ -20,3 +20,6 @@ work/py/tests/.pytest_cache
 
 # Do not track output files
 /work/output
+
+# Local GitHub Pages build location
+/docs/_site
