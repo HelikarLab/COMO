@@ -1,0 +1,45 @@
+---
+---
+
+// Set colors for links
+// From: https://stackoverflow.com/a/10143495
+a.header-link:link {
+  color: white;
+  text-decoration: none;
+}
+
+a.header-link:visited {
+  color: white;
+  text-decoration: none;
+}
+
+a.header-link:hover {
+  color: lightgray;
+  text-decoration: none;
+}
+
+// "body" links, i.e. non-header links
+a.body-link:link {
+  color: #159957;
+  text-decoration: none;
+}
+
+a.body-link:visited {
+  color: #159957;
+  text-decoration: none;
+}
+
+// Make the hover link a little bit more obvious
+a.body-link:hover {
+  color: #159957;
+  text-decoration: underline;
+}
+
+table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+td {
+  width: 50%;
+}

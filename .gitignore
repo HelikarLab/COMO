@@ -24,3 +24,4 @@ work/py/tests/.pytest_cache
 # Local GitHub Pages build location
 /docs/_site
 **/.jekyll-cache
+/docs/Gemfile.lock

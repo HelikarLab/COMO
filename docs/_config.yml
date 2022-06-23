@@ -2,18 +2,20 @@
 remote_theme: "pages-themes/cayman@v0.2.0"
 plugins:
   - "jekyll-remote-theme"
+  - "jekyll-menus"
 
 title: "MADRID"
 description: "MADRID: Metabolic Drug Repurposing Identification"
 show_downloads: true
 
 github:
-  repository_name: "MADRID"
-  repository_url: "https://github.com/JoshLoecker/TestPages"
-  project_tagline: "My TagLine"
+  name: "MADRID"
+  url: "https://github.com/HelikarLab/MADRID"
+  tagline: ""
   brandt_url: "https://github.com/babessell1"
   josh_url: "https://github.com/JoshLoecker"
 
 docker:
-  repository_name: "babessell/madrid"
-  repository_url: "https://hub.docker.com/r/babessell/madrid"
+  name: "babessell/madrid"
+  tag: "development"
+  url: "https://hub.docker.com/r/babessell/madrid"
