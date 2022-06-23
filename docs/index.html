@@ -1,16 +1,85 @@
 ---
 layout: default
-title: Home
+title: MADRID
+description: Metabolic Drug Repurposing Identification
+menus:
+  header:
+    title: Home Menu
+    weight: 1
 ---
+<style>
 
-<h1>How to Run</h1>
-<p>Start by <a href="https://docs.docker.com/get-docker/">installing docker</a>.</p>
+</style>
+
+<h1 id="start-container"><a href="#start-container" class="body-link">Starting the Container</a></h1>
+<p><a href="https://docs.docker.com/get-docker/">Docker must be installed</a></p>
 <p>Then, execute the following tasks in a terminal download the container:</p>
-
 {% highlight bash %}
 docker login
 docker pull babessell/madrid:development
 {% endhighlight %}
 
+<p>Run the container:</p>
+{% highlight bash %}
+docker run \
+  --cpus=4 \
+  -p 4000:8888 \
+  --volume=$HOME/madrid/gurobi.lic:/opt/gurobi/gurobi.lic:ro \
+  --volume=$HOME/madrid/local_madrid:/home/jovyan/work/data/local_files \
+  --name madrid \
+  --rm \
+  --it \
+  "{{ site.docker.name }}:{{ site.docker.tag }}"
+{% endhighlight %}
 
-<p>Define a </p>
+<table style="text-align: center;" >
+  <tr>
+    <th>Option</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td>--cpus</td>
+    <td>Number of CPUs to use</td>
+  </tr>
+  <tr>
+    <td>-p</td>
+    <td>Port to use</td>
+  </tr>
+  <tr>
+    <td>--volume=$HOME/madrid/gurobi.lic</td>
+    <td>The file path of your <a href="https://www.gurobi.com/">Gurobi</a> license. This is a fast solver used in MADRID.</td>
+  </tr>
+  <tr>
+    <td>--volume=$HOME/madrid/local_madrid</td>
+    <td>The location of a "local files" folder, to easily access items within the MADRID container</td>
+  </tr>
+  <tr>
+    <td>--name</td>
+    <td>Name of the container</td>
+  </tr>
+  <tr>
+    <td>--rm</td>
+    <td>Remove the container after it is stopped</td>
+  </tr>
+  <tr>
+    <td>--it</td>
+    <td>Start the container interactively in the foreground</td>
+  </tr>
+  <tr>
+    <td>babessell/madrid:development</td>
+    <td>The container image to start</td>
+  </tr>
+</table>
+
+<h1 id="accessing-madrid"><a href="#accessing-madrid" class="body-link">Accessing MADRID</a></h1>
+<p>Navigate to <code><a href="http://localhost:4000">http://localhost:4000</a></code> from your browser. The <code>4000</code> port number should match that of the <code>-p</code> option entered in <a href="#start-container">Starting the Container</a> </p>
+
+<h1 id="working-in-notebook"><a href="#working-in-notebook" class="body-link">Working in the Notebook</a></h1>
+<p>Open the <a href="https://jupyter.org/">Jupyter Notebook</a> workflow, found at <code>/py/pipeline.ipynb</code> within the web interface.</p>
+<p>Configuration files should be uploaded to <code>/data/config_files</code> and data files to <code>/data/data_matrices</code>, according to instructions in the notebook and provided templates.</p>
+<p>Update the file names in the Jupyter Notebook accordinly.</p>
+
+<h1 id="running-the-pipeline"><a href="#running-the-pipeline" class="body-link">Running the Pipeline</a></h1>
+<p>Run the notebook by simply clicking into a code-block, and pressing the "play" button at the top of the screen</p>
+
+<h1 id="workflow-steps">Workflow Steps</h1>
