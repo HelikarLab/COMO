@@ -17,10 +17,12 @@
     
     <!-- Determine if Jekyll is running on GitHub or locally -->
     <!-- From: https://stackoverflow.com/a/31280149 -->
+    <!-- Local machine -->
     {% if jekyll.environment == "development" %}
       <link rel="stylesheet" href="assets/css/styles.css">
+    <!-- GitHub Pages -->
     {% else %}
-      <link rel="stylesheet" href="/MADRID/assets/css/styles.css">
+      <link rel="stylesheet" href="/MADRID/assets/css/styles.scss">
     {% endif %}
     {% include head-custom.html %}
   </head>
