@@ -14,7 +14,14 @@
     <meta name="theme-color" content="#157878">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}">
-    <link rel="stylesheet" href="assets/css/styles.css">
+    
+    <!-- Determine if Jekyll is running on GitHub or locally -->
+    <!-- From: https://stackoverflow.com/a/31280149 -->
+    {% if jekyll.environment == "development" %}
+      <link rel="stylesheet" href="assets/css/styles.css">
+    {% else %}
+      <link rel="stylesheet" href="/MADRID/assets/css/styles.css">
+    {% endif %}
     {% include head-custom.html %}
   </head>
   <body>
