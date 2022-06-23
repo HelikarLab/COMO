@@ -1,0 +1,12 @@
+- name: Home
+  link: /
+  show_in_nav: true
+
+- name: Madrid
+  link: /pages.madrid.html
+  show_in_nav: true
+
+- name: About
+  link: /pages/about.html
+  show_in_nav: true
+
