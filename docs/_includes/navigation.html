@@ -1,7 +1,27 @@
-<nav>
-    {%  for item in site.data.navigation %}
-        <a href="{{ item.link }}" {% if page.url == item.link %}style="color: red;"{% endif %}>
-            {{ item.name }}
-        </a>
-    {% endfor %}
+{% comment %}
+
+Sort pages based on "weight" front matter field:
+From: https://stackoverflow.com/a/25513956/
+Filter to only show "show_in_nav" items
+
+{% endcomment %}
+
+
+{% assign nav_pages = site.pages | where: "show_in_nav", "true" | sort:"weight" %}
+
+<nav style="text-align: center">
+  {% for item in nav_pages %}
+    <a
+        href="{{ item.url }}" class="nav-link"
+        {% if page.url == item.url %} style="text-decoration: underline" {% endif %}
+    >
+      {{ item.nav_bar_name }}
+    </a>
+    
+    <!-- only display "|" if not on the last item -->
+    {% unless forloop.last %}
+      <p style="display: inline; color: black;"> | </p>
+    {% endunless %}
+
+  {% endfor %}
 </nav>
