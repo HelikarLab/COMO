@@ -17,13 +17,13 @@ This is the home page for MADRID pipeline.
 
 
 ## Flow Charts
-![1](./docs/figures/flowchart1.png)
+![1](./docs/assets/img/step_1.png)
 
-![2](./docs/figures/step_2.jpg)
+![2](./docs/assets/img/step_2.jpg)
 
-![3](./docs/figures/step_3.jpg)
+![3](./docs/assets/img/step_3.jpg)
 
-![4](./docs/figures/step_4.jpg)
+![4](./docs/assets/img/step_4.jpg)
 
 
 ## Running pipeline: Example
