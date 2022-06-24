@@ -2,7 +2,6 @@
 remote_theme: "pages-themes/cayman@v0.2.0"
 plugins:
   - "jekyll-remote-theme"
-  - "jekyll-menus"
 
 title: "MADRID"
 description: "MADRID: Metabolic Drug Repurposing Identification"
@@ -19,3 +18,10 @@ docker:
   name: "babessell/madrid"
   tag: "development"
   url: "https://hub.docker.com/r/babessell/madrid"
+
+# Static images in assets/img
+defaults:
+  - scope:
+      path: "/assets/img"
+    values:
+      image: true

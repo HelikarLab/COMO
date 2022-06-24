@@ -1,0 +1,29 @@
+---
+layout: default
+title: Flow Charts
+description: MADRID Workflow Flow Charts
+show_in_nav: true
+nav_bar_name: Flow Charts
+weight: 2
+---
+<!-- Find all images under /assets/img. Jekyll finds all static files with site.static_files -->
+{% assign images = site.static_files |  where_exp:"item", "item.path contains 'assets/img'" %}
+
+{% comment %} Display text evenly, horizontally across page. From: https://stackoverflow.com/a/34560563 {% endcomment %}
+<div style="display: flex; justify-content: space-around;">
+  {% for image in images %}
+    <div>
+      <a href="#flowchart-image-{{ forloop.index }}" class="body-link">Step {{ forloop.index }}</a>
+    </div>
+  {% endfor %}
+</div>
+<br><br>
+
+
+{% for image in images %}
+  <a id="flowchart-image-{{ forloop.index }}" href="#flowchart-image-{{ forloop.index }}">
+    <img src="{{ image.path }}" alt="Image {{ forloop.index }}">
+  </a>
+  <a href="#top" class="body-link">Return to Top</a>
+  <br><br><br><br>
+{% endfor %}

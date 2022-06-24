@@ -4,6 +4,8 @@
 
 This is the home page for MADRID pipeline.
 
+[View the documentation](https://helikarlab.github.io/MADRID)
+
 ## How To Run application
 - [Install Docker](https://docs.docker.com/install/)
 - `docker login`
@@ -17,7 +19,7 @@ This is the home page for MADRID pipeline.
 
 
 ## Flow Charts
-![1](./docs/assets/img/step_1.png)
+![1](./docs/assets/img/step_1.jpg)
 
 ![2](./docs/assets/img/step_2.jpg)
 
