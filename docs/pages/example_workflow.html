@@ -1,0 +1,31 @@
+---
+layout: default
+title: Example Workflow
+description: How to run the MADRID Workflow
+show_in_nav: true
+nav_bar_name: Example Workflow
+weight: 2
+---
+{% comment %} Display text evenly, horizontally across page. From: https://stackoverflow.com/a/34560563 {% endcomment %}
+<div style="display: flex; justify-content: space-around;">
+  <a href="#example-step-1" class="body-link">Step 1</a>
+  <a href="#example-step-2" class="body-link">Step 2</a>
+  <a href="#example-step-3" class="body-link">Step 3</a>
+  {% for image in images %}
+    <div>
+      <a href="#example-step-{{ forloop.index }}" class="body-link">Step {{ forloop.index }}</a>
+    </div>
+  {% endfor %}
+</div>
+
+<div>
+  <br>
+  <p id="#header">This example will identify drug targets for <a href="https://en.wikipedia.org/wiki/Rheumatoid_arthritis">Rheumatoid arthritis</a> using GSMN of naïve <a href="https://en.wikipedia.org/wiki/T_helper_cell">CD4+ T-cell subtypes</a>.</p>
+  <br>
+</div>
+
+<div id="example-step-1">
+  <h2><a href=#exampe-step-1" class="body-link">Step 1: Setting up Jupyter Notebook</a></h2>
+  <p></p>
+</div>
+
