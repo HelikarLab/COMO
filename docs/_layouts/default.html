@@ -5,40 +5,34 @@
 <!DOCTYPE html>
 <html lang="{{ site.lang | default: 'en-US' }}">
     <head>
-    <meta charset="UTF-8">
+      <meta charset="UTF-8">
 
-    {% seo %}
-    <link rel="preconnect" href="https://fonts.gstatic.com">
-    <link rel="preload" href="https://fonts.googleapis.com/css?family=Open+Sans:400,700&display=swap" as="style" type="text/css" crossorigin>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#157878">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="stylesheet" href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}">
-    
-    <!-- Determine if Jekyll is running on GitHub or locally -->
-    <!-- From: https://stackoverflow.com/a/31280149 -->
-    <!-- Local machine -->
-    {% if jekyll.environment == "development" %}
-      <link rel="stylesheet" href="assets/css/styles.css">
-    <!-- GitHub Pages -->
-    {% else %}
-      <link rel="stylesheet" href="/MADRID/assets/css/styles.scss">
-    {% endif %}
-    {% include head-custom.html %}
-  </head>
-  <body>
+      {% seo %}
+      <link rel="preconnect" href="https://fonts.gstatic.com">
+      <link rel="preload" href="https://fonts.googleapis.com/css?family=Open+Sans:400,700&display=swap" as="style" type="text/css" crossorigin>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <meta name="theme-color" content="#157878">
+      <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+      <link rel="stylesheet" href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}">
+      
+      <!-- Use relative_url because Pages prepends /MADRID/ to our pages -->
+      <link rel="stylesheet" href="{{ 'assets/css/styles.css' | relative_url }}">
+    </head>
+  
+    <body>
+    {% include navigation.html %}
     <a id="skip-to-content" href="#content">Skip to the content.</a>
     <header class="page-header" role="banner">
-        <h1 class="project-name"><a href="{{ page.url }}" class="header-link">{{ page.title | default: site.title | default: site.github.name }}</a></h1>
-        <!-- <h1 class="project-name">{{ page.title | default: site.title | default: site.github.name }}</h1> -->
-        <h2 class="project-tagline">{{ page.description | default: site.description | default: site.github.tagline }}</h2>
+      <h1 class="project-name"><a href="{{ page.url }}" class="header-link">{{ page.title | default: site.title | default: site.github.name }}</a></h1>
+      <!-- <h1 class="project-name">{{ page.title | default: site.title | default: site.github.name }}</h1> -->
+      <h2 class="project-tagline">{{ page.description | default: site.description | default: site.github.tagline }}</h2>
         
-        <a href="{{ site.github.url }}" class="btn">View on GitHub</a>
-        <a href="{{ site.docker.url }}" class="btn">View on DockerHub</a>
-        <br>
-        <a href="https://github.com/HelikarLab/MADRID/actions/workflows/dockerhub.yml"><img src="https://github.com/HelikarLab/MADRID/actions/workflows/dockerhub.yml/badge.svg" alt="Continuous Integration"></a>
-        &nbsp;
-        <a href="https://github.com/HelikarLab/MADRID/actions/workflows/pages/pages-build-deployment"><img src="https://github.com/HelikarLab/MADRID/actions/workflows/pages/pages-build-deployment/badge.svg?branch=master" alt="GitHub Pages Deploymenet"></a>
+      <a href="{{ site.github.url }}" class="btn">View on GitHub</a>
+      <a href="{{ site.docker.url }}" class="btn">View on DockerHub</a>
+      <br>
+      <a href="https://github.com/HelikarLab/MADRID/actions/workflows/dockerhub.yml"><img src="https://github.com/HelikarLab/MADRID/actions/workflows/dockerhub.yml/badge.svg" alt="Continuous Integration"></a>
+      &nbsp; <!-- &nbsp; is a non-breaking space to provide room between SVG images -->
+      <a href="https://github.com/HelikarLab/MADRID/actions/workflows/pages/pages-build-deployment"><img src="https://github.com/HelikarLab/MADRID/actions/workflows/pages/pages-build-deployment/badge.svg?branch=master" alt="GitHub Pages Deploymenet"></a>
       
     </header>
 
