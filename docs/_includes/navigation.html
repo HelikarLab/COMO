@@ -12,7 +12,7 @@ Filter to only show "show_in_nav" items
 <nav style="text-align: center">
   {% for item in nav_pages %}
     <a
-        href="{{ item.url }}" class="nav-link"
+        href="{{ item.url | relative_url }}" class="nav-link"
         {% if page.url == item.url %} style="color: white"
         {%  else %} style="color: #B4B4B4;"
         {% endif %}
