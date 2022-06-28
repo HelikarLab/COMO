@@ -4,19 +4,19 @@ Sort pages based on "weight" front matter field:
 From: https://stackoverflow.com/a/25513956/
 Filter to only show "show_in_nav" items
 
-<link rel="stylesheet" href="{{ "/assets/css/styles.css" | absolute_url }}">
 {% endcomment %}
+
+
 {% assign nav_pages = site.pages | where: "show_in_nav", "true" | sort:"weight" %}
 
 <nav style="text-align: center">
   {% for item in nav_pages %}
     <a
-      href="{{ item.url | relative_url }}"
-      {% if page.url == item.url %}
-        style="color: white; text-decoration: underline;"
-      {% else %}
-        style="color: #B4B4B4;"
-      {% endif %}
+        href="{{ item.url | relative_url }}" class="nav-link"
+        {% if page.url == item.url %} style="color: white"
+        {%  else %} style="color: #B4B4B4;"
+        {% endif %}
+        
     >
       {{ item.nav_bar_name }}
     </a>
@@ -27,9 +27,4 @@ Filter to only show "show_in_nav" items
     {% endunless %}
 
   {% endfor %}
-  
-  <script>
-    {{ "/assets/js/subheading.js" | absolute_url }}
-  </script>
-  
 </nav>
