@@ -11,7 +11,7 @@ permalink: /example-workflow
 
 <div>
   <p id="#example-header">
-    This example will identify drug targets for <a href="https://en.wikipedia.org/wiki/Rheumatoid_arthritis">Rheumatoid arthritis</a> using GSMN of naïve <a href="https://en.wikipedia.org/wiki/T_helper_cell">CD4+ T-cell subtypes</a>.
+    This example will identify drug targets for <a href="https://en.wikipedia.org/wiki/Rheumatoid_arthritis" target="_blank">Rheumatoid arthritis</a> using GSMN of naïve <a href="https://en.wikipedia.org/wiki/T_helper_cell" target="_blank">CD4+ T-cell subtypes</a>.
   </p>
   <p>
     Follow the steps found at <a href="{{ "/#start-container" | relative_url }}">Starting the Container</a> for help on getting started.
@@ -26,7 +26,7 @@ permalink: /example-workflow
     </a>
   </h2>
   <p>
-    The outputs of <a href="https://github.com/alexdobin/STAR">STAR Aligner</a> with the <code>--GeneCounts</code> argument can be directly interfaced with MADRID. Under the folder <code>/data/STAR_output/</code> folder, we provide a template structure with Naive B control cells from Bulk RNA-sequencing experiments found in <a href="https://www.ncbi.nlm.nih.gov/geo/">NCBI's Gene Expression Omnibus</a>. We can run the file <code>/py/rnaseq_preprocess.py</code> with the <code>create_count_matrix</code> argument set to <code>True</code> to merge the counts from each replicate in each study into a single matrix. This follows <b>Step 1</b> in the MADRID container.
+    The outputs of <a href="https://github.com/alexdobin/STAR" target="_blank">STAR Aligner</a> with the <code>--GeneCounts</code> argument can be directly interfaced with MADRID. Under the folder <code>/data/STAR_output/</code> folder, we provide a template structure with Naive B control cells from Bulk RNA-sequencing experiments found in <a href="https://www.ncbi.nlm.nih.gov/geo/">NCBI's Gene Expression Omnibus</a>. We can run the file <code>/py/rnaseq_preprocess.py</code> with the <code>create_count_matrix</code> argument set to <code>True</code> to merge the counts from each replicate in each study into a single matrix. This follows <b>Step 1</b> in the MADRID container.
   </p>
   <p>
     Alternatively, you can provide a count matrix directly and run with <code>create_count_matrix</code> set to <code>False</code> to just fetch the necessary information for normalization.
@@ -36,7 +36,7 @@ permalink: /example-workflow
 <div id="example-step-2">
   <h2>
     <a href="#example-step-2" class="body-link">
-      STEP 2 GOES HERE
+      Step 2
     </a>
   </h2>
   <p>
@@ -51,7 +51,7 @@ permalink: /example-workflow
     Note: If a gene is not supported by a data source/platform, the <code>expression_requirement</code> value will decrease by one for each input data source that does not support the gene.
   </p>
   <p>
-    Running <b>Step 1</b> in the MADRID container will generate "gene activity" files based on transcriptomics and proteomics data, as described by <a href="https://doi.org/10.1038/s41540-020-00165-3"><cite>Puniya et al., 2020</cite></a>.
+    Running <b>Step 1</b> in the MADRID container will generate "gene activity" files based on transcriptomics and proteomics data, as described by <a href="https://doi.org/10.1038/s41540-020-00165-3" target="_blank"><cite>Puniya et al., 2020</cite></a>.
   </p>
   <p>
     This will save final output in <code>GeneExpression_Naive_Merged.csv</code> and its path in <code>step1_results_files.json</code>.
@@ -61,11 +61,11 @@ permalink: /example-workflow
 <div id="example-step-3">
   <h2>
     <a href="#example-step-3" class="body-link">
-      STEP 3 GOES HERE
+      Step 3
     </a>
   </h2>
   <p>
-    Our pipeline includes a modified version of the <a href="https://doi.org/10.1038/nbt.4072"><cite>Recon3D</cite></a> model to use as a reference for model contextualization. The modified version of Recon3D is available at <code>/data/GeneralModel.mat</code>.
+    Our pipeline includes a modified version of the <a href="https://doi.org/10.1038/nbt.4072" target="_blank"><cite>Recon3D</cite></a> model to use as a reference for model contextualization. The modified version of Recon3D is available at <code>/data/GeneralModel.mat</code>.
   </p>
   <p>
     <b>Step 4</b> in MADRID will use <code>GeneExpression_Naive_Merged.csv</code> (from Step 1, above) in combination with the <code>GeneralModel.mat</code> to construct a cell-type specific model of Naive CD4+ cells.
@@ -81,7 +81,7 @@ permalink: /example-workflow
 <div id="example-step-4">
   <h2>
     <a href="#example-step-4" class="body-link">
-      STEP 4 GOES HERE
+      Step 4
     </a>
   </h2>
   <p>
@@ -95,11 +95,11 @@ permalink: /example-workflow
 <div id="example-step-5">
   <h2>
     <a href="#example-step-5" class="body-link">
-      STEP 5 GOES HERE
+      Step 5
     </a>
   </h2>
   <p>
-    This step will use the model (constructed in <b>Step 2</b>/uploaded curated version) and perform knock-out simulations of genes overlapping with the drug-target data file obtained from the <a href="https://www.broadinstitute.org/connectivity-map-cmap">ConnectivityMap</a> database. We refined the drug target-data file and included it at <code>/data/RepurposingHub.txt</code>.
+    This step will use the model (constructed in <b>Step 2</b>/uploaded curated version) and perform knock-out simulations of genes overlapping with the drug-target data file obtained from the <a href="https://www.broadinstitute.org/connectivity-map-cmap" target="_blank">ConnectivityMap</a> database. We refined the drug target-data file and included it at <code>/data/RepurposingHub.txt</code>.
   </p>
   <p>
     This step will use the following files:
@@ -111,7 +111,7 @@ permalink: /example-workflow
     <li><code>RepurposingHub.txt</code></li>
   </ul>
   <p>
-    The final output files will include drug targets ranked based on Perburbation Effect Score (PES) as described by <a href="https://doi.org/10.1038/s41540-020-00165-3"><cite>Puniya et al., 2020</cite></a>.
+    The final output files will include drug targets ranked based on Perburbation Effect Score (PES) as described by <a href="https://doi.org/10.1038/s41540-020-00165-3" target="_blank"><cite>Puniya et al., 2020</cite></a>.
   </p>
   <p>
     The output file <code>/output/d_score.csv</code> will contain Entrez IDs of ranked genes and their corresponding PES. The file <code>drug_score.csv</code> will contain PES ranked drug targets (Entrez IDs and Gene Symbols) with mapped repurposed drugs.
