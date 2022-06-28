@@ -1,9 +1,0 @@
-{% assign nav_pages = site.pages | where: "show_in_nav", "true" | sort:"weight" %}
-
-
-{% for item in nav_pages %}
-  {{ item.title }}
-  {% unless forloop.last %}
-    |
-  {% endunless %}
-{% endfor %}
