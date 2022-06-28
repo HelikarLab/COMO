@@ -16,18 +16,18 @@ weight: 0
   MADRID stands for "<b>M</b>et<b>A</b>bolic <b>D</b>rug <b>R</b>epurposing <b>ID</b>entification".
   
   <br><br>
-  This is a <a href="https://jupyter.org/">Jupyter Notebook</a> based pipeline to build context-specific, <a href="https://en.wikipedia.org/wiki/Metabolic_network_modelling">constraint-based metabolic models (CBMM)</a> from a single source, or combination of sources, from the following "-omics" data:
+  This is a <a href="https://jupyter.org/" target="_blank">Jupyter Notebook</a> based pipeline to build context-specific, <a href="https://en.wikipedia.org/wiki/Metabolic_network_modelling" target="_blank">constraint-based metabolic models (CBMM)</a> from a single source, or combination of sources, from the following "-omics" data:
   <ul>
-    <li><a href="https://en.wikipedia.org/wiki/RNA-Seq">Bulk</a> RNA-sequencing</li>
-    <li><a href="https://en.wikipedia.org/wiki/Single_cell_sequencing">Single-Cell</a> RNA-sequencing</li>
-    <li>Mass Spectrometry <a href="https://en.wikipedia.org/wiki/Proteomics">Proteomics</a></li>
-    <li><a href="https://en.wikipedia.org/wiki/Microarray">Microarray</a></li>
+    <li><a href="https://en.wikipedia.org/wiki/RNA-Seq" target="_blank">Bulk</a> RNA-sequencing</li>
+    <li><a href="https://en.wikipedia.org/wiki/Single_cell_sequencing" target="_blank">Single-Cell</a> RNA-sequencing</li>
+    <li>Mass Spectrometry <a href="https://en.wikipedia.org/wiki/Proteomics" target="_blank">Proteomics</a></li>
+    <li><a href="https://en.wikipedia.org/wiki/Microarray" target="_blank">Microarray</a></li>
   </ul>
   
   Ultimately, this serves as a platform to use these models to identify drug targets and potentially repurposable drugs for metabolism-impacting diseases.
   
   <br><br>
-  MADRID does not require any amount of programming experience to create models. However, every step of the pipeline is packaged in its own <code>.py</code> file to promote accessible modification, addition, or replacement of analysis steps. The Jupyterlab container comes pre-loaded with the most popular <a href="https://www.r-project.org/">R</a> and <a href="https://www.python.org/">Python</a> libraries, but if you would like to use a library and cannot install it, please open a new issue on <a href="{{ site.github.url }}">our Github page</a>!
+  MADRID does not require any amount of programming experience to create models. However, every step of the pipeline is packaged in its own <code>.py</code> file to promote accessible modification, addition, or replacement of analysis steps. The Jupyterlab container comes pre-loaded with the most popular <a href="https://www.r-project.org/" target="_blank">R</a> and <a href="https://www.python.org/" target="_blank">Python</a> libraries, but if you would like to use a library and cannot install it, please open a new issue on <a href="{{ site.github.url }}" target="_blank">our Github page</a>!
   
   <br><br>
   In this pipeline, the term "context" refers to a specific state that can be subset from a genome-scale metabolic model using experimental data. This context can be a specific cell or tissue type in a specific experimental state, such as a control or a disease.
@@ -36,7 +36,7 @@ weight: 0
   For drug perturbation scoring of a specific cell-type or tissue, it is only necessary to build a CBMM (Steps 1 to 5) for the healthy control state. Differential gene expression (Step 6) will be used to for disease analysis so that multiple diseaes can be analyzed using the same CBMM.
   
   <br><br>
-  <b>&#9888;&#65039; Warning &#9888;&#65039; If you terminate your session after running the Docker, any changes you make WILL NOT BE SAVED! Please mount a local directory to the Docker image as instructed on <a href="https://docs.docker.com/storage/volumes/">Docker's website</a>, or in "<a href="#run-the-container">Run the Container</a>" below, to prevent data loss.</b>
+  <b>&#9888;&#65039; Warning &#9888;&#65039; If you terminate your session after running the Docker, any changes you make WILL NOT BE SAVED! Please mount a local directory to the Docker image as instructed on <a href="https://docs.docker.com/storage/volumes/" target="_blank">Docker's website</a>, or in "<a href="#run-the-container">Run the Container</a>" below, to prevent data loss.</b>
 
   
 </div>
@@ -53,11 +53,11 @@ weight: 0
   <div style="margin-left: 2%">
     <a href="#before-starting#rna-seq-data" class="body-link"><h2 id="before-starting#rna-seq-data">RNA-sequencing</h2></a>
     <ul>
-      <li>A folder named "MADRID_input" in the <code>/data/</code> directory. Proper inputs can be generated using our <a href="https://github.com/HelikarLab/FastqToGeneCounts">SnakeMake pipeline</a>, designed specifically for MADRID.</li>
+      <li>A folder named "MADRID_input" in the <code>/data/</code> directory. Proper inputs can be generated using our <a href="https://github.com/HelikarLab/FastqToGeneCounts" target="_blank">SnakeMake pipeline</a>, designed specifically for MADRID.</li>
     </ul>
     
     <blockquote style="margin-left: 5%; margin-right: 5%">
-      <p>RNA-sequencing data can be <a href="https://en.wikipedia.org/wiki/Single_cell_sequencing">single-cell</a> or <a href="https://en.wikipedia.org/wiki/RNA-Seq">bulk</a>, but our SnakeMake pipeline is currently only available for bulk RNA-sequencing processing</p>
+      <p>RNA-sequencing data can be <a href="https://en.wikipedia.org/wiki/Single_cell_sequencing" target="_blank">single-cell</a> or <a href="https://en.wikipedia.org/wiki/RNA-Seq" target="_blank">bulk</a>, but our SnakeMake pipeline is currently only available for bulk RNA-sequencing processing</p>
     </blockquote>
     
     <ul>
@@ -91,7 +91,7 @@ weight: 0
   
   <p>The following is a list of steps to identify drug targets. Stop after <b>Step 3</b> if building a context-specific mdoel for other purposes.</p>
   <ol>
-    <li>Preprocess Bulk RNA-sequencing data by converting gene counts from <a href="https://github.com/alexdobin/STAR">STAR aligner</a> into a unified matrix, fetch necessary info about each gene required for normalization, and generate a configuration sheet.</li>
+    <li>Preprocess Bulk RNA-sequencing data by converting gene counts from <a href="https://github.com/alexdobin/STAR" target="_blank">STAR aligner</a> into a unified matrix, fetch necessary info about each gene required for normalization, and generate a configuration sheet.</li>
     <li>Analyze any combination of Microarray, RNA-sequencing (total, polyA, or single-cell), or proteomics data, and output a list of active genes for each strategy/method.</li>
     <li>Check for consensus amongst strategies according to desired rigor and merge into a singular set of active genes.</li>
     <li>Create tissue specific models based on the list of active genes. If required, the user can manually refine these models and supply them in <b>Step 4</b> of the MADRID container.</li>
@@ -128,7 +128,7 @@ weight: 0
       Starting the Container
     </a>
   </h1>
-  <p><a href="https://docs.docker.com/get-docker/">Docker must be installed</a></p>
+  <p><a href="https://docs.docker.com/get-docker/" target="_blank">Docker must be installed</a></p>
   <p>Then, execute the following tasks in a terminal download the container:</p>
   
   {% highlight bash %}
@@ -166,7 +166,7 @@ weight: 0
   </tr>
   <tr>
     <td>--volume=$HOME/madrid/gurobi.lic</td>
-    <td>The file path of your <a href="https://www.gurobi.com/">Gurobi</a> license. This is a fast solver used in MADRID.</td>
+    <td>The file path of your <a href="https://www.gurobi.com/" target="_blank">Gurobi</a> license. This is a fast solver used in MADRID.</td>
   </tr>
   <tr>
     <td>--volume=$HOME/madrid/local_madrid</td>
@@ -207,13 +207,8 @@ weight: 0
       Working in the Notebook
     </a>
   </h1>
-  <p>Open the <a href="https://jupyter.org/">Jupyter Notebook</a> workflow, found at <code>/py/pipeline.ipynb</code> within the web interface.</p>
+  <p>Open the <a href="https://jupyter.org/" target="_blank">Jupyter Notebook</a> workflow, found at <code>/py/pipeline.ipynb</code> within the web interface.</p>
   <p>Configuration files should be uploaded to <code>/data/config_files</code> and data files to <code>/data/data_matrices</code>, according to instructions in the notebook and provided templates.</p>
   <p>Update the file names in the Jupyter Notebook accordinly.</p>
 </div>
 
-<h1 id="workflow-steps" data-subheading="Workflow Steps">
-  <a href="#workflow-steps">
-    Workflow Steps
-  </a>
-</h1>
