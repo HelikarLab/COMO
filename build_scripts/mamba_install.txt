@@ -21,7 +21,6 @@ r-sjmisc
 r-stringr
 r-tidyverse
 r-zoo
-cobra
 GEOparse
 lxml
 markupsafe==2.0.1
