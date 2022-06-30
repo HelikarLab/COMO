@@ -4,7 +4,7 @@ This is the main driver-file for downloading proteomics data
 import argparse
 import Crux
 import csv
-from .FileInformation import FileInformation
+from FileInformation import FileInformation
 import FTPManager
 import os
 import sys
@@ -107,7 +107,7 @@ class ParseCSVInput:
         """
         master_studies: list[str] = []
         for cell_type in self._data.keys():
-            replicates = self._data[cell_type]["replicate"]
+            replicates = self._data[cell_type]["study"]
             master_studies.extend(replicates)
         return master_studies
     
@@ -228,9 +228,6 @@ class PopulateInformation:
             for i, file_information in enumerate(instances[cell_type]):
                 current_info: FileInformation = file_information
                 previous_info: FileInformation = instances[cell_type][i - 1] if i > 0 else None
-                
-                if i > 0:
-                    print(f"Testing: {current_info.cell_type}_{current_info.study} - {previous_info.cell_type}_{previous_info.study}")
                 
                 # Do not modify the replicate value if we are on the very first iteration of this cell type
                 if i == 0:
@@ -397,6 +394,7 @@ def main(args: list[str]):
     elif args.skip_mzml:
         args.skip_download = True
     
+    # Populate the file_information list
     PopulateInformation(
         file_information=file_information,
         csv_data=csv_data,
