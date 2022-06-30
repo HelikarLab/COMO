@@ -13,9 +13,7 @@ permalink: /flowcharts
 {% comment %} Display text evenly, horizontally across page. From: https://stackoverflow.com/a/34560563 {% endcomment %}
 <div style="display: flex; justify-content: space-around;">
   {% for image in images %}
-    <div>
       <a href="#flowchart-image-{{ forloop.index }}" class="body-link">Step {{ forloop.index }}</a>
-    </div>
   {% endfor %}
 </div>
 <br><br>
@@ -23,7 +21,7 @@ permalink: /flowcharts
 
 {% for image in images %}
   <a id="flowchart-image-{{ forloop.index }}" href="#flowchart-image-{{ forloop.index }}">
-    <img src="{{ image.path }}" alt="Image {{ forloop.index }}">
+    <img src="{{ image.path | absolute_url }}" alt="Image {{ forloop.index }}">
   </a>
   <a href="#top" class="body-link">Return to Top</a>
   <br><br><br><br>
