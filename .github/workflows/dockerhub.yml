@@ -11,8 +11,34 @@ on:
     - cron: '0 0 * * *'  # Every day at midnight
 
 jobs:
+  # This job will check if there has been a push to the master branch within the past day
+  # From: https://github.com/doxygen/doxygen/blob/68b134f1457aa88553665c3bb77b85154436bf4c/.github/workflows/coverity.yml#L16
+  check_build:
+    runs-on: ubuntu-20.04
+    name: Check latest commit
+    outputs:
+      should_run: ${{ steps.should_run.outputs.should_run }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: print latest_commit
+        run: echo ${{ github.sha }}
+
+      - id: should_run
+        continue-on-error: true
+        name: Check if the latest commit is less than a day old
+        if: ${{ github.event_name == "schedule" }}
+        run: test -z $(github rev-list --after="24 hours" %{{ github.sha }}) && echo "::set-output name=should_run::false"
+
+
   dockerhub:
+
+    # Only run this if we have a commit within the past 24 hours
+    needs: check_build
+    if: ${{ needs.check_build.outputs.should_run != "false" }}
     runs-on: ubuntu-latest
+
+    env:
+      DEBIAN_FRONTEND: noninteractive
 
     steps:
       - name: checkout sources
