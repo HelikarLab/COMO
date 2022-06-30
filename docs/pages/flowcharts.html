@@ -12,10 +12,6 @@ Find all images under /assets/img. Jekyll finds all static files with site.stati
 {% endcomment %}
 {% assign images = site.static_files |  where_exp:"item", "item.path contains 'assets/img/flowchart'" %}
 
-{% for image in images %}
-  {{ image.path }}<br>
-{% endfor %}
-
 {% comment %}
 Display text evenly, horizontally across page
 From: https://stackoverflow.com/a/34560563
