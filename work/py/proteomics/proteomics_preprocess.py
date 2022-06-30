@@ -4,7 +4,7 @@ This is the main driver-file for downloading proteomics data
 import argparse
 import Crux
 import csv
-from FileInformation import FileInformation
+from .FileInformation import FileInformation
 import FTPManager
 import os
 import sys
@@ -149,7 +149,7 @@ class PopulateInformation:
             self._preferred_extensions = ["raw"]
         
         self._gather_data()
-        self._new_set_replicate_numbers()
+        self._set_replicate_numbers()
         
         if self._skip_download is False:
             self.print_download_size()
@@ -215,33 +215,8 @@ class PopulateInformation:
         # Convert to MB
         total_size = total_size // 1024 ** 2
         print(f"Total size to download: {total_size} MB")
-        
+            
     def _set_replicate_numbers(self):
-        """
-        This function is responsible for setting the "R#" portion of each "S#R#" batch
-        This is done after all the data is gathered so each batch can be collated together
-        """
-        replicate_num: int = 1
-        for i, information in enumerate(self.file_information):
-            current_info = information
-            previous_info = self.file_information[i - 1] if i > 0 else None
-            
-            if i > 0:
-                print(f"Testing: {current_info.cell_type}_{current_info.study} - {previous_info.cell_type}_{previous_info.study}")
-            # Set the initial current_info replicate to 1
-            if i == 0:
-                replicate_value = f"R{replicate_num}"
-            # If the current info cell type and study match the previous, increment the replicate by one. Otherwise reset it to 1
-            elif current_info.cell_type == previous_info.cell_type and current_info.study == previous_info.study:
-                replicate_num += 1
-                replicate_value = f"R{replicate_num}"
-            else:
-                replicate_num = 1
-                replicate_value = f"R{replicate_num}"
-            
-            current_info.set_replicate(replicate_value)
-            
-    def _new_set_replicate_numbers(self):
         instances: dict[str, list[FileInformation]] = {}
         for information in self.file_information:
             if information.cell_type not in instances.keys():

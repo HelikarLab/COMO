@@ -3,8 +3,8 @@ TODO: Integrate crux percolator into this workflow
 """
 import asyncio
 from bioservices import BioDBNet
-from FileInformation import FileInformation
-from FileInformation import clear_print
+from .FileInformation import FileInformation
+from .FileInformation import clear_print
 import multiprocessing
 from multiprocessing.sharedctypes import Synchronized
 import numpy as np
