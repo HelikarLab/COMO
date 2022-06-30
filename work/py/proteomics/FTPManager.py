@@ -5,8 +5,10 @@ TODO: Find a way to mark a file as "downloaded"
     - Keep a list of file names in a ".completd" hidden folder?
     -
 """
-from FileInformation import FileInformation
-from FileInformation import clear_print
+import ftplib
+
+from .FileInformation import FileInformation
+from .FileInformation import clear_print
 from ftplib import FTP
 import multiprocessing
 from multiprocessing.sharedctypes import Synchronized
@@ -70,7 +72,10 @@ class Reader:
             if file_path.endswith(tuple(self._extensions)):
                 download_url: str = f"{scheme}://{host}{file_path}"
                 self._files.append(download_url)
-                self._file_sizes.append(client.size(file_path))
+                try:
+                    self._file_sizes.append(client.size(file_path))
+                except ftplib.error_perm:
+                    self._file_sizes.append(0)
 
     @property
     def files(self):
