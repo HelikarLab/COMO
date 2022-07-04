@@ -26,7 +26,7 @@ jobs:
       - id: should_run
         continue-on-error: true
         name: Check if the latest commit is less than a day old
-        if: ${{ github.event_name == "schedule" }}
+        if: ${{ github.event_name == 'schedule' }}
         run: test -z $(github rev-list --after="24 hours" %{{ github.sha }}) && echo "::set-output name=should_run::false"
 
 
@@ -34,7 +34,7 @@ jobs:
 
     # Only run this if we have a commit within the past 24 hours
     needs: check_build
-    if: ${{ needs.check_build.outputs.should_run != "false" }}
+    if: ${{ needs.check_build.outputs.should_run != 'false' }}
     runs-on: ubuntu-latest
 
     env:
