@@ -15,24 +15,24 @@ jobs:
   # From: https://github.com/doxygen/doxygen/blob/68b134f1457aa88553665c3bb77b85154436bf4c/.github/workflows/coverity.yml#L16
   check_build:
     runs-on: ubuntu-20.04
-    name: Check latest commit
+    name: Check Latest Commit
     outputs:
       should_run: ${{ steps.should_run.outputs.should_run }}
     steps:
       - uses: actions/checkout@v3
-      - name: print latest_commit
+      - name: Get Latest Commit Hash
         run: echo ${{ github.sha }}
 
       - id: should_run
         continue-on-error: true
-        name: Check if the latest commit is less than a day old
+        name: Check if commit <24 hours
         if: ${{ github.event_name == 'schedule' }}
         run: test -z $(github rev-list --after="24 hours" %{{ github.sha }}) && echo "::set-output name=should_run::false"
 
 
   dockerhub:
 
-    # Only run this if we have a commit within the past 24 hours
+    # Only run the docker build if we have a commit within the past 24 hours
     needs: check_build
     if: ${{ needs.check_build.outputs.should_run != 'false' }}
     runs-on: ubuntu-latest
@@ -42,7 +42,7 @@ jobs:
       DEBIAN_FRONTEND: noninteractive
 
     steps:
-      - name: checkout sources
+      - name: Checkout Repository
         uses: actions/checkout@v3.0.2
 
       - name: Set up QEMU
@@ -57,9 +57,15 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # Set the tag based on the current branch
+      - name: Get Branch Name
+        run: |
+          if ${{ github.ref_name == 'master }} echo 'DOCKER_TAG=development' >> $DOCKER_TAG
+          else echo 'DOCKER_TAG={{ github.ref_name }}' >> $DOCKER_TAG
+
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
           context: .
           push: true
-          tags: babessell/madrid:development
+          tags: babessell/madrid:${{env.DOCKER_TAG}}
