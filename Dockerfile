@@ -27,7 +27,7 @@ RUN conda config --add channels conda-forge \
     && jupyter labextension install @jupyter-widgets/jupyterlab-manager \
     && jupyter labextension install escher \
     && jupyter trust "${JUPYTER_NOTEBOOK}" \
-    && rm -f "${ENVIRONMENT_FILE}" \
+    && rm -f "${ENVIRONMENT_FILE}"
 
 # Install gurbori
 RUN wget --quiet https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
