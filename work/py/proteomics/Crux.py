@@ -361,9 +361,9 @@ class SQTtoCSV:
             dataframe = self._merged_frames[cell_type]
             for column in dataframe.columns:
                 # Find the {cell_type}_S#R# column using regex
-                if re.match(f"{cell_type}_S\d+R\d+", column):
+                if re.match(rf"{cell_type}_S\d+R\d+", column):
                     # Find the S# value using regex
-                    iteration: int = int(re.search("S(\d+)", column).group(1))
+                    iteration: int = int(re.search(r"S(\d+)", column).group(1))
                     
                     # Find the maximum S# value
                     if iteration > max_iteration:
@@ -376,7 +376,7 @@ class SQTtoCSV:
                 # Create a new dataframe to split the S# columns from
                 split_frame: pd.DataFrame = dataframe.copy()
                 # Get the current S{i} columns in
-                abundance_columns: list[str] = [column for column in split_frame.columns if re.match(f"{cell_type}_S{i}R\d+", column)]
+                abundance_columns: list[str] = [column for column in split_frame.columns if re.match(rf"{cell_type}_S{i}R\d+", column)]
                 take_columns: list[str] = ["symbol"] + abundance_columns
                 average_intensity_name: str = f"{cell_type}_S{i}"
                 

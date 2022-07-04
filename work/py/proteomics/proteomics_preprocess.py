@@ -2,10 +2,10 @@
 This is the main driver-file for downloading proteomics data
 """
 import argparse
-import Crux
+from . import Crux
 import csv
-from FileInformation import FileInformation
-import FTPManager
+from .FileInformation import FileInformation
+from . import FTPManager
 import os
 import sys
 from pathlib import Path
@@ -303,15 +303,15 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         "--skip-download",
         required=False,
         dest="skip_download",
-        action="store_true",
         default=False,
+        type=bool,
         help="If this action is passed in, FTP data will not be downloaded.\nThis assumes you have raw data under the folder specified by the option '--ftp-out-dir'",
     )
     parser.add_argument(
         "--skip-mzml",
         required=False,
         dest="skip_mzml",
-        action="store_true",
+        type=bool,
         default=False,
         help="If this action is passed in, files will not be converted from RAW to mzML format.\n"
         "This assumes you have mzML files under the folder specified by the option '--mzml-out-dir'.\n"
@@ -322,7 +322,7 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         "--skip-sqt",
         required=False,
         dest="skip_sqt",
-        action="store_true",
+        type=bool,
         default=False,
         help="If this action is passed in, SQT files will not be created. This assumes you have SQT files under the folder specified by the option '--sqt-out-dir'.\n"
         "This will only read data from SQT files and create a CSV ion intensity file.\n"
@@ -439,5 +439,4 @@ def main(args: list[str]):
     
 
 if __name__ == "__main__":
-    args = sys.argv[1:]
-    main(args)
+    main(sys.argv[1:])
