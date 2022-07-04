@@ -8,10 +8,12 @@ on:
 #      - "master"
   workflow_dispatch:
   schedule:
-    - cron: '0 0 * * *'  # Every day at midnight
+    # Every day at midnight
+    - cron: '0 0 * * *'
 
 jobs:
   # This job will check if there has been a push to the master branch within the past day
+  # If there has been a push to the master branch, then it will run the build job
   # From: https://github.com/doxygen/doxygen/blob/68b134f1457aa88553665c3bb77b85154436bf4c/.github/workflows/coverity.yml#L16
   check_build:
     runs-on: ubuntu-20.04
@@ -57,6 +59,9 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Docker Cache
+
+
       # Set the tag based on the current branch
       - name: Test if Master Branch
         continue-on-error: true
@@ -73,3 +78,5 @@ jobs:
           context: .
           push: true
           tags: babessell/madrid:${{env.DOCKER_TAG}}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
