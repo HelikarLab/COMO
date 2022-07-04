@@ -59,11 +59,11 @@ jobs:
 
       # Set the tag based on the current branch
       - name: Set Master Branch Tag
-        if: ${{ github.ref_name == 'master }}
+        if: ${{ github.ref_name == 'master' }}
         run: echo 'DOCKER_TAG=development' >> $DOCKER_TAG
       - name: Set non-Master Branch Tag
         if: ${{ github.ref_name != 'master' }}
-        run: echo 'DOCKER_TAG={{ github.ref_name }}' >> $DOCKER_TAG
+        run: echo 'DOCKER_TAG=${{ github.ref_name }}' >> $DOCKER_TAG
 
       - name: Build and push
         uses: docker/build-push-action@v3
