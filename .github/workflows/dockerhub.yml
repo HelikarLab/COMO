@@ -61,11 +61,11 @@ jobs:
       - name: Test if Master Branch
         continue-on-error: true
         if: ${{ github.ref_name == 'master' }}
-        run: echo 'DOCKER_TAG=development' > $DOCKER_TAG
+        run: echo 'DOCKER_TAG=development' >> $GITHUB_ENV
       - name: Set non-Master Branch Tag
         continue-on-error: true
         if: ${{ github.ref_name != 'master' }}
-        run: echo 'DOCKER_TAG=${{ github.ref_name }}' > $DOCKER_TAG
+        run: echo 'DOCKER_TAG=${{ github.ref_name }}' >> $GITHUB_ENV
 
       - name: Build and push
         uses: docker/build-push-action@v3
