@@ -42,4 +42,6 @@ RUN echo "c.ServerApp.ip = '0.0.0.0'" >> "${JUPYTER_CONFIG}" \
     && echo "c.ServerApp.token = ''" >> "${JUPYTER_CONFIG}" \
     && echo "c.ServerApp.password = ''" >> "${JUPYTER_CONFIG}"
 
+RUN echo "Dockerfile Improvements Branch" > "${HOME}/branch_name.txt"
+
 VOLUME /home/joyvan/work
