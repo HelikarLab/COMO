@@ -467,7 +467,6 @@ def main(argv):
         help="Proteomics weight for merging z-score distribution",
     )
 
-
     args = parser.parse_args(argv)
 
     microarray_file = args.microarray_file
