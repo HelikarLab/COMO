@@ -67,8 +67,8 @@ organize_gene_counts_files <- function(data_dir) {
 
 
 prepare_sample_counts <- function(counts_file, counts_files, strand_file) {
+    
     # prepare a gene count file to be added to the count matrix
-
     if ( grepl("R\\d+r1", counts_file, ignore.case=FALSE) ) { # if first run in a multirun sample
         rm_run_number <- unlist(strsplit(counts_file, "r1"))[1] # remove run number from sample id
         #split_directory <- unlist(strsplit(rm_run_number, "/")) # split from path
@@ -78,6 +78,7 @@ prepare_sample_counts <- function(counts_file, counts_files, strand_file) {
         run_files <- counts_files[grepl(search_str, counts_files)] # search for other files that are part of same run
         samp_count <- NULL
 
+        
         for ( f in run_files) { # for each run associated with this replicate,
             run_count <- read.delim(f) # read gene counts
             run_len <- length(run_count[,1]) # number of genes
@@ -91,13 +92,13 @@ prepare_sample_counts <- function(counts_file, counts_files, strand_file) {
                        (strand_read=="SECOND_READ_TRANSCRIPTION_STRAND") ||
                        (strand_read=="FIRST_READ_TRANSCRIPTION_STRAND")
                      )
-
+            
             if ( strand_read=="FIRST_READ_TRANSCRIPTION_STRAND" ) { # forward
-            cl <- 3
+                cl <- 3
             } else if ( strand_read=="SECOND_READ_TRANSCRIPTION_STRAND" ) { # reverse
-            cl <- 4
+                cl <- 4
             } else { # unstranded
-            cl <- 2
+                cl <- 2
             }
 
             #cl <- which.max(colSums(run_count[,2:4])) + 1 # max counts is most likely the correct strandedness
@@ -128,7 +129,6 @@ prepare_sample_counts <- function(counts_file, counts_files, strand_file) {
     }
 
     else if ( grepl("R\\d+r", counts_file)==TRUE ) { # multirun files handled when the first run is iterated on, skip
-
         return("skip")
     }
 
@@ -140,18 +140,18 @@ prepare_sample_counts <- function(counts_file, counts_files, strand_file) {
         genes <- samp_count[,1] # get gene names
 
         strand_read <- gsub("[\r\n]", "", readChar(strand_file, file.info(strand_file)$size))
-
+        
         stopifnot( (strand_read=="NONE") ||
                    (strand_read=="SECOND_READ_TRANSCRIPTION_STRAND") ||
                    (strand_read=="FIRST_READ_TRANSCRIPTION_STRAND")
                  )
 
         if ( strand_read=="FIRST_READ_TRANSCRIPTION_STRAND" ) { # forward
-        cl <- 3
+            cl <- 3
         } else if ( strand_read=="SECOND_READ_TRANSCRIPTION_STRAND" ) { # reverse
-        cl <- 4
+            cl <- 4
         } else { # unstranded
-        cl <- 2
+            cl <- 2
         }
         #cl <- which.max(colSums(samp_count[,2:4])) + 1 # max counts is most likely the correct strandedness
 
@@ -165,11 +165,9 @@ prepare_sample_counts <- function(counts_file, counts_files, strand_file) {
 
 
 create_counts_matrix <- function(counts_files, replicate_names, n_replicates, strand_files) {
-
     i_adjust <- 0  # adjusted index, subtracts number of multiruns processed
     counts <- prepare_sample_counts(counts_files[1], counts_files, strand_files[1]) # get first column of counts to add
-
-
+    
     if ( grepl("R\\d+r1", replicate_names[1], ignore.case=FALSE) ) { # if first of a set of multiruns
         colnames(counts)[2] <- unlist(strsplit(replicate_names[1], "r\\d+"))[1] # remove run number tag
 
@@ -177,10 +175,11 @@ create_counts_matrix <- function(counts_files, replicate_names, n_replicates, st
         colnames(counts)[2] <- replicate_names[1] # if not multirun, header is okay
     }
 
+    
     for ( i in 2:n_replicates) { # iterate through rest of replicates after handling the first and initializing matrix
         new_cnts <- prepare_sample_counts(counts_files[i], counts_files, strand_files[i]) # get next column of counts to add
         options(warn=-1) # turn off warnings
-
+        
         if ( new_cnts=="skip" ) { # handle skipped multirun calls
             i_adjust <- i_adjust+1
             next
@@ -235,6 +234,4 @@ generate_counts_matrix_main <- function(data_dir, out_dir) {
     file_name <- file.path(out_dir, paste0("gene_counts_matrix_full_", file_split[length(file_split)], ".csv"))
     write.csv(full_count_matrix, file_name, row.names=FALSE)
     cat("Count Matrix written at ", file_name, "\n")
-
-
 }

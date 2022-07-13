@@ -4,7 +4,7 @@ from bioservices import BioDBNet
 import pandas as pd
 from project import configs
 import re
-import os, time, sys
+import os, time, sys, shutil
 import argparse
 from rpy2.robjects.packages import importr, SignatureTranslatedAnonymousPackage
 import glob
@@ -193,14 +193,14 @@ def create_config_df(context_name):
                     for ff in frag_files:
                         print(ff)
                         frag_df = pd.read_table(ff, low_memory=False, sep="\t", on_bad_lines="skip")
-                        frag_df['meanxcount'] = frag_df['frag_mean']*frag_df['frag_count']
-                        mean_fragment_size = sum(frag_df['meanxcount']/sum(frag_df['frag_count']))
+                        frag_df['meanxcount'] = frag_df['frag_mean'] * frag_df['frag_count']
+                        mean_fragment_size = sum(frag_df['meanxcount'] / sum(frag_df['frag_count']))
                         mean_fragment_sizes = np.append(mean_fragment_sizes, mean_fragment_size)
                         library_sizes = np.append(library_sizes, sum(frag_df['frag_count']))
 
                     mean_fragment_size = sum(mean_fragment_sizes * library_sizes) / sum(library_sizes)
 
-        #label = "_".join([context_name, re.findall(r"S[1-9][0-9]?[0-9]?R[1-9][0-9]?[0-9]?", label)[0]])  # remove run number if there
+        # label = "_".join([context_name, re.findall(r"S[1-9][0-9]?[0-9]?R[1-9][0-9]?[0-9]?", label)[0]])  # remove run number if there
         label = f"{context_name}_{study_number}{rep_number}"
 
         new_row = pd.DataFrame({'SampleName': [label],
@@ -254,7 +254,7 @@ def create_gene_info_file(matrix_file_list, form, taxon_id):
 
     for mfile in matrix_file_list:
         add_genes = pd.read_csv(mfile)["genes"].tolist()
-        genes = list(set(genes+add_genes))
+        genes = list(set(genes + add_genes))
 
     output_db = ['Ensembl Gene ID', 'Gene Symbol', 'Gene ID', 'Chromosomal Location']
     output_db.remove(form)
@@ -282,7 +282,7 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
 
     tmatrix_files = []
     mmatrix_files = []
-    #pmatrix_files = []
+    # pmatrix_files = []
     for context_name in context_names:
         context_name = context_name.strip(" ")
         print(f"Preprocessing {context_name}")
@@ -429,7 +429,8 @@ def main(argv):
     make_matrix = args.make_matrix
     provided_matrix_fname = args.provided_matrix_fname
 
-    context_names = context_names.strip("[").strip("]").replace("'", "").replace(" ", "").split(",") # convert to py list
+    # convert to python list
+    context_names = context_names.strip("[").strip("]").replace("'", "").replace(" ", "").split(",")
 
     if gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
         form = "Ensembl Gene ID"

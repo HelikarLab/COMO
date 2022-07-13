@@ -20,7 +20,6 @@ def ftp_client(host: str, max_attempts: int = 3) -> FTP:
     This class is responsible for creating a "client" connection
     """
     connection_successful: bool = False
-    max_attempts: int = max_attempts
     attempt_num: int = 1
     # Attempt to connect, throw error if unable to do so
     while not connection_successful and attempt_num <= max_attempts:

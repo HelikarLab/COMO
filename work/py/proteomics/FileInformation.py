@@ -52,7 +52,6 @@ class FileInformation:
         self.replicate: str = ""
         self.batch: str = f"{study}"
 
-        
         # Base file save paths
         if raw_path is None:
             self.raw_base_path: Path = Path(project.configs.datadir, "results", cell_type, "proteomics", "raw")
