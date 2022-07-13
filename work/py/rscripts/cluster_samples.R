@@ -1,5 +1,12 @@
 # prevent messy messages from repeatedly writing to juypter
-zz <- file(file.path("home", "jupyteruser", "work", "rlogs", "rnaseq.Rout"), open="wt")
+
+username <- Sys.info()["user"]
+work_dir <- str_interp("/home/${username}/work")
+if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
+    dir.create(str_interp("${work_dir}/py/rlogs"))
+}
+
+zz <- file(file.path(work_dir, "py", "rlogs", "rnaseq.Rout"), open="wt")
 sink(zz, type="message")
 
 
