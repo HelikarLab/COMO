@@ -121,7 +121,7 @@ merge_batch <- function(wd, context, batch) {
             max_d <- source_densy[idx]
             if ( max_d > max_dens ) { max_dens <- max_d }
         }
-        p <- p + ylim(0, 1.5*max_dens)
+        #p <- p + ylim(0, 1.5*max_dens)
         print(p)
         dev.off()
     }
@@ -135,8 +135,8 @@ combine_batch_zdistro <- function(wd, context, batch, zmat) {
     plot_name = file.path(wd, "figures", paste0("plot_", context, "_", batch, "_combine_distro", ".pdf"))
 
     weighted_z <- function(x) {
-        floor_score <- -5
-        ceil_score <- 5
+        floor_score <- -6
+        ceil_score <- 6
         x <- as.numeric(x)
         #if ( length(x) > 20 ) {
           #print("Too many replicates to properly merge with Z-tranform. Will take the average value for this batch.")
@@ -187,7 +187,7 @@ combine_batch_zdistro <- function(wd, context, batch, zmat) {
             max_d <- source_densy[idx]
             if ( max_d > max_dens ) { max_dens <- max_d }
         }
-        p <- p + ylim(0, 1.5*max_dens)
+        #p <- p + ylim(0, 1.5*max_dens)
         print(p)
         dev.off()
 
@@ -205,8 +205,8 @@ combine_context_zdistro <- function(wd, context, n_reps, zmat) {
         "plot_", context, "_combine_batches_distro", ".pdf"))
 
     weighted_z <- function(x, n_reps) {
-        floor_score <- -5
-        ceil_score <- 5
+        floor_score <- -6
+        ceil_score <- 6
         x <- as.numeric(x)
         nas <- sort(   unique(  c( which(is.nan(x)), which(is.na(x)) )  )   )
         weights <- c()
@@ -249,7 +249,7 @@ combine_context_zdistro <- function(wd, context, n_reps, zmat) {
             max_d <- source_densy[idx]
             if ( max_d > max_dens ) { max_dens <- max_d }
         }
-        p <- p + ylim(0, 1.5*max_dens)
+        #p <- p + ylim(0, 1.5*max_dens)
         print(p)
         dev.off()
 
@@ -311,8 +311,8 @@ combine_omics_zdistros <- function(
     }
 
     weighted_z <- function(x, weights) {
-        floor_score <- -5
-        ceil_score <- 5
+        floor_score <- -6
+        ceil_score <- 10
         x <- as.numeric(x)
 
         nas <- which(is.na(x))
@@ -364,7 +364,7 @@ combine_omics_zdistros <- function(
         max_d <- source_densy[idx]
         if ( max_d > max_dens ) { max_dens <- max_d }
     }
-    p <- p + ylim(0, 1.5*max_dens)
+    #p <- p + ylim(0, 1.5*max_dens)
     print(p)
     dev.off()
 
