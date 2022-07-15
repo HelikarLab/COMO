@@ -3,17 +3,13 @@
 import argparse
 import sys
 import os
-import time
-import unidecode
 import pandas as pd
 import numpy as np
 import instruments
 from project import configs
-import rpy2.robjects as ro
 from rpy2.robjects.packages import importr
 from rpy2.robjects import r, pandas2ri
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
-from rpy2.robjects.conversion import localconverter
 
 pandas2ri.activate()
 
