@@ -3,20 +3,17 @@
 import argparse
 import os
 import sys
-#import unidecode
-import time
 import pandas as pd
-import numpy as np
 import json
 from collections import Counter
 from project import configs
-from microarray_gen import *
-from proteomics_gen import *
-from rnaseq_gen import *
+import microarray_gen
+import proteomics_gen
+import rnaseq_gen
 from create_context_specific_model import split_gene_expression_data
 from warnings import warn
 from rpy2.robjects.packages import importr
-from rpy2.robjects import r, pandas2ri
+from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 
 
@@ -31,6 +28,7 @@ tidyverse = importr("tidyverse")
 f = open(os.path.join(configs.rootdir, "py", "rscripts", "combine_distributions.R"), "r")
 string = f.read()
 f.close()
+
 combine_dist_io = SignatureTranslatedAnonymousPackage(string, "combine_dist_io")
 
 
@@ -63,11 +61,11 @@ def merge_xomics(
     """
     print(f"Merging data for {sheet}")
     # load data for each source if it exists. IF not load an empty dummy dataset
-    microarray = load_microarray_tests(filename=microarray_file, context_name=sheet)
-    proteomics = load_proteomics_tests(filename=proteomics_file, context_name=sheet)
-    trnaseq = load_rnaseq_tests(filename=trnaseq_file, context_name=sheet, lib_type="total")  # total RNA-seq
-    mrnaseq = load_rnaseq_tests(filename=mrnaseq_file, context_name=sheet, lib_type="mrna")  # mRNA-seq
-    scrnaseq = load_rnaseq_tests(filename=scrnaseq_file, context_name=sheet, lib_type="scrna")  # Single-cell RNA-seq
+    microarray = microarray_gen.load_microarray_tests(filename=microarray_file, context_name=sheet)
+    proteomics = proteomics_gen.load_proteomics_tests(filename=proteomics_file, context_name=sheet)
+    trnaseq = rnaseq_gen.load_rnaseq_tests(filename=trnaseq_file, context_name=sheet, lib_type="total")  # total RNA-seq
+    mrnaseq = rnaseq_gen.load_rnaseq_tests(filename=mrnaseq_file, context_name=sheet, lib_type="mrna")  # mRNA-seq
+    scrnaseq = rnaseq_gen.load_rnaseq_tests(filename=scrnaseq_file, context_name=sheet, lib_type="scrna")  # Single-cell RNA-seq
 
     files_dict = dict()
 
@@ -121,7 +119,7 @@ def merge_xomics(
         else:
             merge_data = merge_data.join(scrnaseq_data, how="outer")
 
-    merge_data = mergeLogicalTable(merge_data)
+    merge_data = microarray_gen.mergeLogicalTable(merge_data)
 
     num_sources = len(exp_list)
     merge_data["Active"] = 0
@@ -149,7 +147,7 @@ def merge_xomics(
     if not no_hc:  # set genes that are high-confidence in at least one data source to active
         merge_data.loc[merge_data[high_list].sum(axis=1) > 0, "Active"] = 1
 
-    #merge_data = merge_data.astype(int)
+    # merge_data = merge_data.astype(int)
     merge_data = merge_data
 
     filepath = os.path.join(configs.rootdir, "data", "results", sheet, f"merged_{sheet}.csv")
@@ -280,7 +278,7 @@ def handle_context_batch(
     with open(files_json, "w") as fp:
         json.dump(dict_list, fp)
 
-    return
+    # return
 
 
 def main(argv):
@@ -467,6 +465,33 @@ def main(argv):
         help="Proteomics weight for merging z-score distribution",
     )
 
+    # Create a clustering group
+    clustering = parser.add_argument_group("Clustering")
+
+    # Determine if clustering should be done
+    # From: https://stackoverflow.com/questions/15008758
+    clustering.add_argument(
+        "--cluster",
+        required=False,
+        action=argparse.BooleanOptionalAction,
+        dest="perform_cluster",
+        help="Should clustering should be performed"
+    )
+    clustering.add_argument(
+        "--cluster-format",
+        required="--cluster" in argv,  # Require if --cluster is included
+        dest="cluster_format",
+        choices=["binary", "zfpkm"],
+        help="Use binarized or zFPKM clustering output"
+    )
+    clustering.add_argument(
+        "--cluster-sources",
+        required="--cluster" in argv,  # Require if --cluster is included
+        dest="cluster_source",
+        choices=["zfpkm", "tpm", "cpm", "umi"],
+        help="The type of data used in clustering"
+    )
+
     args = parser.parse_args(argv)
 
     microarray_file = args.microarray_file
@@ -511,16 +536,14 @@ def main(argv):
             expression_requirement = int(expression_requirement)
             if int(expression_requirement) < 1:
                 print("Expression requirement must be at least 1!")
-                sys.out()
+                sys.exit(1)
         except ValueError:
             print("Expression requirement must be able to be converted to an integer!")
-            sys.out()
+            sys.exit(1)
 
     if adjust_method not in ["progressive", "regressive", "flat", "custom"]:
-        print(
-            "Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'"
-        )
-        sys.exit()
+        print("Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'")
+        sys.exit(1)
 
     handle_context_batch(
         microarray_file,
@@ -541,7 +564,7 @@ def main(argv):
         keep_gene_score
     )
 
-    return
+    # return
 
 
 if __name__ == "__main__":
