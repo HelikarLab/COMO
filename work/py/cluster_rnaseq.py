@@ -27,6 +27,12 @@ cluster_io = SignatureTranslatedAnonymousPackage(string, "cluster_io")
 
 
 def parse_args(argv) -> argparse.Namespace:
+    """
+    This function is responsible for parsing arguments as they are received from the command line
+    
+    :param argv: The list of arguments directly from the command line
+    :return: The parsed arguments in the form of an argparse.Namespace object
+    """
     parser = argparse.ArgumentParser(
         prog="cluster_rnaseq.py",
         description="Cluster RNA-seq Data using Multiple Correspondence Analysis or UMAP. Clusters at the replicate, "
@@ -156,6 +162,13 @@ def parse_args(argv) -> argparse.Namespace:
 
 
 def validate_args(args: argparse.Namespace) -> argparse.Namespace:
+    """
+    This function is responsible for ensuring the parsed arguments are valid.
+    
+    :param args: The arguments parsed from the parse_args() function
+    :return: The validated arguments in the form of an argparse.Namespace object
+    """
+    
     args.valid_arguments = True
     
     if type(args.min_count) == str and str(args.min_count).lower() != "default":
@@ -256,6 +269,7 @@ def main(argv):
     """
     args = parse_args(argv)
     args = validate_args(args)
+    
     if not args.valid_arguments:
         sys.exit(1)
 
