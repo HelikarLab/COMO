@@ -267,34 +267,22 @@ def main(argv):
         .replace(" ", "")
         .split(",")
     )
-    technique = args.technique.lower()
-    clust_algo = args.clust_algo.lower()
-    label = args.label.upper()
-    rep_ratio = args.rep_ratio
-    batch_ratio = args.batch_ratio
-    min_count = args.min_count
-    quantile = args.quantile
-    min_dist = args.min_dist
-    n_neigh_rep = args.n_neigh_rep
-    n_neigh_batch = args.n_neigh_batch
-    n_neigh_cont = args.n_neigh_cont
-    seed = args.seed
 
     cluster_io.cluster_samples_main(
         wd,
         context_names,
-        technique,
-        clust_algo,
-        label,
-        min_dist=min_dist,
-        n_neigh_rep=n_neigh_rep,
-        n_neigh_batch=n_neigh_batch,
-        n_neigh_cont=n_neigh_cont,
-        rep_ratio=rep_ratio,
-        batch_ratio=batch_ratio,
-        quantile=quantile,
-        min_count=min_count,
-        seed=seed,
+        args.technique.lower(),
+        args.clust_algo.lower(),
+        args.label.upper(),
+        min_dist=args.min_dist,
+        n_neigh_rep=args.n_neigh_rep,
+        n_neigh_batch=args.n_neigh_batch,
+        n_neigh_cont=args.n_neigh_cont,
+        rep_ratio=args.rep_ratio,
+        batch_ratio=args.batch_ratio,
+        quantile=args.quantile,
+        min_count=args.min_count,
+        seed=args.seed,
     )
 
 
