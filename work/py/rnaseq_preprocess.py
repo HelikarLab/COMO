@@ -30,7 +30,7 @@ def fetch_gene_info(input_values, input_db="Ensembl Gene ID",
     ond returns dataframe with specified columns as 'output_db' (default is HUGO symbol, Entrez ID, and chromosome
     chromosomal start and end positions).
     """
-    s = BioDBNet()
+    biodbnet = BioDBNet()
     df_maps = pd.DataFrame([], columns=output_db)
     df_maps.index.name = input_db
     i = 0
@@ -41,7 +41,7 @@ def fetch_gene_info(input_values, input_db="Ensembl Gene ID",
         # TODO: Make this output more user-readable
         # It outputs many lines due to the large number of genes to retrieve
         print(f"retrieve {i}:{upper_range}")
-        df_test = s.db2db(input_db, output_db, input_values[i:upper_range], taxon_id)
+        df_test = biodbnet.db2db(input_db, output_db, input_values[i:upper_range], taxon_id)
         if isinstance(df_test, pd.DataFrame):
             df_maps = pd.concat([df_maps, df_test], sort=False)
         elif df_test == '414':
