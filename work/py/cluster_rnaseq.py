@@ -3,7 +3,8 @@
 import os
 import sys
 from rpy2.robjects.packages import importr
-from rpy2.robjects import r, pandas2ri
+from rpy2.robjects import r
+from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 from project import configs
 import argparse
@@ -25,11 +26,7 @@ f.close()
 cluster_io = SignatureTranslatedAnonymousPackage(string, "cluster_io")
 
 
-def main(argv):
-    """
-    Cluster RNA-seq Data
-    """
-
+def parse_args(argv) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="cluster_rnaseq.py",
         description="Cluster RNA-seq Data using Multiple Correspondence Analysis or UMAP. Clusters at the replicate, "
@@ -44,7 +41,7 @@ def main(argv):
         required=True,
         dest="context_names",
         help="""Tissue/cell name of models to generate. If making multiple models in a batch, then
-                             use the format: \"['context1', 'context2', ... etc]\". Note the outer double-quotes and the 
+                             use the format: \"['context1', 'context2', ... etc]\". Note the outer double-quotes and the
                              inner single-quotes are required to be interpreted. This a string, not a python list""",
     )
     parser.add_argument(
@@ -154,7 +151,113 @@ def main(argv):
         dest="seed",
         help="""Random seed for clustering algorithm initialization""",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    return args
+
+
+def validate_args(args: argparse.Namespace) -> argparse.Namespace:
+    args.valid_arguments = True
+    
+    if type(args.min_count) == str and str(args.min_count).lower() != "default":
+        try:
+            args.min_count = int(args.min_count)
+        except ValueError:
+            print("--min-count must be either 'default' or an integer > 0")
+            args.valid_arguments = False
+    elif type(args.min_count) != str and args.min_count < 0:
+        print("--min-count must be either 'default' or an integer > 0")
+        args.valid_arguments = False
+
+    if type(args.quantile) == str and args.quantile.lower() != "default":
+        try:
+            args.quantile = int(args.quantile)
+        except ValueError:
+            print("--quantile must be either 'default' or an integer between 0 and 100")
+            args.valid_arguments = False
+    elif type(args.quantile) != str and 0 > args.quantile > 1:
+        print("--quantile must be either 'default' or an integer between 0 and 100")
+        args.valid_arguments = False
+
+    if type(args.rep_ratio) == str and str(args.rep_ratio).lower() != "default":
+        try:
+            args.rep_ratio = float(args.rep_ratio)
+        except ValueError:
+            print("--rep-ratio must be 'default' or a float between 0 and 1")
+            args.valid_arguments = False
+    elif type(args.rep_ratio) != str and 0 > args.rep_ratio > 1.0:
+        print("--rep-ratio must be 'default' or a float between 0 and 1")
+
+    if type(args.batch_ratio) == str and str(args.batch_ratio).lower() != "default":
+        try:
+            args.batch_ratio = float(args.batch_ratio)
+        except ValueError:
+            print("--batch-ratio must be 'default' or a float between 0 and 1")
+            args.valid_arguments = False
+    elif type(args.batch_ratio) != str and 0 > args.batch_ratio > 1.0:
+        print("--batch-ratio must be 'default' or a float between 0 and 1")
+
+    if args.technique.lower() not in ["quantile", "tpm", "cpm", "zfpkm"]:
+        print("--technique must be either 'quantile', 'cpm', 'zfpkm'")
+        args.valid_arguments = False
+    elif args.technique.lower() == "tpm":
+        args.technique = "quantile"
+
+    if args.clust_algo.lower() not in ["mca", "umap"]:
+        print("--technique must be either 'umap', 'mca'")
+        args.valid_arguments = False
+
+    if type(args.min_dist) != str and 0 > args.min_dist > 1.0:
+        print("--min_dist must be a float between 0 and 1")
+        args.valid_arguments = False
+
+    if type(args.n_neigh_rep) == str and str(args.n_neigh_rep).lower() != "default":
+        try:
+            args.n_neigh_rep = int(args.n_neigh_rep)
+        except ValueError:
+            print(f"--n_neigh_rep must be either 'default' or an integer greater than 1 and less than or equal to "
+                  f"the total number of replicates being clustered across all contexts.")
+            args.valid_arguments = False
+    elif type(args.n_neigh_rep) != str and args.n_neigh_rep < 2:
+        print(f"--n_neigh_rep must be either 'default' or an integer greater than 1 and less than or equal to "
+              f"the total number of replicates being clustered across all contexts.")
+        args.valid_arguments = False
+
+    if type(args.n_neigh_batch) == str and str(args.n_neigh_batch).lower() != "default":
+        try:
+            args.n_neigh_batch = int(args.n_neigh_batch)
+        except ValueError:
+            print(f"--n_neigh_batch must be either 'default' or an integer greater than 1 and less than or equal to "
+                  f"the total number of batches being clustered across all contexts.")
+            args.valid_arguments = False
+    elif type(args.n_neigh_batch) != str and args.n_neigh_batch < 2:
+        print(f"--n_neigh_batch must be either 'default' or an integer greater than 1 and less than or equal to "
+              f"the total number of batches being clustered across all contexts.")
+        args.valid_arguments = False
+
+    if type(args.n_neigh_cont) == str and str(args.n_neigh_cont).lower() != "default":
+        try:
+            args.n_neigh_cont = int(args.n_neigh_cont)
+        except ValueError:
+            print(f"--n_neigh_batch must be either 'default' or an integer greater than 1 and less than or equal to "
+                  f"the total number of batches being clustered across all contexts.")
+            args.valid_arguments = False
+            
+    if type(args.n_neigh_batch) != str and args.n_neigh_cont < 2:
+        print(f"--n_neigh_context must be either 'default' or an integer greater than 1 and less than or equal to "
+              f"the total number of contexts being clustered.")
+        args.valid_arguments = False
+        
+    return args
+
+
+def main(argv):
+    """
+    Cluster RNA-seq Data
+    """
+    args = parse_args(argv)
+    args = validate_args(args)
+    if not args.valid_arguments:
+        sys.exit(1)
 
     wd = os.path.join(configs.datadir, "results")
     context_names = (
@@ -176,106 +279,6 @@ def main(argv):
     n_neigh_batch = args.n_neigh_batch
     n_neigh_cont = args.n_neigh_cont
     seed = args.seed
-
-    if type(min_count) == str and min_count.lower() != "default":
-        try:
-            min_count = int(min_count)
-        except ValueError:
-            print("--min-count must be either 'default' or an integer > 0")
-            sys.exit()
-    if type(min_count) != str and min_count < 0:
-        print("--min-count must be either 'default' or an integer > 0")
-        sys.exit()
-
-    if type(quantile) == str and quantile.lower() != "default":
-        try:
-            quantile = int(quantile)
-        except ValueError:
-            print("--quantile must be either 'default' or an integer between 0 and 100")
-            sys.exit()
-    if type(quantile) != str and 0 > quantile > 1:
-        print("--quantile must be either 'default' or an integer between 0 and 100")
-        sys.exit()
-
-    if type(rep_ratio) == str and rep_ratio.lower() != "default":
-        try:
-            rep_ratio = float(rep_ratio)
-        except ValueError:
-            print("--rep-ratio must be 'default' or a float between 0 and 1")
-            sys.exit()
-    if type(rep_ratio) != str and 0 > rep_ratio > 1.0:
-        print("--rep-ratio must be 'default' or a float between 0 and 1")
-
-    if type(batch_ratio) == str and batch_ratio.lower() != "default":
-        try:
-            batch_ratio = float(batch_ratio)
-        except ValueError:
-            print("--batch-ratio must be 'default' or a float between 0 and 1")
-            sys.exit()
-    if type(batch_ratio) != str and 0 > batch_ratio > 1.0:
-        print("--batch-ratio must be 'default' or a float between 0 and 1")
-
-    if technique.lower() not in ["quantile", "tpm", "cpm", "zfpkm"]:
-        print("--technique must be either 'quantile', 'cpm', 'zfpkm'")
-        sys.exit()
-
-    if technique.lower() == "tpm":
-        technique = "quantile"
-
-    if clust_algo.lower() not in ["mca", "umap"]:
-        print("--technique must be either 'umap', 'mca'")
-        sys.exit()
-
-    if type(min_dist) != str and 0 > min_dist > 1.0:
-        print("--min_dist must be a float between 0 and 1")
-
-    if type(n_neigh_rep) == str and n_neigh_rep.lower() != "default":
-        try:
-            n_neigh_rep = int(n_neigh_rep)
-        except ValueError:
-            print(
-                f"--n_neigh_rep must be either 'default' or an integer greater than 1 and less than or equal to "
-                f"the total number of replicates being clustered across all contexts."
-            )
-            sys.exit()
-    if type(n_neigh_rep) != str and n_neigh_rep < 2:
-        print(
-            f"--n_neigh_rep must be either 'default' or an integer greater than 1 and less than or equal to "
-            f"the total number of replicates being clustered across all contexts."
-        )
-        sys.exit()
-
-    if type(n_neigh_batch) == str and n_neigh_batch.lower() != "default":
-        try:
-            n_neigh_batch = int(n_neigh_batch)
-        except ValueError:
-            print(
-                f"--n_neigh_batch must be either 'default' or an integer greater than 1 and less than or equal to "
-                f"the total number of batches being clustered across all contexts."
-            )
-            sys.exit()
-    if type(n_neigh_batch) != str and n_neigh_batch < 2:
-        print(
-            f"--n_neigh_batch must be either 'default' or an integer greater than 1 and less than or equal to "
-            f"the total number of batches being clustered across all contexts."
-        )
-        sys.exit()
-
-    if type(n_neigh_cont) == str and n_neigh_cont.lower() != "default":
-        try:
-            n_neigh_cont = int(n_neigh_cont)
-        except ValueError:
-            print(
-                f"--n_neigh_batch must be either 'default' or an integer greater than 1 and less than or equal to "
-                f"the total number of batches being clustered across all contexts."
-            )
-            sys.exit()
-    if type(n_neigh_batch) != str and n_neigh_cont < 2:
-        print(
-            f"--n_neigh_context must be either 'default' or an integer greater than 1 and less than or equal to "
-            f"the total number of contexts being clustered."
-        )
-        sys.exit()
 
     cluster_io.cluster_samples_main(
         wd,
