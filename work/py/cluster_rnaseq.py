@@ -177,7 +177,7 @@ def main(argv):
     n_neigh_cont = args.n_neigh_cont
     seed = args.seed
 
-    if type(min_count) == str and not min_count.lower() == "default":
+    if type(min_count) == str and min_count.lower() != "default":
         try:
             min_count = int(min_count)
         except ValueError:
@@ -187,7 +187,7 @@ def main(argv):
         print("--min-count must be either 'default' or an integer > 0")
         sys.exit()
 
-    if type(quantile) == str and not quantile.lower() == "default":
+    if type(quantile) == str and quantile.lower() != "default":
         try:
             quantile = int(quantile)
         except ValueError:
@@ -197,7 +197,7 @@ def main(argv):
         print("--quantile must be either 'default' or an integer between 0 and 100")
         sys.exit()
 
-    if type(rep_ratio) == str and not rep_ratio.lower() == "default":
+    if type(rep_ratio) == str and rep_ratio.lower() != "default":
         try:
             rep_ratio = float(rep_ratio)
         except ValueError:
@@ -206,7 +206,7 @@ def main(argv):
     if type(rep_ratio) != str and 0 > rep_ratio > 1.0:
         print("--rep-ratio must be 'default' or a float between 0 and 1")
 
-    if type(batch_ratio) == str and not batch_ratio.lower() == "default":
+    if type(batch_ratio) == str and batch_ratio.lower() != "default":
         try:
             batch_ratio = float(batch_ratio)
         except ValueError:
@@ -229,7 +229,7 @@ def main(argv):
     if type(min_dist) != str and 0 > min_dist > 1.0:
         print("--min_dist must be a float between 0 and 1")
 
-    if type(n_neigh_rep) == str and not n_neigh_rep.lower() == "default":
+    if type(n_neigh_rep) == str and n_neigh_rep.lower() != "default":
         try:
             n_neigh_rep = int(n_neigh_rep)
         except ValueError:
@@ -245,7 +245,7 @@ def main(argv):
         )
         sys.exit()
 
-    if type(n_neigh_batch) == str and not n_neigh_batch.lower() == "default":
+    if type(n_neigh_batch) == str and n_neigh_batch.lower() != "default":
         try:
             n_neigh_batch = int(n_neigh_batch)
         except ValueError:
@@ -261,7 +261,7 @@ def main(argv):
         )
         sys.exit()
 
-    if type(n_neigh_cont) == str and not n_neigh_cont.lower() == "default":
+    if type(n_neigh_cont) == str and n_neigh_cont.lower() != "default":
         try:
             n_neigh_cont = int(n_neigh_cont)
         except ValueError:
@@ -293,7 +293,6 @@ def main(argv):
         min_count=min_count,
         seed=seed,
     )
-    return
 
 
 if __name__ == "__main__":
