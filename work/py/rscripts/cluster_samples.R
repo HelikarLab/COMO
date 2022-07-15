@@ -24,15 +24,15 @@ make_logical_matrix <- function(wd, technique, context_names) {
       if (technique=="zfpkm") {
           tfiles <- c(files, Sys.glob(file.path(wd, context, "total", "zFPKM_Matrix_*.csv")))
           mfiles <- c(files, Sys.glob(file.path(wd, context, "mrna", "zFPKM_Matrix_*.csv")))
-          files <- c(tfile, mfiles)
+          files <- c(tfiles, mfiles)
       } else if ( technique=="quantile" ) {
           tfiles <- c(files, Sys.glob(file.path(wd, context, "total", "TPM_Matrix_*.csv")))
           mfiles <- c(files, Sys.glob(file.path(wd, context, "mrna", "TPM_Matrix_*.csv")))
-          files <- c(tfile, mfiles)
+          files <- c(tfiles, mfiles)
       } else if ( technique=="cpm" ) {
           tfiles <- c(files, Sys.glob(file.path(wd, context, "total", "CPM_Matrix_*.csv")))
           mfiles <- c(files, Sys.glob(file.path(wd, context, "mrna", "CPM_Matrix_*.csv")))
-          files <- c(tfile, mfiles)
+          files <- c(tfiles, mfiles)
       } else if ( technique == "umi" ) {
           files <- c(files, Sys.glob(file.path(wd, context, "scrna", "zUMI_Matrix_*.csv")))
       } else {
@@ -45,33 +45,33 @@ make_logical_matrix <- function(wd, technique, context_names) {
     new_matrix <- read.table(f, strip.white=T, header=T, sep=",", row.names=NULL) %>% # read expression matrix
         mutate(across(colnames(.)[-1], as.numeric)) %>% # ensure expression values are numbers
         mutate(across(colnames(.)[1], as.character)) %>% # ensure entrez IDs are character
-        group_by(ent) %>%
+        group_by(ENTREZ_GENE_ID) %>%
         summarise_each(funs(max)) # if multiple of same entrez, take max value
 
     #if ( "X" %in% colnames(new_matrix) ) {
     #  new_matrix <- new_matrix %>% select(-X)
     #}
     if (!cnt) { merge_matrix <- new_matrix }
-    else { merge_matrix <- merge_matrix %>% left_join(new_matrix, by="ent") }
+    else { merge_matrix <- merge_matrix %>% left_join(new_matrix, by="ENTREZ_GENE_ID") }
     cnt <- cnt+1
   }
   if (technique=="zfpkm") {
     cutoff = -3
     logical_matrix <- do.call(cbind, lapply(2:ncol(merge_matrix), function(j) {
     as.integer(merge_matrix[,j] >  cutoff)
-    })) %>% as.data.frame(.) %>% cbind(merge_matrix["ent"], .) %>% na.omit(.)
+    })) %>% as.data.frame(.) %>% cbind(merge_matrix["ENTREZ_GENE_ID"], .) %>% na.omit(.)
   } else if ( technique=="quantile" ) {
     logical_matrix <- do.call(cbind, lapply(2:ncol(merge_matrix), function(j) {
     cutoff = quantile(merge_matrix[,j], prob=1-quantile/100)
     merge_matrix[,j] >  cutoff
-    })) %>% as.data.frame(.) %>% cbind(merge_matrix["ent"], .) %>% na.omit(.)
+    })) %>% as.data.frame(.) %>% cbind(merge_matrix["ENTREZ_GENE_ID"], .) %>% na.omit(.)
   } else if ( technique=="cpm" ) {
     logical_matrix <- do.call(cbind, lapply(2:ncol(merge_matrix), function(j) {
     cutoff = ifelse(min_count=="default",
                     10e6/(median(sum(merge_matrix[,j]))),
                     1e6*min_count/(median(sum(merge_matrix[,j]))) )
     merge_matrix[,j] >  cutoff
-    })) %>% as.data.frame(a.) %>% cbind(merge_matrix["ent"], .) %>% na.omit(.)
+    })) %>% as.data.frame(a.) %>% cbind(merge_matrix["ENTREZ_GENE_ID"], .) %>% na.omit(.)
   }
   colnames(logical_matrix) <- colnames(merge_matrix)
   rsums <- rowSums(logical_matrix[,-1])
@@ -123,7 +123,7 @@ plot_MCA_replicates <- function(logical_matrix, contexts, wd, label) {
 
 plot_UMAP_replicates <- function(logical_matrix, contexts, wd, label, n_neigh, min_dist) {
   n_neigh <- ifelse(n_neigh=="default", as.integer(length(contexts)), n_neigh)
-  if ( n_neigh<2) {
+  if ( n_neigh < 2 ) {
     print("Cannot cluster replicates if n nearest neighbors is < 1!")
     stop()
   }
@@ -291,6 +291,10 @@ plot_MCA_contexts <- function(log_mat_context, contexts, wd) {
 plot_UMAP_contexts <- function(log_mat_context, contexts, wd, label, n_neigh, min_dist) {
   contexts <- unique(contexts)
   n_neigh <- ifelse(n_neigh=="default", as.integer(length(contexts)), n_neigh)
+  print("DEBUG")
+  print(n_neigh)
+  print(length(contexts))
+  print(contexts)
   if ( n_neigh<2) {
     print("Cannot cluster contexts if n nearest neighbors is < 1!")
     stop()
