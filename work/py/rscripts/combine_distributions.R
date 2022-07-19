@@ -377,25 +377,25 @@ combine_omics_zdistros <- function(
 
 
 combine_zscores_main <- function(
-    wd,
-    contexts,
-    use_mrna_flag,
-    use_trna_flag,
-    use_scrna_flag,
-    use_proteins_flag,
-    keep_gene_scores,
-    tweight_master=1,
-    mweight_master=1,
-    sweight_master=1,
-    pweight_master=2) {
+  working_directory,
+  contexts,
+  use_mrna_flag,
+  use_trna_flag,
+  use_scrna_flag,
+  use_proteins_flag,
+  keep_gene_scores,
+  tweight_master=1,
+  mweight_master=1,
+  sweight_master=1,
+  pweight_master=2) {
 
-    fig_path <- file.path(wd, "figures")
+    fig_path <- file.path(working_directory, "figures")
     if ( !file.exists(fig_path) ) { dir.create(fig_path) }
 
-    tbatches <- parse_contexts_zfpkm(wd, contexts, "total")
-    mbatches <- parse_contexts_zfpkm(wd, contexts, "mrna")
-    sbatches <- parse_contexts_zumi(wd, contexts, "scrna")
-    pbatches <- parse_contexts_zscore_prot(wd, contexts)
+    tbatches <- parse_contexts_zfpkm(working_directory, contexts, "total")
+    mbatches <- parse_contexts_zfpkm(working_directory, contexts, "mrna")
+    sbatches <- parse_contexts_zumi(working_directory, contexts, "scrna")
+    pbatches <- parse_contexts_zscore_prot(working_directory, contexts)
 
     for ( context in contexts ) {
         use_mrna <- use_mrna_flag
@@ -437,7 +437,7 @@ combine_zscores_main <- function(
 
         if ( use_trna ) {
             print("Merging total RNA-seq distributions...")
-            twd <- file.path(wd, context, "total")
+            twd <- file.path(working_directory, context, "total")
             nreps <- c()
             cnt <- 0
             for ( batch in cont_tbatches ) {
@@ -457,7 +457,7 @@ combine_zscores_main <- function(
             write.csv(comb_batches_z_trna, filename, row.names=FALSE)
 
             if ( !use_proteins & !use_mrna & !use_scrna) {
-                filename <- file.path(wd, context, "total", paste0("model_scores_", context, ".csv"))
+                filename <- file.path(working_directory, context, "total", paste0("model_scores_", context, ".csv"))
                 write.csv(comb_batches_z_trna, filename, row.names=FALSE)
              }
 
@@ -466,7 +466,7 @@ combine_zscores_main <- function(
 
         if ( use_mrna ) {
             print("Merging polyA enriched RNA-seq distributions...")
-            mwd <- file.path(wd, context, "mrna")
+            mwd <- file.path(working_directory, context, "mrna")
             nreps <- c()
             cnt <- 0
             for ( batch in cont_mbatches ) {
@@ -495,7 +495,7 @@ combine_zscores_main <- function(
 
         if ( use_scrna ) {
             print("Merging single-cell RNA-seq distributions...")
-            swd <- file.path(wd, context, "scrna")
+            swd <- file.path(working_directory, context, "scrna")
             nreps <- c()
             cnt <- 0
             for ( batch in cont_sbatches ) {
@@ -524,7 +524,7 @@ combine_zscores_main <- function(
 
         if ( use_proteins ) {
             print("Merging protein abundance distributions...")
-            pwd = file.path(wd, context, "proteomics")
+            pwd = file.path(working_directory, context, "proteomics")
             nreps <- c()
             cnt <- 0
             for ( batch in cont_pbatches ) {
@@ -556,19 +556,19 @@ combine_zscores_main <- function(
         if ( !use_proteins ) { pweight <- 0 }
 
         comb_omics_z <- combine_omics_zdistros(
-            wd,
-            context,
-            comb_batches_z_trna,
-            comb_batches_z_mrna,
-            comb_batches_z_scrna,
-            comb_batches_z_prot,
-            tweight,
-            mweight,
-            sweight,
-            pweight
+          working_directory,
+          context,
+          comb_batches_z_trna,
+          comb_batches_z_mrna,
+          comb_batches_z_scrna,
+          comb_batches_z_prot,
+          tweight,
+          mweight,
+          sweight,
+          pweight
         )
 
-        filename <- file.path(wd, context, paste0("model_scores_", context, ".csv"))
+        filename <- file.path(working_directory, context, paste0("model_scores_", context, ".csv"))
         write.csv(comb_omics_z, filename, row.names=FALSE)
     }
 
