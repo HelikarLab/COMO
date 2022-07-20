@@ -3,13 +3,17 @@
 import argparse
 import sys
 import os
+import time
+import unidecode
 import pandas as pd
 import numpy as np
 import instruments
 from project import configs
+import rpy2.robjects as ro
 from rpy2.robjects.packages import importr
 from rpy2.robjects import r, pandas2ri
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
+from rpy2.robjects.conversion import localconverter
 
 pandas2ri.activate()
 
@@ -96,16 +100,22 @@ def abundance_to_bool_group(context_name, group_name, abundance_matrix, rep_rati
 
     protein_transform_io.protein_transform_main(abundance_filepath, output_dir, group_name)
     # Logical Calculation
+    print("THRESH")
     thresholds = abundance_matrix.quantile(quantile, axis=0)
+    print(thresholds)
+    abundance_matrix_nozero = abundance_matrix.replace(0, np.nan)
+    thresholds = abundance_matrix_nozero.quantile(quantile, axis=0)
+    print(thresholds)
+
     testbool = pd.DataFrame(0, columns=list(abundance_matrix), index=abundance_matrix.index)
     for col in list(abundance_matrix):
         testbool.loc[abundance_matrix[col] > thresholds[col], [col]] = 1
 
     abundance_matrix["pos"] = (abundance_matrix > 0).sum(axis=1) / abundance_matrix.count(axis=1)
     abundance_matrix["expressed"] = 0
-    abundance_matrix.loc[(abundance_matrix["pos"] > rep_ratio), ["expressed"]] = 1
+    abundance_matrix.loc[(abundance_matrix["pos"] >= rep_ratio), ["expressed"]] = 1
     abundance_matrix["high"] = 0
-    abundance_matrix.loc[(abundance_matrix["pos"] > hi_rep_ratio), ["high"]] = 1
+    abundance_matrix.loc[(abundance_matrix["pos"] >= hi_rep_ratio), ["high"]] = 1
     bool_filepath = os.path.join(output_dir, f"bool_prot_Matrix_{context_name}_{group_name}.csv")
     abundance_matrix.to_csv(bool_filepath, index_label="ENTREZ_GENE_ID")
 
@@ -308,7 +318,8 @@ def main(argv):
             
             # map gene symbol to ENTREZ_GENE_ID
             proteomics_data.dropna(subset=["Gene Symbol"], inplace=True)
-            proteomics_data.drop(columns=["uniprot"], inplace=True)
+            print(proteomics_data.head())
+            #proteomics_data.drop(columns=["uniprot"], inplace=True)
 
             try:
                 proteomics_data.drop(columns=["uniprot"], inplace=True)

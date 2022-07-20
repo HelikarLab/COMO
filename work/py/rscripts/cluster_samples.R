@@ -45,10 +45,10 @@ make_logical_matrix <- function(wd, technique, context_names) {
     for ( f in files ) {
         
         new_matrix <- read.table(f, strip.white=T, header=T, sep=",", row.names=NULL) %>% # read expression matrix
-          mutate(across(colnames(.)[-1], as.numeric)) %>% # ensure expression values are numbers
-          mutate(across(colnames(.)[1], as.character)) %>% # ensure entrez IDs are character
-          group_by(ENTREZ_GENE_ID) %>%
-          summarise_each(funs(max)) # if multiple of same entrez, take max value
+          dplyr::mutate(dplyr::across(colnames(.)[-1], as.numeric)) %>% # ensure expression values are numbers
+          dplyr::mutate(dplyr::across(colnames(.)[1], as.character)) %>% # ensure entrez IDs are character
+          dplyr::group_by(ENTREZ_GENE_ID) %>%
+          dplyr::summarise_each(dplyr::funs(max)) # if multiple of same entrez, take max value
         
         #if ( "X" %in% colnames(new_matrix) ) {
         #  new_matrix <- new_matrix %>% select(-X)
@@ -56,7 +56,7 @@ make_logical_matrix <- function(wd, technique, context_names) {
         if (!cnt) {
             merge_matrix <- new_matrix
         } else {
-            merge_matrix <- merge_matrix %>% left_join(new_matrix, by="ENTREZ_GENE_ID")
+            merge_matrix <- merge_matrix %>% dplyr::left_join(new_matrix, by="ENTREZ_GENE_ID")
         }
         
         cnt <- cnt+1
@@ -81,7 +81,7 @@ make_logical_matrix <- function(wd, technique, context_names) {
           lapply(
             2:ncol(merge_matrix),
             function(j) {
-                cutoff <- quantile(merge_matrix[,j], prob=1-quantile/100)
+                cutoff = quantile(merge_matrix[,j], prob=1-quantile/100)  # Use "=" otherwise 'cutoff' is defined in the environment
                 merge_matrix[,j] >  cutoff
             }
           )) %>%
@@ -95,7 +95,7 @@ make_logical_matrix <- function(wd, technique, context_names) {
           lapply(
             2:ncol(merge_matrix),
             function(j) {
-                cutoff <- ifelse(
+                cutoff = ifelse(  # Use "=" otherwise 'cutoff' is defined in the environment
                   min_count=="default",
                   10e6/(median(sum(merge_matrix[,j]))),
                   1e6*min_count/(median(sum(merge_matrix[,j])))
@@ -162,10 +162,10 @@ plot_MCA_replicates <- function(logical_matrix, contexts, wd, label) {
     plotname <- file.path(fig_path, "mca_plot_replicates.pdf")
     pdf(plotname)
     
-    p <- ggplot(d, ggplot2::aes(x=x, y=y, label=row.names(d), color=contexts)) +
-      geom_point(alpha=0.7) +
-      geom_text_repel(max.overlaps = Inf) +
-      labs(x="Dim 1", y="Dim 2")
+    p <- ggplot2::ggplot(d, ggplot2::aes(x=x, y=y, label=row.names(d), color=contexts)) +
+      ggplot2::geom_point(alpha=0.7) +
+      ggrepel::geom_text_repel(max.overlaps = Inf) +
+      ggplot2::labs(x="Dim 1", y="Dim 2")
     
     if ( !label ) {
         p <- remove_geom(p, "GeomTextRepel")
@@ -192,7 +192,7 @@ plot_UMAP_replicates <- function(logical_matrix, contexts, wd, label, n_neigh, m
         }
       )
     )
-    coords <- data.frame(umap(fac_matrix, n_neighbors=n_neigh, metric="euclidean", min_dist=min_dist)) %>% cbind(., contexts)
+    coords <- data.frame(uwot::umap(fac_matrix, n_neighbors=n_neigh, metric="euclidean", min_dist=min_dist)) %>% cbind(., contexts)
     row.names(coords) <- row.names(logical_matrix)
     colnames(coords) <- c("x", "y", "contexts")
     

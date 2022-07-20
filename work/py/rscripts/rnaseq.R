@@ -311,7 +311,7 @@ zfpkm_filter <- function(SampMetrics, filt_options, context_name, prep) {
 
     N_exp <- filt_options$replicate_ratio # ratio replicates for active
     N_top <- filt_options$replicate_ratio_high # ratio of replicates for high-confidence
-    cutoff <- -2
+    cutoff <- -5
 
     SampMetrics <- calculate_fpkm(SampMetrics)
 
@@ -384,7 +384,7 @@ umi_filter <- function(SampMetrics, filt_options, context_name) {
     prep <- "scrna"
     N_exp <- filt_options$replicate_ratio # ratio replicates for active
     N_top <- filt_options$replicate_ratio_high # ratio of replicates for high-confidence
-    cutoff <- -2
+    cutoff <- -3
 
     #SampMetrics <- calculate_fpkm(SampMetrics)
     for ( i in 1:length(SampMetrics) ) {
