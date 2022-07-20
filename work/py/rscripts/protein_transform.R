@@ -204,5 +204,3 @@ protein_transform_main <- function(abundance_matrix, out_dir, group_name) {
     out_file <- file.path(out_dir, paste0("protein_zscore_Matrix_", group_name, ".csv"))
     write.csv(z_transformed_abundances, out_file, row.names=FALSE)
 }
-
-
