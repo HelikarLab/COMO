@@ -157,7 +157,7 @@ def set_boundaries(model_cobra, bound_rxns, bound_lb, bound_ub):
 
 def feasibility_test(model_cobra, step):
     # check number of unsolvable reactions for reference model under media assumptions
-    model_cobra_rm = cobra.flux_analysis.fastcc(model_cobra)  # create flux consistant model (rmemoves some reactions)
+    model_cobra_rm = cobra.flux_analysis.fastcc(model_cobra, flux_threshold=15, zero_cutoff=1e-7)  # create flux consistant model (rmemoves some reactions)
     incon_rxns = set(model_cobra.reactions.list_attr("id")) - set(model_cobra_rm.reactions.list_attr("id"))
     incon_rxns_cnt = len(incon_rxns)
 
@@ -337,7 +337,7 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm):
     if recon_algorithm in ["IMAT", "TINIT"]:
         print(gene_expressions["Data"].tolist()[0:20])
         # unknown_val = min(gene_expressions["Data"].tolist())
-        unknown_val = -2.9
+        unknown_val = -4.5
     elif recon_algorithm == "GIMME":
         unknown_val = -1
     elif recon_algorithm == "FASTCORE":
@@ -391,8 +391,8 @@ def create_context_specific_model(
     bound_ub,
     solver,
     context_name,
-    low_thresh=-3,
-    high_thresh=-1
+    low_thresh=-5,
+    high_thresh=-3,
 ):
     """
     Seed a context specific model. Core reactions are determined from GPR associations with gene expression logicals.
@@ -410,6 +410,7 @@ def create_context_specific_model(
         raise NameError("reference model format must be .xml, .mat, or .json")
 
     cobra_model.objective = {getattr(cobra_model.reactions, objective): 1}  # set objective
+    #cobra_model.tolerance = 1e-7
 
     if objective not in force_rxns:
         force_rxns.append(objective)
