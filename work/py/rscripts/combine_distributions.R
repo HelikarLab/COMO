@@ -6,7 +6,7 @@ if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
 }
 
 # prevENTREZ_GENE_ID messy messages from repeatedly writing to juypter
-zz <- file(file.path("/home", username, "../..", "py", "rlogs", "combine_distributions.Rout"), open="wt")
+zz <- file(file.path("/home", username, "work", "py", "rlogs", "combine_distributions.Rout"), open="wt")
 sink(zz, type="message")
 
 
@@ -138,22 +138,12 @@ combine_batch_zdistro <- function(wd, context, batch, zmat) {
         floor_score <- -6
         ceil_score <- 6
         x <- as.numeric(x)
-        #if ( length(x) > 20 ) {
-          #print("Too many replicates to properly merge with Z-tranform. Will take the average value for this batch.")
-        #    x <- c(mean(x))
-        #}
-        #weights = rep( 1, length(x) )
-        #weights = rep(1e-18, length(x)) #GOOD
-        #weights = rep(0.5*ceil_score/(length(x)), length(x))
-        #weights <- weights/sum(weights)
         numer = sum(x)
         denom = sqrt(length(x))
         result = numer/denom
-        #print(result)
         if ( result < floor_score ) { result <- floor_score }
         if ( result > ceil_score ) { result <- ceil_score }
         return(result)
-
     }
 
     if ( ncol(zmat)>2 ) {
@@ -341,6 +331,7 @@ combine_omics_zdistros <- function(
     } else {
         combine_z = zmat[,-1]
     }
+	
     merge_df <- cbind(zmat, combined=combine_z)
     combine_z <- cbind(ENTREZ_GENE_ID=as.character(zmat[,"ENTREZ_GENE_ID"]), combine_z)
 

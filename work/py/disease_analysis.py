@@ -31,9 +31,7 @@ affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
 def breakDownEntrezs(disease):
     """
     Split multi-part entrez ids into multiple rows in the dataframe
-
     param: disease - df with columns: Gene ID
-
     return: df with columns:
     """
     disease["Gene ID"] = disease["Gene ID"].str.replace("///", "//")
@@ -44,8 +42,7 @@ def breakDownEntrezs(disease):
         disease["Gene ID"].str.contains("//")
     ].reset_index(drop=True)
     breaks_gene_names = pd.DataFrame(columns=["Gene ID"])
-    # print(single_gene_names.shape)
-    # print(multipleGeneNames.shape)
+
     for index, row in multiple_gene_names.iterrows():
         for genename in row["Gene ID"].split("//"):
             breaks_gene_names = breaks_gene_names.append(
@@ -59,17 +56,13 @@ def breakDownEntrezs(disease):
 def get_entrez_id(regulated, output_full_path, in_db, taxon_id, full_flag=False):
     """
     Fetch entrez ids using bioDbNet
-
     param: regulated -  df, with columns:
     param: output_full_path - path to
     param: in_db - bioDBnet input database query name
     param: taxon_id - bioDBnet taxon id
     param: full_flag - boolean, True if breaking down multi- entrez ids into seperate rows
-
     return: df,
     """
-    # disease = fetch_entrez_gene_id(list(regulated.index.values), input_db=in_db)
-    # print(list(regulated.index.values))
     disease = fetch_gene_info(list(regulated.index.values),
                               input_db=in_db,
                               output_db=["Gene Symbol"],
@@ -94,10 +87,8 @@ def get_entrez_id(regulated, output_full_path, in_db, taxon_id, full_flag=False)
 def pharse_configs(config_filepath, sheet):
     """
     Read microarray config files
-
     param: config_filepath - string, path to microarray formatted disease configuration xlsx file
     param: sheet - string, sheet name to read
-
     return:
     """
     xl = pd.ExcelFile(config_filepath)
@@ -202,9 +193,6 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
     diff_exp_df["logFC"].astype(float)
     diff_exp_df["abs_logFC"] = diff_exp_df["logFC"].abs()
     diff_exp_df["FDR"].astype(float)
-
-    print(diff_exp_df.head())
-
     diff_exp_df.sort_values(by="abs_logFC", ascending=False, inplace=True)
     regulated = diff_exp_df[diff_exp_df["FDR"] < 0.05]
     down_regulated = regulated[regulated["logFC"] < 0]
@@ -254,7 +242,6 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
     diff_exp_df.drop(columns=["Affy"], inplace=True)  # drop for now bc commas mess up csv parsing, maybe fix later
     diff_exp_df.to_csv(raw_file, index=False)
     print(f"Raw Data saved to '{raw_file}'")
-    print(diff_exp_df.head())
 
     files_dict = {
         "GSE": gse_id,
@@ -373,6 +360,7 @@ def main(argv):
             print("data_source should be either 'microarray' or 'rnaseq'")
             print("Refer to example config file for either type for formatting")
             sys.exit(2)
+            
         write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, target_path)
 
 
