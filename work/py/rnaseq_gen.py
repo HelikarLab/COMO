@@ -35,7 +35,6 @@ def load_rnaseq_tests(filename, context_name, lib_type):
     """
     Load rnaseq results returning a dictionary of test (context, context, cell, etc ) names and rnaseq expression data
     """
-
     def load_dummy_dict():
         savepath = os.path.join(
             configs.rootdir, "data", "data_matrices", "dummy", "dummy_rnaseq_data.csv"
@@ -43,15 +42,11 @@ def load_rnaseq_tests(filename, context_name, lib_type):
         dat = pd.read_csv(savepath, index_col="ENTREZ_GENE_ID")
         return "dummy", dat
 
-    if (
-        not filename or filename == "None"
-    ):  # not using this data type, use empty dummy data matrix
+    if (not filename or filename == "None"):  # not using this data type, use empty dummy data matrix
         return load_dummy_dict()
 
     inquiry_full_path = os.path.join(configs.rootdir, "data", "config_sheets", filename)
-    if not os.path.isfile(
-        inquiry_full_path
-    ):  # check that config file exist (isn't needed to load, but helps user)
+    if not os.path.isfile(inquiry_full_path):  # check that config file exist (isn't needed to load, but helps user)
         print(f"Error: Config file not found at {inquiry_full_path}")
         sys.exit()
 
@@ -62,18 +57,16 @@ def load_rnaseq_tests(filename, context_name, lib_type):
     elif lib_type == "scrna":  # if using single-cell RNA-seq
         filename = f"rnaseq_scrna_{context_name}.csv"
     else:
-        print(
-            f"Unsupported RNA-seq library type: {lib_type}. Must be one of 'total', 'mrna', 'sc'."
-        )
+        print(f"Unsupported RNA-seq library type: {lib_type}. Must be one of 'total', 'mrna', 'sc'.")
         sys.exit()
 
-    fullsavepath = os.path.join(
-        configs.rootdir, "data", "results", context_name, lib_type, filename
-    )
+    fullsavepath = os.path.join(configs.rootdir, "data", "results", context_name, lib_type, filename)
+    
     if os.path.isfile(fullsavepath):
         data = pd.read_csv(fullsavepath, index_col="ENTREZ_GENE_ID")
         print(f"Read from {fullsavepath}")
         return context_name, data
+        
     else:
         print(
             f"{lib_type} gene expression file for {context_name} was not found at {fullsavepath}. This may be "
@@ -98,9 +91,7 @@ def handle_context_batch(
     Handle iteration through each context type and create rnaseq expression file by calling rnaseq.R
     """
 
-    rnaseq_config_filepath = os.path.join(
-        configs.rootdir, "data", "config_sheets", config_filename
-    )
+    rnaseq_config_filepath = os.path.join(configs.rootdir, "data", "config_sheets", config_filename)
     xl = pd.ExcelFile(rnaseq_config_filepath)
     sheet_names = xl.sheet_names
 
@@ -152,21 +143,17 @@ def main(argv):
     """
     Generate a list of active and high-confidence genes from a counts matrix using a user defined
     at normalization-technique at /work/data/results/<context name>/rnaseq_<context_name>.csv
-
     Currently, can filter raw RNA-seq counts using three normalization techniques. Which are defined in rnaseq.R
-
     TPM Quantile, where each replicate is normalized with Transcripts-per-million and an upper quantile is taken to
     create a boolean list of active genes for the replicate. Replicates are compared for consensus within the
     study/batch number according to user-defined ratios and then study/batch numbers are checked for consensus
     according to different user defined ratios.   **CITATION NEEDED** **Recomended if user wants more control over the
     size of the model, like a smaller model that allows for only the most expressed reactions, or a larger more
     encompassing one that contains less essential reactions.
-
     zFPKM method outlined in: https://pubmed.ncbi.nlm.nih.gov/24215113/ can be used. Counts will be normalized using
     zFPKM and genes > -3 will be considered expressed per thier recommendation. Expressed genes will be checked for
     consensus at the replicate and study/batch levels the same as TPM Quantile. **Recommended if user wants to give
     least input over gene essentially determination and use the most standardized method of active gene determination.
-
     flat cutoff of CPM (counts per million) normalized values, check for consensus the same as other methods.
     """
 

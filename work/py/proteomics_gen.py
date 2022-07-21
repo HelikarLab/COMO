@@ -33,26 +33,26 @@ def load_proteomics_data(datafilename, context_name):
     """
     Add description......
     """
-    dataFullPath = os.path.join(
-        configs.rootdir, "data", "data_matrices", context_name, datafilename
-    )
+    dataFullPath = os.path.join(configs.rootdir, "data", "data_matrices", context_name, datafilename)
     print('Data matrix is at "{}"'.format(dataFullPath))
+    
     if os.path.isfile(dataFullPath):
         proteomics_data = pd.read_csv(dataFullPath, header=0)
+        
     else:
         print("Error: file not found: {}".format(dataFullPath))
+        
         return None
 
     # Preprocess data, drop na, duplicate ';' in symbol,
     proteomics_data["symbol"] = proteomics_data["symbol"].astype(str)
     proteomics_data.dropna(subset=["symbol"], inplace=True)
-    pluralnames = proteomics_data[
-        proteomics_data["symbol"].str.contains(";") == True
-    ]
+    pluralnames = proteomics_data[proteomics_data["symbol"].str.contains(";") == True]
+    
     for idx, row in pluralnames.iterrows():
-        # print('{}: {}'.format(idx, row['symbol']))
         names = row["symbol"].split(";")
         rows = []
+        
         for name in names:
             rowcopy = row.copy()
             rowcopy["symbol"] = name
@@ -61,8 +61,9 @@ def load_proteomics_data(datafilename, context_name):
         proteomics_data = pd.concat(
             [proteomics_data, pd.DataFrame(rows)], ignore_index=True
         )
-    #proteomics_data.drop_duplicates(inplace=True)
+
     proteomics_data.rename(columns={"symbol": "Gene Symbol"}, inplace=True)
+    
     return proteomics_data
 
 
@@ -78,6 +79,7 @@ def load_gene_symbol_map(gene_symbols, filename="proteomics_entrez_map.csv"):
         sym2id = instruments.fetch_entrez_gene_id(gene_symbols, input_db="Gene Symbol")
         sym2id.loc[sym2id["Gene ID"] == "-", ["Gene ID"]] = np.nan
         sym2id.to_csv(filepath, index_label="Gene Symbol")
+        
     return sym2id[~sym2id.index.duplicated()]
 
 
@@ -87,6 +89,7 @@ def abundance_to_bool_group(context_name, group_name, abundance_matrix, rep_rati
     """
     output_dir = os.path.join(configs.rootdir, "data", "results", context_name, "proteomics")
     os.makedirs(output_dir, exist_ok=True)
+    
     # write group abundances to individual files
     abundance_filepath = os.path.join(
         configs.datadir,
@@ -95,19 +98,17 @@ def abundance_to_bool_group(context_name, group_name, abundance_matrix, rep_rati
         "proteomics",
         "".join(["protein_abundance_", group_name, ".csv"])
     )
-    print(abundance_matrix.head())
     abundance_matrix.to_csv(abundance_filepath, index_label="ENTREZ_GENE_ID")
 
+    # Z-tranform
     protein_transform_io.protein_transform_main(abundance_filepath, output_dir, group_name)
+    
     # Logical Calculation
-    print("THRESH")
     thresholds = abundance_matrix.quantile(quantile, axis=0)
-    print(thresholds)
     abundance_matrix_nozero = abundance_matrix.replace(0, np.nan)
     thresholds = abundance_matrix_nozero.quantile(quantile, axis=0)
-    print(thresholds)
-
     testbool = pd.DataFrame(0, columns=list(abundance_matrix), index=abundance_matrix.index)
+    
     for col in list(abundance_matrix):
         testbool.loc[abundance_matrix[col] > thresholds[col], [col]] = 1
 
@@ -116,6 +117,7 @@ def abundance_to_bool_group(context_name, group_name, abundance_matrix, rep_rati
     abundance_matrix.loc[(abundance_matrix["pos"] >= rep_ratio), ["expressed"]] = 1
     abundance_matrix["high"] = 0
     abundance_matrix.loc[(abundance_matrix["pos"] >= hi_rep_ratio), ["high"]] = 1
+    
     bool_filepath = os.path.join(output_dir, f"bool_prot_Matrix_{context_name}_{group_name}.csv")
     abundance_matrix.to_csv(bool_filepath, index_label="ENTREZ_GENE_ID")
 
@@ -125,28 +127,26 @@ def to_bool_context(context_name, group_ratio, hi_group_ratio, group_names):
     merged_df = pd.DataFrame(columns=["ENTREZ_GENE_ID", "expressed", "high"])
     merged_df.set_index(["ENTREZ_GENE_ID"], inplace=True)
     merged_hi_df = merged_df
+    
     for group in group_names:
-        print("GROUP: ", group)
         read_filepath = os.path.join(output_dir, f"bool_prot_Matrix_{context_name}_{group}.csv")
         read_df = pd.read_csv(read_filepath)
         read_df.set_index("ENTREZ_GENE_ID", inplace=True)
         read_df = read_df[['expressed', 'high']]
-        print(merged_df.head())
-        print(read_df.head())
+        
         if not merged_df.empty:
             merged_df = pd.merge(merged_df, read_df["expressed"], right_index=True, left_index=True)
             merged_hi_df = pd.merge(merged_hi_df, read_df["high"], right_index=True, left_index=True)
+            
         else:
             merged_df = read_df["expressed"].to_frame()
             merged_hi_df = read_df["high"].to_frame()
-    print(merged_df.head())
-    print(merged_hi_df.head())
+
     if len(merged_df.columns) > 1:
         merged_df.apply(lambda x: sum(x)/len(merged_df.columns)>=group_ratio, axis=1, result_type="reduce")
         merged_hi_df.apply(lambda x: sum(x)/len(merged_hi_df.columns)>=hi_group_ratio, axis=1, result_type="reduce")
 
     out_df = pd.merge(merged_df, merged_hi_df, right_index=True, left_index=True)
-    print(out_df.head())
     out_filepath = os.path.join(output_dir, f"Proteomics_{context_name}.csv")
     out_df.to_csv(out_filepath, index_label="ENTREZ_GENE_ID")
     print("Test Data Saved to {}".format(out_filepath))
@@ -157,7 +157,7 @@ def load_proteomics_tests(filename, context_name):
     """
     Description....
     """
-
+    
     def load_empty_dict():
         savepath = os.path.join(
             configs.rootdir,
@@ -169,15 +169,11 @@ def load_proteomics_tests(filename, context_name):
         dat = pd.read_csv(savepath, index_col="ENTREZ_GENE_ID")
         return "dummy", dat
 
-    if (
-        not filename or filename == "None"
-    ):  # if not using proteomics as a data source load empty dummy data matrix
+    if (not filename or filename == "None"):  # if not using proteomics load empty dummy data matrix
         return load_empty_dict()
 
     inquiry_full_path = os.path.join(configs.rootdir, "data", "config_sheets", filename)
-    if not os.path.isfile(
-        inquiry_full_path
-    ):  # check that config file exist (isn't needed to load, but helps user)
+    if not os.path.isfile(inquiry_full_path):  # check that config file exists
         print("Error: file not found {}".format(inquiry_full_path))
         sys.exit()
 
@@ -188,21 +184,24 @@ def load_proteomics_tests(filename, context_name):
     if os.path.isfile(fullsavepath):
         data = pd.read_csv(fullsavepath, index_col="ENTREZ_GENE_ID")
         print("Read from {}".format(fullsavepath))
+        
         return context_name, data
+        
     else:
         print(
             f"Proteomics gene expression file for {context_name} was not found at {fullsavepath}. This may be "
             f"intentional. Contexts where microarray data can be found in /work/data/results/{context_name}/ will "
             f"still be used for other contexts if found."
         )
+        
         return load_empty_dict()
 
 
-def proteomics_gen(temp):
+def proteomics_gen(TEMP):
     """
     Description
     """
-    return "corn"
+    return "TEMP"
 
 
 def main(argv):
@@ -286,26 +285,19 @@ def main(argv):
 
     xl = pd.ExcelFile(prot_config_filepath)
     sheet_names = xl.sheet_names
+    
     for context_name in sheet_names:
         datafilename = "".join(["protein_abundance_", context_name, ".csv"])
         config_sheet = pd.read_excel(prot_config_filepath, sheet_name=context_name)
         print(config_sheet)
         groups = config_sheet["Group"].unique().tolist()
+        
         for group in groups:
-            print(group)
-            print(config_sheet["SampleName"].tolist())
-            print(config_sheet["Group"].tolist())
-            print(np.where([True if g == group else False for g in config_sheet["Group"].tolist()]))
-
             group_idx = np.where([True if g == group else False for g in config_sheet["Group"].tolist()])
-            #cols = config_sheet["SampleName"].iloc[group_idx]
-
-            #cols = np.take(config_sheet["SampleName"].to_numpy(), group_idx) + [["Col 1", "Col 2"]]
             cols = np.take(config_sheet["SampleName"].to_numpy(), group_idx).ravel().tolist() + [
                 "Gene Symbol",
                 "uniprot"
             ]
-
             cols = np.take(config_sheet["SampleName"].to_numpy(), group_idx).ravel().tolist() + ["Gene Symbol"]
 
             proteomics_data = load_proteomics_data(datafilename, context_name)
@@ -318,16 +310,14 @@ def main(argv):
             
             # map gene symbol to ENTREZ_GENE_ID
             proteomics_data.dropna(subset=["Gene Symbol"], inplace=True)
-            print(proteomics_data.head())
-            #proteomics_data.drop(columns=["uniprot"], inplace=True)
-
+            
             try:
                 proteomics_data.drop(columns=["uniprot"], inplace=True)
+                
             except KeyError:
                 pass
             
             proteomics_data = proteomics_data.groupby(["Gene Symbol"]).agg("max")
-            # proteomics_data.set_index('Gene Symbol', inplace=True)
             proteomics_data["ENTREZ_GENE_ID"] = sym2id["Gene ID"]
             proteomics_data.dropna(subset=["ENTREZ_GENE_ID"], inplace=True)
             proteomics_data.set_index("ENTREZ_GENE_ID", inplace=True)

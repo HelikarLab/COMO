@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+
 import os
 import sys
 import time
@@ -27,8 +28,6 @@ for directory in dirlist:
     else:
         break
 
-# Unpack items in dirlist
-# From: https://stackoverflow.com/questions/14826888
 projectdir = os.path.join(*dirlist[0:split_index])
 
 # Add leading "/", as it will not exist right now

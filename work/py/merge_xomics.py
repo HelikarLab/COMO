@@ -3,17 +3,20 @@
 import argparse
 import os
 import sys
+#import unidecode
+import time
 import pandas as pd
+import numpy as np
 import json
 from collections import Counter
 from project import configs
-import microarray_gen
-import proteomics_gen
-import rnaseq_gen
+from microarray_gen import *
+from proteomics_gen import *
+from rnaseq_gen import *
 from create_context_specific_model import split_gene_expression_data
 from warnings import warn
 from rpy2.robjects.packages import importr
-from rpy2.robjects import pandas2ri
+from rpy2.robjects import r, pandas2ri
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 
 
@@ -28,7 +31,6 @@ tidyverse = importr("tidyverse")
 f = open(os.path.join(configs.rootdir, "py", "rscripts", "combine_distributions.R"), "r")
 string = f.read()
 f.close()
-
 combine_dist_io = SignatureTranslatedAnonymousPackage(string, "combine_dist_io")
 
 
@@ -46,7 +48,6 @@ def merge_xomics(
     """
     Merges microarray, rnaseq, and/or proteomics active gene logicals from outputs of their respective "_gen.py"
     scripts.
-
     :param microarray_file: filename of microarray config file in /work/data/config_sheets/
     :param proteomics_file: filename of proteomics config file in /work/data/config_sheets/
     :param trnaseq_file: filename of Total RNA-seq config file in /work/data/config_sheets/
@@ -56,16 +57,15 @@ def merge_xomics(
     :param no_na: filename of single-cell RNA-seq config file in /work/data/config_sheets/
     :param sheet: sheet name to use, should be context, context, cell type, etc
     :param expression_requirement: integer, minimum number of provided sources with active gene for a it to be in model
-
     :return: dictionary where keys are contexts, (tissue name, control type etc) and values are expression tables
     """
     print(f"Merging data for {sheet}")
     # load data for each source if it exists. IF not load an empty dummy dataset
-    microarray = microarray_gen.load_microarray_tests(filename=microarray_file, context_name=sheet)
-    proteomics = proteomics_gen.load_proteomics_tests(filename=proteomics_file, context_name=sheet)
-    trnaseq = rnaseq_gen.load_rnaseq_tests(filename=trnaseq_file, context_name=sheet, lib_type="total")  # total RNA-seq
-    mrnaseq = rnaseq_gen.load_rnaseq_tests(filename=mrnaseq_file, context_name=sheet, lib_type="mrna")  # mRNA-seq
-    scrnaseq = rnaseq_gen.load_rnaseq_tests(filename=scrnaseq_file, context_name=sheet, lib_type="scrna")  # Single-cell RNA-seq
+    microarray = load_microarray_tests(filename=microarray_file, context_name=sheet)
+    proteomics = load_proteomics_tests(filename=proteomics_file, context_name=sheet)
+    trnaseq = load_rnaseq_tests(filename=trnaseq_file, context_name=sheet, lib_type="total")  # total RNA-seq
+    mrnaseq = load_rnaseq_tests(filename=mrnaseq_file, context_name=sheet, lib_type="mrna")  # mRNA-seq
+    scrnaseq = load_rnaseq_tests(filename=scrnaseq_file, context_name=sheet, lib_type="scrna")  # Single-cell RNA-seq
 
     files_dict = dict()
 
@@ -119,7 +119,7 @@ def merge_xomics(
         else:
             merge_data = merge_data.join(scrnaseq_data, how="outer")
 
-    merge_data = microarray_gen.mergeLogicalTable(merge_data)
+    merge_data = mergeLogicalTable(merge_data)
 
     num_sources = len(exp_list)
     merge_data["Active"] = 0
@@ -147,7 +147,7 @@ def merge_xomics(
     if not no_hc:  # set genes that are high-confidence in at least one data source to active
         merge_data.loc[merge_data[high_list].sum(axis=1) > 0, "Active"] = 1
 
-    # merge_data = merge_data.astype(int)
+    #merge_data = merge_data.astype(int)
     merge_data = merge_data
 
     filepath = os.path.join(configs.rootdir, "data", "results", sheet, f"merged_{sheet}.csv")
@@ -200,19 +200,12 @@ def handle_context_batch(
     use_proteins = True if proteomics_file is not None else False
 
     counts = Counter(sheet_names)
-    print(counts)
     sheet_names = sorted(list(set(sheet_names)))
     print(f"Will merge data for: {sheet_names}")
     dict_list = {}
 
     max_inputs = max(counts.values())
     min_inputs = min(counts.values())
-
-    print(sheet_names)
-    print(tweight)
-    print(mweight)
-    print(sweight)
-    print(pweight)
 
     if merge_distro:
         combine_dist_io.combine_zscores_main(
@@ -278,13 +271,12 @@ def handle_context_batch(
     with open(files_json, "w") as fp:
         json.dump(dict_list, fp)
 
-    # return
+    return
 
 
 def main(argv):
     """
     Merge expression tables of multiple sources, microarray, RNA-seq, and/or proteomics into one list
-
     User can specify the number of sources with an active gene in order for it to be considered active in the model.
     Otherwise, it defaults to the number of sources provided. High-confidence genes from any source will be considered
     active in the model, regardless of agreement with other sources.
@@ -465,32 +457,6 @@ def main(argv):
         help="Proteomics weight for merging z-score distribution",
     )
 
-    # Create a clustering group
-    clustering = parser.add_argument_group("Clustering")
-
-    # Determine if clustering should be done
-    # From: https://stackoverflow.com/questions/15008758
-    clustering.add_argument(
-        "--cluster",
-        required=False,
-        action=argparse.BooleanOptionalAction,
-        dest="perform_cluster",
-        help="Should clustering should be performed"
-    )
-    clustering.add_argument(
-        "--cluster-format",
-        required="--cluster" in argv,  # Require if --cluster is included
-        dest="cluster_format",
-        choices=["binary", "zfpkm"],
-        help="Use binarized or zFPKM clustering output"
-    )
-    clustering.add_argument(
-        "--cluster-sources",
-        required="--cluster" in argv,  # Require if --cluster is included
-        dest="cluster_source",
-        choices=["zfpkm", "tpm", "cpm", "umi"],
-        help="The type of data used in clustering"
-    )
 
     args = parser.parse_args(argv)
 
@@ -536,14 +502,16 @@ def main(argv):
             expression_requirement = int(expression_requirement)
             if int(expression_requirement) < 1:
                 print("Expression requirement must be at least 1!")
-                sys.exit(1)
+                sys.out()
         except ValueError:
             print("Expression requirement must be able to be converted to an integer!")
-            sys.exit(1)
+            sys.out()
 
     if adjust_method not in ["progressive", "regressive", "flat", "custom"]:
-        print("Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'")
-        sys.exit(1)
+        print(
+            "Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'"
+        )
+        sys.exit()
 
     handle_context_batch(
         microarray_file,
@@ -564,7 +532,7 @@ def main(argv):
         keep_gene_score
     )
 
-    # return
+    return
 
 
 if __name__ == "__main__":

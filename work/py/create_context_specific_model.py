@@ -71,7 +71,9 @@ def gene_rule_logical(expression_in, level=0):
         else:
             expression_in = expression_in.replace("[", "")
             expression_in = expression_in.replace("]", "")
+            
         return expression_in
+        
     loc_l = expression_in[0:loc_r].rindex("(")
     inner_string = expression_in[loc_l : loc_r + 1]
     inner_string = inner_string.replace("(", "[")
@@ -258,9 +260,8 @@ def seed_imat(
             getattr(context_cobra_model.reactions, r_id).fluxes = val
             flux_df.loc[len(flux_df.index)] = [r_id, val]
 
-    print("removing")
     context_cobra_model.remove_reactions(remove_rxns, True)
-    print("done")
+
     return context_cobra_model, flux_df
 
 
@@ -304,7 +305,6 @@ def split_gene_expression_data(expression_data, recon_algorithm="GIMME"):
 
     for index, row in multiple_gene_names.iterrows():
         for genename in row["Gene"].split("///"):
-            # breaks_gene_names = breaks_gene_names.append({'Gene': genename, 'Data': row['Data']}, ignore_index=True)
             breaks_gene_names = pd.concat(
                 [
                     breaks_gene_names,
@@ -332,7 +332,7 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm):
         expression_data, recon_algorithm=recon_algorithm
     )
     expression_rxns = collections.OrderedDict()
-    # expr_vector = []
+
     cnt = 0
     if recon_algorithm in ["IMAT", "TINIT"]:
         print(gene_expressions["Data"].tolist()[0:20])
@@ -370,12 +370,13 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm):
             gene_reaction_by_rule = gene_rule_evaluable(gene_reaction_rule)
             gene_reaction_by_rule = gene_reaction_by_rule.strip()
             expression_rxns[rxn.id] = eval(gene_reaction_by_rule)
-            # expr_vector.append(expression_rxns[rxn.id])
+            
         except BaseException:
             cnt += 1
 
     print("Map gene expression to reactions, {} errors.".format(cnt))
     expr_vector = np.array(list(expression_rxns.values()), dtype=float)
+    
     return expression_rxns, expr_vector
 
 
@@ -410,7 +411,6 @@ def create_context_specific_model(
         raise NameError("reference model format must be .xml, .mat, or .json")
 
     cobra_model.objective = {getattr(cobra_model.reactions, objective): 1}  # set objective
-    #cobra_model.tolerance = 1e-7
 
     if objective not in force_rxns:
         force_rxns.append(objective)
@@ -420,33 +420,21 @@ def create_context_specific_model(
         cobra_model, bound_rxns, bound_lb, bound_ub
     )
 
-
     # set solver
     cobra_model.solver = solver.lower()
-
-    #if len(bound_rm_rxns) > 0:
-    #    cobra_model.remove_reactions(bound_rm_rxns, True)
-    #    print(f"Removed {len(bound_rm_rxns)} unused boundary reactions")
 
     # check number of unsolvable reactions for reference model under media assumptions
     incon_rxns, cobra_model = feasibility_test(cobra_model, "before_seeding")
 
-    print("read cobamp")
     # CoBAMP methods
     cobamp_model = COBRAModelObjectReader(cobra_model)  # load model in readable format for CoBAMP
-    print("Get irr")
     cobamp_model.get_irreversibilities(True)
-    print("get stoch")
     s_matrix = cobamp_model.get_stoichiometric_matrix()
-    print("get bounds")
     lb, ub = cobamp_model.get_model_bounds(False, True)
-    print("get rx names")
     rx_names = cobamp_model.get_reaction_and_metabolite_ids()[0]
-    print("map")
+    
     # get expressed reactions
     expression_rxns, expr_vector = map_expression_to_rxn(cobra_model, gene_expression_file, recon_algorithm)
-
-    # expressed_rxns = list({k: v for (k, v) in expression_rxns.items() if v > 0}.keys())
 
     # find reactions in the force reactions file that are not in general model and warn user
     for rxn in force_rxns:
@@ -461,6 +449,7 @@ def create_context_specific_model(
     infeas_force_rxns = []
     infeas_exp_cnt = 0
     infeas_force_cnt = 0
+    
     for idx, (rxn, exp) in enumerate(expression_rxns.items()):
         # log reactions in expressed and force lists that are infeasible that the user may wish to review
         if rxn in incon_rxns and expr_vector[idx] == 1:
@@ -484,17 +473,8 @@ def create_context_specific_model(
 
     idx_obj = rx_names.index(objective)
     idx_force = [rx_names.index(rxn) for rxn in force_rxns if rxn in rx_names]
-    print("idx_force")
-    print(idx_force)
     exp_idx_list = [idx for (idx, val) in enumerate(expr_vector) if val > 0]
     exp_thresh = (low_thresh, high_thresh)
-
-    print("build that shiz yo")
-    print("length:")
-    print("ub: ", len(ub))
-    print("lb: ", len(lb))
-    print("exp_vec: ", len(expr_vector))
-    print("reactoins in model: ", len(cobra_model.reactions))
 
     # switch case dictionary runs the functions making it too slow, better solution then elif ladder?
     if recon_algorithm == "GIMME":
@@ -522,8 +502,6 @@ def create_context_specific_model(
         )
     else:
         context_model_cobra = seed_unsupported(recon_algorithm)
-
-    print("we built it boyyyy")
 
     # check number of unsolvable reactions for seeded model under media assumptions
     incon_rxns_cs, context_model_cobra = feasibility_test(
@@ -697,8 +675,6 @@ def main():
     force_rxns_file = args.force_rxns_file
     recon_alg = args.algorithm.upper()
     solver = args.solver.upper()
-    # TODO: Allow user to input a regular list of items for output_filetypes
-    # From: https://stackoverflow.com/questions/15753701
     output_filetypes = args.output_filetypes
 
     if not os.path.exists(reference_model):
