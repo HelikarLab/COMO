@@ -34,13 +34,12 @@ def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
     # From: https://florimond.dev/en/posts/2018/08/python-mutable-defaults-are-the-source-of-all-evil/
     if gpls is None:
         gpls: list[str] = ["GPL96", "GPL97", "GPL8300"]
-    # maps_list = []
-    # gene_maps = pd.DataFrame([],columns=['GPL96','GPL97','GPL8300','ENTREZ_GENE_ID'])
-    # gene_maps.set_index('ENTREZ_GENE_ID',inplace=True)
+
     for gpl in gpls:
         table = gse.gpls[gpl].table.copy()
         if vendor.lower() == "affy":
             temp = table[["ID", "ENTREZ_GENE_ID"]]
+            
         elif vendor.lower() == "agilent":
             input_values = table.loc[
                 table["CONTROL_TYPE"] == "FALSE", "SPOT_ID"
@@ -52,26 +51,15 @@ def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
                 columns={"Agilent ID": "ID", "Gene ID": "ENTREZ_GENE_ID"}, inplace=True
             )
             temp.replace(to_replace="-", value=np.nan, inplace=True)
+            
         else:
             print("Unsupported Platform: {}".format(gpl))
             continue
+            
         # Save to file
         filefullpath = os.path.join(datadir, "{}entrez.csv".format(gpl.lower()))
         temp.to_csv(filefullpath, index=False)
         # Single Table
-        # temp.dropna(axis=0,inplace=True)
-        # temp.set_index('ENTREZ_GENE_ID',inplace=True)
-        # maps_list.append(temp)
-
-    # maps_dict = dict(zip(platforms, maps_list))
-    # return maps_dict
-
-
-# df_outer = create_entrez_table_default(gse)
-
-
-# initialize with platform
-# gsm_maps = get_gsm_tables(gse)
 
 
 class GSEproject:
@@ -95,6 +83,7 @@ class GSEproject:
         self.platforms = dict(zip(gpls, vendors))
         self.download_samples()
 
+
     def organize_gse_raw_data(self):
         """
         Organize raw data at local folder
@@ -112,6 +101,7 @@ class GSEproject:
         # Move Corresponding Cel files to Folders
         onlyfiles = [f for f in os.listdir(self.gene_dir) if f.endswith(".gz")]
         cnt = 0
+        
         for file in onlyfiles:
             filelist = file.split(".")
             prefix = filelist[0]
@@ -124,6 +114,7 @@ class GSEproject:
                 print("Move {} to {}".format(src_path, dst_path))
                 cnt += 1
         print("{} raw data files moved.".format(cnt))
+
 
     def get_gsm_tables(self):
         """
@@ -143,8 +134,8 @@ class GSEproject:
             temp = pd.read_csv(filepath)
             df = temp[["ID", "ENTREZ_GENE_ID"]]
             df.set_index("ID", inplace=True)
-            # df.drop_duplicates(keep='last', inplace=True)
             gsm_tables[gpl] = df
+            
         return gsm_tables
 
     def get_gsm_platform(self):
@@ -156,6 +147,7 @@ class GSEproject:
         keys = self.querytable["Samples"].str.upper().tolist()
         values = self.querytable["GPL ID"].str.upper().tolist()
         gsm_platform = dict(zip(keys, values))
+        
         return gsm_platform
 
     def gsms_included_by(self, df):
@@ -168,6 +160,7 @@ class GSEproject:
                     break
             if not included:
                 return False
+                
         return True
 
     def get_entrez_table_pipeline(self, fromcsv=True):
@@ -193,16 +186,15 @@ class GSEproject:
                     print("Need Append GSMs")
             except:
                 print("Unable to read {}")
-                # self.download_raw(overwrite=True)
 
         print("Create new table: {}".format(filefullpath))
         gsm_maps = self.get_gsm_tables()
-        # gsm_maps_test = gsm_maps.dropna(how='all')
+
         if not any(gsm_maps):
             print("Not available, return empty dataframe")
             return pd.DataFrame([])
 
-        # step 1: Ready Affy files from folders
+        # Ready Affy files from folders
         gsm_tables_sc500 = {}
         for key, vendor in self.platforms.items():
             platformdir = os.path.join(self.gene_dir, key)
@@ -216,7 +208,6 @@ class GSEproject:
                 elif vendor.lower() == "agilent":
 
                     outputdf = readagilent(platformdir, list(self.gsm_platform.keys()))
-                    # outputdf = ro.conversion.rpy2py(outputdf)
                     gsm_maps[key] = fetch_entrez_gene_id(
                         list(map(str, list(outputdf["ProbeName"]))),
                         input_db="Agilent ID",
@@ -231,7 +222,6 @@ class GSEproject:
             else:
                 print("Path not exist: {}".format(platformdir))
                 continue
-            # outputdf = ro.conversion.rpy2py(outputdf)
 
             drop_idx = np.where(gsm_maps[key]["ENTREZ_GENE_ID"] == "-")[0].tolist()
             outputdf.drop(outputdf.index[drop_idx], axis=0, inplace=True)
@@ -239,13 +229,13 @@ class GSEproject:
             outputdf["ENTREZ_GENE_ID"] = gsm_maps[key]["ENTREZ_GENE_ID"].to_list()
             gsm_tables_sc500[key] = outputdf
 
-        # step 2: Drop rows without ENTREZ GENE ID, set index to ENTREZ
+        # Drop rows without ENTREZ GENE ID, set index to ENTREZ
         for key in self.platforms.keys():
             gsm_tables_sc500[key].dropna(subset=["ENTREZ_GENE_ID"], inplace=True)
             gsm_tables_sc500[key].set_index("ENTREZ_GENE_ID", inplace=True)
             print("gsm table drop: ", gsm_tables_sc500[key])
 
-        # step 3: Merge tables of platforms
+        # Merge tables of platforms
         df_outer_sc500 = None
         for key in self.platforms.keys():
             print("{}: {}".format(key, gsm_tables_sc500[key].shape))
@@ -265,6 +255,7 @@ class GSEproject:
         keys = []
         vals = []
         gsms_loaded = []
+        
         for col in list(df_outer_sc500):
             if ".cel.gz" in col:
                 strs = col.split(".cel.gz")
@@ -273,10 +264,11 @@ class GSEproject:
                 vals.append(newcol)
                 keys.append(col)
                 gsms_loaded.append(gsm)
+                
         df_outer_sc500.rename(columns=dict(zip(keys, vals)), inplace=True)
         gsms_loaded = list(set(gsms_loaded).union(set(self.gsm_platform.keys())))
 
-        # step 4: Remove duplicated items, keep largest VALUE for each GSM
+        # Remove duplicated items, keep largest VALUE for each GSM
         if "df_clean_sc500" not in locals():
             df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)
             df_clean_sc500 = df_clean_sc500[
@@ -308,36 +300,41 @@ class GSEproject:
                 "{}.cel.gz.1".format(key_low),
                 "{}.cel.gz.2".format(key_low),
             )
+            
             try:
                 temp = df_outer_sc500.loc[:, [col1, col2, col3]]
+                
             except:
                 if key in list(self.gsm_platform.keys()):
                     print("{} not in df_outer_sc500".format(key))
+                    
                 continue
+                
             temp.sort_values(by=["ENTREZ_GENE_ID", col1], inplace=True)
             temp = temp[~temp.index.duplicated(keep="last")]
             df_clean_sc500[col1] = temp[col1]
             df_clean_sc500[col2] = temp[col2]
             df_clean_sc500[col3] = temp[col3]
 
-        # if 'express' in list(df_outer_sc500):
-        #     df_clean_sc500 = df_outer_sc500.sort_values(by=['ENTREZ_GENE_ID', 'express'])
-        #     df_clean_sc500 = df_clean_sc500[~df_clean_sc500.index.duplicated(keep='last')]
-
-        # step 5: save to csv file
+        # save to csv file
         try:
             df_clean_sc500.set_index("ENTREZ_GENE_ID", inplace=True)
+            
         except:
             pass
+            
         df_clean_sc500.dropna(axis="columns", how="all", inplace=True)
         df_clean_sc500.dropna(how="all", inplace=True)
+        
         try:
             df_clean_sc500.drop(columns=["placeholder"], inplace=True)
         except:
             pass
+            
         df_clean_sc500.sort_index(inplace=True)
         df_clean_sc500.to_csv(filefullpath)
         print("Full table saved to:\n{}".format(filefullpath))
+        
         return df_clean_sc500
 
     def download_raw(self, overwrite=False):
@@ -360,6 +357,7 @@ class GSEproject:
             os.remove(filefullpath)
             print("Remove Raw File: {}".format(filefullpath))
             self.organize_gse_raw_data()
+            
         else:
             pass
 
@@ -374,12 +372,15 @@ class GSEproject:
                 )
             )
             filefullpath = os.path.join(self.gene_dir, "{}.tar".format(gsm))
+            
             if (not os.path.isfile(filefullpath)) or overwrite:
                 urllib.request.urlretrieve(sample_url, filefullpath)
                 print("Retrieve Sample: {}".format(filefullpath))
+                
             else:
                 print("Sample exist: {}".format(filefullpath))
                 continue
+                
             tfile = tarfile.open(filefullpath)
             tfile.extractall(path=platformdir)
             # os.remove(filefullpath) # keep to avoid re-download
@@ -398,4 +399,5 @@ class GSEproject:
                 self.gene_dir, "{}_data_z.csv".format(self.gsename)
             )
             result.to_csv(filefullpath)
+            
         return result

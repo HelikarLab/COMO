@@ -16,11 +16,7 @@ library(readxl)
 
 
 readCountMatrix <- function(cmat_file, config_file, disease_name) {
-  print("read config")
-  print(config_file)
   conf <- read_excel(config_file, sheet=disease_name, col_names=TRUE)
-  print("read matrix")
-  print(cmat_file)
   cmat_whole <- read.csv(cmat_file, header=TRUE)
   cmat_whole[,-1] <- lapply(cmat_whole[,-1], as.numeric)
   cmat_whole <- cmat_whole[rowSums(cmat_whole[,-1])>0,]
@@ -57,14 +53,15 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name) {
   gene_list <- SampMetrics[[1]][[1]][["Ensembl"]]
   
   df <- data.frame(Ensembl=gene_list)
-  #colnames(df)[1] <- "Ensembl"
   group_list <- c(rep("control", length(SampMetrics[["control"]])), rep('patient', length(SampMetrics[["patient"]])))
+  
   for ( j in 1:length(SampMetrics[["control"]]) ) {
     df <- cbind(df, SampMetrics[["control"]][[j]][["Counts"]])
   }
   for ( j in 1:length(SampMetrics[["patient"]]) ) {
     df <- cbind(df, SampMetrics[["patient"]][[j]][["Counts"]])
   }
+  
   df[is.na(df)] <- 0
   ensembl <- df["Ensembl"]
   df["Ensembl"] <- NULL
@@ -120,13 +117,9 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name) {
     expTab <- edgeR_result$table
     
     # save results
-    #expTab['abs_logFC'] <- abs(expTab$logFC)
     names(expTab)[names(expTab) == "PValue"] <- "P.Value"
     names(expTab)[names(expTab) == "genes"] <- "Ensembl"
-    #expTab <- expTab[,deGenes==TRUE]
-    #write.csv(expTab,
-    #          file.path("/home", username, "work", "data", "results", tissue_name, disease_name, "DiffExp.csv")
-    #)
+	
     # smear plot
     plotname <- file.path("/home", username, "work", "data", "results", tissue_name, disease_name, "smear_plot.jpg")
     title <- paste0("DGEList Smear Plot ", test_cell)

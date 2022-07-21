@@ -14,7 +14,6 @@ sink(zz, type="message")
 
 library(tidyverse)
 
-
 # fetch and organize MADRID_input
 organize_gene_counts_files <- function(data_dir) {
     # fetch and organize MADRID_input
@@ -223,10 +222,8 @@ generate_counts_matrix_main <- function(data_dir, out_dir) {
         study_metrics[[i]][["NumSamples"]] <- ncol(study_metrics[[i]][["CountMatrix"]]) # store number of samples
 
         if ( i == 1 ) { # if first study
-            #full_count_matrix <- data.frame(study_metrics[[i]][["CountMatrix"]])
             full_count_matrix <- study_metrics[[i]][["CountMatrix"]] # initialize supermatrix
         } else { # for successive studies
-            #add_mat <-data.frame(study_metrics[[i]][["CountMatrix"]])
             add_mat <- study_metrics[[i]][["CountMatrix"]]
             full_count_matrix <- merge(full_count_matrix, add_mat, by="genes", all=TRUE) # merge study matrix to super
         }
