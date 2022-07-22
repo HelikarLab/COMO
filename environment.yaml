@@ -46,16 +46,16 @@ dependencies:
   - tqdm==4.64.0
   - pip==22.1.2
   - pip:
-      - python-libsbml==5.19.2
-      - optlang==1.5.2
-      - cobra==0.24.0
-      - git+https://github.com/babessell1/cobamp.git@master#egg=cobamp
-      - git+https://github.com/cokelaer/bioservices.git@master#egg=bioservices
-      - git+https://github.com/babessell1/troppo.git@master
-      - memote==0.13.0
-      - framed==0.5.2
-      - pytest==4.6.11
-      - escher==1.7.3
-      - gurobipy==9.5.2
-      - openpyxl==3.0.10
-      - jupyterlab-spreadsheet-editor==0.6
+    - python-libsbml==5.19.2
+    - optlang==1.5.2
+    - cobra==0.24.0
+    - git+https://github.com/babessell1/cobamp.git@master#egg=cobamp
+    - git+https://github.com/cokelaer/bioservices.git@master#egg=bioservices
+    - git+https://github.com/babessell1/troppo.git@master
+    - memote==0.13.0
+    - framed==0.5.2
+    - pytest==4.6.11
+    - escher==1.7.3
+    - gurobipy==9.5.2
+    - openpyxl==3.0.10
+    - jupyterlab-spreadsheet-editor==0.6
