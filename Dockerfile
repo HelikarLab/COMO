@@ -4,11 +4,11 @@ ARG GRB_SHORT_VERSION=9.5
 ARG GRB_VERSION=9.5.0
 ARG PYTHON_VERSION=3.10
 ARG HOME="/home/jovyan"
-ARG ENVIRONMENT_FILE="${HOME}/environment.yml"
+ARG ENVIRONMENT_FILE="${HOME}/environment.yaml"
 ARG JUPYTER_NOTEBOOK="${HOME}/work/py/pipeline.ipynb"
 ARG JUPYTER_CONFIG="${HOME}/.jupyter/jupyter_notebook_config.py"
 
-COPY /environment.yml "${ENVIRONMENT_FILE}"
+COPY /environment.yaml "${ENVIRONMENT_FILE}"
 
 # Give ownership to jovyan user
 COPY --chown=1000:100 /work "${HOME}"/work
