@@ -3,7 +3,6 @@ This file is responsible downloading data found at FTP links
 
 TODO: Find a way to mark a file as "downloaded"
     - Keep a list of file names in a ".completd" hidden folder?
-    -
 """
 from FileInformation import FileInformation
 from FileInformation import clear_print
