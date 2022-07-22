@@ -8,6 +8,8 @@ ARG ENVIRONMENT_FILE="${HOME}/environment.yaml"
 ARG JUPYTER_NOTEBOOK="${HOME}/work/py/pipeline.ipynb"
 ARG JUPYTER_CONFIG="${HOME}/.jupyter/jupyter_notebook_config.py"
 
+COPY /build_scripts/pip_install.txt "${HOME}/pip_install.txt"
+COPY /build_scripts/mamba_install.txt "${HOME}/mamba_install.txt"
 COPY /environment.yaml "${ENVIRONMENT_FILE}"
 
 # Give ownership to jovyan user
@@ -20,14 +22,16 @@ RUN conda config --add channels conda-forge \
     # Remove python from pinned versions; this allows us to update python. From: https://stackoverflow.com/a/11245372/13885200 \
     && sed -i "s/^python 3.*//" /opt/conda/conda-meta/pinned \
     && mamba install --yes python=${PYTHON_VERSION} \
-    && mamba env update --name base --file "${ENVIRONMENT_FILE}" \
+    && mamba install --file "${HOME}/mamba_install.txt" \
+    && python3 -m pip install -r "${HOME}/pip_install.txt" \
+    #&& mamba env update --name base --file "${ENVIRONMENT_FILE}" \
     && mamba clean --all --force-pkgs-dirs --yes \
     && R -e 'devtools::install_github("babessell1/zFPKM")' \
     # Install jupyter extensions
     && jupyter labextension install @jupyter-widgets/jupyterlab-manager \
     && jupyter labextension install escher \
     && jupyter trust "${JUPYTER_NOTEBOOK}" \
-    && rm -f "${ENVIRONMENT_FILE}"
+    && rm -f "${ENVIRONMENT_FILE}" "${HOME}/pip_install.txt" "${HOME}/mamba_install.txt"
 
 # Install gurbori
 RUN wget https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
