@@ -47,7 +47,7 @@ dependencies:
   - pip==22.1.2
   - pip:
     - python-libsbml==5.19.2
-    - optlang==1.5.2
+    - git+https://github.com/babessell1/optlang.git@master#egg=optlang
     - cobra==0.24.0
     - git+https://github.com/babessell1/cobamp.git@master#egg=cobamp
     - git+https://github.com/cokelaer/bioservices.git@master#egg=bioservices
