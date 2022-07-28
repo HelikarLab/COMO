@@ -14,7 +14,7 @@ COPY /environment.yaml "${ENVIRONMENT_FILE}"
 
 # Give ownership to jovyan user
 COPY --chown=1000:100 /work "${HOME}"/work
-
+#
 # Install python-related items
 RUN conda config --add channels conda-forge \
     && conda config --add channels bioconda \
