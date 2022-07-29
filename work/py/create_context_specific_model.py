@@ -159,6 +159,7 @@ def set_boundaries(model_cobra, bound_rxns, bound_lb, bound_ub):
 
 def feasibility_test(model_cobra, step):
     # check number of unsolvable reactions for reference model under media assumptions
+    model_cobra_wtf = cobra.flux_analysis.fastcc(model_cobra, flux_threshold=15, zero_cutoff=1e-7)  # create flux consistant model 
     model_cobra_rm = cobra.flux_analysis.fastcc(model_cobra, flux_threshold=15, zero_cutoff=1e-7)  # create flux consistant model (rmemoves some reactions)
     incon_rxns = set(model_cobra.reactions.list_attr("id")) - set(model_cobra_rm.reactions.list_attr("id"))
     incon_rxns_cnt = len(incon_rxns)
@@ -424,7 +425,8 @@ def create_context_specific_model(
     cobra_model.solver = solver.lower()
 
     # check number of unsolvable reactions for reference model under media assumptions
-    incon_rxns, cobra_model = feasibility_test(cobra_model, "before_seeding")
+    #incon_rxns, cobra_model = feasibility_test(cobra_model, "before_seeding")
+    incon_rxns = []
 
     # CoBAMP methods
     cobamp_model = COBRAModelObjectReader(cobra_model)  # load model in readable format for CoBAMP
@@ -504,9 +506,9 @@ def create_context_specific_model(
         context_model_cobra = seed_unsupported(recon_algorithm)
 
     # check number of unsolvable reactions for seeded model under media assumptions
-    incon_rxns_cs, context_model_cobra = feasibility_test(
-        context_model_cobra, "after_seeding"
-    )
+    #incon_rxns_cs, context_model_cobra = feasibility_test(context_model_cobra, "after_seeding")
+    incon_rxns_cs = []
+    
     if recon_algorithm == "IMAT":
         final_rxns = [rxn.id for rxn in context_model_cobra.reactions]
         imat_rxns = flux_df.rxn
