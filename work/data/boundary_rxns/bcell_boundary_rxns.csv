@@ -52,12 +52,12 @@ EX_pydxn[e],0,1000
 EX_pydx[e],0,1000
 EX_pydam[e],0,1000
 EX_btn[e],0,1000
-EX_fol[e],0,1000
+EX_fol[e],-10,1000
 EX_aqcobal[e],0,1000
 EX_vitd3[e],-1,1000
 EX_ascb_L[e],0,1000
-EX_retinol[e],0,1000
-EX_retinal[e],0,1000
+EX_retinol[e],-10,1000
+EX_retinal[e],-10,1000
 EX_ala_B[e],-1,1000
 EX_ala_D[e],-1,1000
 EX_h2co3[e],-1000,1000
@@ -67,4 +67,4 @@ EX_orn[e],-1,1000
 EX_orn_D[e],-1,1000
 EX_so4[e],-1000,1000
 EX_ribflv[e],-1,1000
-EX_Lcystin[e],0,1000
+EX_Lcystin[e],-1,1000
