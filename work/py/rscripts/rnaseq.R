@@ -486,9 +486,9 @@ save_rnaseq_tests <- function(counts_matrix_file, config_file, out_file, info_fi
           filt_options$min_count <- 1
       }
 	  if ( exists("min_zfpkm") ) {
-          filt_options$min_count <- min_count
+          filt_options$min_zfpkm <- min_zfpkm
       } else {
-          filt_options$min_count <- -3
+          filt_options$min_zfpkm <- -3
       }
       if ( exists("replicate_ratio_high") ) {
           filt_options$replicate_ratio_high<- replicate_ratio_high
