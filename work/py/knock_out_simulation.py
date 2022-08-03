@@ -21,7 +21,7 @@ from project import configs
 from instruments import fetch_entrez_gene_id
 
 
-def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, test_all):
+def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, test_all, pars_flag):
     if ref_flux_file is not None:
         try:
             ref_flux_df = pd.read_csv(ref_flux_file)
@@ -37,7 +37,10 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, tes
 
         ref_sol = cobra.core.solution.Solution(model.objective, "OPTIMAL", ref_flux)
     else:
-        ref_sol = pfba(model)
+        if pars_flag:
+            ref_sol = pfba(model)
+        else:
+            ref_sol = model.optimize()
 
     if os.path.isfile(inhibitors_filepath):
         print(f"Inhibitors file found at:\n{inhibitors_filepath}")
@@ -345,7 +348,16 @@ def main(argv):
         dest="test_all",
         help="Test all genes, even ones predicted to have little no effect."
     )
-        
+    parser.add_argument(
+        "-p",
+        "--parsimonious",
+        action="store_true",
+        required=False,
+        default=False,
+        dest="pars_flag",
+        help="Use parsimonious FBA for optimal reference solution (only if not providing flux file)"
+    )
+    
     args = parser.parse_args()
     tissue_spec_model_file = args.model
     context = args.context
@@ -355,6 +367,7 @@ def main(argv):
     drug_raw_file = args.raw_drug_file
     ref_flux_file = args.ref_flux_file
     test_all = args.test_all
+    pars_flag = args.pars_flag
 
     output_dir = os.path.join(configs.datadir, "results", context, disease)
     inhibitors_file = os.path.join(output_dir, f"{context}_{disease}_inhibitors.tsv")
@@ -371,8 +384,6 @@ def main(argv):
         cobra_model = cobra.io.load_json_model(tissue_spec_model_file)
     else:
         raise NameError("reference model format must be .xml, .mat, or .json")
-        
-    cobra_model.solver = "gurobi"
 
     # preprocess repurposing hub data
     drug_tsv_file = "Repurposing_Hub_Preproc.tsv"
@@ -394,7 +405,8 @@ def main(argv):
                 inhibitors_filepath=inhibitors_file,
                 drug_db=drug_db,
                 ref_flux_file=ref_flux_file,
-                test_all=test_all
+                test_all=test_all,
+                pars_flag=pars_flag
             )
 
     flux_solution_diffs.to_csv(os.path.join(output_dir, "flux_diffs_KO.csv"))
