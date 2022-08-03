@@ -149,13 +149,9 @@ plot_gaussian_fit <- function(results, FacetTitles=TRUE, PlotXfloor) {
 z_transform <- function(abundance_df, min_thresh) {
 
     abundance_df <- rm_infinite(abundance_df)
-    print("1")
-    #print(row.names(abundance_df))
     z_df <- data.frame(row.names=row.names(abundance_df))
-    print("2")
     outputs <- list()
     for (c in colnames(abundance_df)) {
-        print(c)
         output <- z_score_calc(abundance_df[, c], min_thresh)
         z_df[, c] <- output[["z"]]
         outputs[[c]] <- output
@@ -174,7 +170,6 @@ rm_infinite <- function(abundance) {
     # Remove FPKM rows containing all NaN values. These are most likely a result
     # of effective lengths = 0 when calculating FPKM.
     abundance <- as.data.frame(abundance)
-    print(head(abundance))
     return(abundance[which(!apply(abundance, 1, function(r) all(is.nan(r) | is.infinite(r)))), ])
 }
 
@@ -182,14 +177,10 @@ rm_infinite <- function(abundance) {
 protein_transform_main <- function(abundance_matrix, out_dir, group_name) {
     dir.create(file.path(out_dir, "figures"), showWarnings = FALSE)
     prot <- as.data.frame(read.csv(abundance_matrix))
-    print(head(prot))
     prot[is.na(prot)] <- 0
     min_thresh <- min(prot>0)
-    print("min thresh")
-    print(min_thresh)
     #row.names(prot) <- prot$ENTREZ_GENE_ID
     #prot["ENTREZ_GENE_ID"] <- NULL
-    print(head(prot))
     pdf(file.path(out_dir, "figures", paste0("fit_proteinAbundance_", group_name, ".pdf")))
     z_score_plot(prot[,-1], 0, out_dir)
     dev.off()
