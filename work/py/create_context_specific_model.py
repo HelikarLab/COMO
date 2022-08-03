@@ -7,6 +7,7 @@ import numpy as np
 import os
 import re
 import collections
+from cobra.flux_analysis import pfba
 from warnings import warn
 from cobamp.wrappers import COBRAModelObjectReader
 from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
@@ -204,12 +205,21 @@ def seed_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
         preprocess=True,
         flux_threshold=0.9,
     )
-    algorithm = GIMME(s_matrix, lb, ub, properties)
-    model_seeded = algorithm.run()
+    algorithm = GIMME(s_matrix, lb, ub, properties)  
+    model_GIMME = algorithm.run()
     context_cobra_model = cobra_model.copy()
     r_ids = [r.id for r in context_cobra_model.reactions]
-    to_remove_ids = [r_ids[r] for r in np.where(model_seeded == 0)[0]]
+    to_remove_ids = [r_ids[r] for r in np.where(model_GIMME==0)[0]]
+    
     context_cobra_model.remove_reactions(to_remove_ids, True)
+    r_ids = [r.id for r in context_cobra_model.reactions]
+    #psol = pfba(context_cobra_model)
+    psol = context_cobra_model.optimize()
+    to_remove_ids = [r_ids[r] for r in np.where(abs(psol.fluxes) < 1e-8)[0]]
+    print("FLUXY MAMA: ", len(to_remove_ids))
+   
+    context_cobra_model.remove_reactions(to_remove_ids, True)
+
 
     return context_cobra_model
 
@@ -393,8 +403,8 @@ def create_context_specific_model(
     bound_ub,
     solver,
     context_name,
-    low_thresh=-5,
-    high_thresh=-3,
+    low_thresh,
+    high_thresh
 ):
     """
     Seed a context specific model. Core reactions are determined from GPR associations with gene expression logicals.
@@ -509,14 +519,14 @@ def create_context_specific_model(
     #incon_rxns_cs, context_model_cobra = feasibility_test(context_model_cobra, "after_seeding")
     incon_rxns_cs = []
     
-    if recon_algorithm == "IMAT":
+    if recon_algorithm in ["IMAT"]:
         final_rxns = [rxn.id for rxn in context_model_cobra.reactions]
         imat_rxns = flux_df.rxn
         for rxn in imat_rxns:
             if rxn not in final_rxns:
                 flux_df = flux_df[flux_df.rxn != rxn]
 
-        flux_df.to_csv(os.path.join(configs.datadir, "results", context_name, "iMAT_flux.csv"))
+        flux_df.to_csv(os.path.join(configs.datadir, "results", context_name, f"{recon_algorithm}_flux.csv"))
 
     incon_df = pd.DataFrame({"general_infeasible_rxns": list(incon_rxns)})
     infeas_exp_df = pd.DataFrame({"expressed_infeasible_rxns": infeas_exp_rxns})
@@ -643,6 +653,24 @@ def main():
         "GIMME, FASTCORE, iMAT, or tINIT.",
     )
     parser.add_argument(
+        "-lt",
+        "--low-threshold",
+        type=float,
+        required=False,
+        default=-5,
+        dest="low_threshold",
+        help="Low to mid bin cutoff for iMAT solution"
+    )
+    parser.add_argument(
+        "-ht",
+        "--high-threshold",
+        type=float,
+        required=False,
+        default=-3,
+        dest="high_threshold",
+        help="Mid to high bin cutoff for iMAT solution"
+    )      
+    parser.add_argument(
         "-s",
         "--solver",
         type=str,
@@ -676,6 +704,8 @@ def main():
     exclude_rxns_file = args.exclude_rxns_file
     force_rxns_file = args.force_rxns_file
     recon_alg = args.algorithm.upper()
+    low_threshold = args.low_threshold
+    high_threshold = args.high_threshold
     solver = args.solver.upper()
     output_filetypes = args.output_filetypes
 
@@ -840,6 +870,8 @@ def main():
         bound_ub,
         solver,
         context_name,
+        low_threshold,
+        high_threshold
     )
 
     infeas_df.to_csv(
@@ -891,7 +923,8 @@ def main():
     print("Number of Metabolites: " + str(len(context_model.metabolites)))
     print("Number of Reactions: " + str(len(context_model.reactions)))
     print(context_model.objective._get_expression())
-    print(context_model.optimize())
+    print(pfba(context_model))
+    #print(context_model.optimize())
     print("len rxns: ", len(context_model.reactions))
     return None
 
