@@ -132,7 +132,8 @@ def handle_context_batch(
             batch_ratio_high=batch_ratio_high,
             technique=technique,
             quantile=quantile,
-            min_count=min_count
+            min_count=min_count,
+            min_zfpkm=min_zfpkm
         )
 
         print("Test data saved to " + rnaseq_output_filepath)
