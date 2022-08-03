@@ -289,7 +289,6 @@ def main(argv):
     for context_name in sheet_names:
         datafilename = "".join(["protein_abundance_", context_name, ".csv"])
         config_sheet = pd.read_excel(prot_config_filepath, sheet_name=context_name)
-        print(config_sheet)
         groups = config_sheet["Group"].unique().tolist()
         
         for group in groups:
