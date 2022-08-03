@@ -303,7 +303,7 @@ zfpkm_filter <- function(SampMetrics, filt_options, context_name, prep) {
 
     N_exp <- filt_options$replicate_ratio # ratio replicates for active
     N_top <- filt_options$replicate_ratio_high # ratio of replicates for high-confidence
-    cutoff <- -3
+    cutoff <- filt_options$min_zfpkm
 
     SampMetrics <- calculate_fpkm(SampMetrics)
 
@@ -368,7 +368,7 @@ umi_filter <- function(SampMetrics, filt_options, context_name) {
     prep <- "scrna"
     N_exp <- filt_options$replicate_ratio # ratio replicates for active
     N_top <- filt_options$replicate_ratio_high # ratio of replicates for high-confidence
-    cutoff <- -3
+    cutoff <- filt_options$min_zfpkm
 
     #SampMetrics <- calculate_fpkm(SampMetrics)
     for ( i in 1:length(SampMetrics) ) {
@@ -461,7 +461,7 @@ filter_counts <- function(SampMetrics, technique, filt_options, context_name, pr
 
 save_rnaseq_tests <- function(counts_matrix_file, config_file, out_file, info_file, context_name, prep="total",
                               replicate_ratio=0.5, batch_ratio=0.5, replicate_ratio_high=0.9, batch_ratio_high=0.9,
-                              technique="quantile", quantile=0.9, min_count=10) {
+                              technique="quantile", quantile=0.9, min_count=10, min_zfpkm=-3) {
 
       # condense filter options
       filt_options <- list()
@@ -484,6 +484,11 @@ save_rnaseq_tests <- function(counts_matrix_file, config_file, out_file, info_fi
           filt_options$min_count <- min_count
       } else {
           filt_options$min_count <- 1
+      }
+	  if ( exists("min_zfpkm") ) {
+          filt_options$min_count <- min_count
+      } else {
+          filt_options$min_count <- -3
       }
       if ( exists("replicate_ratio_high") ) {
           filt_options$replicate_ratio_high<- replicate_ratio_high

@@ -85,6 +85,7 @@ def handle_context_batch(
     technique,
     quantile,
     min_count,
+    min_zfpkm,
     prep,
 ):
     """
@@ -165,7 +166,6 @@ def main(argv):
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
         "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
     )
-
     parser.add_argument(
         "-c",
         "--config-file",
@@ -175,7 +175,6 @@ def main(argv):
         help="Name of config .xlsx file in the /work/data/config_files/. Can be generated using "
         "rnaseq_preprocess.py or manually created and imported into the Juypterlab",
     )
-
     parser.add_argument(
         "-r",
         "--replicate-ratio",
@@ -187,7 +186,6 @@ def main(argv):
         "Example: 0.7 means that for a gene to be active, at least 70% of replicates in a group "
         "must pass the cutoff after normalization",
     )
-
     parser.add_argument(
         "-g",
         "--batch-ratio",
@@ -199,7 +197,6 @@ def main(argv):
         "Example: 0.7 means that for a gene to be active, at least 70% of groups in a study must  "
         "have passed the replicate ratio test",
     )
-
     parser.add_argument(
         "-rh",
         "--high-replicate-ratio",
@@ -212,7 +209,6 @@ def main(argv):
         "microarray. Example: 0.9 means that for a gene to be high-confidence, at least 90% of "
         "replicates in a group must pass the cutoff after normalization",
     )
-
     parser.add_argument(
         "-gh",
         "--high-batch-ratio",
@@ -225,7 +221,6 @@ def main(argv):
         "proteomics or microarray. Example: 0.9 means that for a gene to be high-confidence, at "
         "least 90% of groups in a study must have passed the replicate ratio test",
     )
-
     parser.add_argument(
         "-t",
         "--filt-technique",
@@ -236,7 +231,6 @@ def main(argv):
         help="Technique to normalize and filter counts with. Either 'zfpkm', 'quantile-tpm' or "
         "'flat-cpm'. More info about each method is discussed in pipeline.ipynb.",
     )
-
     parser.add_argument(
         "-q",
         "--quantile",
@@ -247,7 +241,6 @@ def main(argv):
         help="Cutoff used for quantile-tpm normalization and filtration technique. Example: 25 means "
         "that genes with TPM > 75% percentile wik=ll be considered active for that replicate.",
     )
-
     parser.add_argument(
         "-m",
         "--min-count",
@@ -257,7 +250,15 @@ def main(argv):
         help="Cutoff used for cpm. Minimum number of counts to be considered expressed, alternatively "
         "use 'default' to use method outlined in CITATION NEEDED",
     )
-
+    parser.add_argument(
+        "-z",
+        "--min-zfpkm",
+        required=False,
+        default="default",
+        dest="min_zfpkm",
+        help="Cutoff used for zfpkm. Minimum zfpkm to be considered expressed, according to the paper, "
+             "CITATION NEEDED, should be between -3 and -2."
+    )
     parser.add_argument(
         "-p",
         "--library-prep",
@@ -279,6 +280,7 @@ def main(argv):
     quantile = args.quantile
     min_count = args.min_count
     prep = args.prep
+    min_zfpkm = args.min_zfpkm
 
     if re.search("tpm", technique.lower()) or re.search("quantile", technique.lower()):
         technique = "quantile"
@@ -308,6 +310,7 @@ def main(argv):
         technique,
         quantile,
         min_count,
+        min_zfpkm,
         prep,
     )
 
