@@ -213,12 +213,10 @@ def seed_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
     
     context_cobra_model.remove_reactions(to_remove_ids, True)
     r_ids = [r.id for r in context_cobra_model.reactions]
-    #psol = pfba(context_cobra_model)
-    psol = context_cobra_model.optimize()
-    to_remove_ids = [r_ids[r] for r in np.where(abs(psol.fluxes) < 1e-8)[0]]
-    print("FLUXY MAMA: ", len(to_remove_ids))
-   
-    context_cobra_model.remove_reactions(to_remove_ids, True)
+    psol = pfba(context_cobra_model)
+    #psol = context_cobra_model.optimize()
+    #to_remove_ids = [r_ids[r] for r in np.where(abs(psol.fluxes) < 1e-8)[0]]
+    #context_cobra_model.remove_reactions(to_remove_ids, True)
 
 
     return context_cobra_model
