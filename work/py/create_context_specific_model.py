@@ -206,10 +206,10 @@ def seed_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
         flux_threshold=0.9,
     )
     algorithm = GIMME(s_matrix, lb, ub, properties)  
-    model_GIMME = algorithm.run()
+    gene_activity = algorithm.run()
     context_cobra_model = cobra_model.copy()
     r_ids = [r.id for r in context_cobra_model.reactions]
-    to_remove_ids = [r_ids[r] for r in np.where(model_GIMME==0)[0]]
+    to_remove_ids = [r_ids[r] for r in np.where(gene_activity==0)[0]]
     
     context_cobra_model.remove_reactions(to_remove_ids, True)
     r_ids = [r.id for r in context_cobra_model.reactions]
@@ -345,7 +345,7 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm):
     if recon_algorithm in ["IMAT", "TINIT"]:
         print(gene_expressions["Data"].tolist()[0:20])
         # unknown_val = min(gene_expressions["Data"].tolist())
-        unknown_val = -4.5
+        unknown_val = np.mean([low_thresh, high_thresh]) # put unknowns in mid bin
     elif recon_algorithm == "GIMME":
         unknown_val = -1
     elif recon_algorithm == "FASTCORE":
