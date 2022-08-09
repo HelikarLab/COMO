@@ -160,7 +160,6 @@ def set_boundaries(model_cobra, bound_rxns, bound_lb, bound_ub):
 
 def feasibility_test(model_cobra, step):
     # check number of unsolvable reactions for reference model under media assumptions
-    model_cobra_wtf = cobra.flux_analysis.fastcc(model_cobra, flux_threshold=15, zero_cutoff=1e-7)  # create flux consistant model 
     model_cobra_rm = cobra.flux_analysis.fastcc(model_cobra, flux_threshold=15, zero_cutoff=1e-7)  # create flux consistant model (rmemoves some reactions)
     incon_rxns = set(model_cobra.reactions.list_attr("id")) - set(model_cobra_rm.reactions.list_attr("id"))
     incon_rxns_cnt = len(incon_rxns)
@@ -180,7 +179,7 @@ def feasibility_test(model_cobra, step):
             "according to your expression data, it is likely that you are missing some critical exchange (media) "
             "reactions.\n"
         )
-    else:
+    elif step == "after_seeding":
         print(
             f"Under given boundary assumptions, with infeasible reactions from the general model not considered "
             f"there are {incon_rxns_cnt} new infeasible reactions in the context-specific model.\n"
@@ -191,6 +190,8 @@ def feasibility_test(model_cobra, step):
         print(
             "Note that this value should be very low compared to the reference model."
         )
+    else:
+        pass
 
     return incon_rxns, model_cobra_rm
 
@@ -225,6 +226,12 @@ def seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
     # 'Vlassis, Pacheco, Sauter (2014). Fast reconstruction of compact
     # context-specific metabolic network models. PLoS Comput. Biol. 10,
     # e1003424.'
+    warn(
+        "Fastcore requires a flux consistant model is used as refererence, "
+        "to achieve this fastcc is required which is NOT reproducible."
+    )
+    print("Creating feasible model...")
+    incon_rxns, cobra_model = feasibility_test(cobra_model, "other")
     properties = FastcoreProperties(core=exp_idx_list, solver=solver)
     algorithm = FASTcore(s_matrix, lb, ub, properties)
     context_rxns = algorithm.fastcore()
@@ -330,7 +337,7 @@ def split_gene_expression_data(expression_data, recon_algorithm="GIMME"):
     return gene_expressions
 
 
-def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm):
+def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm, low_thresh=None, high_thresh=None):
     """
     Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules
     which are defined in general genome-scale metabolic model
@@ -443,7 +450,13 @@ def create_context_specific_model(
     rx_names = cobamp_model.get_reaction_and_metabolite_ids()[0]
     
     # get expressed reactions
-    expression_rxns, expr_vector = map_expression_to_rxn(cobra_model, gene_expression_file, recon_algorithm)
+    expression_rxns, expr_vector = map_expression_to_rxn(
+        cobra_model,     
+        gene_expression_file,
+        recon_algorithm,
+        high_thresh=high_thresh,
+        low_thresh=low_thresh
+    )
 
     # find reactions in the force reactions file that are not in general model and warn user
     for rxn in force_rxns:
