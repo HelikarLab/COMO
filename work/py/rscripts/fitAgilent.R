@@ -1,5 +1,5 @@
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
-
+library("stringr")
 username <- Sys.info()["user"]
 work_dir <- str_interp("/home/${username}/work")
 
@@ -10,10 +10,7 @@ if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
 zz <- file(file.path("/home", username, "work", "py", "rlogs", "fitAligent.Rout"), open="wt")
 sink(zz, type="message")
 
-library("stringr")
-
-
-readagilent <- function(addr,targets) {
+readagilent <- function(addr,targets){
     crd <- getwd()
     setwd(addr)
     # targets <- dir(".", "txt.gz")
@@ -27,9 +24,7 @@ readagilent <- function(addr,targets) {
     
     return(ydf)
 }
-
-
-fitagilent <- function(addr,target) {
+fitagilent <- function(addr,target){
     username <- Sys.info()["user"]
     work_dir <- str_interp("/home/${username}/work")
     crd <- getwd()
@@ -49,4 +44,4 @@ fitagilent <- function(addr,target) {
     data = topTable(fit2,number = "inf")
     
     return(data)
-}
+    }
