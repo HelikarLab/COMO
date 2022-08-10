@@ -1,5 +1,5 @@
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
-
+library("stringr")
 username <- Sys.info()["user"]
 work_dir <- str_interp("/home/${username}/work")
 
@@ -7,16 +7,12 @@ if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
     dir.create(str_interp("${work_dir}/py/rlogs"))
 }
 
+
 zz <- file(file.path("/home", username, "work", "py", "rlogs", "generate_counts_matrix.Rout"), open="wt")
 zz <- file(file.path("/home", username, "work", "py", "rlogs", "fitAffy.Rout"), open="wt")
 sink(zz, type="message")
 
-library("stringr")
-library("limma")
-library("affy")
-
-
-readaffydir <- function(addr) {
+readaffydir <- function(addr){
     crd <- getwd()
     setwd(addr)
     mydata = ReadAffy()
@@ -28,12 +24,13 @@ readaffydir <- function(addr) {
     return(y)
 }
 
-
-fitaffydir <- function(addr, target) {
+fitaffydir <- function(addr, target){
     username <- Sys.info()["user"]
     work_dir <- str_interp("/home/${username}/work")
     crd <- getwd()
     setwd(addr)
+    library(limma)
+    library(affy)
     targets = readTargets(target)
     mydata = ReadAffy()
     setwd(crd)
