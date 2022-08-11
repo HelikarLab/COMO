@@ -105,9 +105,9 @@ def fetch_gene_info_refactor(
             )
         )
 
-    # Await all the tasks, must use [0] to get results. [1] is an empty set.
+    # Await all the tasks, must use [0] to get completed results. [1] is a set of pending tasks (i.e., empty).
     database_convert = event_loop.run_until_complete(asyncio.wait(async_tasks))[0]
-    event_loop.close()
+    event_loop.close()  # Close the event loop to free resources
 
     # Loop over database_convert to concat them into dataframe_maps
     for df in database_convert:
