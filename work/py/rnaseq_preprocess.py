@@ -116,40 +116,6 @@ def fetch_gene_info_refactor(
     return dataframe_maps
 
 
-def fetch_gene_info(input_values, input_db="Ensembl Gene ID",
-                    output_db=["Gene Symbol", "Gene ID", "Chromosomal Location"],
-                    delay=15, taxon_id=9606):
-    """
-    THIS FUNCTION IS DEPRECATED. USE fetch_gene_info_refactor INSTEAD.
-
-    Returns a dataframe with important gene information for future operations in MADRID.
-
-    Fetch gene information from BioDbNet, takes 'input_values' (genes) in format of 'input_db' (default, Ensembl) and
-    ond returns dataframe with specified columns as 'output_db' (default is HUGO symbol, Entrez ID, and chromosome
-    chromosomal start and end positions).
-    """
-    biodbnet = BioDBNet()
-    df_maps = pd.DataFrame([], columns=output_db)
-    df_maps.index.name = input_db
-    i = 0
-    batch_len = 500 if taxon_id == 9606 else 300
-    print(f"Total Genes to Retrieve: {len(input_values)}")
-    while i < len(input_values):
-        upper_range = min(i + batch_len, len(input_values))
-        # TODO: Make this output more user-readable
-        # It outputs many lines due to the large number of genes to retrieve
-        print(f"retrieve {i}:{upper_range}")
-        df_test = biodbnet.db2db(input_db, output_db, input_values[i:upper_range], taxon_id)
-        if isinstance(df_test, pd.DataFrame):
-            df_maps = pd.concat([df_maps, df_test], sort=False)
-        elif df_test == '414':
-            print(f"bioDBnet busy, trying again in {delay} seconds")
-            time.sleep(delay)
-            continue
-        i += batch_len
-    return df_maps
-
-
 def create_counts_matrix(context_name):
     """
     Create a counts matrix by reading gene counts tables in MADRID_inputs/<context name>/<study number>/geneCounts/
@@ -358,6 +324,7 @@ def create_gene_info_file(matrix_file_list, form, taxon_id):
     output_db.remove(form)
 
     print(f"Gathering {len(genes)} genes. Please wait...")
+
     gene_info = fetch_gene_info_refactor(input_values=genes, input_db=form, output_db=output_db, taxon_id=taxon_id)
     gene_info['start_position'] = gene_info['Chromosomal Location'].str.extract("chr_start: (\d+)")
     gene_info['end_position'] = gene_info['Chromosomal Location'].str.extract("chr_end: (\d+)")
@@ -564,8 +531,6 @@ def main(argv):
         mode = "make"
 
     handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fname)
-
-    return
 
 
 if __name__ == "__main__":
