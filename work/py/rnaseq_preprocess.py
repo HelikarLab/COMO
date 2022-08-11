@@ -53,13 +53,13 @@ async def _async_fetch_gene_info(biodbnet: BioDBNet, **kwargs) -> pd.DataFrame:
     return database_convert
 
 
-def fetch_gene_info_refactor(
+def fetch_gene_info(
         input_values: list[str],
         input_db: str = "Ensembl Gene ID",
         output_db: list[str] = None,
         taxon_id: int = 9606,
         delay: int = 5
-):
+) -> pd.DataFrame:
     """
     This function returns a dataframe with important gene information for future operations in MADRID.
 
@@ -325,7 +325,7 @@ def create_gene_info_file(matrix_file_list, form, taxon_id):
 
     print(f"Gathering {len(genes)} genes. Please wait...")
 
-    gene_info = fetch_gene_info_refactor(input_values=genes, input_db=form, output_db=output_db, taxon_id=taxon_id)
+    gene_info = fetch_gene_info(input_values=genes, input_db=form, output_db=output_db, taxon_id=taxon_id)
     gene_info['start_position'] = gene_info['Chromosomal Location'].str.extract("chr_start: (\d+)")
     gene_info['end_position'] = gene_info['Chromosomal Location'].str.extract("chr_end: (\d+)")
     gene_info.index.rename("ensembl_gene_id", inplace=True)
