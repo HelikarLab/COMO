@@ -5,7 +5,7 @@ import time
 
 
 # find project root dir
-class Configs:
+class _Configs:
     def __init__(self, projectdir):
         self.rootdir = projectdir
         self.datadir = os.path.join(projectdir, "data")
@@ -15,20 +15,20 @@ class Configs:
         self.docdir = os.path.join(projectdir, "doc")
 
 
-currentdir = os.getcwd()
-dirlist = currentdir.split("/")
+current_dir = os.getcwd()
+directory_list = current_dir.split("/")
 
 # Find the "work" directory
 split_index = 1
-for directory in dirlist:
+for directory in directory_list:
     if directory == "work":
         break  # Exit the loop when we find the "work" directory
     split_index += 1  # Otherwise increment the index
 
 # Unpack items in dirlist
 # From: https://stackoverflow.com/questions/14826888
-projectdir = os.path.join(*dirlist[0:split_index])
+work_dir = os.path.join(*directory_list[0:split_index])
 
 # Add leading "/", as it will not exist right now
-projectdir = os.path.join("/", projectdir)
-configs = Configs(projectdir)
+work_dir = os.path.join("/", work_dir)
+configs = _Configs(work_dir)

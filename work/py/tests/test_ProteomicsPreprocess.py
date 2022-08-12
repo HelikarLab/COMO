@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from proteomics.proteomics_preprocess import ParseCSVInput
 from proteomics.proteomics_preprocess import PopulateInformation
 from fixtures_proteomics_preprocess import CSVConstants
+from fixtures_proteomics_preprocess import create_argparse_object
 from fixtures_proteomics_preprocess import create_fasta_database
 
 
