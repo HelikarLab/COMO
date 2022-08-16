@@ -324,7 +324,7 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
         create_gene_info_file(matrix_path_prov, form, taxon_id)
 
 
-def main(argv):
+def parse_args(argv):
     """
     Parse arguments to rnaseq_preprocess.py, create a gene info files for each provided context at:
     /work/data/results/<context name>/gene_info_<context name>.csv.
@@ -351,6 +351,7 @@ def main(argv):
 
     parser.add_argument("-n", "--context-names",
                         type=str,
+                        nargs="+",
                         required=True,
                         dest="context_names",
                         help="""Tissue/cell name of models to generate. These names should correspond to the folders
@@ -403,10 +404,15 @@ def main(argv):
                         dest="provided_matrix_fname",
                         default="SKIP",
                         help="Name of provided counts matrix in "
-                              "/work/data/data_matrices/<context name>/<NAME OF FILE>.csv"
+                             "/work/data/data_matrices/<context name>/<NAME OF FILE>.csv"
                         )
 
     args = parser.parse_args()
+    return args
+
+
+def main(argv):
+    args = parse_args(argv)
     context_names = args.context_names
     gene_format = args.gene_format
     taxon_id = args.taxon_id
@@ -414,21 +420,35 @@ def main(argv):
     make_matrix = args.make_matrix
     provided_matrix_fname = args.provided_matrix_fname
 
-    # convert to python list
-    context_names = context_names.strip("[").strip("]").replace("'", "").replace(" ", "").split(",")
+    # ----------
+    # We are attempting to move to a new method of gathering a list of items from the command line
+    # In doing so, we must deprecate the use of the current method
+    # ----------
+    # If '[' and ']' are present in the first and last items of the list, assume we are using the "old" method of providing context names
+    if "[" in context_names[0] and "]" in context_names[-1]:
+        print("DEPRECATED: Please use the new method of providing context names, i.e. --context-names 'context1 context2 context3'.")
+        print("This can be done by setting the 'context_names' variable to a simple string separated by lists: context_names='context1 context2 context3'")
+        print("Your current method of passing context names will be removed in the future. Please update your variables above accordingly!")
+        temp_context_names: list[str] = []
+        for name in context_names:
+            temp_name = name.replace("'", "").replace(" ", "")
+            temp_name = temp_name.strip("[],")
+            temp_context_names.append(temp_name)
+        context_names = temp_context_names
 
     if gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
-        form = "Ensembl Gene ID"
+        gene_format = "Ensembl Gene ID"
 
     elif gene_format.upper() in ["HGNC SYMBOL", "HUGO", "HUGO SYMBOL", "SYMBOL", "HGNC", "GENE SYMBOL"]:
-        form = "Gene Symbol"
+        gene_format = "Gene Symbol"
 
     elif gene_format.upper() in ["ENTREZ", "ENTRES", "ENTREZ ID", "ENTREZ NUMBER" "GENE ID"]:
-        form = "Gene ID"
+        gene_format = "Gene ID"
 
     else:  # provided invalid gene format
         print("Gene format (--gene_format) is invalid")
         print("Accepts 'Ensembl', 'Entrez', and 'HGNC symbol'")
+        print(f"You provided: {gene_format}")
         sys.exit()
 
     # handle species alternative ids
@@ -450,9 +470,9 @@ def main(argv):
     elif make_matrix:
         mode = "make"
 
-    handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fname)
+    handle_context_batch(context_names, mode, gene_format, taxon_id, provided_matrix_fname)
 
 
 if __name__ == "__main__":
-    print(sys.argv)
+    # print(sys.argv)
     main(sys.argv[1:])
