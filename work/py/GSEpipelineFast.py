@@ -1,14 +1,17 @@
 #!/usr/bin/python3
 
-import re
+import numpy as np
 import os
 import pandas as pd
-import numpy as np
+from instruments import AffyIO
+import instruments
+import rpy2.robjects as ro
+
 
 # import GEOparse
 import urllib.request
 import tarfile
-from instruments import *
+# from instruments import *
 from GSEpipeline import load_gse_soft
 
 from rpy2.robjects import pandas2ri
@@ -17,6 +20,10 @@ pandas2ri.activate()
 # Input: Extract Gene Info from GEO DataSets
 
 # gse = load_gse_soft(gsename)
+
+from .async_bioservices import database_convert
+from .async_bioservices.input_database import InputDatabase
+from .async_bioservices.output_database import OutputDatabase
 
 # Extract Platform Information
 
@@ -44,11 +51,30 @@ def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
             input_values = table.loc[
                 table["CONTROL_TYPE"] == "FALSE", "SPOT_ID"
             ].tolist()
-            temp = fetch_entrez_gene_id(input_values)
+
+            """
+                input_values,
+    input_db="Agilent ID",
+    output_db: list[str] = None,
+    delay=30,
+            """
+
+            temp = database_convert.fetch_gene_info(
+                input_values=input_values,
+                input_db=InputDatabase.AGILENT_ID,
+                output_db=[
+                    OutputDatabase.GENE_ID.value,
+                    OutputDatabase.ENSEMBL_GENE_ID.value
+                ]
+            )
+
             temp.drop(columns=["Ensembl Gene ID"], inplace=True)
             temp.reset_index(inplace=True)
             temp.rename(
-                columns={"Agilent ID": "ID", "Gene ID": "ENTREZ_GENE_ID"}, inplace=True
+                columns={
+                    InputDatabase.AGILENT_ID.value: "ID",
+                    OutputDatabase.GENE_ID.value: "ENTREZ_GENE_ID"
+                }, inplace=True
             )
             temp.replace(to_replace="-", value=np.nan, inplace=True)
             
@@ -83,7 +109,6 @@ class GSEproject:
         self.platforms = dict(zip(gpls, vendors))
         self.download_samples()
 
-
     def organize_gse_raw_data(self):
         """
         Organize raw data at local folder
@@ -114,7 +139,6 @@ class GSEproject:
                 print("Move {} to {}".format(src_path, dst_path))
                 cnt += 1
         print("{} raw data files moved.".format(cnt))
-
 
     def get_gsm_tables(self):
         """
@@ -207,15 +231,15 @@ class GSEproject:
                     outputdf = ro.conversion.rpy2py(outputdf)
                 elif vendor.lower() == "agilent":
 
-                    outputdf = readagilent(platformdir, list(self.gsm_platform.keys()))
-                    gsm_maps[key] = fetch_entrez_gene_id(
-                        list(map(str, list(outputdf["ProbeName"]))),
-                        input_db="Agilent ID",
-                        output_db=["Gene ID"],
+                    outputdf = instruments.readagilent(platformdir, list(self.gsm_platform.keys()))
+
+                    gsm_maps[key] = database_convert.fetch_gene_info(
+                        input_values=list(map(str, list(outputdf["ProbeName"]))),
+                        input_db=InputDatabase.AGILENT_ID,
+                        output_db=[OutputDatabase.GENE_ID]
                     )
-                    gsm_maps[key].rename(
-                        columns={"Gene ID": "ENTREZ_GENE_ID"}, inplace=True
-                    )
+
+                    gsm_maps[key].rename(columns={"Gene ID": "ENTREZ_GENE_ID"}, inplace=True)
                 else:
                     print("Unsupported Platform {} and Vendor {}".format(key, vendor))
                     continue

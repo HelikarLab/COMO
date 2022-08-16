@@ -1,15 +1,17 @@
 #!/usr/bin/python3
 
-import asyncio
-from bioservices import BioDBNet
 import pandas as pd
 from project import configs
 import re
-import os, time, sys, shutil
+import os
+import sys
 import argparse
 from rpy2.robjects.packages import importr, SignatureTranslatedAnonymousPackage
 import glob
 import numpy as np
+
+from . import async_bioservices
+from .async_bioservices.output_database import OutputDatabase
 
 # import R libraries
 tidyverse = importr("tidyverse")
@@ -19,101 +21,6 @@ f = open(os.path.join(configs.rootdir, "py", "rscripts", "generate_counts_matrix
 string = f.read()
 f.close()
 generate_counts_matrix_io = SignatureTranslatedAnonymousPackage(string, 'generate_counts_matrix_io')
-
-
-async def _async_fetch_gene_info(biodbnet: BioDBNet, **kwargs) -> pd.DataFrame:
-    input_db: str = kwargs["input_db"]
-    output_db: list[str] = kwargs["output_db"]
-    input_values: list[str] = kwargs["input_values"]
-    taxon_id: int = kwargs["taxon_id"]
-    delay: int = kwargs["delay"]
-    event_loop = kwargs["event_loop"]
-
-    # print(f"Getting {current_index}:{current_index + len(input_values)}")
-    database_convert = await event_loop.run_in_executor(
-        None,  # Defaults to ThreadPoolExecutor, uses threads instead of processes. No need to modify
-        biodbnet.db2db,  # The function to call
-        input_db,       # The following are arguments passed to the function
-        output_db,
-        input_values,
-        taxon_id
-    )
-
-    # If the above db2db conversion didn't work, try again until it does
-    while not isinstance(database_convert, pd.DataFrame):
-        print(f"\nToo many requests to BioDBNet, waiting {delay} seconds and trying again.")
-        await asyncio.sleep(delay)
-        database_convert = await event_loop.run_in_executor(
-            None,  # Defaults to ThreadPoolExecutor, uses threads instead of processes. No need to modify
-            _async_fetch_gene_info,  # The function to call
-            biodbnet,
-            kwargs
-        )
-
-    return database_convert
-
-
-def fetch_gene_info(
-        input_values: list[str],
-        input_db: str = "Ensembl Gene ID",
-        output_db: list[str] = None,
-        taxon_id: int = 9606,
-        delay: int = 5
-) -> pd.DataFrame:
-    """
-    This function returns a dataframe with important gene information for future operations in MADRID.
-
-    Fetch gene information from BioDBNet
-    :param input_values: A list of genes in "input_db" format
-    :param input_db: The input database to use (default: "Ensembl Gene ID")
-    :param output_db: The output format to use (default: ["Gene Symbol", "Gene ID", "Chromosomal Location"])
-    :param delay: The delay in seconds to wait before trying again if bioDBnet is busy (default: 15)
-    :param taxon_id: The taxon ID to use (default: 9606)
-
-    :return: A dataframe with specified columns as "output_db" (Default is HUGO symbol, Entrez ID, and chromosome start and end positions)
-    """
-    if output_db is None:
-        output_db: list[str] = ["Gene Symbol", "Gene ID", "Chromosomal Location"]
-
-    biodbnet = BioDBNet()
-    dataframe_maps: pd.DataFrame = pd.DataFrame([], columns=output_db)
-    dataframe_maps.index.name = input_db
-
-    if taxon_id == 9606:
-        batch_len = 500
-    else:
-        batch_len = 300
-
-    # Create a list of tasks to be awaited
-    event_loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(event_loop)
-    async_tasks = []
-    for i in range(0, len(input_values), batch_len):
-        # Define an upper range of values to take from input_values
-        upper_range = min(i + batch_len, len(input_values))
-
-        # Create a task to await
-        async_tasks.append(
-            _async_fetch_gene_info(
-                biodbnet,
-                input_db=input_db,
-                output_db=output_db,
-                input_values=input_values[i:upper_range],
-                taxon_id=taxon_id,
-                delay=delay,
-                event_loop=event_loop
-            )
-        )
-
-    # Await all the tasks, must use [0] to get completed results. [1] is a set of pending tasks (i.e., empty).
-    database_convert = event_loop.run_until_complete(asyncio.wait(async_tasks))[0]
-    event_loop.close()  # Close the event loop to free resources
-
-    # Loop over database_convert to concat them into dataframe_maps
-    for df in database_convert:
-        dataframe_maps = pd.concat([dataframe_maps, df.result()], sort=False)
-
-    return dataframe_maps
 
 
 def create_counts_matrix(context_name):
@@ -127,8 +34,6 @@ def create_counts_matrix(context_name):
     print(f"Creating Counts Matrix for '{context_name}'")
     # call generate_counts_matrix.R to create count matrix from MADRID_input folder
     generate_counts_matrix_io.generate_counts_matrix_main(input_dir, matrix_output_dir)
-
-    return
 
 
 def create_config_df(context_name):
@@ -144,7 +49,9 @@ def create_config_df(context_name):
 
     for gcfilename in gene_counts_files:
         try:
-            label = re.findall(r"S[1-9][0-9]?[0-9]?R[1-9][0-9]?[0-9]?r?[1-9]?[0-9]?[0-9]?", gcfilename)[0]
+            # Match S___R___r___
+            # \d{1,3} matches 1-3 digits
+            label = re.findall(r"S\d{1,3}R\d{1,3}r\d{1,3}", gcfilename)[0]
 
         except IndexError:
             print(f"\nfilename of {gcfilename} is not valid. Should be 'contextName_SXRYrZ.tab', where X is the "
@@ -152,10 +59,10 @@ def create_config_df(context_name):
                   "exclude 'rZ' from the filename.")
             sys.exit()
 
-        study_number = re.findall(r"S[1-9][0-9]?[0-9]?", label)[0]
-        rep_number = re.findall(r"R[1-9][0-9]?[0-9]?", label)[0]
+        study_number = re.findall(r"S\d{1,3}", label)[0]
+        rep_number = re.findall(r"R\d{1,3}", label)[0]
+        run = re.findall(r"r\d{1,3}", label)
 
-        run = re.findall(r"r[1-9][0-9]?[0-9]?", label)
         multi_flag = 0
         if len(run) > 0:
             if run[0] != "r1":
@@ -167,8 +74,8 @@ def create_config_df(context_name):
                 frag_files = []
 
                 for r in runs:
-                    r_label = re.findall(r"r[1-9][0-9]?[0-9]?", r)[0]
-                    R_label = re.findall(r"R[1-9][0-9]?[0-9]?", r)[0]
+                    r_label = re.findall(r"r\d{1,3}", r)[0]
+                    R_label = re.findall(r"R\d{1,3}", r)[0]
                     frag_filename = "".join([context_name, "_", study_number, R_label, r_label, "_fragment_size.txt"])
                     frag_files.append(os.path.join(configs.rootdir, "data", "MADRID_input", context_name,
                                                    "fragmentSizes", study_number, frag_filename))
@@ -235,7 +142,7 @@ def create_config_df(context_name):
         if len(frag_glob) < 1:
             print(f"\nNo fragment file found for {label}, writing as 'UNKNOWN' This must be defined by the user in "
                   "order to use zFPKM normalization")
-            #strand = "UNKNOWN"
+            # strand = "UNKNOWN"
             mean_fragment_size = 100
         elif len(frag_glob) > 1:
             print(f"\nMultiple matching fragment length files for {label}, make sure there is only one copy for each "
@@ -292,7 +199,7 @@ def split_config_df(df):
 
 def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     """
-    Split a counts matrix dataframe into two seperate ones. One for Total RNA library prep, one for mRNA
+    Split a counts-matrix dataframe into two seperate ones. One for Total RNA library prep, one for mRNA
     """
     matrix_all = pd.read_csv(count_matrix_all)
     matrix_total = matrix_all[["genes"] + [n for n in matrix_all.columns if n in df_total["SampleName"].tolist()]]
@@ -301,10 +208,9 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     return matrix_total, matrix_mrna
 
 
-
 def create_gene_info_file(matrix_file_list, form, taxon_id):
     """
-    Create gene info file for specified context by reading first column in it's count matrix file at
+    Create gene info file for specified context by reading first column in its count matrix file at
      /work/data/results/<context name>/gene_info_<context name>.csv
     """
 
@@ -320,12 +226,28 @@ def create_gene_info_file(matrix_file_list, form, taxon_id):
         add_genes = pd.read_csv(mfile)["genes"].tolist()
         genes = list(set(genes + add_genes))
 
-    output_db = ['Ensembl Gene ID', 'Gene Symbol', 'Gene ID', 'Chromosomal Location']
-    output_db.remove(form)
+    # Create our output database format
+    # Do not include values equal to "form"
+    # Note: This is a refactor; I'm not sure why we are removing "form"
+    output_db: list[OutputDatabase] = [
+        i for i in [
+            OutputDatabase.ENSEMBL_GENE_ID,
+            OutputDatabase.GENE_SYMBOL,
+            OutputDatabase.GENE_ID,
+            OutputDatabase.CHROMOSOMAL_LOCATION
+        ]
+        if i.value != form
+    ]
 
     print(f"Gathering {len(genes)} genes. Please wait...")
 
-    gene_info = fetch_gene_info(input_values=genes, input_db=form, output_db=output_db, taxon_id=taxon_id)
+    gene_info = async_bioservices.database_convert.fetch_gene_info(
+        input_values=genes,
+        input_db=form,
+        output_db=output_db,
+        taxon_id=taxon_id
+    )
+
     gene_info['start_position'] = gene_info['Chromosomal Location'].str.extract("chr_start: (\d+)")
     gene_info['end_position'] = gene_info['Chromosomal Location'].str.extract("chr_end: (\d+)")
     gene_info.index.rename("ensembl_gene_id", inplace=True)
@@ -400,8 +322,6 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
 
     else:
         create_gene_info_file(matrix_path_prov, form, taxon_id)
-
-    return
 
 
 def main(argv):
