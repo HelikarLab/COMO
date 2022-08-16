@@ -6,6 +6,8 @@ This is the home page for MADRID pipeline.
 
 [View the documentation](https://helikarlab.github.io/MADRID)
 
+[Create and view Issues](https://joshl.youtrack.cloud/dashboard?id=7bb0e449-3a4f-4fe8-a253-a445efd15ea4)
+
 ## How To Run application
 - [Install Docker](https://docs.docker.com/install/)
 - `docker login`
