@@ -1,27 +1,21 @@
 #!/usr/bin/python3
 import argparse
+import cobra
+import cobra.flux_analysis
+import copy
+import numpy as np
 import os
+import pandas as pd
 import re
 import sys
-import getopt
-import time
-import pandas as pd
-import numpy as np
-import cobra
-import copy
-from cobra.flux_analysis import (
-    single_gene_deletion,
-    single_reaction_deletion,
-    double_gene_deletion,
-    double_reaction_deletion,
-    moma,
-    pfba
-)
 from project import configs
-from instruments import fetch_entrez_gene_id
+
+import async_bioservices
+from async_bioservices.input_database import InputDatabase
+from async_bioservices.output_database import OutputDatabase
 
 
-def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, test_all):
+def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, test_all, pars_flag):
     if ref_flux_file is not None:
         try:
             ref_flux_df = pd.read_csv(ref_flux_file)
@@ -37,7 +31,10 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, tes
 
         ref_sol = cobra.core.solution.Solution(model.objective, "OPTIMAL", ref_flux)
     else:
-        ref_sol = pfba(model)
+        if pars_flag:
+            ref_sol = cobra.flux_analysis.pfba(model)
+        else:
+            ref_sol = model.optimize()
 
     if os.path.isfile(inhibitors_filepath):
         print(f"Inhibitors file found at:\n{inhibitors_filepath}")
@@ -61,7 +58,7 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, tes
     DT_model = list(set(DT_genes["Gene ID"].tolist()).intersection(gene_ind2genes))
     print(f"{len(DT_model)} drug target genes in model")
 
-    model_opt = moma(model, solution=ref_sol, linear=False).to_frame()
+    model_opt = cobra.flux_analysis.moma(model, solution=ref_sol, linear=False).to_frame()
     model_opt[abs(model_opt) < 1e-8] = 0.0
 
     has_effects_gene = []
@@ -74,7 +71,7 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, tes
                 if gene_id == id:
                     boolval = "False"
                 else:
-                    #boolval = "{}".format(model.genes.get_by_id(gene_id)._functional)
+                    # boolval = "{}".format(model.genes.get_by_id(gene_id)._functional)
                     boolval = "{}".format(model.genes.get_by_id(gene_id).functional)
                 gene_reaction_rule = gene_reaction_rule.replace(
                     "{}".format(gene_id), boolval, 1
@@ -86,19 +83,19 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, tes
     flux_solution = pd.DataFrame()
     for id in has_effects_gene:
         print(f"Peforming knock-out simulation for {id}")
-        model_cp = copy.deepcopy(model) # using model_opt instead bc it makes more sense?
+        model_cp = copy.deepcopy(model)  # using model_opt instead bc it makes more sense?
         gene = model_cp.genes.get_by_id(id)
         gene.knock_out()
-        opt_model = moma(model_cp, solution=ref_sol, linear=False).to_frame()
+        opt_model = cobra.flux_analysis.moma(model_cp, solution=ref_sol, linear=False).to_frame()
         flux_solution[id] = opt_model["fluxes"]
         del model_cp
 
     # flux_solution
     flux_solution[abs(flux_solution) < 1e-8] = 0.0
 
-    flux_solution_ratios = flux_solution.div(model_opt["fluxes"], axis=0) # ko / original : inf means
+    flux_solution_ratios = flux_solution.div(model_opt["fluxes"], axis=0)  # ko / original : inf means
     # flux_solution_ratios
-    flux_solution_diffs = flux_solution.sub(model_opt["fluxes"], axis=0) # ko - original
+    flux_solution_diffs = flux_solution.sub(model_opt["fluxes"], axis=0)  # ko - original
     # flux_solution_diffs
 
     # has_effects_gene
@@ -123,7 +120,7 @@ def create_gene_pairs(
         disease_down,
 ):
     disease_down = pd.read_csv(os.path.join(datadir, disease_down))
-    DAG_dis_genes = pd.DataFrame() # data analysis genes
+    DAG_dis_genes = pd.DataFrame()  # data analysis genes
     DAG_dis_genes["Gene ID"] = disease_down.iloc[:, 0].astype(str)
     # DAG_dis_genes
     DAG_dis_met_genes = set(DAG_dis_genes["Gene ID"].tolist()).intersection(
@@ -239,7 +236,18 @@ def repurposing_hub_preproc(drug_file):
                                              }])],
                 ignore_index=True
             )
-    entrez_ids = fetch_entrez_gene_id(drug_db_new["Target"].tolist(), input_db="Gene Symbol")
+
+    entrez_ids = async_bioservices.database_convert.fetch_gene_info(
+        input_values=drug_db_new["Target"].tolist(),
+        input_db=InputDatabase.GENE_SYMBOL,
+        output_db=[
+            OutputDatabase.GENE_SYMBOL,
+            OutputDatabase.GENE_ID,
+            OutputDatabase.CHROMOSOMAL_LOCATION
+        ]
+    )
+
+    # entrez_ids = fetch_entrez_gene_id(drug_db_new["Target"].tolist(), input_db="Gene Symbol")
     entrez_ids.reset_index(drop=False, inplace=True)
     drug_db_new["ENTREZ_GENE_ID"] = entrez_ids["Gene ID"]
     drug_db_new = drug_db_new[["Name", "MOA", "Target", "ENTREZ_GENE_ID", "Phase"]]
@@ -248,9 +256,13 @@ def repurposing_hub_preproc(drug_file):
 
 def drug_repurposing(drug_db, d_score):
     d_score["Gene"] = d_score["Gene"].astype(str)
-    d_score_gene_sym = fetch_entrez_gene_id(
-        d_score["Gene"].tolist(), input_db="Gene ID", output_db=["Gene Symbol"]
+
+    d_score_gene_sym = async_bioservices.database_convert.fetch_gene_info(
+        input_values=d_score["Gene"].tolist(),
+        input_db=InputDatabase.GENE_ID,
+        output_db=[OutputDatabase.GENE_SYMBOL]
     )
+
     d_score.set_index("Gene", inplace=True)
     d_score["Gene Symbol"] = d_score_gene_sym["Gene Symbol"]
     d_score.reset_index(drop=False, inplace=True)
@@ -345,6 +357,15 @@ def main(argv):
         dest="test_all",
         help="Test all genes, even ones predicted to have little no effect."
     )
+    parser.add_argument(
+        "-p",
+        "--parsimonious",
+        action="store_true",
+        required=False,
+        default=False,
+        dest="pars_flag",
+        help="Use parsimonious FBA for optimal reference solution (only if not providing flux file)"
+    )
 
     args = parser.parse_args()
     tissue_spec_model_file = args.model
@@ -355,6 +376,7 @@ def main(argv):
     drug_raw_file = args.raw_drug_file
     ref_flux_file = args.ref_flux_file
     test_all = args.test_all
+    pars_flag = args.pars_flag
 
     output_dir = os.path.join(configs.datadir, "results", context, disease)
     inhibitors_file = os.path.join(output_dir, f"{context}_{disease}_inhibitors.tsv")
@@ -371,8 +393,6 @@ def main(argv):
         cobra_model = cobra.io.load_json_model(tissue_spec_model_file)
     else:
         raise NameError("reference model format must be .xml, .mat, or .json")
-
-    cobra_model.solver = "gurobi"
 
     # preprocess repurposing hub data
     drug_tsv_file = "Repurposing_Hub_Preproc.tsv"
@@ -394,7 +414,8 @@ def main(argv):
             inhibitors_filepath=inhibitors_file,
             drug_db=drug_db,
             ref_flux_file=ref_flux_file,
-            test_all=test_all
+            test_all=test_all,
+            pars_flag=pars_flag
         )
 
     flux_solution_diffs.to_csv(os.path.join(output_dir, "flux_diffs_KO.csv"))
