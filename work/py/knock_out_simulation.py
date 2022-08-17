@@ -88,6 +88,7 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, tes
                 break
     print(f"{len(has_effects_gene)} drug target genes with metabolic effects in model")
     flux_solution = pd.DataFrame()
+    
     for id in has_effects_gene:
         print(f"Peforming knock-out simulation for {id}")
         model_cp = copy.deepcopy(model)  # using model_opt instead bc it makes more sense?
@@ -181,8 +182,11 @@ def score_gene_pairs(gene_pairs, filename, input_reg):
     for p_gene in p_model_genes:
         data_p = gene_pairs.loc[gene_pairs["Gene"] == p_gene].copy()
         total_aff = data_p["Gene IDs"].unique().size
-        n_aff_down = (data_p.loc[abs(data_p["rxn_fluxRatio"]) < 0.9, "Gene IDs"].unique().size)
-        n_aff_up = (data_p.loc[abs(data_p["rxn_fluxRatio"]) > 1.1, "Gene IDs"].unique().size)
+        n_aff_down = (data_p.loc[(abs(data_p["rxn_fluxRatio"]) < 0.95) & (data_p["rxn_fluxRatio"] > 0), "Gene IDs"].unique().size)
+        n_aff_up = (data_p.loc[(abs(data_p["rxn_fluxRatio"]) > 1.05) & (data_p["rxn_fluxRatio"] > 0), "Gene IDs"].unique().size)
+        n_aff_rev =  (data_p.loc[data_p["rxn_fluxRatio"] < 0, "Gene IDs"].unique().size)
+        print(f"number of reversed reactions for {p_gene}: {n_aff_rev}")
+        
         if input_reg == "up":
             d_s = (n_aff_down - n_aff_up) / total_aff
         else:

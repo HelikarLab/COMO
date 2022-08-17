@@ -101,13 +101,26 @@ merge_batch <- function(wd, context, batch) {
 
         stack_df$zscore <- as.numeric(as.character(stack_df$zscore))
 
-        plot_name = file.path(wd, "figures", paste0(
+        plot_name_pdf = file.path(wd, "figures", paste0(
             "plot_", context, "_", substring(basename(f), 1, nchar(basename(f))-4), ".pdf"))
+		
+		plot_name_png = file.path(wd, "figures", paste0(
+            "plot_", context, "_", substring(basename(f), 1, nchar(basename(f))-4), ".png"))
+			
         simplified_plot <- ifelse(length(unique(stack_df$source)) > 10, TRUE, FALSE)
         label <- colnames(stack_df)[-1]
-        pdf(plot_name)
+        pdf(plot_name_pdf)
+		png(
+			plot_name_png,
+			res=1200,
+			units="in",
+			width=3.25,
+			height=3.25
+		)
         p <- ggplot(stack_df, aes(zscore, color=source)) +
-            geom_density()
+            geom_density() +
+			theme(text=element_text(size=12,  family="sans"))
+			
         if ( simplified_plot ) {
             p <- p + theme(legend.position = "none")
         }
@@ -132,7 +145,8 @@ merge_batch <- function(wd, context, batch) {
 
 combine_batch_zdistro <- function(wd, context, batch, zmat) {
     print(paste0("Combining ", batch))
-    plot_name = file.path(wd, "figures", paste0("plot_", context, "_", batch, "_combine_distro", ".pdf"))
+    plot_name_pdf = file.path(wd, "figures", paste0("plot_", context, "_", batch, "_combine_distro", ".pdf"))
+	plot_name_png = file.path(wd, "figures", paste0("plot_", context, "_", batch, "_combine_distro", ".png"))
 
     weighted_z <- function(x) {
         floor_score <- -6
@@ -159,14 +173,24 @@ combine_batch_zdistro <- function(wd, context, batch, zmat) {
 
         simplified_plot <- ifelse(length(unique(stack_df$source)) > 10, TRUE, FALSE)
         label <- colnames(stack_df)[-1]
-        pdf(plot_name)
+        pdf(plot_name_pdf)
+		png(
+			plot_name_png,
+			res=1200,
+			units="in",
+			width=3.25,
+			height=3.25
+		)
+		
         if ( simplified_plot ) {
             #p <- p + theme(legend.position = "none")
             stack_df <- stack_df[stack_df$source=="combined",]
         }
 
         p <- ggplot(stack_df, aes(zscore, color=source)) +
-            geom_density()
+            geom_density() +
+			theme(text=element_text(size=12,  family="sans"))
+			
         max_dens <- 0
         # get y upper limit by finding density of peak at z = 0
         for ( source in unique(p$data$source) ) {
@@ -191,8 +215,10 @@ combine_batch_zdistro <- function(wd, context, batch, zmat) {
 
 combine_context_zdistro <- function(wd, context, n_reps, zmat) {
     print(paste0("Combining ", context, " Z-score distributions. "))
-    plot_name = file.path(wd, "figures", paste0(
+    plot_name_pdf = file.path(wd, "figures", paste0(
         "plot_", context, "_combine_batches_distro", ".pdf"))
+	plot_name_png = file.path(wd, "figures", paste0(
+        "plot_", context, "_combine_batches_distro", ".png"))
 
     weighted_z <- function(x, n_reps) {
         floor_score <- -6
@@ -225,9 +251,17 @@ combine_context_zdistro <- function(wd, context, n_reps, zmat) {
         stack_df$zscore <- as.numeric(as.character(stack_df$zscore))
 
         label <- colnames(stack_df)[-1]
-        pdf(plot_name)
+        pdf(plot_name_pdf)
+		png(
+			plot_name_png,
+			res=1200,
+			units="in",
+			width=3.25,
+			height=3.25
+		)
         p <- ggplot(stack_df, aes(zscore, color=source)) +
-            geom_density()
+            geom_density() +
+			theme(text=element_text(size=12,  family="sans"))
 
         max_dens <- 0
         # get y upper limit by finding density of peak at z = 0
@@ -269,8 +303,9 @@ combine_omics_zdistros <- function(
 
     fig_path <- file.path(wd, context, "figures")
     if ( !file.exists(fig_path) ) { dir.create(fig_path) }
-    plot_name = file.path(fig_path, paste0("plot_", context, "_combine_omics_distro", ".pdf"))
-
+    plot_name_pdf = file.path(fig_path, paste0("plot_", context, "_combine_omics_distro", ".pdf"))
+	plot_name_png = file.path(fig_path, paste0("plot_", context, "_combine_omics_distro", ".png"))
+	
     weights <- c()
     names <- c()
     dfs <- list()
@@ -342,9 +377,19 @@ combine_omics_zdistros <- function(
     stack_df$zscore <- as.numeric(as.character(stack_df$zscore))
 
     label <- colnames(stack_df)[-1]
-    pdf(plot_name)
+    pdf(plot_name_pdf)
+	png(
+		plot_name_png,
+		res=1200,
+		units="in",
+		width=3.25,
+		height=3.25
+	)
+
     p <- ggplot(stack_df, aes(zscore, color=source)) +
-        geom_density()
+        geom_density() +
+		theme(text=element_text(size=12,  family="sans"))
+		
     max_dens <- 0
     # get y upper limit by finding density of peak at z = 0
     for ( source in unique(p$data$source) ) {
