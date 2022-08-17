@@ -6,7 +6,7 @@ import re
 import os
 import sys
 import argparse
-from rpy2.robjects.packages import importr, SignatureTranslatedAnonymousPackage
+from rpy2.robjects.packages import importr
 import glob
 import numpy as np
 from pathlib import Path
@@ -39,7 +39,7 @@ def create_counts_matrix(context_name):
     print(f"Creating Counts Matrix for '{context_name}'")
 
     # call generate_counts_matrix.R to create count matrix from MADRID_input folder
-    rpy2_hook = rpy2_api.Rpy2(r_file_path=r_file_path)
+    rpy2_hook = rpy2_api.Rpy2(r_file_path=r_file_path, data_dir=input_dir, out_dir=matrix_output_dir)
     rpy2_hook.call_function("generate_counts_matrix_main")
 
 
@@ -249,8 +249,6 @@ def create_gene_info_file(matrix_file_list, form: InputDatabase, taxon_id):
         ]
         if i.value != form.value
     ]
-
-    print(f"Gathering data, please wait...")
 
     gene_info = async_bioservices.database_convert.fetch_gene_info(
         input_values=genes,

@@ -1,31 +1,21 @@
 #!/usr/bin/python3
 
+import instruments
 import numpy as np
 import os
 import pandas as pd
-from instruments import AffyIO
-import instruments
 import rpy2.robjects as ro
-
-
-# import GEOparse
-import urllib.request
 import tarfile
-# from instruments import *
-from GSEpipeline import load_gse_soft
+import urllib.request
 
+from GSEpipeline import load_gse_soft
+from instruments import AffyIO
 from rpy2.robjects import pandas2ri
+from async_bioservices import database_convert
+from async_bioservices.input_database import InputDatabase
+from async_bioservices.output_database import OutputDatabase
 
 pandas2ri.activate()
-# Input: Extract Gene Info from GEO DataSets
-
-# gse = load_gse_soft(gsename)
-
-from .async_bioservices import database_convert
-from .async_bioservices.input_database import InputDatabase
-from .async_bioservices.output_database import OutputDatabase
-
-# Extract Platform Information
 
 
 def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):

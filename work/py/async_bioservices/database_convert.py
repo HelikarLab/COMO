@@ -16,7 +16,6 @@ async def _async_fetch_info(
         delay: int = 5
 ):
     # Get the value from InputDatabase, OutputDatabase, and taxon id
-    input_db_value = input_db.value
     output_db_values: list[str] = [i.value for i in output_db]
     if isinstance(taxon_id, TaxonId):
         taxon_id = taxon_id.value
@@ -24,7 +23,7 @@ async def _async_fetch_info(
     database_convert = await event_loop.run_in_executor(
         None,  # Defaults to ThreadPoolExecutor, uses threads instead of processes. No need to modify
         biodbnet.db2db,  # The function to call
-        input_db_value,  # The following are arguments passed to the function
+        input_db.value,  # The following are arguments passed to the function
         output_db_values,
         input_values,
         taxon_id

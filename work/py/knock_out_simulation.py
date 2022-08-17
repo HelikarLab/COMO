@@ -1,25 +1,18 @@
 #!/usr/bin/python3
 import argparse
+import cobra
+import cobra.flux_analysis
+import copy
+import numpy as np
 import os
+import pandas as pd
 import re
 import sys
-import pandas as pd
-import numpy as np
-import cobra
-import copy
-from cobra.flux_analysis import (
-    single_gene_deletion,
-    single_reaction_deletion,
-    double_gene_deletion,
-    double_reaction_deletion,
-    moma,
-    pfba
-)
 from project import configs
 
-from . import async_bioservices
-from .async_bioservices.input_database import InputDatabase
-from .async_bioservices.output_database import OutputDatabase
+import async_bioservices
+from async_bioservices.input_database import InputDatabase
+from async_bioservices.output_database import OutputDatabase
 
 
 def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, test_all, pars_flag):
@@ -39,7 +32,7 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, tes
         ref_sol = cobra.core.solution.Solution(model.objective, "OPTIMAL", ref_flux)
     else:
         if pars_flag:
-            ref_sol = pfba(model)
+            ref_sol = cobra.flux_analysis.pfba(model)
         else:
             ref_sol = model.optimize()
 
@@ -65,7 +58,7 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, tes
     DT_model = list(set(DT_genes["Gene ID"].tolist()).intersection(gene_ind2genes))
     print(f"{len(DT_model)} drug target genes in model")
 
-    model_opt = moma(model, solution=ref_sol, linear=False).to_frame()
+    model_opt = cobra.flux_analysis.moma(model, solution=ref_sol, linear=False).to_frame()
     model_opt[abs(model_opt) < 1e-8] = 0.0
 
     has_effects_gene = []
@@ -93,7 +86,7 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, tes
         model_cp = copy.deepcopy(model)  # using model_opt instead bc it makes more sense?
         gene = model_cp.genes.get_by_id(id)
         gene.knock_out()
-        opt_model = moma(model_cp, solution=ref_sol, linear=False).to_frame()
+        opt_model = cobra.flux_analysis.moma(model_cp, solution=ref_sol, linear=False).to_frame()
         flux_solution[id] = opt_model["fluxes"]
         del model_cp
 
