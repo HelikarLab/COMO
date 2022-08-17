@@ -198,7 +198,7 @@ def feasibility_test(model_cobra, step):
 
 def seed_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
     # `Becker and Palsson (2008). Context-specific metabolic networks are
-    # consistent with experiments. PLoS Comput. Biol. 4, e1000082. 
+    # consistent with experiments. PLoS Comput. Biol. 4, e1000082.`
     properties = GIMMEProperties(
         exp_vector=expr_vector,  # np.array(gimme_data['0']),
         obj_frac=0.9,
@@ -214,7 +214,8 @@ def seed_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
     
     context_cobra_model.remove_reactions(to_remove_ids, True)
     r_ids = [r.id for r in context_cobra_model.reactions]
-    psol = context_cobra_model.optimize()
+    psol = pfba(context_cobra_model)
+    #psol = context_cobra_model.optimize()
     #to_remove_ids = [r_ids[r] for r in np.where(abs(psol.fluxes) < 1e-8)[0]]
     #context_cobra_model.remove_reactions(to_remove_ids, True)
 
@@ -933,8 +934,8 @@ def main():
     print("Number of Metabolites: " + str(len(context_model.metabolites)))
     print("Number of Reactions: " + str(len(context_model.reactions)))
     print(context_model.objective._get_expression())
-    print("Optimal objective solution: ", context_model.optimize().fluxes[objective])
-    print("Parimonious objective solution: ", pfba(context_model).fluxes[objective]) 
+    print(pfba(context_model))
+    #print(context_model.optimize())
     print("len rxns: ", len(context_model.reactions))
     return None
 
