@@ -20,6 +20,9 @@ class Rpy2:
         Taken in part from: https://gist.github.com/indraniel/da11c4f79c79b5e6bfb8
         """
         func_ = rpy2.robjects.packages.SignatureTranslatedAnonymousPackage(self._r_file_read, "func_")
+
+        # Dynamically call the func_ function, using the arguments passed in
+        # From: https://stackoverflow.com/questions/11781265/
         call_func_ = getattr(func_, r_function_name)
         results = call_func_(*self._args, **self._kwargs)
         return results
