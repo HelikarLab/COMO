@@ -7,6 +7,7 @@ ARG HOME="/home/jovyan"
 ARG ENVIRONMENT_FILE="${HOME}/environment.yaml"
 ARG JUPYTER_NOTEBOOK="${HOME}/work/py/pipeline.ipynb"
 ARG JUPYTER_CONFIG="${HOME}/.jupyter/jupyter_notebook_config.py"
+ENV DEBIAN_FRONTEND=noninteractive
 
 COPY /build_scripts/pip_install.txt "${HOME}/pip_install.txt"
 COPY /build_scripts/mamba_install.txt "${HOME}/mamba_install.txt"
