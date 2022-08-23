@@ -7,45 +7,38 @@ on:
 #      - 'bulk_dev'
 #      - "master"
   workflow_dispatch:
-  schedule:
-    # Every day at midnight
-    - cron: '0 0 * * *'
+  push:
+    tags:
+      - "*"
 
 jobs:
   # This job will check if there has been a push to the master branch within the past day
   # If there has been a push to the master branch, then it will run the build job
   # From: https://github.com/doxygen/doxygen/blob/68b134f1457aa88553665c3bb77b85154436bf4c/.github/workflows/coverity.yml#L16
-  check_build:
-    runs-on: ubuntu-20.04
-    name: Check Latest Commit
-    outputs:
-      should_run: ${{ steps.should_run.outputs.should_run }}
-    steps:
-      - uses: actions/checkout@v3
-      - name: Get Latest Commit Hash
-        run: echo ${{ github.sha }}
-
-      - id: should_run
-        continue-on-error: true
-        name: Check if commit <24 hours
-        if: ${{ github.event_name == 'schedule' }}
-        run: test -z $(github rev-list --after="24 hours" %{{ github.sha }}) && echo "::set-output name=should_run::false"
-
-
   dockerhub:
-
-    # Only run the docker build if we have a commit within the past 24 hours
-    needs: check_build
-    if: ${{ needs.check_build.outputs.should_run != 'false' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Build Docker Image
-
     env:
       DEBIAN_FRONTEND: noninteractive
-
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3.0.2
+      # Checkout the repository
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # Get tag/release information for docker tags
+      - name: Docker Metadata
+        id: metadata
+        uses: docker/metadata-action@v4
+        with:
+          flavor: |
+            latest=false
+            prefix=
+            suffix=
+          images: babessell/madrid
+          tags: |
+            type=match,pattern=^\w+-\d+\.\d+
+            type=ref,event=tag
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/master') }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -59,22 +52,12 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-
-      # Set the tag based on the current branch
-      - name: Test if Master Branch
-        continue-on-error: true
-        if: ${{ github.ref_name == 'master' }}
-        run: echo 'DOCKER_TAG=development' >> $GITHUB_ENV
-      - name: Set non-Master Branch Tag
-        continue-on-error: true
-        if: ${{ github.ref_name != 'master' }}
-        run: echo 'DOCKER_TAG=${{ github.ref_name }}' >> $GITHUB_ENV
-
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
           context: .
-          push: true
-          tags: babessell/madrid:${{env.DOCKER_TAG}}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
