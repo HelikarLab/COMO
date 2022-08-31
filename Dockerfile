@@ -36,7 +36,7 @@ RUN conda config --add channels conda-forge \
     && rm -f "${ENVIRONMENT_FILE}" "${HOME}/pip_install.txt" "${HOME}/mamba_install.txt"
 
 # Install gurbori
-RUN wget https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
+RUN wget --quiet https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
     && tar -xf gurobi${GRB_VERSION}_linux64.tar.gz \
     && rm -f gurobi${GRB_VERSION}_linux64.tar.gz \
     && mv -f gurobi* gurobi \
