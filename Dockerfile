@@ -30,8 +30,8 @@ RUN conda config --quiet --add channels conda-forge \
     && mamba clean --quiet --all --force-pkgs-dirs --yes \
     && R -e 'devtools::install_github("babessell1/zFPKM", quiet=TRUE)' \
     # Install jupyter extensions
-    && jupyter labextension install @jupyter-widgets/jupyterlab-manager \
-    && jupyter labextension install escher \
+    && jupyter labextension -y install @jupyter-widgets/jupyterlab-manager \
+    && jupyter labextension -y install escher \
     && jupyter trust "${JUPYTER_NOTEBOOK}" \
     && rm -f "${ENVIRONMENT_FILE}" "${HOME}/pip_install.txt" "${HOME}/mamba_install.txt"
 
