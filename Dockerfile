@@ -28,7 +28,7 @@ RUN conda config --add channels conda-forge \
     # && python3 -m pip install -r "${HOME}/pip_install.txt" \
     #&& mamba env update --name base --file "${ENVIRONMENT_FILE}" \
     && mamba clean --all --force-pkgs-dirs --yes \
-    && R -e 'devtools::install_github("babessell1/zFPKM")' \
+    && R -e 'devtools::install_github("babessell1/zFPKM", quiet=TRUE)' \
     # Install jupyter extensions
     && jupyter labextension install @jupyter-widgets/jupyterlab-manager \
     && jupyter labextension install escher \
