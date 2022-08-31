@@ -17,17 +17,17 @@ COPY /environment.yaml "${ENVIRONMENT_FILE}"
 COPY --chown=1000:100 /work "${HOME}"/work
 #
 # Install python-related items
-RUN conda config --add channels conda-forge \
-    && conda config --add channels bioconda \
-    && conda config --add channels r \
+RUN conda config --quiet --add channels conda-forge \
+    && conda config --quiet --add channels bioconda \
+    && conda config --quiet --add channels r \
     # Remove python from pinned versions; this allows us to update python. From: https://stackoverflow.com/a/11245372/13885200 \
     && sed -i "s/^python 3.*//" /opt/conda/conda-meta/pinned \
-    && mamba install --yes python=${PYTHON_VERSION} \
-    && mamba env update --name base --file "${ENVIRONMENT_FILE}" \
+    && mamba install --quiet --yes python=${PYTHON_VERSION} \
+    && mamba env update --quiet --name base --file "${ENVIRONMENT_FILE}" \
     # && mamba install --file "${HOME}/mamba_install.txt" \
     # && python3 -m pip install -r "${HOME}/pip_install.txt" \
     #&& mamba env update --name base --file "${ENVIRONMENT_FILE}" \
-    && mamba clean --all --force-pkgs-dirs --yes \
+    && mamba clean --quiet --all --force-pkgs-dirs --yes \
     && R -e 'devtools::install_github("babessell1/zFPKM", quiet=TRUE)' \
     # Install jupyter extensions
     && jupyter labextension install @jupyter-widgets/jupyterlab-manager \
