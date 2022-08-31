@@ -14,6 +14,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  DEBIAN_FRONTEND: noninteractive
 
 jobs:
   # This job will check if there has been a push to the master branch within the past day
@@ -25,8 +26,7 @@ jobs:
       contents: read
       packages: write
     name: Build Docker Image
-    env:
-      DEBIAN_FRONTEND: noninteractive
+
     steps:
       # Checkout the repository
       - name: Checkout Repository
@@ -66,3 +66,5 @@ jobs:
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
+          secrets: |
+            GIT_AUTH_TOKEN=${{ secrets.GITHUB_TOKEN }}
