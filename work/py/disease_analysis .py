@@ -5,9 +5,15 @@ import json
 import math
 from project import configs
 from GSEpipelineFast import *
-from rnaseq_preprocess import fetch_gene_info
-
+from rpy2.robjects.packages import importr
+from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 from rpy2.robjects import pandas2ri
+
+from async_bioservices import database_convert
+from async_bioservices.input_database import InputDatabase
+from async_bioservices.output_database import OutputDatabase
+from async_bioservices.taxon_ids import TaxonIDs
+
 
 pandas2ri.activate()
 
@@ -32,6 +38,7 @@ f = open(os.path.join(configs.rootdir, "py", "rscripts", "fitAgilent.R"), "r")
 string = f.read()
 f.close()
 agilentio = SignatureTranslatedAnonymousPackage(string, "agilentio")
+
 
 def breakDownEntrezs(disease):
     """
@@ -68,12 +75,18 @@ def get_entrez_id(regulated, output_full_path, in_db, taxon_id, full_flag=False)
     param: full_flag - boolean, True if breaking down multi- entrez ids into seperate rows
     return: df,
     """
-    disease = fetch_gene_info(list(regulated.index.values),
-                              input_db=in_db,
-                              output_db=["Gene Symbol"],
-                              delay=15,
-                              taxon_id=taxon_id
-                              )
+    disease = database_convert.fetch_gene_info(
+        input_values=list(regulated.index.values),
+        input_db=in_db,
+        output_db=[OutputDatabase.GENE_SYMBOL],
+        taxon_id=taxon_id,
+    )
+    # disease = fetch_gene_info(list(regulated.index.values),
+    #                           input_db=in_db,
+    #                           output_db=["Gene Symbol"],
+    #                           delay=15,
+    #                           taxon_id=taxon_id
+    #                           )
     disease.reset_index(inplace=True)
     # disease.drop(columns=["Ensembl Gene ID"], inplace=True)
     disease.replace(to_replace="-", value=np.nan, inplace=True)
@@ -153,19 +166,21 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
         print(diff_exp_df)
         
         if inst_name == "affy":
-            bdnet = fetch_gene_info(
-                list(map(str, diff_exp_df["Affy ID"].tolist())),
-                input_db="Affy ID",
-                output_db=["Ensembl Gene ID", "Gene ID", "Gene Symbol"],
-                delay=15, taxon_id=taxon_id)
-            print(bdnet["Gene ID"])
+            input_db = InputDatabase.AFFY_ID
         elif inst_name == "agilent":
-            bdnet = fetch_gene_info(
-                list(map(str, diff_exp_df["Affy ID"].tolist())),
-                input_db="Agilent ID",
-                output_db=["Ensembl Gene ID", "Gene ID", "Gene Symbol"],
-                delay=15, taxon_id=taxon_id)
-            
+            input_db = InputDatabase.AGILENT_ID
+
+        bdnet = database_convert.fetch_gene_info(
+            list(map(str, diff_exp_df["Affy ID"].tolist())),
+            input_db=input_db,
+            output_db=[
+                OutputDatabase.ENSEMBL_GENE_ID,
+                OutputDatabase.GENE_ID,
+                OutputDatabase.GENE_SYMBOL,
+            ],
+            taxon_id=taxon_id
+        )
+
         diff_exp_df["Entrez"] = bdnet["Gene ID"].tolist()
         diff_exp_df["Ensembl"] = bdnet["Ensembl Gene ID"].tolist()
         diff_exp_df["Symbol"] = bdnet["Gene Symbol"].tolist()
@@ -203,11 +218,14 @@ def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_
     diff_exp_df = ro.conversion.rpy2py(diff_exp_df)
     gse_id = "rnaseq"
 
-    bdnet = fetch_gene_info(
-        list(map(str, diff_exp_df["Ensembl"].tolist())),
-        input_db="Ensembl Gene ID",
-        output_db=["Gene ID", "Affy ID", "Gene Symbol"],
-        delay=15,
+    bdnet = database_convert.fetch_gene_info(
+        input_values=list(map(str, diff_exp_df["Ensembl"].tolist())),
+        input_db=InputDatabase.ENSEMBL_GENE_ID,
+        output_db=[
+            OutputDatabase.GENE_ID,
+            OutputDatabase.AFFY_ID,
+            OutputDatabase.GENE_SYMBOL
+        ],
         taxon_id=taxon_id
     )
 
