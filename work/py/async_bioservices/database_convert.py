@@ -13,7 +13,7 @@ async def _async_fetch_info(
         input_db: InputDatabase,
         output_db: list[OutputDatabase] = None,
         taxon_id: TaxonIDs | int = TaxonIDs.HUMAN,
-        delay: int = 5
+        delay: int = 15
 ):
     # Get the value from InputDatabase, OutputDatabase, and taxon id
     output_db_values: list[str] = [i.value for i in output_db]
@@ -31,7 +31,7 @@ async def _async_fetch_info(
 
     # If the above db2db conversion didn't work, try again until it does
     while not isinstance(database_convert, pd.DataFrame):
-        print(f"\nToo many requests to BioDBNet, waiting {delay} seconds and trying again.")
+        print(f"\nToo many requests to BioDBNet, waiting {delay} seconds and trying again.\n")
         await asyncio.sleep(delay)
         database_convert = await event_loop.run_in_executor(
             None,  # Defaults to ThreadPoolExecutor, uses threads instead of processes. No need to modify
@@ -52,11 +52,14 @@ async def _fetch_gene_info_manager(tasks: list[asyncio.Task], batch_length: int)
     results: list[int] = []
 
     index: int = 0
+    semaphore = asyncio.Semaphore(10)  # Limit number of concurrent tasks
+
     for task in asyncio.as_completed(tasks):
-        result = await task
+        async with semaphore:
+            result = await task
 
         # Multiply by batch length to get the approximate number of true genes being converted
-        print(f"\rCollecting genes... {(index + 1) * batch_length} of {len(tasks) * batch_length} finished", end="")
+        print(f"\rCollecting genes... {(index + 1) * batch_length} of {len(tasks) * batch_length}", end="")
         results.append(result)
         index += 1
     print()
@@ -102,6 +105,8 @@ def fetch_gene_info(
     event_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(event_loop)
     async_tasks = []
+
+
     for i in range(0, len(input_values), batch_len):
         # Define an upper range of values to take from input_values
         upper_range = min(i + batch_len, len(input_values))
