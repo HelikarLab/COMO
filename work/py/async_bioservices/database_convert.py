@@ -48,11 +48,11 @@ async def _async_fetch_info(
     return database_convert
 
 
-async def _fetch_gene_info_manager(tasks: list[asyncio.Task], batch_length: int):
+async def _fetch_gene_info_manager(tasks: list[asyncio.Task], batch_length: int, max_concurrency: int):
     results: list[int] = []
 
     index: int = 0
-    semaphore = asyncio.Semaphore(10)  # Limit number of concurrent tasks
+    semaphore = asyncio.Semaphore(max_concurrency)  # Limit number of concurrent tasks
 
     for task in asyncio.as_completed(tasks):
         async with semaphore:
@@ -71,7 +71,8 @@ def fetch_gene_info(
         input_db: InputDatabase = InputDatabase,
         output_db: list[OutputDatabase] = None,
         taxon_id: TaxonIDs | int = TaxonIDs.HUMAN,
-        delay: int = 5
+        delay: int = 5,
+        max_concurrency: int = 10
 ) -> pd.DataFrame:
     """
     This function returns a dataframe with important gene information for future operations in MADRID.
@@ -82,6 +83,7 @@ def fetch_gene_info(
     :param output_db: The output format to use (default: ["Gene Symbol", "Gene ID", "Chromosomal Location"])
     :param delay: The delay in seconds to wait before trying again if bioDBnet is busy (default: 15)
     :param taxon_id: The taxon ID to use (default: 9606)
+    :param max_concurrency: The maximum number of concurrent tasks to run (default: 10)
 
     :return: A dataframe with specified columns as "output_db" (Default is HUGO symbol, Entrez ID, and chromosome start and end positions)
     """
@@ -125,7 +127,14 @@ def fetch_gene_info(
         async_tasks.append(task)
 
     # database_convert = event_loop.run_until_complete(asyncio.gather(*async_tasks))
-    database_convert = event_loop.run_until_complete(_fetch_gene_info_manager(tasks=async_tasks, batch_length=batch_len))
+    database_convert = event_loop.run_until_complete(
+        _fetch_gene_info_manager(
+            tasks=async_tasks,
+            batch_length=batch_len,
+            max_concurrency=max_concurrency
+        )
+    )
+
     event_loop.close()  # Close the event loop to free resources
 
     # Loop over database_convert to concat them into dataframe_maps
