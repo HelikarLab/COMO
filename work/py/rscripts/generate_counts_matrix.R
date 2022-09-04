@@ -176,7 +176,7 @@ create_counts_matrix <- function(counts_files, replicate_names, n_replicates, st
     }
 
     
-    for ( i in 2:n_replicates) { # iterate through rest of replicates after handling the first and initializing matrix
+    for (i in 1 : n_replicates) { # iterate through rest of replicates after handling the first and initializing matrix
         new_cnts <- prepare_sample_counts(counts_files[i], counts_files, strand_files[i]) # get next column of counts to add
         options(warn=-1) # turn off warnings
         
