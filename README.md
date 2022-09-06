@@ -10,7 +10,7 @@ This is the home page for MADRID pipeline.
 
 ## How To Run application
 - [Install Docker](https://docs.docker.com/install/)
-- `docker login`
+- `sudo docker login`
 - `sudo docker pull babessell/madrid:development`
 - `sudo docker run --cpus=4 -p 4000:8888 --volume=$HOME/gurobi.lic:/opt/gurobi/gurobi.lic:ro  -v /$HOME/saghamiri/Desktop/LocalMadrid:/home/jovyan/work/data/local_files --rm --name jupyteruser --rm -it babessell/madrid:development` Run docker image and assign 2 CPUs to it.
 - Open [http://127.0.0.1:4000](http://127.0.0.1:4000) from your browser  
