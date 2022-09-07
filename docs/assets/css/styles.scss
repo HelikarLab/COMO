@@ -5,24 +5,66 @@ $white: #FFFFFF;
 $body-green: #159957;
 $no-format-blue: #1f6bb8;
 
-a:link {color: $body-green; text-decoration: none;}
-a:visited {color: $body-green; text-decoration: none;}
-a:hover {color: $body-green; text-decoration: underline;}
+a:link {
+    color: $body-green;
+    text-decoration: none;
+}
+a:visited {
+    color: $body-green;
+    text-decoration: none;
+}
+a:hover {
+    color: $body-green;
+    text-decoration: underline;
+}
 
 // Set colors for links
 // From: https://stackoverflow.com/a/10143495
 // "body" links, i.e. non-header links
-a.body-link:link { color: $body-green; text-decoration: none; }
-a.body-link:visited { color: $body-green; text-decoration: none; }
-a.body-link:hover { color: $body-green; text-decoration: underline; }
+a.body-link:link {
+    color: $body-green;
+    text-decoration: none;
+}
+a.body-link:visited {
+    color: $body-green;
+    text-decoration: none;
+}
+a.body-link:hover {
+    color: $body-green;
+    text-decoration: underline;
+}
 
-a.remove-formatting:link { color: $no-format-blue; text-decoration: none; }
-a.remove-formatting:visited { color: $no-format-blue; text-decoration: none; }
-a.remove-formatting:hover { color: $no-format-blue; text-decoration: underline; }
+a.remove-formatting:link {
+    color: $no-format-blue;
+    text-decoration: none;
+}
+a.remove-formatting:visited {
+    color: $no-format-blue;
+    text-decoration: none;
+}
+a.remove-formatting:hover {
+    color: $no-format-blue;
+    text-decoration: underline;
+}
 
-a.header-link:link { color: $white; text-decoration: none; }
-a.header-link:visited { color: $white; text-decoration: none; }
-a.header-link:hover { color: $white; }
+a.header-link:link {
+    color: $white;
+    text-decoration: none;
+}
+a.header-link:visited {
+    color: $white;
+    text-decoration: none;
+}
+a.header-link:hover {
+    color: $white;
 
-table { table-layout: fixed; width: 100%; }
-td { width: 50%; }
+}
+
+table {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+td {
+    width: 50%;
+}
