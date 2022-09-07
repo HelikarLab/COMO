@@ -12,17 +12,7 @@ Find all images under /assets/img. Jekyll finds all static files with site.stati
 {% endcomment %}
 {% assign images = site.static_files |  where_exp:"item", "item.path contains 'assets/img/flowchart'" %}
 
-{% comment %}
-Display text evenly, horizontally across page
-From: https://stackoverflow.com/a/34560563
-{% endcomment %}
-<div style="display: flex; justify-content: space-around;">
-  {% for image in images %}
-      <a href="#flowchart-image-{{ forloop.index }}" class="body-link">Step {{ forloop.index }}</a>
-  {% endfor %}
-</div>
-<br><br>
-
+<br>
 {% comment %}
 Place images on the page
 {% endcomment %}
