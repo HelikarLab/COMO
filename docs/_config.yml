@@ -10,14 +10,15 @@ show_downloads: true
 github:
   name: "MADRID"
   url: "https://github.com/HelikarLab/MADRID"
+  issues: "https://github.com/HelikarLab/MADRID/issues"
   tagline: ""
   brandt_url: "https://github.com/babessell1"
   josh_url: "https://github.com/JoshLoecker"
 
 docker:
-  name: "babessell/madrid"
-  tag: "development"
-  url: "https://hub.docker.com/r/babessell/madrid"
+  name: "ghcr.io/helikarlab/madrid"
+  tag: "[CHOSEN-TAG]"
+  all_tags: "https://github.com/HelikarLab/MADRID/pkgs/container/madrid/versions"
 
 # Static images in assets/img
 defaults:

@@ -1,0 +1,76 @@
+{% comment %}
+Home page
+{% endcomment %}
+{%  if page.url == "/" %}
+  <div style="display: block;">
+    <div style="margin: auto; width: 50%; display: flex; justify-content: space-around;">
+      <a class="heading-link" href="#about-madrid" target="_self">About MADRID</a>
+      <a class="heading-link" href="#before-starting" target="_self">Before You Start</a>
+      <a class="heading-link" href="#identifying-drug-targets" target="_self">Identifying Drug Targets</a>
+    </div>
+    
+    <br>
+    
+    <div style="margin: auto; width: 75%; display: flex; justify-content: space-around;">
+      <a class="heading-link" href="#configuration-information" target="_self">Configuration Information</a>
+      <a class="heading-link" href="#start-container" target="_self">Start the Container</a>
+      <a class="heading-link" href="#accessing-madrid" target="_self">Accessing MADRID</a>
+      <a class="heading-link" href="#working-in-notebook" target="_self">Working in the Notebook</a>
+    </div>
+  </div>
+{% endif %}
+
+
+{% comment %}
+Example Workflow
+{% endcomment %}
+{%  if page.url == "/example-workflow" or page.url == "/user-defined-workflow" %}
+  <div style="margin: auto; width: 50%; display: flex; justify-content: space-around;">
+    <a class="heading-link" href="{{ "example-workflow" | absolute_url }}">Example Workflow</a>
+    <a class="heading-link" href="{{ "user-defined-workflow" | absolute_url }}">User-Defined Data</a>
+  </div>
+  
+  <br>
+  
+  <div style="margin: auto; width: 50%; display: flex; justify-content: space-around;">
+    {% if page.url == "/example-workflow" %}
+    {% comment %} Display text evenly, horizontally across page. From: https://stackoverflow.com/a/34560563 {% endcomment %}
+      <a class="heading-link" href="#example-step-1">Step 1</a>
+      <a class="heading-link" href="#example-step-2">Step 2</a>
+      <a class="heading-link" href="#example-step-3">Step 3</a>
+      <a class="heading-link" href="#example-step-4">Step 4</a>
+      <a class="heading-link" href="#example-step-5">Step 5</a>
+    {% elsif page.url == "/user-defined-workflow" %}
+      <a class="heading-link" href="#user-step-1">Step 1</a>
+      <a class="heading-link" href="#user-step-2">Step 2</a>
+      <a class="heading-link" href="#user-step-3">Step 3</a>
+      <a class="heading-link" href="#user-step-4">Step 4</a>
+      <a class="heading-link" href="#user-step-5">Step 5</a>
+      <a class="heading-link" href="#user-step-6">Step 6</a>
+    {% endif %}
+  </div>
+  
+{% endif %}
+
+
+{% comment %}
+Flow Charts
+{% endcomment %}
+{%  if page.url == "/flowcharts" %}
+  {% assign images = site.static_files |  where_exp:"item", "item.path contains 'assets/img/flowchart'" %}
+    {% comment %}
+    Display text evenly, horizontally across page
+    From: https://stackoverflow.com/a/34560563
+    {% endcomment %}
+    <div style="margin: auto; width: 50%; display: flex; justify-content: space-around;">
+      {% for image in images %}
+        <a class="heading-link" href="/flowcharts#flowchart-image-{{ forloop.index }}">Step {{ forloop.index }}</a>
+      {% endfor %}
+    </div>
+{% endif %}
+
+
+{% comment %}
+Resources
+Nothing listed here as there is no need for sub-navigation
+{% endcomment %}
