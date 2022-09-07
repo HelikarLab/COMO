@@ -6,209 +6,243 @@ show_in_nav: true
 nav_bar_name: Home
 weight: 0
 ---
-
-<h1 id="about-madrid" data-subheading="About MADRID">
-  <a href="#about-madrid" class="body-link">
-    What is MADRID?
-  </a>
-</h1>
-<div>
-  MADRID stands for "<b>M</b>et<b>A</b>bolic <b>D</b>rug <b>R</b>epurposing <b>ID</b>entification".
+<html>
+  <head>
+    <base target="_blank">
+  </head>
   
-  <br><br>
-  This is a <a href="https://jupyter.org/" target="_blank">Jupyter Notebook</a> based pipeline to build context-specific, <a href="https://en.wikipedia.org/wiki/Metabolic_network_modelling" target="_blank">constraint-based metabolic models (CBMM)</a> from a single source, or combination of sources, from the following "-omics" data:
-  <ul>
-    <li><a href="https://en.wikipedia.org/wiki/RNA-Seq" target="_blank">Bulk</a> RNA-sequencing</li>
-    <li><a href="https://en.wikipedia.org/wiki/Single_cell_sequencing" target="_blank">Single-Cell</a> RNA-sequencing</li>
-    <li>Mass Spectrometry <a href="https://en.wikipedia.org/wiki/Proteomics" target="_blank">Proteomics</a></li>
-    <li><a href="https://en.wikipedia.org/wiki/Microarray" target="_blank">Microarray</a></li>
-  </ul>
-  
-  Ultimately, this serves as a platform to use these models to identify drug targets and potentially repurposable drugs for metabolism-impacting diseases.
-  
-  <br><br>
-  MADRID does not require any amount of programming experience to create models. However, every step of the pipeline is packaged in its own <code>.py</code> file to promote accessible modification, addition, or replacement of analysis steps. The Jupyterlab container comes pre-loaded with the most popular <a href="https://www.r-project.org/" target="_blank">R</a> and <a href="https://www.python.org/" target="_blank">Python</a> libraries, but if you would like to use a library and cannot install it, please open a new issue on <a href="{{ site.github.url }}" target="_blank">our Github page</a>!
-  
-  <br><br>
-  In this pipeline, the term "context" refers to a specific state that can be subset from a genome-scale metabolic model using experimental data. This context can be a specific cell or tissue type in a specific experimental state, such as a control or a disease.
-  
-  <br><br>
-  For drug perturbation scoring of a specific cell-type or tissue, it is only necessary to build a CBMM (Steps 1 to 5) for the healthy control state. Differential gene expression (Step 6) will be used to for disease analysis so that multiple diseaes can be analyzed using the same CBMM.
-  
-  <br><br>
-  <b>&#9888;&#65039; Warning &#9888;&#65039; If you terminate your session after running the Docker, any changes you make WILL NOT BE SAVED! Please mount a local directory to the Docker image as instructed on <a href="https://docs.docker.com/storage/volumes/" target="_blank">Docker's website</a>, or in "<a href="#run-the-container">Run the Container</a>" below, to prevent data loss.</b>
-
-  
-</div>
-
-<div>
-  <br>
-  <h1 id="before-starting" data-subheading="Before Starting">
-    <a href="#before-starting" class="body-link">
-      Before You Start
-    </a>
-  </h1>
-  <p>The proper data must be provided, dependent on what analysis you would like to run</p>
-  
-  <div style="margin-left: 2%">
-    <a href="#before-starting#rna-seq-data" class="body-link"><h2 id="before-starting#rna-seq-data">RNA-sequencing</h2></a>
-    <ul>
-      <li>A folder named "MADRID_input" in the <code>/data/</code> directory. Proper inputs can be generated using our <a href="https://github.com/HelikarLab/FastqToGeneCounts" target="_blank">SnakeMake pipeline</a>, designed specifically for MADRID.</li>
-    </ul>
-    
-    <blockquote style="margin-left: 5%; margin-right: 5%">
-      <p>RNA-sequencing data can be <a href="https://en.wikipedia.org/wiki/Single_cell_sequencing" target="_blank">single-cell</a> or <a href="https://en.wikipedia.org/wiki/RNA-Seq" target="_blank">bulk</a>, but our SnakeMake pipeline is currently only available for bulk RNA-sequencing processing</p>
-    </blockquote>
-    
-    <ul>
-      <li>If processing RNA-sequencing data with an alternative procedure, or importing a pre-made gene count matrix, follow the instructions found in <b>Step 1</b> of the MADRID container. View <a href="#start-container">Starting the Container</a> and <a href="#accessing-madrid">Accessing MADRID</a>, below, to get started.</li>
-    </ul>
-    
-    <br>
-    <a href="#before-starting#proteomics" class="body-link"><h2 id="before-starting#proteomics">Proteomics</h2></a>
-    <ul>
-      <li>A matrix of measurement where rows are proteins in Entrez format, and columns are arbitrary sample names.</li>
-    </ul>
-    
-    <br>
-    <a href="#before-starting#microarray" class="body-link"><h2 id="before-starting#microarray">Microarray</h2></a>
-    <ul>
-      <li>&#9888;&#65039; WARNING &#9888;&#65039; Microarray has become mostly obsolete. RNA-sequencing should be used if possible.</li>
-      <li>Results must be uploaded to Gene Expression Omnibus</li>
-      <li>The only thing required by MADRID is a configuration file with: GSE, GSM, and GPL codes.</li>
-      <li>A template can be found at: <code>/data/config_sheets/microarray_data_inputs.xlsx</code>.</li>
-    </ul>
-  </div>
-</div>
-
-<div>
-  <br>
-  <h1 id="identifying-drug-targets" data-subheading="Identifying Drug Targets">
-    <a href="#identifying-drug-targets" class="body-link">
-      Identifying Drug Targets
-    </a>
-  </h1>
-  
-  <p>The following is a list of steps to identify drug targets. Stop after <b>Step 3</b> if building a context-specific mdoel for other purposes.</p>
-  <ol>
-    <li>Preprocess Bulk RNA-sequencing data by converting gene counts from <a href="https://github.com/alexdobin/STAR" target="_blank">STAR aligner</a> into a unified matrix, fetch necessary info about each gene required for normalization, and generate a configuration sheet.</li>
-    <li>Analyze any combination of Microarray, RNA-sequencing (total, polyA, or single-cell), or proteomics data, and output a list of active genes for each strategy/method.</li>
-    <li>Check for consensus amongst strategies according to desired rigor and merge into a singular set of active genes.</li>
-    <li>Create tissue specific models based on the list of active genes. If required, the user can manually refine these models and supply them in <b>Step 4</b> of the MADRID container.</li>
-    <li>Identify differential gene expressions from disease datasets using either microarray or bulk RNA-sequencing transcriptomics information.</li>
-    <li>Identify drug targets and repurposable drugs. This step consists of four substeps
+  <body>
+    <h1 id="about-madrid" data-subheading="About MADRID">
+      <a href="#about-madrid" class="body-link">
+        What is MADRID?
+      </a>
+    </h1>
+    <div>
+      MADRID stands for "<b>M</b>et<b>A</b>bolic <b>D</b>rug <b>R</b>epurposing <b>ID</b>entification".
+      
+      <br><br>
+      This is a <a href="https://jupyter.org/">Jupyter Notebook</a> based pipeline to build context-specific, <a href="https://en.wikipedia.org/wiki/Metabolic_network_modelling">constraint-based metabolic models (CBMM)</a> from a single source, or combination of sources, from the following "-omics" data:
       <ul>
-        <li>Mapping drugs on automatically-created or user-supplied models</li>
-        <li>Knock-out simulation</li>
-        <li>Compare simulation results of perturbed and unperturbed models</li>
-        <li>Integrate with disease genes and score drug targets</li>
+        <li><a href="https://en.wikipedia.org/wiki/RNA-Seq">Bulk</a> RNA-sequencing</li>
+        <li><a href="https://en.wikipedia.org/wiki/Single_cell_sequencing">Single-Cell</a> RNA-sequencing</li>
+        <li>Mass Spectrometry <a href="https://en.wikipedia.org/wiki/Proteomics">Proteomics</a></li>
+        <li><a href="https://en.wikipedia.org/wiki/Microarray">Microarray</a></li>
       </ul>
-    </li>
-  </ol>
-</div>
-
-<div>
-  <br>
-  <h1 id="configuration-information" data-subheading="Configuration Information">
-    <a href="#configuration-information" class="body-link">
-      Configuration Information
-    </a>
-  </h1>
-  Configuration Excel files should be uploaded to <code>/data/config_sheets</code>. The sheet names in these configuration files should correspond to the context (tissue name, cell name, control, etc.) where each sheet contains the sample names to include in that context-specific model. These sample names should correspond to the sample (column names in the source data matrix, which should be uploaded (or output) in <code>/data/data_matrices/&lt;model name&gt;</code> of the MADRID container.
-  
-  <br><br>
-  
-  In the Docker image, some exemplary input files are included to build metabolic models of naïve, Th1, Th2, and Th17 subtypes, and identify drug targets for Rheumatoid arthritis. You can follow the documentation in the container, the format of these files, and the template files to create your own input files.
-</div>
-
-<div>
-  <br>
-  <h1 id="start-container" data-subheading="Starting the Container">
-    <a href="#start-container" class="body-link">
-      Starting the Container
-    </a>
-  </h1>
-  <p><a href="https://docs.docker.com/get-docker/" target="_blank">Docker must be installed</a></p>
-  <p>Then, execute the following tasks in a terminal download the container:</p>
-  
-  {% highlight bash %}
-  docker login
-  docker pull babessell/madrid:development
-  {% endhighlight %}
-  
-  <p id="run-the-container">Run the container:</p>
-  {% highlight bash %}
-  docker run \
-    --cpus=4 \
-    -p 4000:8888 \
-    --volume=$HOME/madrid/gurobi.lic:/opt/gurobi/gurobi.lic:ro \
-    --volume=$HOME/madrid/local_madrid:/home/jovyan/work/data/local_files \
-    --name madrid \
-    --rm \
-    --it \
-    "{{ site.docker.name }}:{{ site.docker.tag }}"
-  {% endhighlight %}
-</div>
-
-<div>
-<table style="text-align: center;" >
-  <tr>
-    <th>Option</th>
-    <th>Description</th>
-  </tr>
-  <tr>
-    <td>--cpus</td>
-    <td>Number of CPUs to use</td>
-  </tr>
-  <tr>
-    <td>-p</td>
-    <td>Port to use</td>
-  </tr>
-  <tr>
-    <td>--volume=$HOME/madrid/gurobi.lic</td>
-    <td>The file path of your <a href="https://www.gurobi.com/" target="_blank">Gurobi</a> license. This is a fast solver used in MADRID.</td>
-  </tr>
-  <tr>
-    <td>--volume=$HOME/madrid/local_madrid</td>
-    <td>The location of a "local files" folder, to easily access items within the MADRID container</td>
-  </tr>
-  <tr>
-    <td>--name</td>
-    <td>Name of the container</td>
-  </tr>
-  <tr>
-    <td>--rm</td>
-    <td>Remove the container after it is stopped</td>
-  </tr>
-  <tr>
-    <td>--it</td>
-    <td>Start the container interactively in the foreground</td>
-  </tr>
-  <tr>
-    <td>babessell/madrid:development</td>
-    <td>The container image to start</td>
-  </tr>
-</table>
-</div>
-
-<div>
-  <br>
-  <h1 id="accessing-madrid" data-subheading="Accessing MADRID">
-    <a href="#accessing-madrid" class="body-link">
-      Accessing MADRID
-    </a>
-  </h1>
-  <p>Navigate to <code><a href="http://localhost:4000">http://localhost:4000</a></code> from your browser. The <code>4000</code> port number should match that of the <code>-p</code> option entered in <a href="#start-container">Starting the Container</a> </p>
-</div>
-
-<div>
-  <h1 id="working-in-notebook" data-subheading="Working in the Notebook">
-    <a href="#working-in-notebook" class="body-link">
-      Working in the Notebook
-    </a>
-  </h1>
-  <p>Open the <a href="https://jupyter.org/" target="_blank">Jupyter Notebook</a> workflow, found at <code>/py/pipeline.ipynb</code> within the web interface.</p>
-  <p>Configuration files should be uploaded to <code>/data/config_files</code> and data files to <code>/data/data_matrices</code>, according to instructions in the notebook and provided templates.</p>
-  <p>Update the file names in the Jupyter Notebook accordinly.</p>
-</div>
-
+      
+      Ultimately, this serves as a platform to use these models to identify drug targets and potentially repurposable drugs for metabolism-impacting diseases.
+      
+      <br><br>
+      MADRID does not require any amount of programming experience to create models. However, every step of the pipeline is packaged in its own <code>.py</code> file to promote accessible modification, addition, or replacement of analysis steps. The Jupyterlab container comes pre-loaded with the most popular <a href="https://www.r-project.org/">R</a> and <a href="https://www.python.org/">Python</a> libraries, but if you would like to use a library and cannot install it, please open a new issue on <a href="{{ site.github.url }}">our Github page</a>!
+      
+      <br><br>
+      In this pipeline, the term "context" refers to a specific state that can be subset from a genome-scale metabolic model using experimental data. This context can be a specific cell or tissue type in a specific experimental state, such as a control or a disease.
+      
+      <br><br>
+      For drug perturbation scoring of a specific cell-type or tissue, it is only necessary to build a CBMM (Steps 1 to 5) for the healthy control state. Differential gene expression (Step 6) will be used to for disease analysis so that multiple diseaes can be analyzed using the same CBMM.
+      
+      <br><br>
+      <b>&#9888;&#65039; Warning &#9888;&#65039; If you terminate your session after running the Docker, any changes you make WILL NOT BE SAVED! Please mount a local directory to the Docker image as instructed on <a href="https://docs.docker.com/storage/volumes/">Docker's website</a>, or in "<a href="#run-the-container">Run the Container</a>" below, to prevent data loss.</b>
+      
+      
+    </div>
+    
+    <div>
+      <br>
+      <h1 id="before-starting" data-subheading="Before Starting">
+        <a href="#before-starting" class="body-link">
+          Before You Start
+        </a>
+      </h1>
+      <p>The proper data must be provided, dependent on what analysis you would like to run</p>
+      
+      <div style="margin-left: 2%">
+        <a href="#before-starting#rna-seq-data" class="body-link"><h2 id="before-starting#rna-seq-data">RNA-sequencing</h2></a>
+        <ul>
+          <li>A folder named "MADRID_input" in the <code>/data/</code> directory. Proper inputs can be generated using our <a href="https://github.com/HelikarLab/FastqToGeneCounts">SnakeMake pipeline</a>, designed specifically for MADRID.</li>
+        </ul>
+        
+        <blockquote style="margin-left: 5%; margin-right: 5%">
+          <p>RNA-sequencing data can be <a href="https://en.wikipedia.org/wiki/Single_cell_sequencing">single-cell</a> or <a href="https://en.wikipedia.org/wiki/RNA-Seq">bulk</a>, but our SnakeMake pipeline is currently only available for bulk RNA-sequencing processing</p>
+        </blockquote>
+        
+        <ul>
+          <li>If processing RNA-sequencing data with an alternative procedure, or importing a pre-made gene count matrix, follow the instructions found in <b>Step 1</b> of the MADRID container. View <a href="#start-container">Starting the Container</a> and <a href="#accessing-madrid">Accessing MADRID</a>, below, to get started.</li>
+        </ul>
+        
+        <br>
+        <a href="#before-starting#proteomics" class="body-link"><h2 id="before-starting#proteomics">Proteomics</h2></a>
+        <ul>
+          <li>A matrix of measurement where rows are proteins in Entrez format, and columns are arbitrary sample names.</li>
+        </ul>
+        
+        <br>
+        <a href="#before-starting#microarray" class="body-link"><h2 id="before-starting#microarray">Microarray</h2></a>
+        <ul>
+          <li>&#9888;&#65039; WARNING &#9888;&#65039; Microarray has become mostly obsolete. RNA-sequencing should be used if possible.</li>
+          <li>Results must be uploaded to Gene Expression Omnibus</li>
+          <li>The only thing required by MADRID is a configuration file with: GSE, GSM, and GPL codes.</li>
+          <li>A template can be found at: <code>/data/config_sheets/microarray_data_inputs.xlsx</code>.</li>
+        </ul>
+      </div>
+    </div>
+    
+    <div>
+      <br>
+      <h1 id="identifying-drug-targets" data-subheading="Identifying Drug Targets">
+        <a href="#identifying-drug-targets" class="body-link">
+          Identifying Drug Targets
+        </a>
+      </h1>
+      
+      <p>The following is a list of steps to identify drug targets. Stop after <b>Step 3</b> if building a context-specific mdoel for other purposes.</p>
+      <ol>
+        <li>Preprocess Bulk RNA-sequencing data by converting gene counts from <a href="https://github.com/alexdobin/STAR">STAR aligner</a> into a unified matrix, fetch necessary info about each gene required for normalization, and generate a configuration sheet.</li>
+        <li>Analyze any combination of Microarray, RNA-sequencing (total, polyA, or single-cell), or proteomics data, and output a list of active genes for each strategy/method.</li>
+        <li>Check for consensus amongst strategies according to desired rigor and merge into a singular set of active genes.</li>
+        <li>Create tissue specific models based on the list of active genes. If required, the user can manually refine these models and supply them in <b>Step 4</b> of the MADRID container.</li>
+        <li>Identify differential gene expressions from disease datasets using either microarray or bulk RNA-sequencing transcriptomics information.</li>
+        <li>Identify drug targets and repurposable drugs. This step consists of four substeps
+          <ul>
+            <li>Mapping drugs on automatically-created or user-supplied models</li>
+            <li>Knock-out simulation</li>
+            <li>Compare simulation results of perturbed and unperturbed models</li>
+            <li>Integrate with disease genes and score drug targets</li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+    
+    <div>
+      <br>
+      <h1 id="configuration-information" data-subheading="Configuration Information">
+        <a href="#configuration-information" class="body-link">
+          Configuration Information
+        </a>
+      </h1>
+      Configuration Excel files should be uploaded to <code>/data/config_sheets</code>. The sheet names in these configuration files should correspond to the context (tissue name, cell name, control, etc.) where each sheet contains the sample names to include in that context-specific model. These sample names should correspond to the sample (column names in the source data matrix, which should be uploaded (or output) in <code>/data/data_matrices/&lt;model name&gt;</code> of the MADRID container.
+      
+      <br><br>
+      
+      In the Docker image, some exemplary input files are included to build metabolic models of naïve, Th1, Th2, and Th17 subtypes, and identify drug targets for Rheumatoid arthritis. You can follow the documentation in the container, the format of these files, and the template files to create your own input files.
+    </div>
+    
+    <div>
+      <br>
+      <h1 id="start-container" data-subheading="Starting the Container">
+        <a href="#start-container" class="body-link">
+          Starting the Container
+        </a>
+      </h1>
+      
+      <h2 id="choosing-tag" data-subheading="Choosing a Tag">
+        <a href="#choosing-tag" class="body-link">
+          Choosing a Tag
+        </a>
+      </h2>
+      <p>Several tags are available for use. <a href="https://docs.docker.com/engine/reference/commandline/tag/">Tags</a> are Docker's method of versioning. For this package, several tags are available (as described below), but the most useful one is most likely <code>lastest</code>.</p>
+      <p>A list of available tags can be found <a href="{{ site.docker.all_tags }}">here</a></p>
+      
+      <table style="text-align: center;">
+        <thead>
+          <tr>
+            <th>Tag</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>latest</code></td>
+            <td>Latest stable release<br>(may include breaking changes)</td>
+          </tr>
+          <tr>
+            <td><code>master-1.0</code></td>
+            <td>Any stable changes under the 1.0 release</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <p><a href="https://docs.docker.com/get-docker/">Docker must be installed</a></p>
+      <p>Then, execute the following tasks in a terminal download the container, where <code>[CHOSEN-TAG]</code> is the tag chosen from the above table</p>
+      
+      {% highlight bash %}
+      docker login
+      docker pull {{ site.docker.name }}:[CHOSEN-TAG]
+      {% endhighlight %}
+      
+      <p id="run-the-container">Run the container:</p>
+      {% highlight bash %}
+      docker run \
+        --cpus=4 \
+        -p 4000:8888 \
+        --volume=$HOME/madrid/gurobi.lic:/opt/gurobi/gurobi.lic:ro \
+        --volume=$HOME/madrid/local_madrid:/home/jovyan/work/data/local_files \
+        --name madrid \
+        --rm \
+        --it \
+        "{{ site.docker.name }}:{{ site.docker.tag }}"
+      {% endhighlight %}
+    </div>
+    
+    <div>
+    <table style="text-align: center;" >
+      <tr>
+        <th>Option</th>
+        <th>Description</th>
+      </tr>
+      <tr>
+        <td>--cpus</td>
+        <td>Number of CPUs to use</td>
+      </tr>
+      <tr>
+        <td>-p</td>
+        <td>Port to use</td>
+      </tr>
+      <tr>
+        <td>--volume=$HOME/madrid/gurobi.lic</td>
+        <td>The file path of your <a href="https://www.gurobi.com/">Gurobi</a> license. This is a fast solver used in MADRID.</td>
+      </tr>
+      <tr>
+        <td>--volume=$HOME/madrid/local_madrid</td>
+        <td>The location of a "local files" folder, to easily access items within the MADRID container</td>
+      </tr>
+      <tr>
+        <td>--name</td>
+        <td>Name of the container</td>
+      </tr>
+      <tr>
+        <td>--rm</td>
+        <td>Remove the container after it is stopped</td>
+      </tr>
+      <tr>
+        <td>--it</td>
+        <td>Start the container interactively in the foreground</td>
+      </tr>
+      <tr>
+        <td>{{ site.docker.name }}:{{ site.docker.tag }}</td>
+        <td>The container image to start</td>
+      </tr>
+    </table>
+    </div>
+    
+    <div>
+      <br>
+      <h1 id="accessing-madrid" data-subheading="Accessing MADRID">
+        <a href="#accessing-madrid" class="body-link">
+          Accessing MADRID
+        </a>
+      </h1>
+      <p>Navigate to <code><a href="http://localhost:4000">http://localhost:4000</a></code> from your browser. The <code>4000</code> port number should match that of the <code>-p</code> option entered in <a href="#start-container">Starting the Container</a> </p>
+    </div>
+    
+    <div>
+      <h1 id="working-in-notebook" data-subheading="Working in the Notebook">
+        <a href="#working-in-notebook" class="body-link">
+          Working in the Notebook
+        </a>
+      </h1>
+      <p>Open the <a href="https://jupyter.org/">Jupyter Notebook</a> workflow, found at <code>/py/pipeline.ipynb</code> within the web interface.</p>
+      <p>Configuration files should be uploaded to <code>/data/config_files</code> and data files to <code>/data/data_matrices</code>, according to instructions in the notebook and provided templates.</p>
+      <p>Update the file names in the Jupyter Notebook accordinly.</p>
+    </div>
+  </body>
+</html>
