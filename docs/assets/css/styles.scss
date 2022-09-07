@@ -5,6 +5,10 @@ $white: #FFFFFF;
 $body-green: #159957;
 $no-format-blue: #1f6bb8;
 
+
+// Set colors for links
+// From: https://stackoverflow.com/a/10143495
+// "body" links, i.e. non-header links
 a:link {
     color: $body-green;
     text-decoration: none;
@@ -18,21 +22,8 @@ a:hover {
     text-decoration: underline;
 }
 
-// Set colors for links
-// From: https://stackoverflow.com/a/10143495
-// "body" links, i.e. non-header links
-a.body-link:link {
-    color: $body-green;
-    text-decoration: none;
-}
-a.body-link:visited {
-    color: $body-green;
-    text-decoration: none;
-}
-a.body-link:hover {
-    color: $body-green;
-    text-decoration: underline;
-}
+
+
 
 a.remove-formatting:link {
     color: $no-format-blue;
@@ -47,17 +38,17 @@ a.remove-formatting:hover {
     text-decoration: underline;
 }
 
-a.header-link:link {
+a.heading-link:link {
     color: $white;
     text-decoration: none;
 }
-a.header-link:visited {
+a.heading-link:visited {
     color: $white;
     text-decoration: none;
 }
-a.header-link:hover {
+a.heading-link:hover {
     color: $white;
-
+    text-decoration: underline;
 }
 
 table {
