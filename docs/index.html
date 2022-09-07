@@ -18,7 +18,10 @@ weight: 0
       </a>
     </h1>
     <div>
-      MADRID stands for "<b>M</b>et<b>A</b>bolic <b>D</b>rug <b>R</b>epurposing <b>ID</b>entification".
+      MADRID stands for "<b>M</b>et<b>A</b>bolic
+                         <b>D</b>rug
+                         <b>R</b>epurposing
+                         <b>ID</b>entification".
       
       <br><br>
       This is a <a href="https://jupyter.org/">Jupyter Notebook</a> based pipeline to build context-specific, <a href="https://en.wikipedia.org/wiki/Metabolic_network_modelling">constraint-based metabolic models (CBMM)</a> from a single source, or combination of sources, from the following "-omics" data:
@@ -32,17 +35,13 @@ weight: 0
       Ultimately, this serves as a platform to use these models to identify drug targets and potentially repurposable drugs for metabolism-impacting diseases.
       
       <br><br>
-      MADRID does not require any amount of programming experience to create models. However, every step of the pipeline is packaged in its own <code>.py</code> file to promote accessible modification, addition, or replacement of analysis steps. The Jupyterlab container comes pre-loaded with the most popular <a href="https://www.r-project.org/">R</a> and <a href="https://www.python.org/">Python</a> libraries, but if you would like to use a library and cannot install it, please open a new issue on <a href="{{ site.github.url }}">our Github page</a>!
+      MADRID does not require any amount of programming experience to create models. However, every step of the pipeline is packaged in its own <code>.py</code> file to promote accessible modification, addition, or replacement of analysis steps. The Jupyterlab container comes pre-loaded with the most popular <a href="https://www.r-project.org/">R</a> and <a href="https://www.python.org/">Python</a> libraries, but if you would like to use a library and cannot install it, please open a new issue on <a href="{{ site.github.issues }}">our Github page</a>!
       
       <br><br>
       In this pipeline, the term "context" refers to a specific state that can be subset from a genome-scale metabolic model using experimental data. This context can be a specific cell or tissue type in a specific experimental state, such as a control or a disease.
       
       <br><br>
       For drug perturbation scoring of a specific cell-type or tissue, it is only necessary to build a CBMM (Steps 1 to 5) for the healthy control state. Differential gene expression (Step 6) will be used to for disease analysis so that multiple diseaes can be analyzed using the same CBMM.
-      
-      <br><br>
-      <b>&#9888;&#65039; Warning &#9888;&#65039; If you terminate your session after running the Docker, any changes you make WILL NOT BE SAVED! Please mount a local directory to the Docker image as instructed on <a href="https://docs.docker.com/storage/volumes/">Docker's website</a>, or in "<a href="#run-the-container">Run the Container</a>" below, to prevent data loss.</b>
-      
       
     </div>
     
@@ -134,6 +133,8 @@ weight: 0
         </a>
       </h1>
       
+      <b>&#9888;&#65039; Warning &#9888;&#65039; If you terminate your session after running the Docker, any changes you make WILL NOT BE SAVED! Please mount a local directory to the Docker image as instructed on <a href="https://docs.docker.com/storage/volumes/">Docker's website</a>, or in "<a href="#run-the-container">Run the Container</a>" below, to prevent data loss.</b>
+      
       <h2 id="choosing-tag" data-subheading="Choosing a Tag">
         <a href="#choosing-tag" class="body-link">
           Choosing a Tag
@@ -161,8 +162,9 @@ weight: 0
         </tbody>
       </table>
       
-      <p><a href="https://docs.docker.com/get-docker/">Docker must be installed</a></p>
-      <p>Then, execute the following tasks in a terminal download the container, where <code>[CHOSEN-TAG]</code> is the tag chosen from the above table</p>
+      <br>
+      <p><b><a href="https://docs.docker.com/get-docker/">Docker must be installed</a></b></p>
+      <p>Execute the following tasks in a terminal download the container, where <code>[CHOSEN-TAG]</code> is the tag chosen from the table above:</p>
       
       {% highlight bash %}
       docker login
@@ -173,7 +175,7 @@ weight: 0
       {% highlight bash %}
       docker run \
         --cpus=4 \
-        -p 4000:8888 \
+        -p 8888:8888 \
         --volume=$HOME/madrid/gurobi.lic:/opt/gurobi/gurobi.lic:ro \
         --volume=$HOME/madrid/local_madrid:/home/jovyan/work/data/local_files \
         --name madrid \
@@ -184,44 +186,47 @@ weight: 0
     </div>
     
     <div>
-    <table style="text-align: center;" >
-      <tr>
-        <th>Option</th>
-        <th>Description</th>
-      </tr>
-      <tr>
-        <td>--cpus</td>
-        <td>Number of CPUs to use</td>
-      </tr>
-      <tr>
-        <td>-p</td>
-        <td>Port to use</td>
-      </tr>
-      <tr>
-        <td>--volume=$HOME/madrid/gurobi.lic</td>
-        <td>The file path of your <a href="https://www.gurobi.com/">Gurobi</a> license. This is a fast solver used in MADRID.</td>
-      </tr>
-      <tr>
-        <td>--volume=$HOME/madrid/local_madrid</td>
-        <td>The location of a "local files" folder, to easily access items within the MADRID container</td>
-      </tr>
-      <tr>
-        <td>--name</td>
-        <td>Name of the container</td>
-      </tr>
-      <tr>
-        <td>--rm</td>
-        <td>Remove the container after it is stopped</td>
-      </tr>
-      <tr>
-        <td>--it</td>
-        <td>Start the container interactively in the foreground</td>
-      </tr>
-      <tr>
-        <td>{{ site.docker.name }}:{{ site.docker.tag }}</td>
-        <td>The container image to start</td>
-      </tr>
-    </table>
+      <br>
+      <p>Below is the list of options included in the above <code>run</code> command. These can be removed or changed as-needed, as long as you are aware of their implications.</p>
+      <p>If you have questions, don't be afraid to ask on our <a href="{{ site.github.issues }}">Issues Page</a>!</p>
+      <table style="text-align: center;" >
+        <tr>
+          <th>Option</th>
+          <th>Description</th>
+        </tr>
+        <tr>
+          <td>--cpus</td>
+          <td>Number of CPUs to use</td>
+        </tr>
+        <tr>
+          <td>-p</td>
+          <td>Port to use</td>
+        </tr>
+        <tr>
+          <td>--volume=$HOME/madrid/gurobi.lic</td>
+          <td>The file path of your <a href="https://www.gurobi.com/">Gurobi</a> license. This is a fast solver used in MADRID.</td>
+        </tr>
+        <tr>
+          <td>--volume=$HOME/madrid/local_madrid</td>
+          <td>The location of a "local files" folder, to easily access items within the MADRID container</td>
+        </tr>
+        <tr>
+          <td>--name</td>
+          <td>Name of the container</td>
+        </tr>
+        <tr>
+          <td>--rm</td>
+          <td>Remove the container after it is stopped</td>
+        </tr>
+        <tr>
+          <td>--it</td>
+          <td>Start the container interactively in the foreground</td>
+        </tr>
+        <tr>
+          <td>{{ site.docker.name }}:{{ site.docker.tag }}</td>
+          <td>The container image to start</td>
+        </tr>
+      </table>
     </div>
     
     <div>
@@ -231,7 +236,7 @@ weight: 0
           Accessing MADRID
         </a>
       </h1>
-      <p>Navigate to <code><a href="http://localhost:4000">http://localhost:4000</a></code> from your browser. The <code>4000</code> port number should match that of the <code>-p</code> option entered in <a href="#start-container">Starting the Container</a> </p>
+      <p>Navigate to <code><a href="http://localhost:8888">http://localhost:8888</a></code> from your browser. The <code>8888</code> port number should match that of the <code>-p</code> option entered in <a href="#start-container">Starting the Container</a> </p>
     </div>
     
     <div>
