@@ -9,7 +9,7 @@ import project
 
 def test_config():
     configs = project.configs
-    madrid_work_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    madrid_work_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
     assert configs.rootdir == madrid_work_dir
     assert configs.datadir == os.path.join(madrid_work_dir, "data")
