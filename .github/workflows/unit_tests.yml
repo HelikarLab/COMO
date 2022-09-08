@@ -9,6 +9,8 @@ on:
 jobs:
     unit_tests:
       runs-on: ubuntu-latest
+
+      # Using a matrix lets us define additional versions of Python to test against
       strategy:
         matrix:
           python-version: ["3.10"]
@@ -16,8 +18,6 @@ jobs:
       steps:
         - name: Checkout Repository
           uses: actions/checkout@v3
-          with:
-            path: "/home/runner/work/MADRID"
 
         - name: Set up Python ${{ matrix.python-version }}
           uses: actions/setup-python@v4
