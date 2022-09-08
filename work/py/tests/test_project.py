@@ -9,13 +9,11 @@ import project
 
 def test_config():
     configs = project.configs
+
+    # /home/runner/work/MADRID/MADRID
     madrid_work_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-    print("")
     print(f"{madrid_work_dir=}")
-
-    # Print the current directory with os
-    print(f"{os.getcwd()=}")
 
     assert configs.rootdir == madrid_work_dir
     assert configs.datadir == os.path.join(madrid_work_dir, "data")
