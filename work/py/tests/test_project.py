@@ -11,6 +11,9 @@ def test_config():
     configs = project.configs
     madrid_work_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+    print("")
+    print(f"{madrid_work_dir=}")
+
     assert configs.rootdir == madrid_work_dir
     assert configs.datadir == os.path.join(madrid_work_dir, "data")
     assert configs.configdir == os.path.join(madrid_work_dir, "data", "config_sheets")
