@@ -13,6 +13,40 @@ import numpy as np
 import time
 from urllib.parse import urlparse
 
+import asyncio
+import aioftp
+import aiofiles
+
+
+async def aioftp_client(host: str, max_attempts: int = 3) -> aioftp.Client:
+    """
+    This class is responsible for creating a "client" connection
+    """
+    connection_successful: bool = False
+    attempt_num: int = 1
+    # Attempt to connect, throw error if unable to do so
+    while not connection_successful and attempt_num <= max_attempts:
+        try:
+            ftp_client: aioftp.Client = aioftp.Client()
+            await ftp_client.connect(host, 21)
+            await ftp_client.login()
+            connection_successful = True
+        except ConnectionResetError:
+
+            # Make sure this print statement is on a new line on the first error
+            if attempt_num == 1:
+                print("")
+
+            # Line clean: https://stackoverflow.com/a/5419488/13885200
+            clear_print(f"Attempt {attempt_num} of {max_attempts} failed to connect")
+            attempt_num += 1
+            time.sleep(5)
+    if not connection_successful:
+        print("")
+        raise ConnectionResetError("Could not connect to FTP server")
+
+    return ftp_client
+
 
 def ftp_client(host: str, max_attempts: int = 3) -> FTP:
     """
@@ -52,23 +86,28 @@ class Reader:
         self._files: list[str] = []
         self._file_sizes: list[int] = []
         
-        self._get_info()
-        
-    def _get_info(self):
+        self._get_info_wrapper()
+
+    def _get_info_wrapper(self):
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        task = asyncio.create_task(self._get_info())
+        event_loop.run_until_complete(task)
+
+    async def _get_info(self):
         """
         This function is responsible for getting all files under the root_link
         """
         scheme: str = urlparse(self._root_link).scheme
         host = urlparse(self._root_link).hostname
         folder = urlparse(self._root_link).path
-        
-        client: FTP = ftp_client(host=host)
-        
-        for file_path in client.nlst(folder):
-            if file_path.endswith(tuple(self._extensions)):
-                download_url: str = f"{scheme}://{host}{file_path}"
-                self._files.append(download_url)
-                self._file_sizes.append(client.size(file_path))
+
+        async with aioftp_client(host) as client:
+            for path, info in (await client.list(folder, recursive=True)):
+                if path.endswith(tuple(self._extensions)):
+                    download_url: str = f"{scheme}://{host}{path}"
+                    self._files.append(download_url)
+                    self._file_sizes.append(info.size)
 
     @property
     def files(self):
@@ -93,7 +132,28 @@ class Download:
         self._download_counter: Synchronized = multiprocessing.Value("i", 1)
 
         # Find files to download
-        self.download_data_wrapper()
+        self.aioftp_download_data_wrapper()
+
+    def aioftp_download_data_wrapper(self):
+        """
+        This function is responsible for "kicking off" asynchronous data downloading
+        """
+        print("Starting file download")
+
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        async_tasks = []
+        for file_information in self._file_information:
+            async_tasks.append(
+                self._aioftp_download_data(
+                    file_information=file_information,
+                    event_loop=event_loop
+                )
+            )
+
+        # Await all the tasks, must use [0] to get completed results. [1] is a set of pending tasks (i.e., empty).
+        event_loop.run_until_complete(asyncio.wait(async_tasks))
+        event_loop.close()
 
     def download_data_wrapper(self):
         """
@@ -122,6 +182,32 @@ class Download:
         [job.start() for job in jobs]       # Start jobs
         [job.join() for job in jobs]        # Wait for jobs to finish
         [job.terminate() for job in jobs]   # Terminate jobs
+
+    async def _aioftp_download_data(self, file_information: FileInformation, event_loop):
+
+        # Define FTP-related variables
+        parsed_url = urlparse(file_information.download_url)
+        host = parsed_url.hostname
+        path = parsed_url.path
+
+        # Convert file size from byte to MB
+        size_mb: int = round(file_information.file_size / (1024 ** 2))
+
+        # Get the lock and print file info
+        self._download_counter.acquire()
+        print(f"Started download {self._download_counter.value:02d} / {len(self._file_information):02d} ({size_mb} MB) - {file_information.raw_file_name}")  # fmt: skip
+        self._download_counter.value += 1
+        self._download_counter.release()
+
+        # Connect to the host, login, and download the file
+        async with aioftp_client(host) as client:
+            async with client.download_stream(path) as stream:
+                async with aiofiles.open(file_information.raw_file_path, "wb") as file:
+                    while True:
+                        data = await stream.read(1024)
+                        if not data:
+                            break
+                        await file.write(data)
 
     def download_data(self, file_information: list[FileInformation]):
 
