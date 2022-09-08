@@ -14,6 +14,9 @@ def test_config():
     print("")
     print(f"{madrid_work_dir=}")
 
+    # Print the current directory with os
+    print(f"{os.getcwd()=}")
+
     assert configs.rootdir == madrid_work_dir
     assert configs.datadir == os.path.join(madrid_work_dir, "data")
     assert configs.configdir == os.path.join(madrid_work_dir, "data", "config_sheets")
