@@ -10,7 +10,7 @@ weight: 0
   <head>
     <base target="_blank">
   </head>
-  
+
   <body>
     <h1 id="about-madrid" data-subheading="About MADRID">
       <a href="#about-madrid" class="body-link">
@@ -22,7 +22,7 @@ weight: 0
                          <b>D</b>rug
                          <b>R</b>epurposing
                          <b>ID</b>entification".
-      
+
       <br><br>
       This is a <a href="https://jupyter.org/">Jupyter Notebook</a> based pipeline to build context-specific, <a href="https://en.wikipedia.org/wiki/Metabolic_network_modelling">constraint-based metabolic models (CBMM)</a> from a single source, or combination of sources, from the following "-omics" data:
       <ul>
@@ -31,20 +31,20 @@ weight: 0
         <li>Mass Spectrometry <a href="https://en.wikipedia.org/wiki/Proteomics">Proteomics</a></li>
         <li><a href="https://en.wikipedia.org/wiki/Microarray">Microarray</a></li>
       </ul>
-      
+
       Ultimately, this serves as a platform to use these models to identify drug targets and potentially repurposable drugs for metabolism-impacting diseases.
-      
+
       <br><br>
       MADRID does not require any amount of programming experience to create models. However, every step of the pipeline is packaged in its own <code>.py</code> file to promote accessible modification, addition, or replacement of analysis steps. The Jupyterlab container comes pre-loaded with the most popular <a href="https://www.r-project.org/">R</a> and <a href="https://www.python.org/">Python</a> libraries, but if you would like to use a library and cannot install it, please open a new issue on <a href="{{ site.github.issues }}">our Github page</a>!
-      
+
       <br><br>
       In this pipeline, the term "context" refers to a specific state that can be subset from a genome-scale metabolic model using experimental data. This context can be a specific cell or tissue type in a specific experimental state, such as a control or a disease.
-      
+
       <br><br>
       For drug perturbation scoring of a specific cell-type or tissue, it is only necessary to build a CBMM (Steps 1 to 5) for the healthy control state. Differential gene expression (Step 6) will be used to for disease analysis so that multiple diseaes can be analyzed using the same CBMM.
-      
+
     </div>
-    
+
     <div>
       <br>
       <h1 id="before-starting" data-subheading="Before Starting">
@@ -53,27 +53,27 @@ weight: 0
         </a>
       </h1>
       <p>The proper data must be provided, dependent on what analysis you would like to run</p>
-      
+
       <div style="margin-left: 2%">
         <a href="#before-starting#rna-seq-data" class="body-link"><h2 id="before-starting#rna-seq-data">RNA-sequencing</h2></a>
         <ul>
           <li>A folder named "MADRID_input" in the <code>/data/</code> directory. Proper inputs can be generated using our <a href="https://github.com/HelikarLab/FastqToGeneCounts">SnakeMake pipeline</a>, designed specifically for MADRID.</li>
         </ul>
-        
+
         <blockquote style="margin-left: 5%; margin-right: 5%">
           <p>RNA-sequencing data can be <a href="https://en.wikipedia.org/wiki/Single_cell_sequencing">single-cell</a> or <a href="https://en.wikipedia.org/wiki/RNA-Seq">bulk</a>, but our SnakeMake pipeline is currently only available for bulk RNA-sequencing processing</p>
         </blockquote>
-        
+
         <ul>
           <li>If processing RNA-sequencing data with an alternative procedure, or importing a pre-made gene count matrix, follow the instructions found in <b>Step 1</b> of the MADRID container. View <a href="#start-container">Starting the Container</a> and <a href="#accessing-madrid">Accessing MADRID</a>, below, to get started.</li>
         </ul>
-        
+
         <br>
         <a href="#before-starting#proteomics" class="body-link"><h2 id="before-starting#proteomics">Proteomics</h2></a>
         <ul>
           <li>A matrix of measurement where rows are proteins in Entrez format, and columns are arbitrary sample names.</li>
         </ul>
-        
+
         <br>
         <a href="#before-starting#microarray" class="body-link"><h2 id="before-starting#microarray">Microarray</h2></a>
         <ul>
@@ -84,7 +84,7 @@ weight: 0
         </ul>
       </div>
     </div>
-    
+
     <div>
       <br>
       <h1 id="identifying-drug-targets" data-subheading="Identifying Drug Targets">
@@ -92,7 +92,7 @@ weight: 0
           Identifying Drug Targets
         </a>
       </h1>
-      
+
       <p>The following is a list of steps to identify drug targets. Stop after <b>Step 3</b> if building a context-specific mdoel for other purposes.</p>
       <ol>
         <li>Preprocess Bulk RNA-sequencing data by converting gene counts from <a href="https://github.com/alexdobin/STAR">STAR aligner</a> into a unified matrix, fetch necessary info about each gene required for normalization, and generate a configuration sheet.</li>
@@ -110,7 +110,7 @@ weight: 0
         </li>
       </ol>
     </div>
-    
+
     <div>
       <br>
       <h1 id="configuration-information" data-subheading="Configuration Information">
@@ -119,12 +119,12 @@ weight: 0
         </a>
       </h1>
       Configuration Excel files should be uploaded to <code>/data/config_sheets</code>. The sheet names in these configuration files should correspond to the context (tissue name, cell name, control, etc.) where each sheet contains the sample names to include in that context-specific model. These sample names should correspond to the sample (column names in the source data matrix, which should be uploaded (or output) in <code>/data/data_matrices/&lt;model name&gt;</code> of the MADRID container.
-      
+
       <br><br>
-      
+
       In the Docker image, some exemplary input files are included to build metabolic models of naïve, Th1, Th2, and Th17 subtypes, and identify drug targets for Rheumatoid arthritis. You can follow the documentation in the container, the format of these files, and the template files to create your own input files.
     </div>
-    
+
     <div>
       <br>
       <h1 id="start-container" data-subheading="Starting the Container">
@@ -132,9 +132,9 @@ weight: 0
           Starting the Container
         </a>
       </h1>
-      
+
       <b>&#9888;&#65039; Warning &#9888;&#65039; If you terminate your session after running the Docker, any changes you make WILL NOT BE SAVED! Please mount a local directory to the Docker image as instructed on <a href="https://docs.docker.com/storage/volumes/">Docker's website</a>, or in "<a href="#run-the-container">Run the Container</a>" below, to prevent data loss.</b>
-      
+
       <h2 id="choosing-tag" data-subheading="Choosing a Tag">
         <a href="#choosing-tag" class="body-link">
           Choosing a Tag
@@ -142,7 +142,7 @@ weight: 0
       </h2>
       <p>Several tags are available for use. <a href="https://docs.docker.com/engine/reference/commandline/tag/">Tags</a> are Docker's method of versioning. For this package, several tags are available (as described below), but the most useful one is most likely <code>lastest</code>.</p>
       <p>A list of available tags can be found <a href="{{ site.docker.all_tags }}">here</a></p>
-      
+
       <table style="text-align: center;">
         <thead>
           <tr>
@@ -161,16 +161,16 @@ weight: 0
           </tr>
         </tbody>
       </table>
-      
+
       <br>
       <p><b><a href="https://docs.docker.com/get-docker/">Docker must be installed</a></b></p>
       <p>Execute the following tasks in a terminal download the container, where <code>[CHOSEN-TAG]</code> is the tag chosen from the table above:</p>
-      
+
       {% highlight bash %}
       docker login
       docker pull {{ site.docker.name }}:[CHOSEN-TAG]
       {% endhighlight %}
-      
+
       <p id="run-the-container">Run the container:</p>
       {% highlight bash %}
       docker run \
@@ -184,7 +184,7 @@ weight: 0
         "{{ site.docker.name }}:{{ site.docker.tag }}"
       {% endhighlight %}
     </div>
-    
+
     <div>
       <br>
       <p>Below is the list of options included in the above <code>run</code> command. These can be removed or changed as-needed, as long as you are aware of their implications.</p>
@@ -228,7 +228,7 @@ weight: 0
         </tr>
       </table>
     </div>
-    
+
     <div>
       <br>
       <h1 id="accessing-madrid" data-subheading="Accessing MADRID">
@@ -238,7 +238,7 @@ weight: 0
       </h1>
       <p>Navigate to <code><a href="http://localhost:8888">http://localhost:8888</a></code> from your browser. The <code>8888</code> port number should match that of the <code>-p</code> option entered in <a href="#start-container">Starting the Container</a> </p>
     </div>
-    
+
     <div>
       <h1 id="working-in-notebook" data-subheading="Working in the Notebook">
         <a href="#working-in-notebook" class="body-link">
