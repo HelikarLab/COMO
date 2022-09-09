@@ -3,8 +3,6 @@ TODO: Integrate crux percolator into this workflow
 """
 import asyncio
 from bioservices import BioDBNet
-from .FileInformation import FileInformation
-from .FileInformation import clear_print
 import multiprocessing
 from multiprocessing.sharedctypes import Synchronized
 import numpy as np
@@ -14,6 +12,9 @@ from pathlib import Path
 import re
 import subprocess
 import tqdm
+
+from .FileInformation import FileInformation
+from .FileInformation import clear_print
 
 
 class RAWtoMZML:

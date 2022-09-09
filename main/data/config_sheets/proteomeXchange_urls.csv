@@ -1,8 +1,8 @@
-url,cell_type
-ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026140,naiveB
-ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026142,naiveB
-ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026143,naiveB
-ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026165,naiveB
-ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026167,naiveB
-ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026173,naiveB
-ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026172,naiveB
+url,cell_type,study
+ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026140,naiveB,S1
+ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026142,naiveB,S2
+ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026143,naiveB,S3
+ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026165,naiveB,S4
+ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026167,naiveB,S5
+ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026173,naiveB,S6
+ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026172,naiveB,S7
