@@ -6,7 +6,7 @@ if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
     dir.create(str_interp("${work_dir}/py/rlogs"))
 }
 
-zz <- file(file.path("/home", username, "work", "py", "rlogs", "DGE.Rout"), open="wt")
+zz <- file(file.path("/home", username, "main", "py", "rlogs", "DGE.Rout"), open="wt")
 sink(zz, type="message")
 
 
@@ -75,15 +75,15 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name) {
   
   tmm <- cpm(dgList)
 
-  dir.create(file.path("/home", username, "work", "data", "results", tissue_name, disease_name),
+  dir.create(file.path("/home", username, "main", "data", "results", tissue_name, disease_name),
              showWarnings = FALSE
   )
   write.csv(cbind(ensembl,tmm),
-            file.path("/home", username, "work", "data", "results", tissue_name, disease_name, "TMM_Matrix.csv")
+            file.path("/home", username, "main", "data", "results", tissue_name, disease_name, "TMM_Matrix.csv")
   )
 
   # MDS Plot
-  plotname <- file.path("/home", username, "work", "data", "results", tissue_name, disease_name, "MDS_plot.jpg")
+  plotname <- file.path("/home", username, "main", "data", "results", tissue_name, disease_name, "MDS_plot.jpg")
   title <- "DGEList Multi-Dimensional Scaling"
   jpeg(plotname)
   lab <- colnames(df)
@@ -95,7 +95,7 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name) {
   colnames(designMat) <- levels(dgList$samples$group)
   
   # BCV plot
-  plotname <- file.path("/home", username, "work", "data", "results", tissue_name, disease_name, "BCV_plot.jpg")
+  plotname <- file.path("/home", username, "main", "data", "results", tissue_name, disease_name, "BCV_plot.jpg")
   title <- "DGEList Biological Coefficient of Variation"
   dgList <- estimateGLMCommonDisp(dgList, design=designMat)
   dgList <- estimateGLMTrendedDisp(dgList, design=designMat)
@@ -125,10 +125,10 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name) {
     names(expTab)[names(expTab) == "genes"] <- "Ensembl"
     #expTab <- expTab[,deGenes==TRUE]
     #write.csv(expTab,
-    #          file.path("/home", username, "work", "data", "results", tissue_name, disease_name, "DiffExp.csv")
+    #          file.path("/home", username, "main", "data", "results", tissue_name, disease_name, "DiffExp.csv")
     #)
     # smear plot
-    plotname <- file.path("/home", username, "work", "data", "results", tissue_name, disease_name, "smear_plot.jpg")
+    plotname <- file.path("/home", username, "main", "data", "results", tissue_name, disease_name, "smear_plot.jpg")
     title <- paste0("DGEList Smear Plot ", test_cell)
     jpeg(plotname)
     plotSmear(qlf, de.tags=deGenes, main=title)
