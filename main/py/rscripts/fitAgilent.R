@@ -7,7 +7,7 @@ if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
     dir.create(str_interp("${work_dir}/py/rlogs"))
 }
 
-zz <- file(file.path("/home", username, "work", "py", "rlogs", "fitAligent.Rout"), open="wt")
+zz <- file(file.path("/home", username, "main", "py", "rlogs", "fitAligent.Rout"), open="wt")
 sink(zz, type="message")
 
 readagilent <- function(addr,targets){

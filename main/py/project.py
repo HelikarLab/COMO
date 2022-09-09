@@ -18,11 +18,11 @@ class _Configs:
 current_dir = os.getcwd()
 directory_list = current_dir.split("/")
 
-# Find the "work" directory
+# Find the "main" directory
 split_index = 1
 for directory in directory_list:
-    if directory == "work":
-        break  # Exit the loop when we find the "work" directory
+    if directory == "main":
+        break  # Exit the loop when we find the "main" directory
     split_index += 1  # Otherwise increment the index
 
 # Unpack items in dirlist

@@ -8,7 +8,7 @@ docker_old/*
 /**/.ipynb_checkpoints/
 
 # R logs
-/work/py/rlogs/
+/main/py/rlogs/
 *.Rhistory
 
 # Microsoft temporary files
@@ -16,10 +16,10 @@ docker_old/*
 
 # Python cache files
 /**/__pycache__
-work/py/tests/.pytest_cache
+main/py/tests/.pytest_cache
 
 # Do not track output files
-/work/output
+/main/output
 
 # Local GitHub Pages build location
 /docs/_site

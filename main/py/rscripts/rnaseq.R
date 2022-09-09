@@ -8,7 +8,7 @@ if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
 }
 
 # prevent messy messages from repeatedly writing to juypter
-zz <- file(file.path("/home", username, "work", "py", "rlogs", "rnaseq.Rout"), open="wt")
+zz <- file(file.path("/home", username, "main", "py", "rlogs", "rnaseq.Rout"), open="wt")
 sink(zz, type="message")
 
 library(tidyverse)
@@ -212,7 +212,7 @@ cpm_filter <- function(SampMetrics, filt_options, context_name, prep) {
         size <- SampMetrics[[i]][["GeneSizes"]]
         lib.size <- colSums(counts)
         CPM <- cpm(counts,lib.size=lib.size)
-        cpm_fname <- file.path("home", "jupyteruser", "work", "data", "results",
+        cpm_fname <- file.path("home", "jupyteruser", "main", "data", "results",
                                 context_name, prep, paste0("CPM_Matrix_", prep, "_", study_number, ".csv"))
         write_cpm <- cbind(ent, CPM)
         write.csv(write_cpm, cpm_fname, row.names=FALSE)
@@ -264,7 +264,7 @@ TPM_quant_filter <- function(SampMetrics, filt_options, context_name, prep) {
         ent <- SampMetrics[[i]][["Entrez"]]
         size <- SampMetrics[[i]][["GeneSizes"]]
         tpm <- SampMetrics[[i]][["TPM_Matrix"]]
-        tpm_fname <- file.path("home", "jupyteruser", "work", "data", "results",
+        tpm_fname <- file.path("home", "jupyteruser", "main", "data", "results",
                         context_name, prep, paste0("TPM_Matrix_", prep, "_", study_number, ".csv"))
         write_tpm <- cbind(ent, tpm)
         write.csv(write_tpm, tpm_fname, row.names=FALSE)
@@ -322,7 +322,7 @@ zfpkm_filter <- function(SampMetrics, filt_options, context_name, prep) {
         fmat <- SampMetrics[[i]][["FPKM_Matrix"]] # get fpkm matrix
         fdf <- data.frame(fmat) # convert to df
         fdf[rowSums(fdf[])>0,]
-        fpkm_fname <- file.path("/home", username, "work", "data", "results",
+        fpkm_fname <- file.path("/home", username, "main", "data", "results",
                                  context_name, prep, paste0("FPKM_Matrix_", prep, "_", study_number, ".csv"))
         write_fpkm <- cbind(ent, fdf)
         colnames(write_fpkm)[1] <- "ENTREZ_GENE_ID"
@@ -337,13 +337,13 @@ zfpkm_filter <- function(SampMetrics, filt_options, context_name, prep) {
         #zmat[nas] <- -4
         #SampMetrics[[i]][["zFPKM_Matrix"]] <- zmat
         #zmat[missing_vals] <- NA # set NA values back to NA
-        zfpkm_fname <- file.path("/home", username, "work", "data", "results",
+        zfpkm_fname <- file.path("/home", username, "main", "data", "results",
                                  context_name, prep, paste0("zFPKM_Matrix_", prep, "_", study_number, ".csv"))
         write_zfpkm <- cbind(ent, zmat)
         colnames(write_zfpkm)[1] <- "ENTREZ_GENE_ID"
         write.csv(write_zfpkm, zfpkm_fname, row.names=FALSE)
 
-        zfpkm_plot_dir <- file.path("/home", username, "work", "data", "results",
+        zfpkm_plot_dir <- file.path("/home", username, "main", "data", "results",
                                     context_name, prep, "figures")
 
         if ( !file.exists(zfpkm_plot_dir) ) {
@@ -404,13 +404,13 @@ umi_filter <- function(SampMetrics, filt_options, context_name) {
         #zmat[nas] <- -4
         #SampMetrics[[i]][["zFPKM_Matrix"]] <- zmat
         #zmat[missing_vals] <- NA # set NA values back to NA
-        zumi_fname <- file.path("/home", username, "work", "data", "results",
+        zumi_fname <- file.path("/home", username, "main", "data", "results",
                                  context_name, prep, paste0("zUMI_Matrix_", prep, "_", study_number, ".csv"))
         write_zumi <- cbind(ent, zmat)
         colnames(write_zumi)[1] <- "ENTREZ_GENE_ID"
         write.csv(write_zumi, zumi_fname, row.names=FALSE)
 
-        zumi_plot_dir <- file.path("/home", username, "work", "data", "results",
+        zumi_plot_dir <- file.path("/home", username, "main", "data", "results",
                                     context_name, prep, "figures")
 
         if ( !file.exists(zumi_plot_dir) ) {

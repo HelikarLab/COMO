@@ -6,7 +6,7 @@ if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
 }
 
 # prevent messy messages from repeatedly writing to juypter
-zz <- file(file.path("/home", username, "work", "py", "rlogs", "protein_transform.Rout"), open="wt")
+zz <- file(file.path("/home", username, "main", "py", "rlogs", "protein_transform.Rout"), open="wt")
 sink(zz, type="message")
 
 

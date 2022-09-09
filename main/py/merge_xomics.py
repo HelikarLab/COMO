@@ -49,13 +49,13 @@ def merge_xomics(
     Merges microarray, rnaseq, and/or proteomics active gene logicals from outputs of their respective "_gen.py"
     scripts.
 
-    :param microarray_file: filename of microarray config file in /work/data/config_sheets/
-    :param proteomics_file: filename of proteomics config file in /work/data/config_sheets/
-    :param trnaseq_file: filename of Total RNA-seq config file in /work/data/config_sheets/
-    :param mrnaseq_file: filename of mRNA-seq config file in /work/data/config_sheets/
-    :param scrnaseq_file: filename of single-cell RNA-seq config file in /work/data/config_sheets/
+    :param microarray_file: filename of microarray config file in /main/data/config_sheets/
+    :param proteomics_file: filename of proteomics config file in /main/data/config_sheets/
+    :param trnaseq_file: filename of Total RNA-seq config file in /main/data/config_sheets/
+    :param mrnaseq_file: filename of mRNA-seq config file in /main/data/config_sheets/
+    :param scrnaseq_file: filename of single-cell RNA-seq config file in /main/data/config_sheets/
     :param no_hc: True if not adjusting for NA values (happens when gene missing from data source)
-    :param no_na: filename of single-cell RNA-seq config file in /work/data/config_sheets/
+    :param no_na: filename of single-cell RNA-seq config file in /main/data/config_sheets/
     :param sheet: sheet name to use, should be context, context, cell type, etc
     :param expression_requirement: integer, minimum number of provided sources with active gene for a it to be in model
 
@@ -330,7 +330,7 @@ def main(argv):
         required=False,
         default=None,
         dest="microarray_file",
-        help="Name of microarray config .xlsx file in the /work/data/config_files/.",
+        help="Name of microarray config .xlsx file in the /main/data/config_files/.",
     )
 
     parser.add_argument(
@@ -340,7 +340,7 @@ def main(argv):
         required=False,
         default=None,
         dest="trnaseq_file",
-        help="Name of total RNA-seq config .xlsx file in the /work/data/config_files/.",
+        help="Name of total RNA-seq config .xlsx file in the /main/data/config_files/.",
     )
 
     parser.add_argument(
@@ -350,7 +350,7 @@ def main(argv):
         required=False,
         default=None,
         dest="mrnaseq_file",
-        help="Name of mRNA-seq config .xlsx file in the /work/data/config_files/.",
+        help="Name of mRNA-seq config .xlsx file in the /main/data/config_files/.",
     )
 
     parser.add_argument(
@@ -360,7 +360,7 @@ def main(argv):
         required=False,
         default=None,
         dest="scrnaseq_file",
-        help="Name of RNA-seq config .xlsx file in the /work/data/config_files/.",
+        help="Name of RNA-seq config .xlsx file in the /main/data/config_files/.",
     )
 
     parser.add_argument(
@@ -370,7 +370,7 @@ def main(argv):
         required=False,
         default=None,
         dest="proteomics_file",
-        help="Name of proteomics config .xlsx file in the /work/data/config_files/.",
+        help="Name of proteomics config .xlsx file in the /main/data/config_files/.",
     )
 
     parser.add_argument(
@@ -402,7 +402,7 @@ def main(argv):
         dest="custom_file",
         default="SKIP",
         help="Name of .xlsx file where first column is context names and second column is expression "
-        "requirement for that context, in /work/data/",
+        "requirement for that context, in /main/data/",
     )
 
     parser.add_argument(

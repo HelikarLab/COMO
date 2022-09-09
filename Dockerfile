@@ -10,7 +10,7 @@ COPY build_scripts/mamba_install.txt "${HOME}"/mamba_install.txt
 COPY build_scripts/pip_install.txt "${HOME}"/pip_install.txt
 
 # Give ownership to jovyan user
-COPY --chown=1000:100 work "${HOME}"/work
+COPY --chown=1000:100 main "${HOME}"/main
 
 # Install python-related items
 RUN conda config --add channels conda-forge \
