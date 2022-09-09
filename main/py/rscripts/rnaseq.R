@@ -271,6 +271,9 @@ TPM_quant_filter <- function(SampMetrics, filt_options, context_name, prep) {
             tpm_q <- tpm[,j]
             tpm_q <- tpm_q[tpm_q>0]
             q_cutoff <- quantile(tpm_q, prob=1-quant/100)
+            #q_cutoff_top <- quantile(tpm_q, prob=1-perc_top/100)
+            #bools <- data.frame(as.integer(tpm[,j]>q_cutoff))
+            #bools_top <- data.frame(as.integer(tpm[,j]>q_cutoff_top))
             test_bools <- cbind(test_bools, as.integer(tpm[,j]>q_cutoff))
         }
 
@@ -321,10 +324,7 @@ zfpkm_filter <- function(SampMetrics, filt_options, context_name, prep) {
         nas <- is.na(fdf)==1
         zmat <- zFPKM(fdf, min_thresh=0, assayName="FPKM") # calculate zFPKM
         zmat[minimums] <- -4 # instead of -inf set to lower limit
-        #zmat[nas] <- -4
-        #SampMetrics[[i]][["zFPKM_Matrix"]] <- zmat
-        #zmat[missing_vals] <- NA # set NA values back to NA
-        zfpkm_fname <- file.path("/home", username, "main", "data", "results",
+        zfpkm_fname <- file.path("/home", username, "work", "data", "results",
                                  context_name, prep, paste0("zFPKM_Matrix_", prep, "_", study_number, ".csv"))
         write_zfpkm <- cbind(ent, zmat)
         colnames(write_zfpkm)[1] <- "ENTREZ_GENE_ID"
@@ -381,9 +381,6 @@ umi_filter <- function(SampMetrics, filt_options, context_name) {
         nas <- is.na(udf) == 1
         zmat <- zFPKM(udf, min_thresh=0, assayName="UMI") # calculate zFPKM
         zmat[minimums] <- -4 # instead of -inf set to lower limit
-        #zmat[nas] <- -4
-        #SampMetrics[[i]][["zFPKM_Matrix"]] <- zmat
-        #zmat[missing_vals] <- NA # set NA values back to NA
         zumi_fname <- file.path("/home", username, "main", "data", "results",
                                  context_name, prep, paste0("zUMI_Matrix_", prep, "_", study_number, ".csv"))
 
