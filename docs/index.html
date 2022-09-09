@@ -13,7 +13,7 @@ weight: 0
   </a>
 </h1>
 <div>
-  MADRID stands for "<b>M</b>et<b>A</b>bolic <b>D</b>rug <b>R</b>epurposing <b>ID</b>entification".
+  MADRID stands for "<strong>M</strong>et<strong>A</strong>bolic <strong>D</strong>rug <strong>R</strong>epurposing <strong>ID</strong>entification".
   
   <br><br>
   This is a <a href="https://jupyter.org/" target="_blank">Jupyter Notebook</a> based pipeline to build context-specific, <a href="https://en.wikipedia.org/wiki/Metabolic_network_modelling" target="_blank">constraint-based metabolic models (CBMM)</a> from a single source, or combination of sources, from the following "-omics" data:
@@ -36,7 +36,7 @@ weight: 0
   For drug perturbation scoring of a specific cell-type or tissue, it is only necessary to build a CBMM (Steps 1 to 5) for the healthy control state. Differential gene expression (Step 6) will be used to for disease analysis so that multiple diseaes can be analyzed using the same CBMM.
   
   <br><br>
-  <b>&#9888;&#65039; Warning &#9888;&#65039; If you terminate your session after running the Docker, any changes you make WILL NOT BE SAVED! Please mount a local directory to the Docker image as instructed on <a href="https://docs.docker.com/storage/volumes/" target="_blank">Docker's website</a>, or in "<a href="#run-the-container">Run the Container</a>" below, to prevent data loss.</b>
+  <strong>&#9888;&#65039; Warning &#9888;&#65039; If you terminate your session after running the Docker, any changes you make WILL NOT BE SAVED! Please mount a local directory to the Docker image as instructed on <a href="https://docs.docker.com/storage/volumes/" target="_blank">Docker's website</a>, or in "<a href="#run-the-container">Run the Container</a>" below, to prevent data loss.</strong>
 
   
 </div>
@@ -61,7 +61,7 @@ weight: 0
     </blockquote>
     
     <ul>
-      <li>If processing RNA-sequencing data with an alternative procedure, or importing a pre-made gene count matrix, follow the instructions found in <b>Step 1</b> of the MADRID container. View <a href="#start-container">Starting the Container</a> and <a href="#accessing-madrid">Accessing MADRID</a>, below, to get started.</li>
+      <li>If processing RNA-sequencing data with an alternative procedure, or importing a pre-made gene count matrix, follow the instructions found in <strong>Step 1</strong> of the MADRID container. View <a href="#start-container">Starting the Container</a> and <a href="#accessing-madrid">Accessing MADRID</a>, below, to get started.</li>
     </ul>
     
     <br>
@@ -89,12 +89,12 @@ weight: 0
     </a>
   </h1>
   
-  <p>The following is a list of steps to identify drug targets. Stop after <b>Step 3</b> if building a context-specific mdoel for other purposes.</p>
+  <p>The following is a list of steps to identify drug targets. Stop after <strong>Step 3</strong> if building a context-specific mdoel for other purposes.</p>
   <ol>
     <li>Preprocess Bulk RNA-sequencing data by converting gene counts from <a href="https://github.com/alexdobin/STAR" target="_blank">STAR aligner</a> into a unified matrix, fetch necessary info about each gene required for normalization, and generate a configuration sheet.</li>
     <li>Analyze any combination of Microarray, RNA-sequencing (total, polyA, or single-cell), or proteomics data, and output a list of active genes for each strategy/method.</li>
     <li>Check for consensus amongst strategies according to desired rigor and merge into a singular set of active genes.</li>
-    <li>Create tissue specific models based on the list of active genes. If required, the user can manually refine these models and supply them in <b>Step 4</b> of the MADRID container.</li>
+    <li>Create tissue specific models based on the list of active genes. If required, the user can manually refine these models and supply them in <strong>Step 4</strong> of the MADRID container.</li>
     <li>Identify differential gene expressions from disease datasets using either microarray or bulk RNA-sequencing transcriptomics information.</li>
     <li>Identify drug targets and repurposable drugs. This step consists of four substeps
       <ul>
@@ -142,7 +142,7 @@ weight: 0
     --cpus=4 \
     -p 4000:8888 \
     --volume=$HOME/madrid/gurobi.lic:/opt/gurobi/gurobi.lic:ro \
-    --volume=$HOME/madrid/local_madrid:/home/jovyan/work/data/local_files \
+    --volume=$HOME/madrid/local_madrid:/home/jovyan/main/data/local_files \
     --name madrid \
     --rm \
     --it \
@@ -152,6 +152,7 @@ weight: 0
 
 <div>
 <table style="text-align: center;" >
+  <caption>Configurable options and their descriptions for MADRID docker command line</caption>
   <tr>
     <th>Option</th>
     <th>Description</th>
