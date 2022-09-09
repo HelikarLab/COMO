@@ -32,4 +32,4 @@ work_dir = os.path.join(*directory_list[0:split_index])
 
 # Add leading "/", as it will not exist right now
 work_dir = os.path.join("/", work_dir)
-configs = _Configs(work_dir)
+configs = Configs(work_dir)
