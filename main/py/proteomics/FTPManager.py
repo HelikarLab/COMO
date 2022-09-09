@@ -5,9 +5,6 @@ TODO: Find a way to mark a file as "downloaded"
     - Keep a list of file names in a ".completd" hidden folder?
 """
 import ftplib
-
-from .FileInformation import FileInformation
-from .FileInformation import clear_print
 from ftplib import FTP
 import multiprocessing
 from multiprocessing.sharedctypes import Synchronized
@@ -15,6 +12,8 @@ import numpy as np
 import time
 from urllib.parse import urlparse
 
+from .FileInformation import FileInformation
+from .FileInformation import clear_print
 
 def ftp_client(host: str, max_attempts: int = 3) -> FTP:
     """

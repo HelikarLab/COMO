@@ -43,7 +43,7 @@ dependencies:
   - thermorawfileparser==1.4.0
   - crux-toolkit==4.1
   - bioservices==1.10.0
-  - tqdm==4.64.0
+  - tqdm==4.64.1
   - pip==22.1.2
   - pip:
     - python-libsbml==5.19.2
