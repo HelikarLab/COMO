@@ -12,12 +12,12 @@ library(tools)
 
 get_study_value <- function(file_path) {
     # This function will get the S## value from the file path
-    
+
     # Find "S##.csv", but use a lookahead to avoid "taking" the ".csv" portion
     match <- stringr::str_extract(string = toupper(file_path), pattern = "S\\d{1,2}(?=\\.CSV)")
 
     if (!is.na(match))
-        match <- toupper(match)
+      match <- toupper(match)
 
     return(match)
 }
@@ -26,36 +26,36 @@ get_replicate_files <- function(results_directory, context_names, source_type, u
 
     # This function will get the file paths of zFPKMs for each replicate
     all_context_files <- list()
-     for (context_name in context_names) {
+    for (context_name in context_names) {
         lower_context_name <- tolower(context_name)
         source_type <- tolower(source_type)
-        
+
         current_context_files <- list.files(file.path(results_directory, lower_context_name), full.names = TRUE, recursive = TRUE)
         context_files <- c()
-        
+
         for (file in current_context_files) {
             file_name <- tolower(file)
-            
+
             # Check the current file meets our criteria
             if (
               tools::file_ext(file_name) == "csv" &&                      # Ensure the current file is a CSV file
-              grepl(lower_context_name, file_name) &&  # Test if the current file is part of the current context (i.e., naiveB, immNK)
-              grepl(source_type, file_name) &&   # Test if the current file has source type (zFPKM, TPM, CPM)
-              # Create a "group" that works if either trna or mrna is TRUE
-              (
-                (use_trna && grepl("total", file_name)) ||         # Test if the current file is a total-rna file
-                (use_mrna && grepl("mrna", file_name))             # Test if the current file is an mRNA (polyA) file
-              )
+                grepl(lower_context_name, file_name) &&  # Test if the current file is part of the current context (i.e., naiveB, immNK)
+                grepl(source_type, file_name) &&   # Test if the current file has source type (zFPKM, TPM, CPM)
+                # Create a "group" that works if either trna or mrna is TRUE
+                (
+                  (use_trna && grepl("total", file_name)) ||         # Test if the current file is a total-rna file
+                    (use_mrna && grepl("mrna", file_name))             # Test if the current file is an mRNA (polyA) file
+                )
             ) {
                 context_files <- append(context_files, file)
             }
         }
-        
+
         # Only append new list if context_files has at least one item
         if (length(context_files) > 0)
-            all_context_files[[context_name]] <- context_files
+          all_context_files[[context_name]] <- context_files
     }
-    
+
     # Return list if it has at least one item, otherwise return "NA"
     if (length(all_context_files) > 0) {
         return(all_context_files)
@@ -103,7 +103,7 @@ cluster_sources_main <- function(
   use_mrna,
   binarize_data
 ) {
-    
+
     study_files <- get_replicate_files(results_directory = results_directory, context_names = context_names,  source_type = source_type, use_trna = use_trna, use_mrna = use_mrna)
     study_dataframes <- read_matrix_values(study_files = study_files)
     print("DONE")

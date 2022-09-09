@@ -51,10 +51,10 @@ async def _async_fetch_info_wrapper(coroutines: list):
 
 def fetch_gene_info(
         input_values: list[str],
-        input_db: InputDatabase = InputDatabase,
-        output_db: list[OutputDatabase] = None,
+        input_db: InputDatabase,
+        output_db: list[OutputDatabase] | list[str],
         taxon_id: TaxonIDs | int = TaxonIDs.HUMAN,
-        delay: int = 5
+        delay: int = 10
 ) -> pd.DataFrame:
     """
     This function returns a dataframe with important gene information for future operations in MADRID.

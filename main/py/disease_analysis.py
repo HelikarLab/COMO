@@ -2,12 +2,18 @@
 import argparse
 import sys
 import json
-import math
+import os
+import pandas as pd
+import numpy as np
 from project import configs
-from GSEpipelineFast import *
-from rnaseq_preprocess import fetch_gene_info
 
+from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
+from rpy2.robjects.packages import importr
 from rpy2.robjects import pandas2ri
+
+from async_bioservices import database_convert
+from async_bioservices.input_database import InputDatabase
+from async_bioservices.output_database import OutputDatabase
 
 pandas2ri.activate()
 
@@ -28,12 +34,16 @@ f.close()
 affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
 
 
+f = open(os.path.join(configs.rootdir, "py", "rscripts", "fitAgilent.R"), "r")
+string = f.read()
+f.close()
+agilentio = SignatureTranslatedAnonymousPackage(string, "agilentio")
+
+
 def breakDownEntrezs(disease):
     """
     Split multi-part entrez ids into multiple rows in the dataframe
-
     param: disease - df with columns: Gene ID
-
     return: df with columns:
     """
     disease["Gene ID"] = disease["Gene ID"].str.replace("///", "//")
@@ -44,8 +54,7 @@ def breakDownEntrezs(disease):
         disease["Gene ID"].str.contains("//")
     ].reset_index(drop=True)
     breaks_gene_names = pd.DataFrame(columns=["Gene ID"])
-    # print(single_gene_names.shape)
-    # print(multipleGeneNames.shape)
+
     for index, row in multiple_gene_names.iterrows():
         for genename in row["Gene ID"].split("//"):
             breaks_gene_names = breaks_gene_names.append(
@@ -59,23 +68,26 @@ def breakDownEntrezs(disease):
 def get_entrez_id(regulated, output_full_path, in_db, taxon_id, full_flag=False):
     """
     Fetch entrez ids using bioDbNet
-
     param: regulated -  df, with columns:
     param: output_full_path - path to
     param: in_db - bioDBnet input database query name
     param: taxon_id - bioDBnet taxon id
     param: full_flag - boolean, True if breaking down multi- entrez ids into seperate rows
-
     return: df,
     """
-    # disease = fetch_entrez_gene_id(list(regulated.index.values), input_db=in_db)
-    # print(list(regulated.index.values))
-    disease = fetch_gene_info(list(regulated.index.values),
-                              input_db=in_db,
-                              output_db=["Gene Symbol"],
-                              delay=15,
-                              taxon_id=taxon_id
-                              )
+    disease = database_convert.fetch_gene_info(
+        input_values=list(regulated.index.values),
+        input_db=in_db,
+        output_db=["Gene Symbol"],
+        taxon_id=taxon_id,
+    )
+    # disease = fetch_gene_info(list(regulated.index.values),
+    #                           input_db=in_db,
+    #                           output_db=["Gene Symbol"],
+    #                           delay=15,
+    #                           taxon_id=taxon_id
+    #                           )
+
     disease.reset_index(inplace=True)
     # disease.drop(columns=["Ensembl Gene ID"], inplace=True)
     disease.replace(to_replace="-", value=np.nan, inplace=True)
@@ -94,10 +106,8 @@ def get_entrez_id(regulated, output_full_path, in_db, taxon_id, full_flag=False)
 def pharse_configs(config_filepath, sheet):
     """
     Read microarray config files
-
     param: config_filepath - string, path to microarray formatted disease configuration xlsx file
     param: sheet - string, sheet name to read
-
     return:
     """
     xl = pd.ExcelFile(config_filepath)
@@ -128,28 +138,51 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
     """
     query_table, df_target = pharse_configs(config_filepath, disease_name)
     df_target.to_csv(target_path, index=False, sep="\t")
+    print(query_table)
     sr = query_table["GSE ID"]
     gse_ids = sr[sr.str.match("GSE")].unique()
     gse_id = gse_ids[0]
+    
+    inst = query_table["Instrument"]
+    inst_name = inst.unique()
+    inst_name = inst_name[0]
+    print(inst_name)
+    
     gseXXX = GSEproject(gse_id, query_table, configs.rootdir)
     for key, val in gseXXX.platforms.items():
         raw_dir = os.path.join(gseXXX.gene_dir, key)
         print(f"{key}:{val}, {raw_dir}")
-        diff_exp_df = affyio.fitaffydir(raw_dir, target_path)
+        if inst_name == "affy":
+            diff_exp_df = affyio.fitaffydir(raw_dir, target_path)
+        elif inst_name == "agilent":
+            diff_exp_df = agilentio.fitagilent(raw_dir, target_path)
         diff_exp_df = ro.conversion.rpy2py(diff_exp_df)
+        diff_exp_df.reset_index(inplace=True)
+        diff_exp_df = diff_exp_df.rename(columns = {'index':'Affy ID'})
+        print(diff_exp_df)
+        print(type(diff_exp_df))
+        data_top = diff_exp_df.head() 
+        print(data_top)
+        diff_exp_df.rename(columns={"adj.P.Val": "FDR"}, inplace=True)
+        print(diff_exp_df)
+        
+        if inst_name == "affy":
+            input_db: InputDatabase = InputDatabase.AFFY_ID
+        elif inst_name == "agilent":
+            input_db: InputDatabase = InputDatabase.AGILENT_ID
 
-        bdnet = fetch_gene_info(
-            diff_exp_df["Affy ID"].tolist(),
-            input_db="Affy ID",
-            output_db=["Ensembl Gene ID", "Gene ID", "Gene Symbol"],
-            delay=15, taxon_id=taxon_id)
+        bdnet = database_convert.fetch_gene_info(
+            input_values=list(map(str, diff_exp_df["Affy ID"].tolist())),
+            input_db=input_db,
+            output_db=[OutputDatabase.ENSEMBL_GENE_ID, OutputDatabase.GENE_ID, OutputDatabase.GENE_SYMBOL],
+            taxon_id=taxon_id
+        )
 
-        diff_exp_df["Entrez"] = bdnet["Gene ID"]
-        diff_exp_df["Ensembl"] = bdnet["Ensembl Gene ID"]
-        diff_exp_df["Symbol"] = bdnet["Gene Symbol"]
-
+        diff_exp_df["Entrez"] = bdnet["Gene ID"].tolist()
+        diff_exp_df["Ensembl"] = bdnet["Ensembl Gene ID"].tolist()
+        diff_exp_df["Symbol"] = bdnet["Gene Symbol"].tolist()
+        print(diff_exp_df)
         diff_exp_df.rename(columns={"Affy ID": "Affy"}, inplace=True)
-
     return diff_exp_df, gse_id
 
 
@@ -182,11 +215,10 @@ def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_
     diff_exp_df = ro.conversion.rpy2py(diff_exp_df)
     gse_id = "rnaseq"
 
-    bdnet = fetch_gene_info(
-        list(map(str, diff_exp_df["Ensembl"].tolist())),
-        input_db="Ensembl Gene ID",
-        output_db=["Gene ID", "Affy ID", "Gene Symbol"],
-        delay=15,
+    bdnet = database_convert.fetch_gene_info(
+        input_values=list(map(str, diff_exp_df["Ensembl"].tolist())),
+        input_db=InputDatabase.ENSEMBL_GENE_ID,
+        output_db=[OutputDatabase.GENE_ID, OutputDatabase.AFFY_ID, OutputDatabase.GENE_SYMBOL],
         taxon_id=taxon_id
     )
 
@@ -202,9 +234,6 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
     diff_exp_df["logFC"].astype(float)
     diff_exp_df["abs_logFC"] = diff_exp_df["logFC"].abs()
     diff_exp_df["FDR"].astype(float)
-
-    print(diff_exp_df.head())
-
     diff_exp_df.sort_values(by="abs_logFC", ascending=False, inplace=True)
     regulated = diff_exp_df[diff_exp_df["FDR"] < 0.05]
     down_regulated = regulated[regulated["logFC"] < 0]
@@ -254,7 +283,6 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
     diff_exp_df.drop(columns=["Affy"], inplace=True)  # drop for now bc commas mess up csv parsing, maybe fix later
     diff_exp_df.to_csv(raw_file, index=False)
     print(f"Raw Data saved to '{raw_file}'")
-    print(diff_exp_df.head())
 
     files_dict = {
         "GSE": gse_id,
@@ -373,6 +401,7 @@ def main(argv):
             print("data_source should be either 'microarray' or 'rnaseq'")
             print("Refer to example config file for either type for formatting")
             sys.exit(2)
+            
         write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, target_path)
 
 
