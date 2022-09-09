@@ -6,10 +6,12 @@ import os
 import pandas as pd
 import numpy as np
 from project import configs
+import GSEpipelineFast
 
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 from rpy2.robjects.packages import importr
 from rpy2.robjects import pandas2ri
+import rpy2.robjects as ro
 
 from async_bioservices import database_convert
 from async_bioservices.input_database import InputDatabase
@@ -148,7 +150,7 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
     inst_name = inst_name[0]
     print(inst_name)
     
-    gseXXX = GSEproject(gse_id, query_table, configs.rootdir)
+    gseXXX = GSEpipelineFast.GSEproject(gse_id, query_table, configs.rootdir)
     for key, val in gseXXX.platforms.items():
         raw_dir = os.path.join(gseXXX.gene_dir, key)
         print(f"{key}:{val}, {raw_dir}")
