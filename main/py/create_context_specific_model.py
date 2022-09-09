@@ -7,6 +7,7 @@ import numpy as np
 import os
 import re
 import collections
+from cobra.flux_analysis import pfba
 from warnings import warn
 from cobamp.wrappers import COBRAModelObjectReader
 from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
@@ -71,7 +72,9 @@ def gene_rule_logical(expression_in, level=0):
         else:
             expression_in = expression_in.replace("[", "")
             expression_in = expression_in.replace("]", "")
+            
         return expression_in
+        
     loc_l = expression_in[0:loc_r].rindex("(")
     inner_string = expression_in[loc_l : loc_r + 1]
     inner_string = inner_string.replace("(", "[")
@@ -157,7 +160,7 @@ def set_boundaries(model_cobra, bound_rxns, bound_lb, bound_ub):
 
 def feasibility_test(model_cobra, step):
     # check number of unsolvable reactions for reference model under media assumptions
-    model_cobra_rm = cobra.flux_analysis.fastcc(model_cobra)  # create flux consistant model (rmemoves some reactions)
+    model_cobra_rm = cobra.flux_analysis.fastcc(model_cobra, flux_threshold=15, zero_cutoff=1e-7)  # create flux consistant model (rmemoves some reactions)
     incon_rxns = set(model_cobra.reactions.list_attr("id")) - set(model_cobra_rm.reactions.list_attr("id"))
     incon_rxns_cnt = len(incon_rxns)
 
@@ -176,7 +179,7 @@ def feasibility_test(model_cobra, step):
             "according to your expression data, it is likely that you are missing some critical exchange (media) "
             "reactions.\n"
         )
-    else:
+    elif step == "after_seeding":
         print(
             f"Under given boundary assumptions, with infeasible reactions from the general model not considered "
             f"there are {incon_rxns_cnt} new infeasible reactions in the context-specific model.\n"
@@ -187,6 +190,8 @@ def feasibility_test(model_cobra, step):
         print(
             "Note that this value should be very low compared to the reference model."
         )
+    else:
+        pass
 
     return incon_rxns, model_cobra_rm
 
@@ -201,12 +206,19 @@ def seed_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
         preprocess=True,
         flux_threshold=0.9,
     )
-    algorithm = GIMME(s_matrix, lb, ub, properties)
-    model_seeded = algorithm.run()
+    algorithm = GIMME(s_matrix, lb, ub, properties)  
+    gene_activity = algorithm.run()
     context_cobra_model = cobra_model.copy()
     r_ids = [r.id for r in context_cobra_model.reactions]
-    to_remove_ids = [r_ids[r] for r in np.where(model_seeded == 0)[0]]
+    to_remove_ids = [r_ids[r] for r in np.where(gene_activity==0)[0]]
+    
     context_cobra_model.remove_reactions(to_remove_ids, True)
+    r_ids = [r.id for r in context_cobra_model.reactions]
+    psol = pfba(context_cobra_model)
+    #psol = context_cobra_model.optimize()
+    #to_remove_ids = [r_ids[r] for r in np.where(abs(psol.fluxes) < 1e-8)[0]]
+    #context_cobra_model.remove_reactions(to_remove_ids, True)
+
 
     return context_cobra_model
 
@@ -215,6 +227,12 @@ def seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
     # 'Vlassis, Pacheco, Sauter (2014). Fast reconstruction of compact
     # context-specific metabolic network models. PLoS Comput. Biol. 10,
     # e1003424.'
+    warn(
+        "Fastcore requires a flux consistant model is used as refererence, "
+        "to achieve this fastcc is required which is NOT reproducible."
+    )
+    print("Creating feasible model...")
+    incon_rxns, cobra_model = feasibility_test(cobra_model, "other")
     properties = FastcoreProperties(core=exp_idx_list, solver=solver)
     algorithm = FASTcore(s_matrix, lb, ub, properties)
     context_rxns = algorithm.fastcore()
@@ -258,9 +276,8 @@ def seed_imat(
             getattr(context_cobra_model.reactions, r_id).fluxes = val
             flux_df.loc[len(flux_df.index)] = [r_id, val]
 
-    print("removing")
     context_cobra_model.remove_reactions(remove_rxns, True)
-    print("done")
+
     return context_cobra_model, flux_df
 
 
@@ -304,7 +321,6 @@ def split_gene_expression_data(expression_data, recon_algorithm="GIMME"):
 
     for index, row in multiple_gene_names.iterrows():
         for genename in row["Gene"].split("///"):
-            # breaks_gene_names = breaks_gene_names.append({'Gene': genename, 'Data': row['Data']}, ignore_index=True)
             breaks_gene_names = pd.concat(
                 [
                     breaks_gene_names,
@@ -322,7 +338,7 @@ def split_gene_expression_data(expression_data, recon_algorithm="GIMME"):
     return gene_expressions
 
 
-def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm):
+def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm, low_thresh=None, high_thresh=None):
     """
     Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules
     which are defined in general genome-scale metabolic model
@@ -332,12 +348,12 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm):
         expression_data, recon_algorithm=recon_algorithm
     )
     expression_rxns = collections.OrderedDict()
-    # expr_vector = []
+
     cnt = 0
     if recon_algorithm in ["IMAT", "TINIT"]:
         print(gene_expressions["Data"].tolist()[0:20])
         # unknown_val = min(gene_expressions["Data"].tolist())
-        unknown_val = -2.9
+        unknown_val = np.mean([low_thresh, high_thresh]) # put unknowns in mid bin
     elif recon_algorithm == "GIMME":
         unknown_val = -1
     elif recon_algorithm == "FASTCORE":
@@ -370,12 +386,13 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm):
             gene_reaction_by_rule = gene_rule_evaluable(gene_reaction_rule)
             gene_reaction_by_rule = gene_reaction_by_rule.strip()
             expression_rxns[rxn.id] = eval(gene_reaction_by_rule)
-            # expr_vector.append(expression_rxns[rxn.id])
+            
         except BaseException:
             cnt += 1
 
     print("Map gene expression to reactions, {} errors.".format(cnt))
     expr_vector = np.array(list(expression_rxns.values()), dtype=float)
+    
     return expression_rxns, expr_vector
 
 
@@ -391,8 +408,8 @@ def create_context_specific_model(
     bound_ub,
     solver,
     context_name,
-    low_thresh=-3,
-    high_thresh=-1
+    low_thresh,
+    high_thresh
 ):
     """
     Seed a context specific model. Core reactions are determined from GPR associations with gene expression logicals.
@@ -419,33 +436,28 @@ def create_context_specific_model(
         cobra_model, bound_rxns, bound_lb, bound_ub
     )
 
-
     # set solver
     cobra_model.solver = solver.lower()
 
-    #if len(bound_rm_rxns) > 0:
-    #    cobra_model.remove_reactions(bound_rm_rxns, True)
-    #    print(f"Removed {len(bound_rm_rxns)} unused boundary reactions")
-
     # check number of unsolvable reactions for reference model under media assumptions
-    incon_rxns, cobra_model = feasibility_test(cobra_model, "before_seeding")
+    #incon_rxns, cobra_model = feasibility_test(cobra_model, "before_seeding")
+    incon_rxns = []
 
-    print("read cobamp")
     # CoBAMP methods
     cobamp_model = COBRAModelObjectReader(cobra_model)  # load model in readable format for CoBAMP
-    print("Get irr")
     cobamp_model.get_irreversibilities(True)
-    print("get stoch")
     s_matrix = cobamp_model.get_stoichiometric_matrix()
-    print("get bounds")
     lb, ub = cobamp_model.get_model_bounds(False, True)
-    print("get rx names")
     rx_names = cobamp_model.get_reaction_and_metabolite_ids()[0]
-    print("map")
+    
     # get expressed reactions
-    expression_rxns, expr_vector = map_expression_to_rxn(cobra_model, gene_expression_file, recon_algorithm)
-
-    # expressed_rxns = list({k: v for (k, v) in expression_rxns.items() if v > 0}.keys())
+    expression_rxns, expr_vector = map_expression_to_rxn(
+        cobra_model,     
+        gene_expression_file,
+        recon_algorithm,
+        high_thresh=high_thresh,
+        low_thresh=low_thresh
+    )
 
     # find reactions in the force reactions file that are not in general model and warn user
     for rxn in force_rxns:
@@ -460,6 +472,7 @@ def create_context_specific_model(
     infeas_force_rxns = []
     infeas_exp_cnt = 0
     infeas_force_cnt = 0
+    
     for idx, (rxn, exp) in enumerate(expression_rxns.items()):
         # log reactions in expressed and force lists that are infeasible that the user may wish to review
         if rxn in incon_rxns and expr_vector[idx] == 1:
@@ -483,17 +496,8 @@ def create_context_specific_model(
 
     idx_obj = rx_names.index(objective)
     idx_force = [rx_names.index(rxn) for rxn in force_rxns if rxn in rx_names]
-    print("idx_force")
-    print(idx_force)
     exp_idx_list = [idx for (idx, val) in enumerate(expr_vector) if val > 0]
     exp_thresh = (low_thresh, high_thresh)
-
-    print("build that shiz yo")
-    print("length:")
-    print("ub: ", len(ub))
-    print("lb: ", len(lb))
-    print("exp_vec: ", len(expr_vector))
-    print("reactoins in model: ", len(cobra_model.reactions))
 
     # switch case dictionary runs the functions making it too slow, better solution then elif ladder?
     if recon_algorithm == "GIMME":
@@ -522,20 +526,18 @@ def create_context_specific_model(
     else:
         context_model_cobra = seed_unsupported(recon_algorithm)
 
-    print("we built it boyyyy")
-
     # check number of unsolvable reactions for seeded model under media assumptions
-    incon_rxns_cs, context_model_cobra = feasibility_test(
-        context_model_cobra, "after_seeding"
-    )
-    if recon_algorithm == "IMAT":
+    #incon_rxns_cs, context_model_cobra = feasibility_test(context_model_cobra, "after_seeding")
+    incon_rxns_cs = []
+    
+    if recon_algorithm in ["IMAT"]:
         final_rxns = [rxn.id for rxn in context_model_cobra.reactions]
         imat_rxns = flux_df.rxn
         for rxn in imat_rxns:
             if rxn not in final_rxns:
                 flux_df = flux_df[flux_df.rxn != rxn]
 
-        flux_df.to_csv(os.path.join(configs.datadir, "results", context_name, "iMAT_flux.csv"))
+        flux_df.to_csv(os.path.join(configs.datadir, "results", context_name, f"{recon_algorithm}_flux.csv"))
 
     incon_df = pd.DataFrame({"general_infeasible_rxns": list(incon_rxns)})
     infeas_exp_df = pd.DataFrame({"expressed_infeasible_rxns": infeas_exp_rxns})
@@ -662,6 +664,24 @@ def main():
         "GIMME, FASTCORE, iMAT, or tINIT.",
     )
     parser.add_argument(
+        "-lt",
+        "--low-threshold",
+        type=float,
+        required=False,
+        default=-5,
+        dest="low_threshold",
+        help="Low to mid bin cutoff for iMAT solution"
+    )
+    parser.add_argument(
+        "-ht",
+        "--high-threshold",
+        type=float,
+        required=False,
+        default=-3,
+        dest="high_threshold",
+        help="Mid to high bin cutoff for iMAT solution"
+    )      
+    parser.add_argument(
         "-s",
         "--solver",
         type=str,
@@ -695,9 +715,9 @@ def main():
     exclude_rxns_file = args.exclude_rxns_file
     force_rxns_file = args.force_rxns_file
     recon_alg = args.algorithm.upper()
+    low_threshold = args.low_threshold
+    high_threshold = args.high_threshold
     solver = args.solver.upper()
-    # TODO: Allow user to input a regular list of items for output_filetypes
-    # From: https://stackoverflow.com/questions/15753701
     output_filetypes = args.output_filetypes
 
     if not os.path.exists(reference_model):
@@ -861,6 +881,8 @@ def main():
         bound_ub,
         solver,
         context_name,
+        low_threshold,
+        high_threshold
     )
 
     infeas_df.to_csv(
@@ -912,7 +934,8 @@ def main():
     print("Number of Metabolites: " + str(len(context_model.metabolites)))
     print("Number of Reactions: " + str(len(context_model.reactions)))
     print(context_model.objective._get_expression())
-    print(context_model.optimize())
+    print(pfba(context_model))
+    #print(context_model.optimize())
     print("len rxns: ", len(context_model.reactions))
     return None
 

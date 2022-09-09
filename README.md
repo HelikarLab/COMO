@@ -6,9 +6,11 @@ This is the home page for MADRID pipeline.
 
 [View the documentation](https://helikarlab.github.io/MADRID)
 
+[Create and view Issues](https://joshl.youtrack.cloud/dashboard?id=7bb0e449-3a4f-4fe8-a253-a445efd15ea4)
+
 ## How To Run application
 - [Install Docker](https://docs.docker.com/install/)
-- `docker login`
+- `sudo docker login`
 - `sudo docker pull babessell/madrid:development`
 - `sudo docker run --cpus=4 -p 4000:8888 --volume=$HOME/gurobi.lic:/opt/gurobi/gurobi.lic:ro  -v /$HOME/saghamiri/Desktop/LocalMadrid:/home/jovyan/work/data/local_files --rm --name jupyteruser --rm -it babessell/madrid:development` Run docker image and assign 2 CPUs to it.
 - Open [http://127.0.0.1:4000](http://127.0.0.1:4000) from your browser  
@@ -19,13 +21,13 @@ This is the home page for MADRID pipeline.
 
 
 ## Flow Charts
-![1](./docs/assets/img/step_1.jpg)
+![1](./docs/assets/img/flowchart_step_1.jpg)
 
-![2](./docs/assets/img/step_2.jpg)
+![2](./docs/assets/img/flowchart_step_2.jpg)
 
-![3](./docs/assets/img/step_3.jpg)
+![3](./docs/assets/img/flowchart_step_3.jpg)
 
-![4](./docs/assets/img/step_4.jpg)
+![4](./docs/assets/img/flowchart_step_4.jpg)
 
 
 ## Running pipeline: Example

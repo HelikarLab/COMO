@@ -1,11 +1,12 @@
 #!/usr/bin/python3
+
 import os
 import sys
 import time
 
 
 # find project root dir
-class _Configs:
+class Configs:
     def __init__(self, projectdir):
         self.rootdir = projectdir
         self.datadir = os.path.join(projectdir, "data")

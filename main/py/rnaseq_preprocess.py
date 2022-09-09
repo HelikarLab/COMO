@@ -1,14 +1,17 @@
 #!/usr/bin/python3
 
-from bioservices import BioDBNet
 import pandas as pd
 from project import configs
 import re
-import os, time, sys, shutil
+import os
+import sys
 import argparse
 from rpy2.robjects.packages import importr, SignatureTranslatedAnonymousPackage
 import glob
 import numpy as np
+
+from . import async_bioservices
+from .async_bioservices.output_database import OutputDatabase
 
 # import R libraries
 tidyverse = importr("tidyverse")
@@ -18,38 +21,6 @@ f = open(os.path.join(configs.rootdir, "py", "rscripts", "generate_counts_matrix
 string = f.read()
 f.close()
 generate_counts_matrix_io = SignatureTranslatedAnonymousPackage(string, 'generate_counts_matrix_io')
-
-
-def fetch_gene_info(input_values, input_db="Ensembl Gene ID",
-                    output_db=["Gene Symbol", "Gene ID", "Chromosomal Location"],
-                    delay=15, taxon_id=9606):
-    """
-    Returns a dataframe with important gene information for future operations in MADRID.
-
-    Fetch gene information from BioDbNet, takes 'input_values' (genes) in format of 'input_db' (default, Ensembl) and
-    ond returns dataframe with specified columns as 'output_db' (default is HUGO symbol, Entrez ID, and chromosome
-    chromosomal start and end positions).
-    """
-    s = BioDBNet()
-    df_maps = pd.DataFrame([], columns=output_db)
-    df_maps.index.name = input_db
-    i = 0
-    batch_len = 500 if taxon_id == 9606 else 300
-    print(f"Total Genes to Retrieve: {len(input_values)}")
-    while i < len(input_values):
-        upper_range = min(i + batch_len, len(input_values))
-        # TODO: Make this output more user-readable
-        # It outputs many lines due to the large number of genes to retrieve
-        print(f"retrieve {i}:{upper_range}")
-        df_test = s.db2db(input_db, output_db, input_values[i:upper_range], taxon_id)
-        if isinstance(df_test, pd.DataFrame):
-            df_maps = pd.concat([df_maps, df_test], sort=False)
-        elif df_test == '414':
-            print(f"bioDBnet busy, trying again in {delay} seconds")
-            time.sleep(delay)
-            continue
-        i += batch_len
-    return df_maps
 
 
 def create_counts_matrix(context_name):
@@ -64,14 +35,12 @@ def create_counts_matrix(context_name):
     # call generate_counts_matrix.R to create count matrix from MADRID_input folder
     generate_counts_matrix_io.generate_counts_matrix_main(input_dir, matrix_output_dir)
 
-    return
-
 
 def create_config_df(context_name):
     """
-    Create configuration sheet at /main/data/config_sheets/rnaseq_data_inputs_auto.xlsx
+    Create configuration sheet at /work/data/config_sheets/rnaseq_data_inputs_auto.xlsx
     based on the gene counts matrix. If using zFPKM normalization technique, fetch mean fragment lengths from
-    /main/data/MADRID_inputs/<context name>/<study number>/fragmentSizes/
+    /work/data/MADRID_inputs/<context name>/<study number>/fragmentSizes/
     """
     gene_counts_glob = os.path.join(configs.rootdir, "data", "MADRID_input", context_name, "geneCounts", "*", "*.tab")
     gene_counts_files = glob.glob(gene_counts_glob, recursive=True)
@@ -80,7 +49,9 @@ def create_config_df(context_name):
 
     for gcfilename in gene_counts_files:
         try:
-            label = re.findall(r"S[1-9][0-9]?[0-9]?R[1-9][0-9]?[0-9]?r?[1-9]?[0-9]?[0-9]?", gcfilename)[0]
+            # Match S___R___r___
+            # \d{1,3} matches 1-3 digits
+            label = re.findall(r"S\d{1,3}R\d{1,3}r\d{1,3}", gcfilename)[0]
 
         except IndexError:
             print(f"\nfilename of {gcfilename} is not valid. Should be 'contextName_SXRYrZ.tab', where X is the "
@@ -88,10 +59,10 @@ def create_config_df(context_name):
                   "exclude 'rZ' from the filename.")
             sys.exit()
 
-        study_number = re.findall(r"S[1-9][0-9]?[0-9]?", label)[0]
-        rep_number = re.findall(r"R[1-9][0-9]?[0-9]?", label)[0]
+        study_number = re.findall(r"S\d{1,3}", label)[0]
+        rep_number = re.findall(r"R\d{1,3}", label)[0]
+        run = re.findall(r"r\d{1,3}", label)
 
-        run = re.findall(r"r[1-9][0-9]?[0-9]?", label)
         multi_flag = 0
         if len(run) > 0:
             if run[0] != "r1":
@@ -103,8 +74,8 @@ def create_config_df(context_name):
                 frag_files = []
 
                 for r in runs:
-                    r_label = re.findall(r"r[1-9][0-9]?[0-9]?", r)[0]
-                    R_label = re.findall(r"R[1-9][0-9]?[0-9]?", r)[0]
+                    r_label = re.findall(r"r\d{1,3}", r)[0]
+                    R_label = re.findall(r"R\d{1,3}", r)[0]
                     frag_filename = "".join([context_name, "_", study_number, R_label, r_label, "_fragment_size.txt"])
                     frag_files.append(os.path.join(configs.rootdir, "data", "MADRID_input", context_name,
                                                    "fragmentSizes", study_number, frag_filename))
@@ -154,7 +125,7 @@ def create_config_df(context_name):
 
         # Get preparation method
         if len(prep_glob) < 1:
-            print(f"\nNo prep file found for {label}, assuming 'total' as in Total RNA library preparation")
+            print(f"No prep file found for {label}, assuming 'total' as in Total RNA library preparation")
             prep = "total"
         elif len(prep_glob) > 1:
             print(f"\nMultiple matching prep files for {label}, make sure there is only one copy for each "
@@ -171,7 +142,7 @@ def create_config_df(context_name):
         if len(frag_glob) < 1:
             print(f"\nNo fragment file found for {label}, writing as 'UNKNOWN' This must be defined by the user in "
                   "order to use zFPKM normalization")
-            #strand = "UNKNOWN"
+            # strand = "UNKNOWN"
             mean_fragment_size = 100
         elif len(frag_glob) > 1:
             print(f"\nMultiple matching fragment length files for {label}, make sure there is only one copy for each "
@@ -193,14 +164,14 @@ def create_config_df(context_name):
                     for ff in frag_files:
                         print(ff)
                         frag_df = pd.read_table(ff, low_memory=False, sep="\t", on_bad_lines="skip")
-                        frag_df['meanxcount'] = frag_df['frag_mean']*frag_df['frag_count']
-                        mean_fragment_size = sum(frag_df['meanxcount']/sum(frag_df['frag_count']))
+                        frag_df['meanxcount'] = frag_df['frag_mean'] * frag_df['frag_count']
+                        mean_fragment_size = sum(frag_df['meanxcount'] / sum(frag_df['frag_count']))
                         mean_fragment_sizes = np.append(mean_fragment_sizes, mean_fragment_size)
                         library_sizes = np.append(library_sizes, sum(frag_df['frag_count']))
 
                     mean_fragment_size = sum(mean_fragment_sizes * library_sizes) / sum(library_sizes)
 
-        #label = "_".join([context_name, re.findall(r"S[1-9][0-9]?[0-9]?R[1-9][0-9]?[0-9]?", label)[0]])  # remove run number if there
+        # label = "_".join([context_name, re.findall(r"S[1-9][0-9]?[0-9]?R[1-9][0-9]?[0-9]?", label)[0]])  # remove run number if there
         label = f"{context_name}_{study_number}{rep_number}"
 
         new_row = pd.DataFrame({'SampleName': [label],
@@ -228,7 +199,7 @@ def split_config_df(df):
 
 def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     """
-    Split a counts matrix dataframe into two seperate ones. One for Total RNA library prep, one for mRNA
+    Split a counts-matrix dataframe into two seperate ones. One for Total RNA library prep, one for mRNA
     """
     matrix_all = pd.read_csv(count_matrix_all)
     matrix_total = matrix_all[["genes"] + [n for n in matrix_all.columns if n in df_total["SampleName"].tolist()]]
@@ -237,11 +208,10 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     return matrix_total, matrix_mrna
 
 
-
 def create_gene_info_file(matrix_file_list, form, taxon_id):
     """
-    Create gene info file for specified context by reading first column in it's count matrix file at
-     /main/data/results/<context name>/gene_info_<context name>.csv
+    Create gene info file for specified context by reading first column in its count matrix file at
+     /work/data/results/<context name>/gene_info_<context name>.csv
     """
 
     print(f"Fetching gene info")
@@ -254,11 +224,30 @@ def create_gene_info_file(matrix_file_list, form, taxon_id):
 
     for mfile in matrix_file_list:
         add_genes = pd.read_csv(mfile)["genes"].tolist()
-        genes = list(set(genes+add_genes))
+        genes = list(set(genes + add_genes))
 
-    output_db = ['Ensembl Gene ID', 'Gene Symbol', 'Gene ID', 'Chromosomal Location']
-    output_db.remove(form)
-    gene_info = fetch_gene_info(genes, input_db=form, output_db=output_db, taxon_id=taxon_id)
+    # Create our output database format
+    # Do not include values equal to "form"
+    # Note: This is a refactor; I'm not sure why we are removing "form"
+    output_db: list[OutputDatabase] = [
+        i for i in [
+            OutputDatabase.ENSEMBL_GENE_ID,
+            OutputDatabase.GENE_SYMBOL,
+            OutputDatabase.GENE_ID,
+            OutputDatabase.CHROMOSOMAL_LOCATION
+        ]
+        if i.value != form
+    ]
+
+    print(f"Gathering {len(genes)} genes. Please wait...")
+
+    gene_info = async_bioservices.database_convert.fetch_gene_info(
+        input_values=genes,
+        input_db=form,
+        output_db=output_db,
+        taxon_id=taxon_id
+    )
+
     gene_info['start_position'] = gene_info['Chromosomal Location'].str.extract("chr_start: (\d+)")
     gene_info['end_position'] = gene_info['Chromosomal Location'].str.extract("chr_end: (\d+)")
     gene_info.index.rename("ensembl_gene_id", inplace=True)
@@ -267,10 +256,8 @@ def create_gene_info_file(matrix_file_list, form, taxon_id):
     gene_info.to_csv(gene_info_file)
     print(f"Gene Info file written at '{gene_info_file}'")
 
-    return
 
-
-def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_file, data_source):
+def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_file):
     """
     Handle iteration through each context type and create files according to flag used (config, matrix, info)
     """
@@ -282,20 +269,20 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
 
     tmatrix_files = []
     mmatrix_files = []
-    #pmatrix_files = []
+    # pmatrix_files = []
     for context_name in context_names:
         context_name = context_name.strip(" ")
         print(f"Preprocessing {context_name}")
-        #gene_output_dir = os.path.join(configs.rootdir, "data", "results", context_name)
+        gene_output_dir = os.path.join(configs.rootdir, "data", "results", context_name)
         matrix_output_dir = os.path.join(configs.rootdir, "data", "data_matrices", context_name)
-        #os.makedirs(gene_output_dir, exist_ok=True)
+        os.makedirs(gene_output_dir, exist_ok=True)
         os.makedirs(matrix_output_dir, exist_ok=True)
-        #print('Gene info output directory is "{}"'.format(gene_output_dir))
+        print('Gene info output directory is "{}"'.format(gene_output_dir))
 
         matrix_path_all = os.path.join(matrix_output_dir, ("gene_counts_matrix_full_" + context_name + ".csv"))
         matrix_path_total = os.path.join(matrix_output_dir, ("gene_counts_matrix_total_" + context_name + ".csv"))
         matrix_path_mrna = os.path.join(matrix_output_dir, ("gene_counts_matrix_mrna_" + context_name + ".csv"))
-        matrix_path_prov = provided_matrix_file
+        matrix_path_prov = os.path.join(matrix_output_dir, provided_matrix_file)
 
         if mode == "make":
             create_counts_matrix(context_name)
@@ -334,23 +321,19 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
         create_gene_info_file(tmatrix_files + mmatrix_files, form, taxon_id)
 
     else:
-        out_dir = os.path.join(matrix_output_dir, f"gene_counts_matrix_{data_source}_{context_name}.csv")
-        shutil.copy(matrix_path_prov, out_dir)
-        create_gene_info_file([matrix_path_prov], form, taxon_id)
-
-    return
+        create_gene_info_file(matrix_path_prov, form, taxon_id)
 
 
-def main(argv):
+def parse_args(argv):
     """
     Parse arguments to rnaseq_preprocess.py, create a gene info files for each provided context at:
-    /main/data/results/<context name>/gene_info_<context name>.csv.
+    /work/data/results/<context name>/gene_info_<context name>.csv.
 
      If using --info-matrix or --info-matrix-config:
-    create gene count matrix file at /main/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv,
+    create gene count matrix file at /work/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv,
 
     If using --info-matrix-config:
-    create config file at /main/data/config_sheets/rnaseq_data_inputs_auto.xlsx
+    create config file at /work/data/config_sheets/rnaseq_data_inputs_auto.xlsx
     """
     parser = argparse.ArgumentParser(
         prog="rnaseq_preprocess.py",
@@ -368,11 +351,12 @@ def main(argv):
 
     parser.add_argument("-n", "--context-names",
                         type=str,
+                        nargs="+",
                         required=True,
                         dest="context_names",
                         help="""Tissue/cell name of models to generate. These names should correspond to the folders
                              in 'MADRID_inputs/' if creating count matrix files, or to
-                             'main/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv' if supplying
+                             'work/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv' if supplying
                              the count matrix as an imported .csv file. If making multiple models in a batch, then
                              use the format: \"['context1', 'context2', ... etc]\". Note the outer double-quotes and the 
                              inner single-quotes are required to be interpreted. This a string, not a python list"""
@@ -411,7 +395,7 @@ def main(argv):
                        default=False,
                        dest="make_matrix",
                        help="Flag for if you want to make a counts matrix, but not a config file. "
-                            "Requires a correctly structured MADRID_input folder in /main/data/. Can make one using: "
+                            "Requires a correctly structured MADRID_input folder in /work/data/. Can make one using: "
                             "https://github.com/HelikarLab/FastqToGeneCounts"
                        )
 
@@ -420,39 +404,51 @@ def main(argv):
                         dest="provided_matrix_fname",
                         default="SKIP",
                         help="Name of provided counts matrix in "
-                              "/main/data/data_matrices/<context name>/<NAME OF FILE>.csv"
-                        )
-
-    parser.add_argument("-s", "--data-source",
-                        required="--provide-matrix" in argv,  # require if using --provide-matrix flag,
-                        dest="data_source",
-                        default="NA",
-                        help="Experimental source of data. Can be either 'total', 'mrna', or 'scrna'"
+                             "/work/data/data_matrices/<context name>/<NAME OF FILE>.csv"
                         )
 
     args = parser.parse_args()
+    return args
+
+
+def main(argv):
+    args = parse_args(argv)
     context_names = args.context_names
     gene_format = args.gene_format
     taxon_id = args.taxon_id
     provide_matrix = args.provide_matrix
     make_matrix = args.make_matrix
     provided_matrix_fname = args.provided_matrix_fname
-    data_source = args.data_source
 
-    context_names = context_names.strip("[").strip("]").replace("'", "").replace(" ", "").split(",") # convert to py list
+    # ----------
+    # We are attempting to move to a new method of gathering a list of items from the command line
+    # In doing so, we must deprecate the use of the current method
+    # ----------
+    # If '[' and ']' are present in the first and last items of the list, assume we are using the "old" method of providing context names
+    if "[" in context_names[0] and "]" in context_names[-1]:
+        print("DEPRECATED: Please use the new method of providing context names, i.e. --context-names 'context1 context2 context3'.")
+        print("This can be done by setting the 'context_names' variable to a simple string separated by lists: context_names='context1 context2 context3'")
+        print("Your current method of passing context names will be removed in the future. Please update your variables above accordingly!")
+        temp_context_names: list[str] = []
+        for name in context_names:
+            temp_name = name.replace("'", "").replace(" ", "")
+            temp_name = temp_name.strip("[],")
+            temp_context_names.append(temp_name)
+        context_names = temp_context_names
 
     if gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
-        form = "Ensembl Gene ID"
+        gene_format = "Ensembl Gene ID"
 
     elif gene_format.upper() in ["HGNC SYMBOL", "HUGO", "HUGO SYMBOL", "SYMBOL", "HGNC", "GENE SYMBOL"]:
-        form = "Gene Symbol"
+        gene_format = "Gene Symbol"
 
     elif gene_format.upper() in ["ENTREZ", "ENTRES", "ENTREZ ID", "ENTREZ NUMBER" "GENE ID"]:
-        form = "Gene ID"
+        gene_format = "Gene ID"
 
     else:  # provided invalid gene format
         print("Gene format (--gene_format) is invalid")
         print("Accepts 'Ensembl', 'Entrez', and 'HGNC symbol'")
+        print(f"You provided: {gene_format}")
         sys.exit()
 
     # handle species alternative ids
@@ -471,18 +467,12 @@ def main(argv):
     # use mutually exclusive flag to set mode which tells which files to generate
     if provide_matrix:
         mode = "provide"
-        if data_source not in ["total", "mrna", "scrna"]:
-            print("--data-source must be provided if using a premade counts matrix and must be either "
-                  "'total', 'mrna', or 'scrna'")
-            sys.exit()
     elif make_matrix:
         mode = "make"
 
-    handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fname, data_source)
-
-    return
+    handle_context_batch(context_names, mode, gene_format, taxon_id, provided_matrix_fname)
 
 
 if __name__ == "__main__":
-    print(sys.argv)
+    # print(sys.argv)
     main(sys.argv[1:])
