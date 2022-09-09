@@ -25,6 +25,3 @@ main/py/tests/.pytest_cache
 /docs/_site
 **/.jekyll-cache
 /docs/Gemfile.lock
-
-# gurobi files
-/main/gurobi952
