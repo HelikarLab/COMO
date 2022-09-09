@@ -15,7 +15,8 @@ from urllib.parse import urlparse
 from .FileInformation import FileInformation
 from .FileInformation import clear_print
 
-def ftp_client(host: str, max_attempts: int = 3) -> FTP:
+
+def ftp_client(host: str, max_attempts: int = 3, port: int = 21, user: str = "anonymous", passwd: str = "guest") -> FTP:
     """
     This class is responsible for creating a "client" connection
     """
@@ -24,7 +25,8 @@ def ftp_client(host: str, max_attempts: int = 3) -> FTP:
     # Attempt to connect, throw error if unable to do so
     while not connection_successful and attempt_num <= max_attempts:
         try:
-            ftp_client: FTP = FTP(host, user="anonymous", passwd="guest")
+            client: FTP = FTP(user=user, passwd=passwd)
+            client.connect(host=host, port=port)
             connection_successful = True
         except ConnectionResetError:
             
@@ -33,14 +35,14 @@ def ftp_client(host: str, max_attempts: int = 3) -> FTP:
                 print("")
             
             # Line clean: https://stackoverflow.com/a/5419488/13885200
-            clear_print(f"Attempt {attempt_num} of {max_attempts} failed to connect")
+            clear_print(f"Attempt {attempt_num} of {max_attempts} failed to connect, waiting 5 seconds before trying again")
             attempt_num += 1
             time.sleep(5)
     if not connection_successful:
         print("")
         raise ConnectionResetError("Could not connect to FTP server")
     
-    return ftp_client
+    return client
 
 
 class Reader:
