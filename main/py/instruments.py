@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+
 import os
 import time
 import pandas as pd
@@ -8,6 +9,7 @@ import rpy2.robjects as ro
 from rpy2.robjects.conversion import localconverter
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 from bioservices import BioDBNet
+
 
 class RObject:
     def __init__(self):
@@ -113,9 +115,7 @@ def readagilent(datadir, gsms, scalefactor=1.1, quantile=0.95, ):
         df_results.loc[:, col] = 1.0 - quantile
         col = "{}.cel.gz".format(gsm.lower())
         df_results.rename(columns={gsm: col}, inplace=True)
-    # df_results.rename(columns={'ProbeName': 'ID'}, inplace=True)
-    # df_results.set_index('ID', inplace=True)
-    # df_results.set_index('ProbeName', inplace=True)
+
     return df_results.drop(["ControlType", "SystematicName"], axis=1)
 
 
@@ -131,13 +131,11 @@ def fetch_entrez_gene_id(
         output_db: list[str] = ["Gene ID", "Ensembl Gene ID"]
 
     s = BioDBNet()
-    # input_db = 'Agilent ID'
-    # input_values = df_results.ProbeName.tolist()
 
     df_maps = pd.DataFrame([], columns=output_db)
     df_maps.index.name = input_db
     i = 0
-    # for i in range(0,len(input_values),500):
+
     while i < len(input_values):
         print("retrieve {}:{}".format(i, min(i + 500, len(input_values))))
         df_test = s.db2db(
@@ -150,6 +148,7 @@ def fetch_entrez_gene_id(
             time.sleep(delay)
             continue
         i += 500
+        
     return df_maps
 
 
@@ -164,7 +163,8 @@ if __name__ == '__main__':
 
     # Process the affyio functions
     # This is done using a class because the GSEpipeline also utilizes the R-affyio object
-    # This is the best method of keeping this information segregated in a "main" statement, while allowing access to other functions
+    # This is the best method of keeping this information segregated in a "main" statement,
+    # while allowing access to other functions
     affyio = AffyIO().affyio
 
     # read and translate R functions for handling agilent
