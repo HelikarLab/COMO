@@ -2,13 +2,15 @@
 This is the main driver-file for downloading proteomics data
 """
 import argparse
-from . import Crux
 import csv
-from .FileInformation import FileInformation
-from . import FTPManager
 import os
 import sys
 from pathlib import Path
+
+
+from . import Crux
+from .FileInformation import FileInformation
+from . import FTPManager
 
 
 class ArgParseFormatter(
@@ -147,7 +149,7 @@ class PopulateInformation:
         self._preferred_extensions: list[str] = preferred_extensions
         if self._preferred_extensions is None:
             self._preferred_extensions = ["raw"]
-        
+
         self._gather_data()
         self._set_replicate_numbers()
         
@@ -261,10 +263,11 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         "Comments can be added to the csv file by starting a line with a '#'\n"
         "The input file should be formatted as the following example:\n"
         "\n"
-        "url,cell_type\n"
+        "url,cell_type,study\n"
         "# This is a comment\n"
-        "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026140,naiveB\n"
-        "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD017564,m0Macro\n",
+        "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD026140,naiveB,S1\n"
+        "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD017564,m0Macro,S1\n"
+        "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2022/02/PXD017987,naiveB,S2\n",
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
         "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
         formatter_class=ArgParseFormatter,
