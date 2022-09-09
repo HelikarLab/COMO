@@ -9,6 +9,7 @@ from pathlib import Path
 # Add parent directory to path, allows us to import the "project.py" file from the parent directory
 # From: https://stackoverflow.com/a/30536516/13885200
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from proteomics.Crux import MZMLtoSQT, RAWtoMZML, SQTtoCSV
 from proteomics.FileInformation import FileInformation
 from proteomics.FTPManager import Download, Reader
@@ -21,15 +22,24 @@ class TestCrux:
 
 class TestFileInformation:
     def test_creating_instances(self, tmp_path):
-        cell_type: str = "cd8NaiveT"
-        download_url: str = "ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2015/02/PXD001065/Aus-141_2.raw"
+        """
+        This is an example instance. If anything is incorrectly changed in the FileInformation class, this test will fail.
+        """
+
+        # Define several constants
+        cell_type: str = "t_gondii"
         study: str = "S1"
         replicate: str = "R1"
-        raw_path: Path = tmp_path / f"cd8NaiveT_{study}{replicate}_Aus-141_2.raw"
-        mzml_path: Path = tmp_path / f"cd8NaiveT_{study}{replicate}_Aus-141_2.mzML"
-        sqt_path: Path = tmp_path / f"cd8NaiveT_{study}{replicate}_Aus-141_2.sqt"
-        intensity_path: Path = tmp_path / f"protein_abundance_matrix_{cell_type}.csv"
+        file_name: str = "2DE_2DE_10-2D"
 
+        # Define paths
+        download_url: str = f"ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2015/02/PXD000297/{file_name}.raw"
+        raw_path: Path = Path(tmp_path, f"{cell_type}_{study}{replicate}_{file_name}.raw")
+        mzml_path: Path = Path(tmp_path, f"{cell_type}_{study}{replicate}_{file_name}.mzml")
+        sqt_path: Path = Path(tmp_path, f"{cell_type}_{study}{replicate}_{file_name}.target.sqt")
+        intensity_path: Path = Path(tmp_path, f"protein_abundance_matrix_{cell_type}.csv")
+
+        # Create an instance of FileInformation
         instance: FileInformation = FileInformation(
             cell_type=cell_type,
             download_url=download_url,
@@ -40,17 +50,20 @@ class TestFileInformation:
             sqt_path=sqt_path,
             file_size=0
         )
+
+        # Set the replicate (R1)
         instance.set_replicate(replicate)
 
+        # Check that the instance is correct
         assert instance.cell_type == cell_type
         assert instance.download_url == download_url
         assert instance.study == study
         assert instance.replicate == replicate
         assert instance.batch == study + replicate
-        assert instance.raw_base_path == raw_path.parent
-        assert instance.mzml_base_path == mzml_path.parent
-        assert instance.sqt_base_path == sqt_path.parent
-        assert instance.intensity_csv == intensity_path
+        assert str(instance.raw_file_path) == str(raw_path)
+        assert str(instance.mzml_file_path) == str(mzml_path)
+        assert str(instance.sqt_file_path) == str(sqt_path)
+        assert str(instance.intensity_csv) == str(intensity_path)
         assert instance.file_size == 0
 
 
