@@ -16,7 +16,7 @@ docker_old/*
 
 # Python cache files
 /**/__pycache__
-main/py/tests/.pytest_cache
+**/*.pytest_cache
 
 # Do not track output files
 /main/output
@@ -25,3 +25,4 @@ main/py/tests/.pytest_cache
 /docs/_site
 **/.jekyll-cache
 /docs/Gemfile.lock
+
