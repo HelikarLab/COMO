@@ -14,6 +14,7 @@ from sqlalchemy import create_engine
 from project import configs
 from GSEpipelineFast import *
 
+
 # create declarative_base instance
 Base = declarative_base()
 
@@ -75,12 +76,6 @@ def lookupMicroarrayDB(gseXXX):
         return True
     else:
         return False
-    # df = pd.read_sql(
-    #     session.query(Sample).filter_by(Sample='GSM60728').options(load_only("ABS_CALL", "ENTREZ_GENE_ID")).statement,
-    #     session.bind,
-    #     index_col='ENTREZ_GENE_ID'
-    #     )
-    # df.drop('id', axis=1, inplace=True)
 
 
 def updateMicroarrayDB(gseXXX):
@@ -172,6 +167,7 @@ def fetchLogicalTable(gsm_ids):
     """
     df_results = pd.DataFrame([], columns=["ENTREZ_GENE_ID"])
     df_results.set_index("ENTREZ_GENE_ID", inplace=True)
+    
     for gsm in gsm_ids:
         df = pd.read_sql(
             session.query(Sample)
@@ -197,6 +193,7 @@ def fetchLogicalTable(gsm_ids):
 
     # Need to set index name after merge
     df_results.index.name = "ENTREZ_GENE_ID"
+    
     return df_results
 
 
@@ -210,7 +207,6 @@ def mergeLogicalTable(df_results):
     # step 1: get all plural ENTREZ_GENE_IDs in the input table, extract unique IDs
     df_results.reset_index(drop=False, inplace=True)
     df_results["ENTREZ_GENE_ID"] = df_results["ENTREZ_GENE_ID"].astype(str)
-    # print(df_results.dtypes)
     df_results["ENTREZ_GENE_ID"] = df_results["ENTREZ_GENE_ID"].str.replace(
         " /// ", "//"
     )
@@ -236,45 +232,42 @@ def mergeLogicalTable(df_results):
         df_results = pd.concat(
             [df_results, pd.DataFrame(dup_rows)], axis=0, ignore_index=True
         )
-        # df_results = df_results.append(dup_rows,ignore_index=True)
+
         df_results.drop(
             df_results[df_results["ENTREZ_GENE_ID"] == entrez_id].index, inplace=True
         )
 
-    # step 2: print out information about merge
     common_elements = list(set(entrez_single_id_list).intersection(set(id_list)))
-    # information of merge
-    # print('{} single ENTREZ_GENE_IDs to merge'.format(len(common_elements)))
-    # print('id_list: {}, set: {}'.format(len(id_list),len(set(id_list))))
-    # print('entrez_single_id_list: {}, set: {}'.format(len(entrez_single_id_list),len(set(entrez_single_id_list))))
-    # print('entrez_id_list: {}, set: {}'.format(len(entrez_id_list),len(set(entrez_id_list))))
-
     dups = [x for x in id_list if id_list.count(x) > 1]
-    # dups = list(set(id_list))
-    # print('dups: {}, set: {}'.format(len(dups),len(set(dups))))
 
     full_entre_id_sets = []
     cnt = 0
     entrez_dups_list = []
     idx_list = list(range(len(entrez_id_list)))
+    
     for idx1 in range(len(entrez_id_list)):
         if idx1 not in idx_list:
             continue
+            
         set1 = set(entrez_id_list[idx1].split("//"))
         idx_list.remove(idx1)
         toremove = []
+        
         for idx2 in idx_list:
             set2 = set(entrez_id_list[idx2].split("//"))
-            intersect = set1.intersection(set2)
+            intersect = set1.intersection(set2)       
             if bool(intersect):
                 set1 = set1.union(set2)
                 toremove.append(idx2)
+                
         for idx3 in toremove:
             idx_list.remove(idx3)
+            
         sortlist = list(set1)
         sortlist.sort(key=int)
         new_entrez_id = " /// ".join(sortlist)
         full_entre_id_sets.append(new_entrez_id)
+        
     full_entre_id_sets = list(set(full_entre_id_sets))
 
     for full_entrez_id in full_entre_id_sets:
@@ -282,16 +275,12 @@ def mergeLogicalTable(df_results):
         entrez_dups_list.append(singles)
         cnt += 1
 
-    # print('{} id merged'.format(cnt))
     entrez_dups_dict = dict(zip(full_entre_id_sets, entrez_dups_list))
-    # full_entre_id_sets = list(set(full_entre_id_sets))
 
-    # df_results.reset_index(inplace=True)
     for merged_entrez_id, entrez_dups_list in entrez_dups_dict.items():
         df_results["ENTREZ_GENE_ID"].replace(to_replace=entrez_dups_list, value=merged_entrez_id, inplace=True)
-    # df_results.drop_duplicates(subset=['ENTREZ_GENE_ID'], keep='first', inplace=True)
-    df_results.set_index("ENTREZ_GENE_ID", inplace=True)
 
+    df_results.set_index("ENTREZ_GENE_ID", inplace=True)
     df_output = df_results.fillna(-1).groupby(level=0).max()
     df_output.replace(-1, np.nan, inplace=True)
 
@@ -305,6 +294,7 @@ def mergeLogicalTable(df_results):
     
     I am unsure what to do in this situation
     """
+    
     #return df_output.astype(int)
     return df_output
 
@@ -319,17 +309,15 @@ def load_microarray_tests(filename, context_name):
             "dummy_microarray_data.csv",
         )
         dat = pd.read_csv(savepath, index_col="ENTREZ_GENE_ID")
+        
         return "dummy", dat
 
-    if (
-        not filename or filename == "None"
-    ):  # if not using microarray as a data source use empty dummy matrix
+    if (not filename or filename == "None"):  # if not using microarray use empty dummy matrix
+    
         return load_empty_dict()
 
     inquiry_full_path = os.path.join(configs.rootdir, "data", "config_sheets", filename)
-    if not os.path.isfile(
-        inquiry_full_path
-    ):  # do not need to load but check to help user figure out why not working
+    if not os.path.isfile(inquiry_full_path): 
         print("Error: file not found {}".format(inquiry_full_path))
         sys.exit()
 
@@ -340,13 +328,16 @@ def load_microarray_tests(filename, context_name):
     if os.path.isfile(fullsavepath):
         data = pd.read_csv(fullsavepath, index_col="ENTREZ_GENE_ID")
         print("Read from {}".format(fullsavepath))
+        
         return context_name, data
+        
     else:
         print(
             f"Microarray gene expression file for {context_name} was not found at {fullsavepath}. This may be "
             f"intentional. Contexts where microarray data can be found in /work/data/results/{context_name}/ will "
             f"still be used for other contexts if found."
         )
+        
         return load_empty_dict()
 
 
@@ -399,7 +390,6 @@ def main(argv):
     inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_names, header=0)
 
     for context_name in sheet_names:
-        # print(list(inqueries[i]))
         inqueries[context_name].fillna(method="ffill", inplace=True)
         df = inqueries[context_name].loc[:, ["GSE ID", "Samples", "GPL ID", "Instrument"]]
         df_output = queryTest(df, expression_proportion, top_proportion)

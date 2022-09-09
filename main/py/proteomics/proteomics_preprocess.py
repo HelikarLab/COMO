@@ -184,11 +184,6 @@ class PopulateInformation:
             
                 # Iterate through all files and sizes found for url_##
                 for k, (file, size) in enumerate(zip(urls, sizes)):
-                    # Set the study if it was not set in the input CSV
-                    if study == "":
-                        replicate_name: str = f"S{j + 1}R{k + 1}"
-                    else:
-                        replicate_name: str = f"{study}R{k + 1}"
                 
                     self.file_information.append(
                         FileInformation(

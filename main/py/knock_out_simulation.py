@@ -18,13 +18,10 @@ from cobra.flux_analysis import (
     pfba
 )
 from project import configs
-
-# from transcriptomic_gen import *
-# from proteomics_gen import *
 from instruments import fetch_entrez_gene_id
 
 
-def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file):
+def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, test_all):
     if ref_flux_file is not None:
         try:
             ref_flux_df = pd.read_csv(ref_flux_file)
@@ -57,8 +54,6 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file):
         DT_genes.dropna(axis=0, inplace=True)
         DT_genes.to_csv(inhibitors_filepath, header=False, sep="\t")
         print(f"Inhibitors file written to:\n{inhibitors_filepath}")
-    
-    print(DT_genes.head())
 
     gene_ind2genes = [x.id for x in model.genes]
     gene_ind2genes = set(gene_ind2genes)
@@ -66,10 +61,7 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file):
     DT_model = list(set(DT_genes["Gene ID"].tolist()).intersection(gene_ind2genes))
     print(f"{len(DT_model)} drug target genes in model")
 
-    #model_opt = moma(model).to_frame()
-    model_opt = moma(model, solution=ref_sol).to_frame()
-    # model_opt = model.optimize().to_frame()
-
+    model_opt = moma(model, solution=ref_sol, linear=False).to_frame()
     model_opt[abs(model_opt) < 1e-8] = 0.0
 
     has_effects_gene = []
@@ -82,35 +74,31 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file):
                 if gene_id == id:
                     boolval = "False"
                 else:
-                    boolval = "{}".format(model.genes.get_by_id(gene_id)._functional)
+                    #boolval = "{}".format(model.genes.get_by_id(gene_id)._functional)
+                    boolval = "{}".format(model.genes.get_by_id(gene_id).functional)
                 gene_reaction_rule = gene_reaction_rule.replace(
                     "{}".format(gene_id), boolval, 1
                 )
-            if not eval(gene_reaction_rule):
+            if not eval(gene_reaction_rule) or test_all:
                 has_effects_gene.append(id)
                 break
     print(f"{len(has_effects_gene)} drug target genes with metabolic effects in model")
     flux_solution = pd.DataFrame()
     for id in has_effects_gene:
         print(f"Peforming knock-out simulation for {id}")
-        model_cp = copy.deepcopy(model)
-        print("len model: ", len(model_cp.reactions))
+        model_cp = copy.deepcopy(model) # using model_opt instead bc it makes more sense?
         gene = model_cp.genes.get_by_id(id)
         gene.knock_out()
-        print("len ko model: ", len(model_cp.reactions))
-        opt_model = moma(model_cp, solution=ref_sol).to_frame()
-        print("ref flux length: ", len(ref_flux))
-        # opt_model = model_cp.optimize().to_frame() #FBA
-        opt_model_cp = opt_model.copy()  # get defragmented
-        flux_solution[id] = opt_model_cp["fluxes"]
+        opt_model = moma(model_cp, solution=ref_sol, linear=False).to_frame()
+        flux_solution[id] = opt_model["fluxes"]
         del model_cp
 
     # flux_solution
     flux_solution[abs(flux_solution) < 1e-8] = 0.0
 
-    flux_solution_ratios = flux_solution.div(model_opt["fluxes"], axis=0)
+    flux_solution_ratios = flux_solution.div(model_opt["fluxes"], axis=0) # ko / original : inf means
     # flux_solution_ratios
-    flux_solution_diffs = flux_solution.sub(model_opt["fluxes"], axis=0)
+    flux_solution_diffs = flux_solution.sub(model_opt["fluxes"], axis=0) # ko - original
     # flux_solution_diffs
 
     # has_effects_gene
@@ -172,7 +160,7 @@ def create_gene_pairs(
         pegene["Gene"] = id
         pegene = pegene.loc[
             (~pegene["rxn_fluxRatio"].isna())
-            & (abs(rxn_fluxDiffs) + abs(rxn_fluxValue) > 1e-6)
+            & (abs(rxn_fluxDiffs) + abs(rxn_fluxValue) > 1e-8)
             ]
         # pegene.dropna(axis=0,subset=['rxn_fluxRatio'],inplace=True)
         pegene.index.name = "reaction"
@@ -186,13 +174,11 @@ def create_gene_pairs(
 def score_gene_pairs(gene_pairs, filename, input_reg):
     p_model_genes = gene_pairs.Gene.unique()
     d_score = pd.DataFrame([], columns=["score"])
-
     for p_gene in p_model_genes:
         data_p = gene_pairs.loc[gene_pairs["Gene"] == p_gene].copy()
         total_aff = data_p["Gene IDs"].unique().size
-        n_aff_down = data_p.loc[abs(data_p["rxn_fluxRatio"]) < 0.9, "Gene IDs"].unique().size
-        n_aff_up = data_p.loc[abs(data_p["rxn_fluxRatio"]) > 1.1, "Gene IDs"].unique().size
-
+        n_aff_down = (data_p.loc[abs(data_p["rxn_fluxRatio"]) < 0.9, "Gene IDs"].unique().size)
+        n_aff_up = (data_p.loc[abs(data_p["rxn_fluxRatio"]) > 1.1, "Gene IDs"].unique().size)
         if input_reg == "up":
             d_s = (n_aff_down - n_aff_up) / total_aff
         else:
@@ -210,17 +196,12 @@ def score_gene_pairs_diff(gene_pairs, file_full_path):
     d_score = pd.DataFrame([], columns=["score"])
     for p_gene in p_model_genes:
         data_p = gene_pairs.loc[gene_pairs["Gene"] == p_gene].copy()
-        # print(data_p)
         total_aff = data_p["Gene IDs"].unique().size
-        # print(total_aff)
         n_aff_down = (
             data_p.loc[data_p["rxn_fluxRatio"] < -1e-8, "Gene IDs"].unique().size
         )
-        # print(n_aff_down)
         n_aff_up = data_p.loc[data_p["rxn_fluxRatio"] > 1e-8, "Gene IDs"].unique().size
-        # print(n_aff_up)
         d_s = (n_aff_down - n_aff_up) / total_aff
-        # print(d_s)
         d_score.at[p_gene, "score"] = d_s
 
     d_score.index.name = "Gene"
@@ -276,19 +257,16 @@ def drug_repurposing(drug_db, d_score):
     d_score_new = pd.DataFrame()
     for index, row in d_score.iterrows():
         target = row["Gene Symbol"]
-        # print(target)
-        #drugs = drug_db.loc[drug_db["Target"] == target, :]
-        drugs = drug_db.loc[drug_db.Target == target, :]
-        # print(drugs)
+        drugs = drug_db.loc[drug_db["Target"] == target, :]
         drugs.is_copy = False
         drugs["d_score"] = row["score"]
-        #d_score_new = d_score_new.append(drugs, ignore_index=True)
         d_score_new = pd.concat([d_score_new, drugs], ignore_index=True)
 
     d_score_new.drop_duplicates(inplace=True)
     d_score_trim = d_score_new[
         d_score_new["MOA"].str.lower().str.contains("inhibitor") == True
         ]
+
     return d_score_trim
 
 
@@ -358,6 +336,15 @@ def main(argv):
         dest="ref_flux_file",
         help="The name of the reference flux file"
     )
+    parser.add_argument(
+        "-a",
+        "--test-all",
+        action="store_true",
+        required=False,
+        default=False,
+        dest="test_all",
+        help="Test all genes, even ones predicted to have little no effect."
+    )
 
     args = parser.parse_args()
     tissue_spec_model_file = args.model
@@ -367,6 +354,7 @@ def main(argv):
     disease_down_file = args.disease_down
     drug_raw_file = args.raw_drug_file
     ref_flux_file = args.ref_flux_file
+    test_all = args.test_all
 
     output_dir = os.path.join(configs.datadir, "results", context, disease)
     inhibitors_file = os.path.join(output_dir, f"{context}_{disease}_inhibitors.tsv")
@@ -384,6 +372,8 @@ def main(argv):
     else:
         raise NameError("reference model format must be .xml, .mat, or .json")
 
+    cobra_model.solver = "gurobi"
+
     # preprocess repurposing hub data
     drug_tsv_file = "Repurposing_Hub_Preproc.tsv"
     drug_raw_file = os.path.join(configs.datadir, drug_raw_file)
@@ -399,12 +389,13 @@ def main(argv):
 
     # Knock Out Simulation
     model, gene_ind2genes, has_effects_gene, fluxsolution, flux_solution_ratios, flux_solution_diffs = \
-            knock_out_simulation(
-                model=cobra_model,
-                inhibitors_filepath=inhibitors_file,
-                drug_db=drug_db,
-                ref_flux_file=ref_flux_file
-            )
+        knock_out_simulation(
+            model=cobra_model,
+            inhibitors_filepath=inhibitors_file,
+            drug_db=drug_db,
+            ref_flux_file=ref_flux_file,
+            test_all=test_all
+        )
 
     flux_solution_diffs.to_csv(os.path.join(output_dir, "flux_diffs_KO.csv"))
     flux_solution_ratios.to_csv(os.path.join(output_dir, "flux_ratios_KO.csv"))
@@ -433,22 +424,11 @@ def main(argv):
         disease_down=disease_up_file,
     )
     gene_pairs_up.to_csv(os.path.join(output_dir, "Gene_Pairs_Inhi_Fratio_UP.txt"), index=False)
-    # print(geneInd2genes)
-    # print(fluxSolutionRatios)
-    # print(HasEffects_Gene)
-    # Gene_Pairs_down = load_Inhi_Fratio(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_DOWN.txt'))
-    # gene_pairs_up = load_Inhi_Fratio(os.path.join(datadir,'Gene_Pairs_Inhi_Fratio_UP.txt'))
     d_score_down = score_gene_pairs(gene_pairs_down, os.path.join(output_dir, "d_score_DOWN.csv"), input_reg="down")
-    # d_score_down = score_gene_pairs_diff(Gene_Pairs_down, 'd_score_DOWN.csv')
     d_score_up = score_gene_pairs(gene_pairs_up, os.path.join(output_dir, "d_score_UP.csv"), input_reg="up")
-    # d_score_up = score_gene_pairs_diff(gene_pairs_up, 'd_score_UP.csv')
     pertubation_effect_score = (d_score_up + d_score_down).sort_values(by="score", ascending=False)
     pertubation_effect_score.to_csv(os.path.join(output_dir, "d_score.csv"))
-    print(d_score_down)
-    print(d_score_up)
-    print(pertubation_effect_score)
     pertubation_effect_score.reset_index(drop=False, inplace=True)
-    # pertubation_effect_score = pd.read_csv(os.path.join(datadir,'d_score.csv'))
 
     # last step: output drugs based on d score
     drug_score = drug_repurposing(drug_db, pertubation_effect_score)

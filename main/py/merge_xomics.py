@@ -58,7 +58,6 @@ def merge_xomics(
     :param no_na: filename of single-cell RNA-seq config file in /main/data/config_sheets/
     :param sheet: sheet name to use, should be context, context, cell type, etc
     :param expression_requirement: integer, minimum number of provided sources with active gene for a it to be in model
-
     :return: dictionary where keys are contexts, (tissue name, control type etc) and values are expression tables
     """
     print(f"Merging data for {sheet}")
@@ -202,19 +201,12 @@ def handle_context_batch(
     use_proteins = True if proteomics_file is not None else False
 
     counts = Counter(sheet_names)
-    print(counts)
     sheet_names = sorted(list(set(sheet_names)))
     print(f"Will merge data for: {sheet_names}")
     dict_list = {}
 
     max_inputs = max(counts.values())
     min_inputs = min(counts.values())
-
-    print(sheet_names)
-    print(tweight)
-    print(mweight)
-    print(sweight)
-    print(pweight)
 
     if merge_distro:
         combine_dist_io.combine_zscores_main(
@@ -286,7 +278,6 @@ def handle_context_batch(
 def main(argv):
     """
     Merge expression tables of multiple sources, microarray, RNA-seq, and/or proteomics into one list
-
     User can specify the number of sources with an active gene in order for it to be considered active in the model.
     Otherwise, it defaults to the number of sources provided. High-confidence genes from any source will be considered
     active in the model, regardless of agreement with other sources.

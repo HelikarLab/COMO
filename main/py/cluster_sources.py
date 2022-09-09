@@ -3,7 +3,7 @@ from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 
 # read and translate R functions
-r_file_source = open("rscripts/cluster_sources.R", "r").read()
+r_file_source = open("./rscripts/cluster_sources.R", "r").read()
 
 cluster_sources = SignatureTranslatedAnonymousPackage(r_file_source, "cluster_sources")
 
