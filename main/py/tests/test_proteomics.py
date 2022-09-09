@@ -5,6 +5,7 @@ This file tests the proteomics module
 import os
 import sys
 from pathlib import Path
+from pytest_mock import mocker
 
 # Add parent directory to path, allows us to import the "project.py" file from the parent directory
 # From: https://stackoverflow.com/a/30536516/13885200
@@ -12,7 +13,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from proteomics.Crux import MZMLtoSQT, RAWtoMZML, SQTtoCSV
 from proteomics.FileInformation import FileInformation
-from proteomics.FTPManager import Download, Reader
+from proteomics.FTPManager import Download, Reader, ftp_client
 from proteomics.proteomics_preprocess import ParseCSVInput, PopulateInformation
 
 
@@ -32,7 +33,7 @@ class TestFileInformation:
         replicate: str = "R1"
         file_name: str = "2DE_2DE_10-2D"
 
-        # Define paths
+        # Define paths; this file was chosen because it is only 14MB in size
         download_url: str = f"ftp://ftp.pride.ebi.ac.uk/pride/data/archive/2015/02/PXD000297/{file_name}.raw"
         raw_path: Path = Path(tmp_path, f"{cell_type}_{study}{replicate}_{file_name}.raw")
         mzml_path: Path = Path(tmp_path, f"{cell_type}_{study}{replicate}_{file_name}.mzml")
@@ -51,7 +52,7 @@ class TestFileInformation:
             file_size=0
         )
 
-        # Set the replicate (R1)
+        # Set the replicate (`R1`)
         instance.set_replicate(replicate)
 
         # Check that the instance is correct
@@ -68,7 +69,16 @@ class TestFileInformation:
 
 
 class TestFTPManager:
-    pass
+    def test_ftp_client(self):
+        """
+        This test checks that the ftp_client function works as expected
+        """
+        host: str = "ftp.pride.ebi.ac.uk"
+        port: int = 21
+        client = ftp_client(host=host, port=port, user="anonymous", passwd="guest")
+
+        assert client.host == host
+        assert client.port == port
 
 
 class TestProteomicsPreprocess:
