@@ -26,19 +26,24 @@
     <body>
     <a id="skip-to-content" href="#content">Skip to the content.</a>
     <header class="page-header" role="banner">
-      <h1 class="project-name"><a href="{{ page.url }}" class="heading-link">{{ page.title | default: site.title | default: site.github.name }}</a></h1>
-      <h2 class="project-tagline">{{ page.description | default: site.description | default: site.github.tagline }}</h2>
+
+        <h1 class="project-name"><a href="{{ page.url }}" class="heading-link">{{ page.title | default: site.title | default: site.github.name }}</a></h1>
+        <h2 class="project-tagline">{{ page.description | default: site.description | default: site.github.tagline }}</h2>
         
-      <a href="{{ site.github.url }}" class="btn heading-link" target="_blank">View on GitHub</a>
-      <a href="{{ site.docker.url }}" class="btn heading-link" target="_blank">View on DockerHub</a>
-      <br>
-      <a href="https://github.com/HelikarLab/MADRID/actions/workflows/dockerhub.yml"><img src="https://github.com/HelikarLab/MADRID/actions/workflows/dockerhub.yml/badge.svg" alt="Continuous Integration"></a>
-      &nbsp; <!-- &nbsp; is a non-breaking space to provide room between SVG images -->
-      <a href="https://github.com/HelikarLab/MADRID/actions/workflows/pages/pages-build-deployment"><img src="https://github.com/HelikarLab/MADRID/actions/workflows/pages/pages-build-deployment/badge.svg?branch=master" alt="GitHub Pages Deploymenet"></a>
-      <br><br>
-      {% include navigation.html %}
-      <br>
-      {% include sub_navigation.html %}
+        <a href="{{ site.github.url }}" class="btn heading-link" target="_blank">View on GitHub</a>
+        <a href="{{ site.docker.url }}" class="btn heading-link" target="_blank">View on DockerHub</a>
+        <br>
+
+        <a href="https://github.com/HelikarLab/MADRID/actions/workflows/dockerhub.yml"><img src="https://github.com/HelikarLab/MADRID/actions/workflows/dockerhub.yml/badge.svg" alt="Continuous Integration"></a>
+        &nbsp; <!-- &nbsp; is a non-breaking space to provide room between SVG images -->
+        <a href="https://github.com/HelikarLab/MADRID/actions/workflows/unit_tests.yml"><img src="https://github.com/HelikarLab/MADRID/actions/workflows/unit_tests.yml/badge.svg?branch=master" alt="Unit Tests"></a>
+        &nbsp; <!-- &nbsp; is a non-breaking space to provide room between SVG images -->
+        <a href="https://github.com/HelikarLab/MADRID/actions/workflows/pages/pages-build-deployment"><img src="https://github.com/HelikarLab/MADRID/actions/workflows/pages/pages-build-deployment/badge.svg?branch=master" alt="GitHub Pages Deploymenet"></a>
+
+        <br><br>
+        {% include navigation.html %}
+        <br>
+        {% include sub_navigation.html %}
     </header>
 
     <main id="content" class="main-content" role="main">
