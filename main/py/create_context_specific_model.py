@@ -591,7 +591,7 @@ def main():
         required=True,
         dest="modelfile",
         help="Name of Genome-scale metabolic model to seed the context model to. For example, the "
-        "GeneralModel.mat, is a modified Recon3D model. We also provide iMM_madrid for mouse."
+        "GeneralModelUpdatedV2.mat, is a modified Recon3D model. We also provide iMM_madrid for mouse."
         "OT can be .mat, .xml, or .json.",
     )
     parser.add_argument(
