@@ -602,7 +602,7 @@ def main():
         dest="genefile",
         help="Path to logical table of active genes output from merge_xomics.py called "
         "ActiveGenes_contextName_Merged.csv. Should be in the corresponding context/context folder "
-        "inside /work/data/results/contextName/. The json file output from the function using "
+        "inside /main/data/results/contextName/. The json file output from the function using "
         "the context of interest as the key can be used here.",
     )
     parser.add_argument(

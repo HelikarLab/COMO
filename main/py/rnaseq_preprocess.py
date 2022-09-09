@@ -69,9 +69,9 @@ def create_counts_matrix(context_name):
 
 def create_config_df(context_name):
     """
-    Create configuration sheet at /work/data/config_sheets/rnaseq_data_inputs_auto.xlsx
+    Create configuration sheet at /main/data/config_sheets/rnaseq_data_inputs_auto.xlsx
     based on the gene counts matrix. If using zFPKM normalization technique, fetch mean fragment lengths from
-    /work/data/MADRID_inputs/<context name>/<study number>/fragmentSizes/
+    /main/data/MADRID_inputs/<context name>/<study number>/fragmentSizes/
     """
     gene_counts_glob = os.path.join(configs.rootdir, "data", "MADRID_input", context_name, "geneCounts", "*", "*.tab")
     gene_counts_files = glob.glob(gene_counts_glob, recursive=True)
@@ -241,7 +241,7 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
 def create_gene_info_file(matrix_file_list, form, taxon_id):
     """
     Create gene info file for specified context by reading first column in it's count matrix file at
-     /work/data/results/<context name>/gene_info_<context name>.csv
+     /main/data/results/<context name>/gene_info_<context name>.csv
     """
 
     print(f"Fetching gene info")
@@ -344,13 +344,13 @@ def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_fi
 def main(argv):
     """
     Parse arguments to rnaseq_preprocess.py, create a gene info files for each provided context at:
-    /work/data/results/<context name>/gene_info_<context name>.csv.
+    /main/data/results/<context name>/gene_info_<context name>.csv.
 
      If using --info-matrix or --info-matrix-config:
-    create gene count matrix file at /work/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv,
+    create gene count matrix file at /main/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv,
 
     If using --info-matrix-config:
-    create config file at /work/data/config_sheets/rnaseq_data_inputs_auto.xlsx
+    create config file at /main/data/config_sheets/rnaseq_data_inputs_auto.xlsx
     """
     parser = argparse.ArgumentParser(
         prog="rnaseq_preprocess.py",
@@ -372,7 +372,7 @@ def main(argv):
                         dest="context_names",
                         help="""Tissue/cell name of models to generate. These names should correspond to the folders
                              in 'MADRID_inputs/' if creating count matrix files, or to
-                             'work/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv' if supplying
+                             'main/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv' if supplying
                              the count matrix as an imported .csv file. If making multiple models in a batch, then
                              use the format: \"['context1', 'context2', ... etc]\". Note the outer double-quotes and the 
                              inner single-quotes are required to be interpreted. This a string, not a python list"""
@@ -411,7 +411,7 @@ def main(argv):
                        default=False,
                        dest="make_matrix",
                        help="Flag for if you want to make a counts matrix, but not a config file. "
-                            "Requires a correctly structured MADRID_input folder in /work/data/. Can make one using: "
+                            "Requires a correctly structured MADRID_input folder in /main/data/. Can make one using: "
                             "https://github.com/HelikarLab/FastqToGeneCounts"
                        )
 
@@ -420,7 +420,7 @@ def main(argv):
                         dest="provided_matrix_fname",
                         default="SKIP",
                         help="Name of provided counts matrix in "
-                              "/work/data/data_matrices/<context name>/<NAME OF FILE>.csv"
+                              "/main/data/data_matrices/<context name>/<NAME OF FILE>.csv"
                         )
 
     parser.add_argument("-s", "--data-source",
