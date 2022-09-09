@@ -24,12 +24,12 @@ readaffydir <- function(addr){
 }
 
 fitaffydir <- function(addr, target){
-    username <- SYs.info()["user"]
+    username <- Sys.info()["user"]
     work_dir <- str_interp("/home/${username}/work")
     crd <- getwd()
     setwd(addr)
-    library(limma, lib.loc=str_interp("${work_dir}/rlibs"))
-    library(affy, lib.loc=str_interp("${work_dir}/rlibs"))
+    library(limma)
+    library(affy)
     targets = readTargets(target)
     mydata = ReadAffy()
     setwd(crd)
