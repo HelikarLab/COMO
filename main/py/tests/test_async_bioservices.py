@@ -44,26 +44,12 @@ def test_conversion():
     This test determines if the data collected/converted from async_bioservices.database_convert.fetch_gene_info is correct.
     It does so by comparing the results of fetch_gene_info to a pre-collected dataframe, defined as `static_dataframe`
     """
+    # This is a static, pre-defined dataframe to test against
+    # "data" is of type Ensembl Gene IDS
+    # "index" is of type Gene Symbols
     static_dataframe: pd.DataFrame = pd.DataFrame(
-        data={
-            "Ensembl Gene ID": [
-                "ENSG00000141510",
-                "ENSG00000232810",
-                "ENSG00000146648",
-                "ENSG00000112715",
-                "ENSG00000130203",
-                "ENSG00000136244",
-                "ENSG00000105329",
-                "ENSG00000177000",
-                "ENSG00000091831",
-                "ENSG00000142208"
-            ]
-        },
-        index=[
-            "TP53", "TNF", "EGFR",
-            "VEGFA", "APOE", "IL6",
-            "TGFB1", "MTHFR", "ESR1", "AKT1"
-        ]
+        data={"Ensembl Gene ID": ["ENSG00000141510", "ENSG00000232810", "ENSG00000146648"]},
+        index=["TP53", "TNF", "EGFR"]
     )
 
     input_values: list[str] = static_dataframe.index.to_list()
