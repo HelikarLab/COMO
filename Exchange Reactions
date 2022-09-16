@@ -1,0 +1,16 @@
+Lower bound: Uptake of nutrients
+	- "-1" = 1 mmol/hour
+Upper bound: Secretion of nutrients
+Forward or Reverse direction (reverse only for reversible directions)
+
+
+For basal metabolites, set -1000/1000 lower/upper bounds
+Glucose is primary carbon source when proliferating
+All amino acids are required
+	- Tight constraints: not in abundance in the body, residues can act as limiting factor
+	- Set lower bound as -1 to limit uptake
+Fatty Acids
+	- Make lower bound 0 if I am positive NK cell does not uptake
+
+
+Table w/ all media conditions
