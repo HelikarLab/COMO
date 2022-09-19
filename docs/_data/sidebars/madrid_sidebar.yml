@@ -58,6 +58,14 @@ entries:
                 url: /madrid_args_rnaseq_preprocess.html
                 output: web, pdf
 
+              - title: RNA Seq Gen
+                url: /madrid_args_rnaseq_gen.html
+                output: web, pdf
+
+              - title: Proteomics Gen
+                url: /madrid_args_proteomics_gen.html
+                output: web, pdf
+
           - title: R Arguments
             output: web, pdf
             subfolderitems:
