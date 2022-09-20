@@ -70,6 +70,10 @@ entries:
                 url: /madrid_args_proteomics_gen.html
                 output: web, pdf
 
+              - title: Merge Omics
+                url: /madrid_args_merge_xomics.html
+                output: web, pdf
+
           - title: R Arguments
             output: web, pdf
             subfolderitems:
