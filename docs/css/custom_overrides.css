@@ -1,0 +1,12 @@
+/*
+This file is used to overwrite the default styles of this theme
+*/
+
+
+/*
+Allow for scrolling codeblocks
+From: https://stackoverflow.com/questions/36612856
+*/
+pre code{
+    white-space: pre;
+}
