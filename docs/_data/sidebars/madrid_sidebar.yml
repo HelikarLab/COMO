@@ -40,6 +40,10 @@ entries:
         url: /madrid_resources.html
         output: web, pdf
 
+      - title: Repository Structure
+        url: /madrid_repository_structure.html
+        output: web, pdf
+
   - title: Arguments
     output: web
     folderitems:
