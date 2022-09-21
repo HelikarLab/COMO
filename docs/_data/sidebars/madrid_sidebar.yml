@@ -58,25 +58,30 @@ entries:
             output: web, pdf
             subfolderitems:
 
-              - title: RNA Seq Preprocess
-                url: /madrid_args_rnaseq_preprocess.html
+              - title: Create Context Specific Model
+                url: /madrid_args_create_context_specific_model.html
                 output: web, pdf
 
-              - title: RNA Seq Gen
-                url: /madrid_args_rnaseq_gen.html
+              - title: Disease Analysis
+                url: /madrid_args_disease_analysis.html
                 output: web, pdf
 
-              - title: Proteomics Gen
-                url: /madrid_args_proteomics_gen.html
+              - title: Knockout Simulation
+                url: /madrid_args_knockout_simulation.html
                 output: web, pdf
 
               - title: Merge Omics
                 url: /madrid_args_merge_xomics.html
                 output: web, pdf
 
-          - title: R Arguments
-            output: web, pdf
-            subfolderitems:
-              - title: Cluster Samples
-                url: /madrid_args_cluster_samples.html
+              - title: Proteomics Gen
+                url: /madrid_args_proteomics_gen.html
+                output: web, pdf
+
+              - title: RNA Seq Gen
+                url: /madrid_args_rnaseq_gen.html
+                output: web, pdf
+
+              - title: RNA Seq Preprocess
+                url: /madrid_args_rnaseq_preprocess.html
                 output: web, pdf
