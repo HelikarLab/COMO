@@ -113,16 +113,16 @@ docker run \
 Below is a list of options included in the above `docker run` command. These can be removed or changed as-needed, as long as you are aware of their implications
 If you have questions, don't be afraid to ask on our [Issues Page](https://github.com/HelikarLab/MADRID/issues)!
 
-|                             Option                              |  Required?  |                                                       Description                                                        |
-|:---------------------------------------------------------------:|:-----------:|:------------------------------------------------------------------------------------------------------------------------:|
-|                            --cpus=4                             |     No      |                   The number of CPUs to allocate to the container. This is optional, but recommended.                    |
-|                          -p 8888:8888                           |     Yes     |                                        The port to use for the Jupyter Notebook.                                         |
-|                    --volume=$HOME/gurobi.lic                    |     Yes     | The path to your Gurobi license file. This is required to run the [Gurobi Optimizer](https://www.gurobi.com/) in MADRID. |
-|                   --volume=$HOME/madrid_local                   | Recommended |            The path to store local MADRID files at. This is not required, but recommended to negate data loss            |
-|                             --name                              |     No      |                                What the container should be named for easy identification                                |
-|                              --rm                               |     No      |                                   Remove the container after you are finished with it                                    |
-|                               -it                               |     No      |                                             Run the container interactively                                              |
-|              ghcr.io/helikarlab/madrid:CHOSEN-TAG               |     Yes     |                                           The container image and tag to start                                           |
+|                 Option                 |  Required?  |                                                       Description                                                        |
+|:--------------------------------------:|:-----------:|:------------------------------------------------------------------------------------------------------------------------:|
+|               `--cpus=4`               |     No      |                   The number of CPUs to allocate to the container. This is optional, but recommended.                    |
+|             `-p 8888:8888`             |     Yes     |                                        The port to use for the Jupyter Notebook.                                         |
+|      `--volume=$HOME/gurobi.lic`       |     Yes     | The path to your Gurobi license file. This is required to run the [Gurobi Optimizer](https://www.gurobi.com/) in MADRID. |
+|     `--volume=$HOME/madrid_local`      | Recommended |            The path to store local MADRID files at. This is not required, but recommended to negate data loss            |
+|                `--name`                |     No      |                                What the container should be named for easy identification                                |
+|                 `--rm`                 |     No      |                                   Remove the container after you are finished with it                                    |
+|                 `-it`                  |     No      |                                             Run the container interactively                                              |
+| `ghcr.io/helikarlab/madrid:CHOSEN-TAG` |     Yes     |                                           The container image and tag to start                                           |
 
 ## Accessing MADRID
 Navigate to [http://localhost:8888](http://localhost:8888) in your browser

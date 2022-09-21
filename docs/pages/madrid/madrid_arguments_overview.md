@@ -20,9 +20,5 @@ python3 script_name.py --taxon-id 9606
 |:----------------:|:------------------------------------:|
 |     python3      | Execute python from the command line |
 | `script_name.py` |  The name of the script to execute   |
-| --taxon-id 9606  |  The taxon ID to be used in MADRID   |
+| `--taxon-id` 9606  |  The taxon ID to be used in MADRID   |
 
-
-Arguments of each script are listed in the sidebar, under the appropriate script name.  
-[Python Arguments](madrid_args_python.html)  
-[R Arguments](madrid_args_r.html)
