@@ -1,0 +1,79 @@
+<style>
+    html {
+        scroll-behavior: smooth;
+    }
+    table {
+        width: 100%;
+    }
+    .table_wrapper {
+        overflow-x: auto;
+        white-space: nowrap;
+        word-wrap: break-word;
+    }
+</style>
+
+
+{% comment %}
+Get the maximum number of characters for the "Arguments" column
+{% endcomment %}
+{% assign min_width = 0 %}
+
+{% comment %} Iterate through each item in the JSON list {% endcomment %}
+{% for row in site.data.arguments.python %}
+
+    {% comment %} Skip comment rows {% endcomment %}
+    {%  if row[0] == "comment" %}
+        {% continue %}
+
+    {% comment %} Only look at values matching the current page {% endcomment %}
+    {% elsif row["Permalink"] == page.permalink %}
+
+        {% comment %} Determine the maximum size of the column {% endcomment %}
+        {% assign temp_width = row["Argument"]  | size %}
+        {% if temp_width > min_width %}
+            {% assign min_width = temp_width %}
+        {% endif %}
+
+    {% endif %}
+{% endfor %}
+
+<div class="table_wrapper">
+<table>
+    {% for row in site.data.arguments.python %}
+        {% if row[0] == "_comment" %}
+            {% continue %}
+        {% endif %}
+
+        {% assign argument = row["Argument"] %}
+        {% assign required = row["Required?"] %}
+        {% assign default_value = row["Default Value"] %}
+        {% assign description = row["Description"] %}
+        {% assign file = row["Permalink"] %}
+
+        {% if forloop.first %}
+            <thead>
+            <tr>
+                <th style="white-space: nowrap;">Argument</th>
+                <th>Required?</th>
+                <th>Default Value</th>
+                <th>Description</th>
+            </tr>
+            </thead>
+        {% endif %}
+
+        <tbody>
+
+            {% if file == page.permalink %}
+            <tr>
+                {% comment %} Must increment max width to fit in HTML table, not sure why {% endcomment %}
+                <td id="{{ argument }}" markdown="span" style="white-space: nowrap; min-width: {{ min_width | plus:5 }}ch;"><code>{{ argument }}</code></td>
+                <td markdown="span">{{ required }}</td>
+                <td markdown="span">{{ default_value }}</td>
+                <td markdown="span" style="width: 99%;">{{ description }}</td>
+            </tr>
+            {% endif %}
+        </tbody>
+
+    {% endfor %}
+</table>
+</div>
