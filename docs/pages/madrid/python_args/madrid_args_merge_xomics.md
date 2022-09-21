@@ -4,7 +4,7 @@ sidebar: madrid_sidebar
 permalink: madrid_args_merge_xomics.html
 folder: madrid
 summary: "The arguments used in the `/main/py/merge_xomics.py` file"
-last_updated: September 20, 2022
+last_updated: September 21, 2022
 ---
 
 This file merges the omics data into a single matrix.
@@ -28,3 +28,7 @@ cmd = ' '.join(['python3', 'merge_xomics.py',
                ])
 !{cmd}
 ```
+
+## Arguments
+
+{% include argument_table.html %}
