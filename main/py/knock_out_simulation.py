@@ -18,7 +18,12 @@ from cobra.flux_analysis import (
     pfba
 )
 from project import configs
-from instruments import fetch_entrez_gene_id
+# from instruments import fetch_entrez_gene_id
+
+from async_bioservices import database_convert
+from async_bioservices.input_database import InputDatabase
+from async_bioservices.output_database import OutputDatabase
+from async_bioservices.taxon_ids import TaxonIDs
 
 
 def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, test_all):
@@ -239,7 +244,16 @@ def repurposing_hub_preproc(drug_file):
                                              }])],
                 ignore_index=True
             )
-    entrez_ids = fetch_entrez_gene_id(drug_db_new["Target"].tolist(), input_db="Gene Symbol")
+
+    entrez_ids = database_convert.fetch_gene_info(
+        input_values=drug_db_new["Target"].tolist(),
+        input_db=InputDatabase.GENE_SYMBOL,
+        output_db=[
+            OutputDatabase.GENE_ID,
+            OutputDatabase.ENSEMBL_GENE_ID
+        ]
+    )
+    # entrez_ids = fetch_entrez_gene_id(drug_db_new["Target"].tolist(), input_db="Gene Symbol")
     entrez_ids.reset_index(drop=False, inplace=True)
     drug_db_new["ENTREZ_GENE_ID"] = entrez_ids["Gene ID"]
     drug_db_new = drug_db_new[["Name", "MOA", "Target", "ENTREZ_GENE_ID", "Phase"]]
@@ -248,9 +262,14 @@ def repurposing_hub_preproc(drug_file):
 
 def drug_repurposing(drug_db, d_score):
     d_score["Gene"] = d_score["Gene"].astype(str)
-    d_score_gene_sym = fetch_entrez_gene_id(
-        d_score["Gene"].tolist(), input_db="Gene ID", output_db=["Gene Symbol"]
+
+    d_score_gene_sym = database_convert.fetch_gene_info(
+        input_values=d_score["Gene"].tolist(),
+        input_db=InputDatabase.GENE_ID,
+        output_db=[OutputDatabase.GENE_SYMBOL]
     )
+
+    # d_score_gene_sym = fetch_entrez_gene_id(d_score["Gene"].tolist(), input_db="Gene ID", output_db=["Gene Symbol"])
     d_score.set_index("Gene", inplace=True)
     d_score["Gene Symbol"] = d_score_gene_sym["Gene Symbol"]
     d_score.reset_index(drop=False, inplace=True)

@@ -3,7 +3,7 @@ from bioservices import BioDBNet
 import pandas as pd
 from .input_database import InputDatabase
 from .output_database import OutputDatabase
-from.taxon_ids import TaxonIDs
+from .taxon_ids import TaxonIDs
 
 
 async def _async_fetch_info(
@@ -20,7 +20,7 @@ async def _async_fetch_info(
     else:
         taxon_id_value = taxon_id
 
-    database_convert = await asyncio.to_thread(
+    conversion = await asyncio.to_thread(
         biodbnet.db2db,  # The function to call
         input_db,       # The following are arguments passed to the function
         output_db,
@@ -29,10 +29,10 @@ async def _async_fetch_info(
     )
 
     # If the above db2db conversion didn't work, try again until it does
-    while not isinstance(database_convert, pd.DataFrame):
+    while not isinstance(conversion, pd.DataFrame):
         print(f"\nToo many requests to BioDBNet, waiting {delay} seconds and trying again.")
         await asyncio.sleep(delay)
-        database_convert = await asyncio.to_thread(
+        conversion = await asyncio.to_thread(
             _async_fetch_info,  # The function to call
             biodbnet,
             input_values,
@@ -42,7 +42,7 @@ async def _async_fetch_info(
             delay
         )
 
-    return database_convert
+    return conversion
 
 
 async def _async_fetch_info_wrapper(coroutines: list):
@@ -58,14 +58,12 @@ def fetch_gene_info(
 ) -> pd.DataFrame:
     """
     This function returns a dataframe with important gene information for future operations in MADRID.
-
     Fetch gene information from BioDBNet
     :param input_values: A list of genes in "input_db" format
     :param input_db: The input database to use (default: "Ensembl Gene ID")
     :param output_db: The output format to use (default: ["Gene Symbol", "Gene ID", "Chromosomal Location"])
     :param delay: The delay in seconds to wait before trying again if bioDBnet is busy (default: 15)
     :param taxon_id: The taxon ID to use (default: 9606)
-
     :return: A dataframe with specified columns as "output_db" (Default is HUGO symbol, Entrez ID, and chromosome start and end positions)
     """
     input_db = input_db.value
