@@ -2,7 +2,7 @@ import os
 import sys
 import pandas as pd
 
-# Add parent directory to path, allows us to import the "project.py" file from the parent directory
+# Allow us to import anything we need from the /main/py directory
 # From: https://stackoverflow.com/a/30536516/13885200
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
