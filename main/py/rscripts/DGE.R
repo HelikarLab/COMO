@@ -1,18 +1,21 @@
+library(DESeq2)
+library(edgeR)
+library(readxl)
+library(stringr)
+
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
 username <- Sys.info()["user"]
-work_dir <- str_interp("/home/${username}/work")
+work_dir <- stringr::str_interp("/home/${username}/work")
 
-if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
-    dir.create(str_interp("${work_dir}/py/rlogs"))
+if (!dir.exists(stringr::str_interp("${work_dir}/py/rlogs"))) {
+    dir.create(stringr::str_interp("${work_dir}/py/rlogs"))
 }
 
 zz <- file(file.path("/home", username, "work", "py", "rlogs", "DGE.Rout"), open="wt")
 sink(zz, type="message")
 
 
-library(DESeq2)
-library(edgeR)
-library(readxl)
+
 
 
 readCountMatrix <- function(cmat_file, config_file, disease_name) {

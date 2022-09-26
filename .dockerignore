@@ -1,7 +1,6 @@
 # A list of items to ignore when building the docker image
 /.github
 /docs
-/docs_new
 /docker_old
 /.gitattributes
 /.gitignore
