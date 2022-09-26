@@ -35,4 +35,4 @@ jobs:
 
         # Change into the GITHUB_WORKSPACE /home/runner/work/REPO/REPO and execute tests
         - name: Run tests
-          run: cd ${{ env.GITHUB_WORKSPACE }}; pytest
+          run: pytest
