@@ -11,10 +11,9 @@ from rpy2.robjects.packages import importr, SignatureTranslatedAnonymousPackage
 import glob
 import numpy as np
 
+import utilities
 import async_bioservices
 from async_bioservices.output_database import OutputDatabase
-
-# import .async_bioservices
 from .async_bioservices.output_database import OutputDatabase
 
 # import R libraries
@@ -355,7 +354,6 @@ def parse_args(argv):
 
     parser.add_argument("-n", "--context-names",
                         type=str,
-                        nargs="+",
                         required=True,
                         dest="context_names",
                         help="""Tissue/cell name of models to generate. These names should correspond to the folders
@@ -416,28 +414,12 @@ def parse_args(argv):
 
 def main(argv):
     args = parse_args(argv)
-    context_names = args.context_names
+    context_names = utilities.stringlist_to_list(args.context_names)
     gene_format = args.gene_format
     taxon_id = args.taxon_id
     provide_matrix = args.provide_matrix
     make_matrix = args.make_matrix
     provided_matrix_fname = args.provided_matrix_fname
-
-    # ----------
-    # We are attempting to move to a new method of gathering a list of items from the command line
-    # In doing so, we must deprecate the use of the current method
-    # ----------
-    # If '[' and ']' are present in the first and last items of the list, assume we are using the "old" method of providing context names
-    if "[" in context_names[0] and "]" in context_names[-1]:
-        print("DEPRECATED: Please use the new method of providing context names, i.e. --context-names 'context1 context2 context3'.")
-        print("This can be done by setting the 'context_names' variable to a simple string separated by spaces: context_names='context1 context2 context3'")
-        print("Your current method of passing context names will be removed in the future. Please update your variables above accordingly!\n\n")
-        temp_context_names: list[str] = []
-        for name in context_names:
-            temp_name = name.replace("'", "").replace(" ", "")
-            temp_name = temp_name.strip("[],")
-            temp_context_names.append(temp_name)
-        context_names = temp_context_names
 
     if gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
         gene_format = "Ensembl Gene ID"

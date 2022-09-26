@@ -16,6 +16,8 @@ from troppo.methods.reconstruction.imat import IMAT, IMATProperties
 from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
 from project import configs
 
+from utilities import stringlist_to_list
+
 sys.setrecursionlimit(1500)  # for re.search
 
 
@@ -722,23 +724,23 @@ def main(argv):
     low_threshold = args.low_threshold
     high_threshold = args.high_threshold
     solver = args.solver.upper()
-    output_filetypes = args.output_filetypes
+    output_filetypes = stringlist_to_list(args.output_filetypes)
+
+    print(output_filetypes)
 
     # ----------
     # We are attempting to move to a new method of gathering a list of items from the command line
     # In doing so, we must deprecate the use of the current method
     # ----------
     # If '[' and ']' are present in the first and last items of the list, assume we are using the "old" method of providing context names
-    if "[" in output_filetypes[0] and "]" in output_filetypes[-1]:
-        print("DEPRECATED: Please use the new method of providing context names, i.e. --output-filetypes 'typ1 type 2 type3'.")
-        print("If you are using MADRID, this can be done by setting the 'context_names' variable to a simple string separated by spaces: output_filetypes='typ1 type2 type3'")
-        print("Your current method of passing context names will be removed in the future. Please update your variables above accordingly!\n\n")
-        temp_filetypes: list[str] = []
-        for name in temp_filetypes:
-            temp_type = name.replace("'", "").replace(" ", "")
-            temp_type = temp_type.strip("[],")
-            temp_filetypes.append(temp_type)
-        output_filetypes = temp_filetypes
+#    if "[" in output_filetypes[0] and "]" in output_filetypes[-1]:
+#        print("DEPRECATED: Please use the new method of providing context names, i.e. --output-filetypes 'typ1 type 2 type3'.")
+#        print("If you are using MADRID, this can be done by setting the 'context_names' variable to a simple string separated by spaces: output_filetypes='type1 type2 type3'")
+#        print("Your current method of passing context names will be removed in the future. Please update your variables above accordingly!\n\n")
+#        output_filetypes = output_filetypes.rstrip("]").lstrip("[").replace("'", "").split(",")
+#        output_filetypes = [x.strip() for x in output_filetypes]
+#    else:
+#        output_filetypes = output_filetypes.split(" ")
 
     if not os.path.exists(reference_model):
         raise FileNotFoundError(f"Reference model not found at {reference_model}")
