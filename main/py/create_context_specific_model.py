@@ -729,16 +729,16 @@ def main(argv):
     # In doing so, we must deprecate the use of the current method
     # ----------
     # If '[' and ']' are present in the first and last items of the list, assume we are using the "old" method of providing context names
-    if "[" in context_name[0] and "]" in context_name[-1]:
-        print("DEPRECATED: Please use the new method of providing context names, i.e. --context-names 'context1 context2 context3'.")
-        print("This can be done by setting the 'context_names' variable to a simple string separated by commas: context_names='context1 context2 context3'")
+    if "[" in output_filetypes[0] and "]" in output_filetypes[-1]:
+        print("DEPRECATED: Please use the new method of providing context names, i.e. --output-filetypes 'typ1 type 2 type3'.")
+        print("If you are using MADRID, this can be done by setting the 'context_names' variable to a simple string separated by spaces: output_filetypes='typ1 type2 type3'")
         print("Your current method of passing context names will be removed in the future. Please update your variables above accordingly!\n\n")
-        temp_context_names: list[str] = []
-        for name in context_name:
-            temp_name = name.replace("'", "").replace(" ", "")
-            temp_name = temp_name.strip("[],")
-            temp_context_names.append(temp_name)
-        context_name = temp_context_names
+        temp_filetypes: list[str] = []
+        for name in temp_filetypes:
+            temp_type = name.replace("'", "").replace(" ", "")
+            temp_type = temp_type.strip("[],")
+            temp_filetypes.append(temp_type)
+        output_filetypes = temp_filetypes
 
     if not os.path.exists(reference_model):
         raise FileNotFoundError(f"Reference model not found at {reference_model}")
