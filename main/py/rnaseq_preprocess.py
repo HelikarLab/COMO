@@ -362,8 +362,7 @@ def parse_args(argv):
                              in 'MADRID_inputs/' if creating count matrix files, or to
                              'work/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv' if supplying
                              the count matrix as an imported .csv file. If making multiple models in a batch, then
-                             use the format: \"['context1', 'context2', ... etc]\". Note the outer double-quotes and the 
-                             inner single-quotes are required to be interpreted. This a string, not a python list"""
+                             use the format: "context1,context2,context3". """
                         )
 
     parser.add_argument("-f", "--gene-format",
@@ -431,7 +430,7 @@ def main(argv):
     # If '[' and ']' are present in the first and last items of the list, assume we are using the "old" method of providing context names
     if "[" in context_names[0] and "]" in context_names[-1]:
         print("DEPRECATED: Please use the new method of providing context names, i.e. --context-names 'context1 context2 context3'.")
-        print("This can be done by setting the 'context_names' variable to a simple string separated by lists: context_names='context1 context2 context3'")
+        print("This can be done by setting the 'context_names' variable to a simple string separated by commas: context_names='context1 context2 context3'")
         print("Your current method of passing context names will be removed in the future. Please update your variables above accordingly!\n\n")
         temp_context_names: list[str] = []
         for name in context_names:
