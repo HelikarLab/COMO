@@ -8,7 +8,6 @@ if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
 }
 
 # prevent messy messages from repeatedly writing to juypter
-
 zz <- file(file.path("/home", username, "main", "py", "rlogs", "generate_counts_matrix.Rout"), open="wt")
 sink(zz, type="message")
 
@@ -168,6 +167,7 @@ create_counts_matrix <- function(counts_files, replicate_names, n_replicates, st
     # If the length of n_replicates is 1, then all samples are replicates of the same study
     # Show a warning and exit the script; we cannot have less than 2 replicates
     # Show the replicate name in the warning
+
     if (length(n_replicates) == 1) {
         warning("There is only one replicate for study ", replicate_names[1], ". Please provide at least two replicates.")
         stop()
