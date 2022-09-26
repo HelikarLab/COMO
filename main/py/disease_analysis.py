@@ -131,12 +131,12 @@ def pharse_configs(config_filepath, sheet):
 def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, taxon_id):
     """
     Get differential gene expression for microarray data
-    
+
     param: config_filepath - string, path to microarray formatted disease configuration xlsx file
     param: disease_name - string, disease name which should correspond to sheet name in disease config xlsx file
     param: target_path - string, path to save disease targets
-    
-    return: dataframe with fold changes, FDR adjusted p-values, 
+
+    return: dataframe with fold changes, FDR adjusted p-values,
     """
     query_table, df_target = pharse_configs(config_filepath, disease_name)
     df_target.to_csv(target_path, index=False, sep="\t")
@@ -144,12 +144,12 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
     sr = query_table["GSE ID"]
     gse_ids = sr[sr.str.match("GSE")].unique()
     gse_id = gse_ids[0]
-    
+
     inst = query_table["Instrument"]
     inst_name = inst.unique()
     inst_name = inst_name[0]
     print(inst_name)
-    
+
     gseXXX = GSEpipelineFast.GSEproject(gse_id, query_table, configs.rootdir)
     for key, val in gseXXX.platforms.items():
         raw_dir = os.path.join(gseXXX.gene_dir, key)
@@ -163,11 +163,11 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
         diff_exp_df = diff_exp_df.rename(columns = {'index':'Affy ID'})
         print(diff_exp_df)
         print(type(diff_exp_df))
-        data_top = diff_exp_df.head() 
+        data_top = diff_exp_df.head()
         print(data_top)
         diff_exp_df.rename(columns={"adj.P.Val": "FDR"}, inplace=True)
         print(diff_exp_df)
-        
+
         if inst_name == "affy":
             input_db: InputDatabase = InputDatabase.AFFY_ID
         elif inst_name == "agilent":
@@ -191,12 +191,12 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
 def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_id):
     """
     Get differential gene expression for RNA-seq data
-    
+
     param: config_filepath - string, path to microarray formatted disease configuration xlsx file
     param: disease_name - string, disease name which should correspond to sheet name in disease config xlsx file
     param: context_name - string, context name which should correspond to folder in 'results' folder
-    
-    return: dataframe with fold changes, FDR adjusted p-values, 
+
+    return: dataframe with fold changes, FDR adjusted p-values,
     """
     count_matrix_filename = "".join(["gene_counts_matrix_", disease_name, "_", context_name, ".csv"])
     count_matrix_path = os.path.join(configs.datadir,
@@ -243,7 +243,7 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
     diff_exp_df["regulated"] = [
         "unchanged" if gene not in regulated[search_col].tolist()
         else ("upregulated" if gene in up_regulated[search_col].tolist()
-        else "downregulated")
+              else "downregulated")
         for gene in diff_exp_df[search_col].tolist()
     ]
     up_file = os.path.join(
@@ -403,7 +403,7 @@ def main(argv):
             print("data_source should be either 'microarray' or 'rnaseq'")
             print("Refer to example config file for either type for formatting")
             sys.exit(2)
-            
+
         write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, target_path)
 
 
