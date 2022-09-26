@@ -1,8 +1,8 @@
-import os
+import sys
 
 # Only need to import the modules if NOT running under PyTest
-# from: https://stackoverflow.com/a/58866220/13885200
-if "PYTEST_CURRENT_TEST" not in os.environ:
+# from: https://stackoverflow.com/questions/25188119
+if "pytest" not in sys.modules:
     import Crux
     import FileInformation
     import FTPManager
