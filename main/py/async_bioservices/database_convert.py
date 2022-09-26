@@ -29,7 +29,7 @@ async def _async_fetch_info(
     )
 
     # If the above db2db conversion didn't work, try again until it does
-    while not isinstance(database_convert, pd.DataFrame):
+    while not isinstance(conversion, pd.DataFrame):
         print(f"\nToo many requests to BioDBNet, waiting {delay} seconds and trying again.")
         await asyncio.sleep(delay)
         conversion = await asyncio.to_thread(
