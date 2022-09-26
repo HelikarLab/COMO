@@ -10,7 +10,7 @@ from rpy2.robjects.packages import importr, SignatureTranslatedAnonymousPackage
 import glob
 import numpy as np
 
-from . import async_bioservices
+import .async_bioservices
 from .async_bioservices.output_database import OutputDatabase
 
 # import R libraries
@@ -474,5 +474,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    # print(sys.argv)
     main(sys.argv[1:])
