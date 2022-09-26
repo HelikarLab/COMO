@@ -33,5 +33,6 @@ jobs:
             # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
             flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
+        # Change into the GITHUB_WORKSPACE /home/runner/work/REPO/REPO and execute tests
         - name: Run tests
-          run: pytest
+          run: cd ${{ env.GITHUB_WORKSPACE }}; pytest
