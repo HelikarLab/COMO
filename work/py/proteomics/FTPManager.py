@@ -141,7 +141,7 @@ class Download:
         async with semaphore:
             client = await aioftp_client(host)
             self._download_counter.acquire()
-            print(f"Started download {self._download_counter.value:02d} / {len(self._file_information):02d} ({size_mb} MB) - {file_information.raw_file_name}")  # fmt: skip
+            clear_print(f"Started download {self._download_counter.value:02d} / {len(self._file_information):02d} ({size_mb} MB) - {file_information.raw_file_name}")
             self._download_counter.value += 1
             self._download_counter.release()
 

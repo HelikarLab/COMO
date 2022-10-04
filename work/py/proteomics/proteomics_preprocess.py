@@ -432,6 +432,7 @@ def main(args: list[str]):
             file_information=file_information,
             core_count=args.core_count,
         )
+        print("")  # New line to separate this output from the next
 
     if args.skip_mzml is False:
         # Convert raw to mzML and then create SQT files
@@ -439,6 +440,7 @@ def main(args: list[str]):
             file_information=file_information,
             core_count=args.core_count,
         )
+        print("")  # New line to separate this output from the next
 
     if args.skip_sqt is False:
         # Convert mzML to SQT
@@ -453,6 +455,8 @@ def main(args: list[str]):
         file_information=file_information,
         core_count=args.core_count,
     )
+    print("")  # New line to separate this output from the next
+
 
     # Get the root folder of output CSV file
     root_folders: set[Path] = set([i.intensity_csv.parent for i in file_information])
