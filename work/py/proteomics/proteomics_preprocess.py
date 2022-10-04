@@ -220,9 +220,7 @@ class PopulateInformation:
         for i, information in enumerate(self.file_information):
             current_info = information
             previous_info = self.file_information[i - 1] if i > 0 else None
-            
-            if i > 0:
-                print(f"Testing: {current_info.cell_type}_{current_info.study} - {previous_info.cell_type}_{previous_info.study}")
+
             # Set the initial current_info replicate to 1
             if i == 0:
                 replicate_value = f"R{replicate_num}"
@@ -248,10 +246,7 @@ class PopulateInformation:
             for i, file_information in enumerate(instances[cell_type]):
                 current_info: FileInformation = file_information
                 previous_info: FileInformation = instances[cell_type][i - 1] if i > 0 else None
-                
-                if i > 0:
-                    print(f"Testing: {current_info.cell_type}_{current_info.study} - {previous_info.cell_type}_{previous_info.study}")
-                
+
                 # Do not modify the replicate value if we are on the very first iteration of this cell type
                 if i == 0:
                     pass
@@ -328,7 +323,8 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         dest="skip_download",
         action="store_true",
         default=False,
-        help="If this action is passed in, FTP data will not be downloaded.\nThis assumes you have raw data under the folder specified by the option '--ftp-out-dir'",
+        help="If this action is passed in, FTP data will not be downloaded.\n"
+             "This assumes you have raw data under the folder specified by the option '--ftp-out-dir'",
     )
     parser.add_argument(
         "--skip-mzml",
@@ -358,7 +354,11 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         dest="core_count",
         metavar="cores",
         default=os.cpu_count() // 2,
-        help="This is the number of threads to use for downloading files. It will default to the minimum of: half the available CPU cores available, or the number of input files found.\nIt will not use more cores than necessary\nOptions are an integer or 'all' to use all available cores",
+        help="This is the number of threads to use for downloading files.\n"
+             "It will default to the minimum of: half the available CPU cores available, or the number of input files found.\n"
+             "It will not use more cores than necessary\n"
+             "Options are an integer or 'all' to use all available cores.\n"
+             "Note: Downloading will use a MAX of 2 threads at once, as some FTP servers do not work well with multiple connections from the same IP address at once.",
     )
     # TODO: Add option to delete intermediate files (raw, mzml, sqt)
 
@@ -425,6 +425,7 @@ def main(args: list[str]):
     )
 
     # Download data if we should not skip anything
+    print(f"Using cores: {args.core_count}")
     if args.skip_download is False:
         # Start the download of FTP data
         FTPManager.Download(
