@@ -56,7 +56,7 @@ class RAWtoMZML:
 
             self._conversion_counter.acquire()
             self._conversion_counter.value += 1
-            clear_print(f"Starting mzML conversion: {self._conversion_counter.value} / {len(self.file_information)} - {information.raw_file_name}")
+            clear_print(f"Starting raw -> mzML conversion: {self._conversion_counter.value} / {len(self.file_information)} - {information.raw_file_name}")
             self._conversion_counter.release()
             
             information.mzml_base_path.mkdir(parents=True, exist_ok=True)
