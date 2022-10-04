@@ -2,15 +2,13 @@
 This is the main driver-file for downloading proteomics data
 """
 import argparse
+import Crux
 import csv
+from FileInformation import FileInformation
+import FTPManager
 import os
 import sys
 from pathlib import Path
-
-
-from . import Crux
-from .FileInformation import FileInformation
-from . import FTPManager
 
 
 class ArgParseFormatter(
@@ -212,7 +210,7 @@ class PopulateInformation:
         # Convert to MB
         total_size = total_size // 1024 ** 2
         print(f"Total size to download: {total_size} MB")
-            
+
     def _set_replicate_numbers(self):
         instances: dict[str, list[FileInformation]] = {}
         for information in self.file_information:
@@ -225,7 +223,7 @@ class PopulateInformation:
             for i, file_information in enumerate(instances[cell_type]):
                 current_info: FileInformation = file_information
                 previous_info: FileInformation = instances[cell_type][i - 1] if i > 0 else None
-                
+
                 # Do not modify the replicate value if we are on the very first iteration of this cell type
                 if i == 0:
                     pass
@@ -303,7 +301,8 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         dest="skip_download",
         default=False,
         type=bool,
-        help="If this action is passed in, FTP data will not be downloaded.\nThis assumes you have raw data under the folder specified by the option '--ftp-out-dir'",
+        help="If this action is passed in, FTP data will not be downloaded.\n"
+             "This assumes you have raw data under the folder specified by the option '--ftp-out-dir'",
     )
     parser.add_argument(
         "--skip-mzml",
@@ -333,7 +332,11 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         dest="core_count",
         metavar="cores",
         default=os.cpu_count() // 2,
-        help="This is the number of threads to use for downloading files. It will default to the minimum of: half the available CPU cores available, or the number of input files found.\nIt will not use more cores than necessary\nOptions are an integer or 'all' to use all available cores",
+        help="This is the number of threads to use for downloading files.\n"
+             "It will default to the minimum of: half the available CPU cores available, or the number of input files found.\n"
+             "It will not use more cores than necessary\n"
+             "Options are an integer or 'all' to use all available cores.\n"
+             "Note: Downloading will use a MAX of 2 threads at once, as some FTP servers do not work well with multiple connections from the same IP address at once.",
     )
     # TODO: Add option to delete intermediate files (raw, mzml, sqt)
 
@@ -407,6 +410,7 @@ def main(args: list[str]):
             file_information=file_information,
             core_count=args.core_count,
         )
+        print("")  # New line to separate this output from the next
 
     if args.skip_mzml is False:
         # Convert raw to mzML and then create SQT files
@@ -414,6 +418,7 @@ def main(args: list[str]):
             file_information=file_information,
             core_count=args.core_count,
         )
+        print("")  # New line to separate this output from the next
 
     if args.skip_sqt is False:
         # Convert mzML to SQT
@@ -428,6 +433,7 @@ def main(args: list[str]):
         file_information=file_information,
         core_count=args.core_count,
     )
+    print("")  # New line to separate this output from the next
 
     # Get the root folder of output CSV file
     root_folders: set[Path] = set([i.intensity_csv.parent for i in file_information])
