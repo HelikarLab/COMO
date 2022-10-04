@@ -144,8 +144,9 @@ class Download:
             print(f"Started download {self._download_counter.value:02d} / {len(self._file_information):02d} ({size_mb} MB) - {file_information.raw_file_name}")  # fmt: skip
             self._download_counter.value += 1
             self._download_counter.release()
-            # Download file
-            await client.download(source=path, destination=file_information.raw_file_path, )
+
+            # Download file, use "write_into" to write to a file, not a directory
+            await client.download(source=path, destination=file_information.raw_file_path, write_into=True)
 
         await client.quit()
 
