@@ -4,19 +4,18 @@ This file is responsible downloading data found at FTP links
 TODO: Find a way to mark a file as "downloaded"
     - Keep a list of file names in a ".completd" hidden folder?
 """
-import ftplib
-from ftplib import FTP
+from FileInformation import FileInformation
+from FileInformation import clear_print
+
+import aioftp
+import asyncio
 import multiprocessing
 from multiprocessing.sharedctypes import Synchronized
-import numpy as np
 import time
 from urllib.parse import urlparse
 
-from .FileInformation import FileInformation
-from .FileInformation import clear_print
 
-
-def ftp_client(host: str, max_attempts: int = 3, port: int = 21, user: str = "anonymous", passwd: str = "guest") -> FTP:
+async def aioftp_client(host: str, username: str = "anonymous", password: str = "guest", max_attempts: int = 3) -> aioftp.Client:
     """
     This class is responsible for creating a "client" connection
     """
@@ -25,23 +24,24 @@ def ftp_client(host: str, max_attempts: int = 3, port: int = 21, user: str = "an
     # Attempt to connect, throw error if unable to do so
     while not connection_successful and attempt_num <= max_attempts:
         try:
-            client: FTP = FTP(user=user, passwd=passwd)
-            client.connect(host=host, port=port)
+            client: aioftp.Client = aioftp.Client()
+            await client.connect(host, 21)
+            await client.login(user=username, password=password)
             connection_successful = True
         except ConnectionResetError:
-            
+
             # Make sure this print statement is on a new line on the first error
             if attempt_num == 1:
                 print("")
-            
+
             # Line clean: https://stackoverflow.com/a/5419488/13885200
-            clear_print(f"Attempt {attempt_num} of {max_attempts} failed to connect, waiting 5 seconds before trying again")
+            clear_print(f"Attempt {attempt_num} of {max_attempts} failed to connect")
             attempt_num += 1
             time.sleep(5)
     if not connection_successful:
         print("")
         raise ConnectionResetError("Could not connect to FTP server")
-    
+
     return client
 
 
@@ -55,26 +55,30 @@ class Reader:
         self._files: list[str] = []
         self._file_sizes: list[int] = []
         
-        self._get_info()
-        
-    def _get_info(self):
+        self._get_info_wrapper()
+
+    def _get_info_wrapper(self):
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        async_tasks = [self._get_info()]
+
+        event_loop.run_until_complete(asyncio.wait(async_tasks))
+        event_loop.close()
+
+    async def _get_info(self):
         """
         This function is responsible for getting all files under the root_link
         """
         scheme: str = urlparse(self._root_link).scheme
         host = urlparse(self._root_link).hostname
         folder = urlparse(self._root_link).path
-        
-        client: FTP = ftp_client(host=host)
-        
-        for file_path in client.nlst(folder):
-            if file_path.endswith(tuple(self._extensions)):
-                download_url: str = f"{scheme}://{host}{file_path}"
+
+        client = await aioftp_client(host)
+        for path, info in (await client.list(folder, recursive=True)):
+            if str(path).endswith(tuple(self._extensions)):
+                download_url: str = f"{scheme}://{host}{path}"
                 self._files.append(download_url)
-                try:
-                    self._file_sizes.append(client.size(file_path))
-                except ftplib.error_perm:
-                    self._file_sizes.append(0)
+                self._file_sizes.append(int(info["size"]))
 
     @property
     def files(self):
@@ -97,65 +101,54 @@ class Download:
         self._file_information: list[FileInformation] = file_information
         self._core_count: int = min(core_count, 2)  # Limit to 2 downloads at a time
         self._download_counter: Synchronized = multiprocessing.Value("i", 1)
+        self._semaphore = asyncio.Semaphore(self._core_count)
 
         # Find files to download
-        self.download_data_wrapper()
+        self._download_data_wrapper()
 
-    def download_data_wrapper(self):
+    def _download_data_wrapper(self):
         """
-        This function is responsible for using multiprocessing to download as many files at once in parallel
+        This function is responsible for "kicking off" asynchronous data downloading
         """
-        # Calculate the number of cores ot use
-        # We are going to use half the number of cores, OR the number of files to download, whichever is less
-        # Otherwise if user specified the number of cores, use that
         print("Starting file download")
 
-        # Split list into chunks to process separately
-        file_chunks: list[FileInformation] = np.array_split(self._file_information, self._core_count)
-
-        # Create a list of jobs
-        jobs: list[multiprocessing.Process] = []
-        
-        for i, information in enumerate(file_chunks):
-
-            # Append a job to the list
-            job = multiprocessing.Process(
-                target=self.download_data,
-                args=(information,),
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
+        async_tasks = []
+        for file_information in self._file_information:
+            async_tasks.append(
+                self._aioftp_download_data(
+                    file_information=file_information,
+                    semaphore=self._semaphore,
+                )
             )
-            jobs.append(job)
 
-        [job.start() for job in jobs]       # Start jobs
-        [job.join() for job in jobs]        # Wait for jobs to finish
-        [job.terminate() for job in jobs]   # Terminate jobs
+        # Await all the tasks
+        event_loop.run_until_complete(asyncio.wait(async_tasks))
+        event_loop.close()
 
-    def download_data(self, file_information: list[FileInformation]):
+    async def _aioftp_download_data(self, file_information: FileInformation, semaphore: asyncio.Semaphore) -> None:
 
-        # Start processing the files
-        for i, information in enumerate(file_information):
-        
-            # Define FTP-related variables
-            parsed_url = urlparse(information.download_url)
-            host = parsed_url.hostname
-            path = parsed_url.path
+        # Define FTP-related variables
+        parsed_url = urlparse(file_information.download_url)
+        host = parsed_url.hostname
+        path = parsed_url.path
 
-            # Convert file_size from byte to MB
-            size_mb: int = round(information.file_size / (1024**2))
+        # Convert file size from byte to MB
+        size_mb: int = round(file_information.file_size / (1024 ** 2))
 
-            # Connect to the host, login, and download the file
-            client: FTP = ftp_client(host=host)
-            # client: FTP = FTP(host=host, user="anonymous", passwd="guest")
-
-            # Get the lock and print file info
+        # Use a semaphore so only N number of tasks can be started at once
+        async with semaphore:
+            client = await aioftp_client(host)
             self._download_counter.acquire()
-            print(f"Started download {self._download_counter.value:02d} / {len(self._file_information):02d} ({size_mb} MB) - {information.raw_file_name}")  # fmt: skip
+            clear_print(f"Started download {self._download_counter.value:02d} / {len(self._file_information):02d} ({size_mb} MB) - {file_information.raw_file_name}")
             self._download_counter.value += 1
             self._download_counter.release()
 
-            # Download the file
-            information.raw_file_path.parent.mkdir(parents=True, exist_ok=True)
-            client.retrbinary(f"RETR {path}", open(information.raw_file_path, "wb").write)
-            client.quit()
+            # Download file, use "write_into" to write to a file, not a directory
+            await client.download(source=path, destination=file_information.raw_file_path, write_into=True)
+
+        await client.quit()
 
 
 if __name__ == "__main__":
