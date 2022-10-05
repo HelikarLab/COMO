@@ -27,7 +27,7 @@ RUN conda config --quiet --add channels conda-forge \
     # Install jupyter extensions
     && jupyter labextension install @jupyter-widgets/jupyterlab-manager \
     && jupyter labextension install escher \
-    && jupyter trust "${HOME}/work/py/pipeline.ipynb" \
+    && jupyter trust "${HOME}/main/py/pipeline.ipynb" \
     && rm -f "${HOME}/pip_install.txt" \
     && rm -f "${HOME}/mamba_install.txt"
 
@@ -40,8 +40,8 @@ RUN wget --quiet https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VE
 
 # Update jupyter notebook configuration \
 RUN echo "c.ServerApp.ip = '0.0.0.0'" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
-    && echo "c.ServerApp.root_dir = '${HOME}/work'" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
+    && echo "c.ServerApp.root_dir = '${HOME}/main'" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
     && echo "c.ServerApp.token = ''" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
-    && echo "c.ServerApp.password = ''" >> ${HOME}/.jupyter/jupyter_notebook_config.py
+    && echo "c.ServerApp.password = ''" >> "${HOME}/.jupyter/jupyter_notebook_config.py"
 
-VOLUME /home/joyvan/work
+VOLUME /home/joyvan/main
