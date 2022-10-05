@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
-import os, time, sys
+import os
+import sys
 import pandas as pd
 from rpy2.robjects.packages import importr
 from rpy2.robjects import r, pandas2ri

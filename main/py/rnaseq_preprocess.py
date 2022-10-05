@@ -7,23 +7,25 @@ import re
 import os
 import sys
 import argparse
-from rpy2.robjects.packages import importr, SignatureTranslatedAnonymousPackage
+# from rpy2.robjects.packages import importr, SignatureTranslatedAnonymousPackage
 import glob
 import numpy as np
+from pathlib import Path
 
 import utilities
 import async_bioservices
 from async_bioservices.output_database import OutputDatabase
-from .async_bioservices.output_database import OutputDatabase
+import rpy2_api
 
 # import R libraries
-tidyverse = importr("tidyverse")
+#tidyverse = importr("tidyverse")
 
 # read and translate R functions
-f = open(os.path.join(configs.rootdir, "py", "rscripts", "generate_counts_matrix.R"), "r")
-string = f.read()
-f.close()
-generate_counts_matrix_io = SignatureTranslatedAnonymousPackage(string, 'generate_counts_matrix_io')
+r_file_path: Path = Path(os.path.join(configs.rootdir, "py", "rscripts", "generate_counts_matrix.R"))
+#f = open(os.path.join(configs.rootdir, "py", "rscripts", "generate_counts_matrix.R"), "r")
+#string = f.read()
+#f.close()
+#generate_counts_matrix_io = SignatureTranslatedAnonymousPackage(string, 'generate_counts_matrix_io')
 
 
 def create_counts_matrix(context_name):
@@ -36,7 +38,9 @@ def create_counts_matrix(context_name):
     matrix_output_dir = os.path.join(configs.rootdir, 'data', 'data_matrices', context_name)
     print(f"Creating Counts Matrix for '{context_name}'")
     # call generate_counts_matrix.R to create count matrix from MADRID_input folder
-    generate_counts_matrix_io.generate_counts_matrix_main(input_dir, matrix_output_dir)
+    robject = rpy2_api.Rpy2(r_file_path, data_dir=input_dir, out_dir=matrix_output_dir)
+    robject.call_function("generate_counts_matrix_main")
+    # generate_counts_matrix_io.generate_counts_matrix_main(input_dir, matrix_output_dir)
 
 
 def create_config_df(context_name):
