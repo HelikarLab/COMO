@@ -3,27 +3,17 @@ import argparse
 import os
 import re
 import sys
-import getopt
-import time
 import pandas as pd
 import numpy as np
 import cobra
 import copy
-from cobra.flux_analysis import (
-    single_gene_deletion,
-    single_reaction_deletion,
-    double_gene_deletion,
-    double_reaction_deletion,
-    moma,
-    pfba
-)
+from cobra.flux_analysis import moma, pfba
 from project import configs
 # from instruments import fetch_entrez_gene_id
 
 from async_bioservices import database_convert
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.output_database import OutputDatabase
-from async_bioservices.taxon_ids import TaxonIDs
 
 
 def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, test_all):
