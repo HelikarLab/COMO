@@ -14,6 +14,6 @@ def stringlist_to_list(stringlist: str) -> list[str]:
         new_list = stringlist.rstrip("]").lstrip("[").replace("'", "").split(",")
         new_list = [x.strip() for x in new_list]
     else:
-        new_list = stringlist.split(",")
+        new_list = stringlist.split(" ")
 
     return new_list
