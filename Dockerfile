@@ -6,7 +6,7 @@ ARG PYTHON_VERSION=3.10
 
 COPY /build_scripts/pip_install.txt "${HOME}/pip_install.txt"
 COPY /build_scripts/mamba_install.txt "${HOME}/mamba_install.txt"
-COPY /environment.yaml "${ENVIRONMENT_FILE}"
+COPY /environment.yaml "${HOME}/environment.yaml"
 
 # Give ownership to jovyan user
 COPY --chown=1000:100 main "${HOME}"/main
@@ -18,7 +18,7 @@ RUN conda config --quiet --add channels conda-forge \
     # Remove python from pinned versions; this allows us to update python. From: https://stackoverflow.com/a/11245372/13885200 \
     && sed -i "s/^python 3.*//" /opt/conda/conda-meta/pinned \
     && mamba install --quiet --yes python=${PYTHON_VERSION} \
-    && mamba env update --quiet --file="${ENVIRONMENT_FILE}" \
+    && mamba env update --quiet --name=base --file="${HOME}/environment.yaml" \
     # && mamba install --file "${HOME}/mamba_install.txt" \
     # && python3 -m pip install -r "${HOME}/pip_install.txt" \
     #&& mamba env update --name base --file "${ENVIRONMENT_FILE}" \
