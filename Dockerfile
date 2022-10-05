@@ -18,7 +18,7 @@ RUN conda config --quiet --add channels conda-forge \
     # Remove python from pinned versions; this allows us to update python. From: https://stackoverflow.com/a/11245372/13885200 \
     && sed -i "s/^python 3.*//" /opt/conda/conda-meta/pinned \
     && mamba install --quiet --yes python=${PYTHON_VERSION} \
-    && mamba env update --quiet --name=base --file="${ENVIRONMENT_FILE}" \
+    && mamba env update --quiet --file="${ENVIRONMENT_FILE}" \
     # && mamba install --file "${HOME}/mamba_install.txt" \
     # && python3 -m pip install -r "${HOME}/pip_install.txt" \
     #&& mamba env update --name base --file "${ENVIRONMENT_FILE}" \
