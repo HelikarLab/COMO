@@ -4,18 +4,16 @@ This file tests the proteomics module
 
 import os
 import sys
+import time
 from pathlib import Path
-from pytest_mock import mocker
-
-# Add parent directory to path, allows us to import the "project.py" file from the parent directory
-# From: https://stackoverflow.com/a/30536516/13885200
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from proteomics.Crux import MZMLtoSQT, RAWtoMZML, SQTtoCSV
 from proteomics.FileInformation import FileInformation
 from proteomics.FTPManager import Download, Reader, ftp_client
 from proteomics.proteomics_preprocess import ParseCSVInput, PopulateInformation
 
+from fixtures.fixture_ftp_server import fixture_ftp_server
+from fixtures.fixture_ftp_server import ftp_file_names
 
 class TestCrux:
     pass
@@ -80,6 +78,39 @@ class TestFTPManager:
         assert client.host == host
         assert client.port == port
 
+    def test_reader(self, ftpserver, fixture_ftp_server, ftp_file_names):
+        # Use pytest_localftpserver and fixtures.fixture_ftp_server.fix
+        # Now we can get login information for our local FTP server
+        file_extensions: list[str] = ["raw"]
+        login_data: str = ftpserver.get_login_data(style="url", anon=True)
+        dict_login_data: dict = ftpserver.get_login_data(style="dict", anon=False)
+        port: int = dict_login_data["port"]
+        user: str = dict_login_data["user"]
+        passwd: str = dict_login_data["passwd"]
+
+        # Now we can use our reader class and collect files from the local FTP server
+        reader = Reader(
+            file_extensions=file_extensions,
+            root_link=login_data,
+            port=port,
+            user=user,
+            passwd=passwd
+        )
+
+        # Assert that we have files ending in "raw", and that the file name found is in the ftp file names list
+        for file in reader.file_names:
+            assert file.endswith(tuple(file_extensions))
+            assert file in ftp_file_names
+
+    def test_download(self, mocker, tmp_path):
+        """
+        This checks that the Download class works as expected
+        """
 
 class TestProteomicsPreprocess:
     pass
+
+
+if __name__ == '__main__':
+    reader = TestFTPManager()
+    reader.test_reader_mocker()

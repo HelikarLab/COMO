@@ -129,6 +129,7 @@ class ParseCSVInput:
         """
         return self._data
 
+
 class PopulateInformation:
     def __init__(
             self,
@@ -197,7 +198,7 @@ class PopulateInformation:
             # Print number of URLs found for each cell type
             # This is done after appending because some cell types may have more than 1 root URL, and it messes up the formatting
             if url_count == 1:
-                print(f" | 1 file found")
+                print(" | 1 file found")
             else:
                 print(f" | {url_count} files found")
             
@@ -437,7 +438,7 @@ def main(args: list[str]):
 
     # Get the root folder of output CSV file
     root_folders: set[Path] = set([i.intensity_csv.parent for i in file_information])
-    print(f"\nProtein intensities saved under:")
+    print("\nProtein intensities saved under:")
     for folder in root_folders:
         print(folder)
     
