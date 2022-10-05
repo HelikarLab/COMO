@@ -51,7 +51,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=match,pattern=^\w+-\d+\.\d+
-            type=ref,event=tag
+            type=semver,pattern={{version}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/master') }}
 
       - name: Set up QEMU
