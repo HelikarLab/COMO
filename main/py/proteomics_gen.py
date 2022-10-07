@@ -195,7 +195,7 @@ def load_proteomics_tests(filename, context_name):
     else:
         print(
             f"Proteomics gene expression file for {context_name} was not found at {fullsavepath}. This may be "
-            f"intentional. Contexts where microarray data can be found in /work/data/results/{context_name}/ will "
+            f"intentional. Contexts where microarray data can be found in /main/data/results/{context_name}/ will "
             f"still be used for other contexts if found."
         )
         
