@@ -73,7 +73,7 @@ def load_rnaseq_tests(filename, context_name, lib_type):
     else:
         print(
             f"{lib_type} gene expression file for {context_name} was not found at {fullsavepath}. This may be "
-            f"intentional. Contexts where {lib_type} data can be found in /work/data/results/{context_name}/ will "
+            f"intentional. Contexts where {lib_type} data can be found in /main/data/results/{context_name}/ will "
             "still be used if found for other contexts."
         )
         return load_dummy_dict()
@@ -163,7 +163,7 @@ def handle_context_batch(
 def main(argv):
     """
     Generate a list of active and high-confidence genes from a counts matrix using a user defined
-    at normalization-technique at /work/data/results/<context name>/rnaseq_<context_name>.csv
+    at normalization-technique at /main/data/results/<context name>/rnaseq_<context_name>.csv
     Currently, can filter raw RNA-seq counts using three normalization techniques. Which are defined in rnaseq.R
     TPM Quantile, where each replicate is normalized with Transcripts-per-million and an upper quantile is taken to
     create a boolean list of active genes for the replicate. Replicates are compared for consensus within the
@@ -181,7 +181,7 @@ def main(argv):
     parser = argparse.ArgumentParser(
         prog="rnaseq_gen.py",
         description="Generate a list of active and high-confidence genes from a counts matrix using a user defined "
-        "at normalization-technique at /work/data/results/<context name>/rnaseq_<context_name>.csv: "
+        "at normalization-technique at /main/data/results/<context name>/rnaseq_<context_name>.csv: "
         "https://github.com/HelikarLab/FastqToGeneCounts",
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
         "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
@@ -192,7 +192,7 @@ def main(argv):
         type=str,
         required=True,
         dest="config_filename",
-        help="Name of config .xlsx file in the /work/data/config_files/. Can be generated using "
+        help="Name of config .xlsx file in the /main/data/config_files/. Can be generated using "
         "rnaseq_preprocess.py or manually created and imported into the Juypterlab",
     )
     parser.add_argument(

@@ -1,7 +1,7 @@
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
 library("stringr")
 username <- Sys.info()["user"]
-work_dir <- str_interp("/home/${username}/work")
+work_dir <- str_interp("/home/${username}/main")
 
 if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
     dir.create(str_interp("${work_dir}/py/rlogs"))
@@ -324,7 +324,7 @@ zfpkm_filter <- function(SampMetrics, filt_options, context_name, prep) {
         nas <- is.na(fdf)==1
         zmat <- zFPKM(fdf, min_thresh=0, assayName="FPKM") # calculate zFPKM
         zmat[minimums] <- -4 # instead of -inf set to lower limit
-        zfpkm_fname <- file.path("/home", username, "work", "data", "results",
+        zfpkm_fname <- file.path("/home", username, "main", "data", "results",
                                  context_name, prep, paste0("zFPKM_Matrix_", prep, "_", study_number, ".csv"))
         write_zfpkm <- cbind(ent, zmat)
         colnames(write_zfpkm)[1] <- "ENTREZ_GENE_ID"
