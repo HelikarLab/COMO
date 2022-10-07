@@ -11,7 +11,6 @@ import glob
 import numpy as np
 from pathlib import Path
 
-import async_bioservices
 from async_bioservices import database_convert
 from async_bioservices.output_database import OutputDatabase
 from async_bioservices.input_database import InputDatabase
