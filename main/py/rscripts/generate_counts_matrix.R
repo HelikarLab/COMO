@@ -167,16 +167,14 @@ create_counts_matrix <- function(counts_files, replicate_names, n_replicates, st
     # If the length of n_replicates is 1, then all samples are replicates of the same study
     # Show a warning and exit the script; we cannot have less than 2 replicates
     # Show the replicate name in the warning
-
-    if (length(n_replicates) == 1) {
+    if (n_replicates == 1) {
         warning("There is only one replicate for study ", replicate_names[1], ". Please provide at least two replicates.")
         stop()
     }
 
-
     i_adjust <- 0  # adjusted index, subtracts number of multiruns processed
+
     counts <- prepare_sample_counts(counts_files[1], counts_files, strand_files[1]) # get first column of counts to add
-    
     if ( grepl("R\\d+r1", replicate_names[1], ignore.case=FALSE) ) { # if first of a set of multiruns
         colnames(counts)[2] <- unlist(strsplit(replicate_names[1], "r\\d+"))[1] # remove run number tag
 
@@ -219,11 +217,12 @@ generate_counts_matrix_main <- function(data_dir, out_dir) {
     print("Creating counts matrix")
 
     for ( i in 1:length(study_metrics) ) { # for each study
-        res <- create_counts_matrix(study_metrics[[i]][["CountFiles"]],
-                             study_metrics[[i]][["SampleNames"]],
-                             study_metrics[[i]][["NumSamples"]],
-                             study_metrics[[i]][["StrandFiles"]]
-                             ) # create count matrix for study
+        res <- create_counts_matrix(
+          counts_files = study_metrics[[i]][["CountFiles"]],
+          replicate_names = study_metrics[[i]][["SampleNames"]],
+          n_replicates = study_metrics[[i]][["NumSamples"]],
+          strand_files = study_metrics[[i]][["StrandFiles"]]
+        ) # create count matrix for study
 
         study_metrics[[i]][["CountMatrix"]] <- res # store count matrix
 
