@@ -1,9 +1,9 @@
 import asyncio
 from bioservices import BioDBNet
 import pandas as pd
-from input_database import InputDatabase
-from output_database import OutputDatabase
-from taxon_ids import TaxonIDs
+from async_bioservices.input_database import InputDatabase
+from async_bioservices.output_database import OutputDatabase
+from async_bioservices.taxon_ids import TaxonIDs
 
 
 async def _async_fetch_info(
@@ -22,7 +22,6 @@ async def _async_fetch_info(
 
     # print(f"Getting {current_index}:{current_index + len(input_values)}")
     conversion = await asyncio.to_thread(
-        None,  # Defaults to ThreadPoolExecutor, uses threads instead of processes. No need to modify
         biodbnet.db2db,  # The function to call
         input_db.value,  # The following are arguments passed to the function
         output_db,
@@ -85,7 +84,6 @@ def fetch_gene_info(
 
     :return: A dataframe with specified columns as "output_db" (Default is HUGO symbol, Entrez ID, and chromosome start and end positions)
     """
-    input_db = input_db.value
     if output_db is None:
         output_db: list[str] = [
             OutputDatabase.GENE_SYMBOL.value,
@@ -97,7 +95,7 @@ def fetch_gene_info(
 
     biodbnet = BioDBNet()
     dataframe_maps: pd.DataFrame = pd.DataFrame([], columns=output_db)
-    dataframe_maps.index.name = input_db
+    dataframe_maps.index.name = input_db.value
 
     if taxon_id == TaxonIDs.HOMO_SAPIENS:
         batch_len = 500
@@ -106,14 +104,12 @@ def fetch_gene_info(
 
     # Create a list of tasks to be awaited
     event_loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(event_loop)
     async_tasks = []
     for i in range(0, len(input_values), batch_len):
         # Define an upper range of values to take from input_values
         upper_range = min(i + batch_len, len(input_values))
 
-        # Create a task to await
-        async_tasks.append(
+        task = event_loop.create_task(
             _async_fetch_info(
                 biodbnet=biodbnet,
                 input_values=input_values[i:upper_range],
@@ -123,14 +119,17 @@ def fetch_gene_info(
                 delay=delay
             )
         )
+        async_tasks.append(task)
 
-    # Await all the tasks, must use [0] to get completed results. [1] is a set of pending tasks (i.e., empty).
-    database_convert = event_loop.run_until_complete(asyncio.wait(async_tasks))[0]
+    # wait all the tasks, must use [0] to get completed results. [1] is a set of pending tasks (i.e., empty).
+    # database_convert = event_loop.run_until_complete(asyncio.wait(async_tasks))[0]
+    # database_convert = asyncio.run_coroutine_threadsafe(_fetch_gene_info_manager(async_tasks, batch_len), event_loop)
+    database_convert: list[pd.DataFrame] = event_loop.run_until_complete(_fetch_gene_info_manager(async_tasks, batch_len))
     event_loop.close()  # Close the event loop to free resources
 
     # Loop over database_convert to concat them into dataframe_maps
     for i, df in enumerate(database_convert):
         print(f"\rConcatenating dataframes... {i + 1} of {len(database_convert)}", end="")
-        dataframe_maps = pd.concat([dataframe_maps, df.result()], sort=False)
+        dataframe_maps = pd.concat([dataframe_maps, df], sort=False)
     print("")
     return dataframe_maps

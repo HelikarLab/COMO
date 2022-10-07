@@ -44,4 +44,4 @@ RUN echo "c.ServerApp.ip = '0.0.0.0'" >> "${HOME}/.jupyter/jupyter_notebook_conf
     && echo "c.ServerApp.token = ''" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
     && echo "c.ServerApp.password = ''" >> "${HOME}/.jupyter/jupyter_notebook_config.py"
 
-VOLUME /home/joyvan/main
+VOLUME /home/jovyan/main/data/local_files
