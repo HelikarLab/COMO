@@ -58,7 +58,7 @@ def create_config_df(context_name):
         try:
             # Match S___R___r___
             # \d{1,3} matches 1-3 digits
-            label = re.findall(r"S\d{1,3}R\d{1,3}r\d{1,3}", gcfilename)[0]
+            label = re.findall(r"S\d{1,3}R\d{1,3}r\d{1,3}?", gcfilename)[0]
 
         except IndexError:
             print(f"\nfilename of {gcfilename} is not valid. Should be 'contextName_SXRYrZ.tab', where X is the "
