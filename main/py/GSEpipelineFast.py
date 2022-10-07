@@ -21,9 +21,9 @@ pandas2ri.activate()
 
 # gse = load_gse_soft(gsename)
 
-from .async_bioservices import database_convert
-from .async_bioservices.input_database import InputDatabase
-from .async_bioservices.output_database import OutputDatabase
+from async_bioservices import database_convert
+from async_bioservices.input_database import InputDatabase
+from async_bioservices.output_database import OutputDatabase
 
 # Extract Platform Information
 
