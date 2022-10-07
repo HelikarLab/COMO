@@ -162,5 +162,3 @@ from .omicsdi import OmicsDI
 
 # import mapping
 from . import apps
-
-# import dev

@@ -1,55 +1,108 @@
-<!--- This page was modified from the default Cayman theme -->
-<!-- Cayman Source: https://github.com/pages-themes/cayman -->
-<!-- Page source: https://github.com/pages-themes/cayman/blob/master/_layouts/default.html -->
-
 <!DOCTYPE html>
-<html lang="{{ site.lang | default: 'en-US' }}">
-    <head>
-      <meta charset="UTF-8">
+<html>
+<head>
+    {% include head.html %}
+    <script>
+        $(document).ready(function() {
+            // Initialize navgoco with default options
+            $("#mysidebar").navgoco({
+                caretHtml: '',
+                accordion: true,
+                openClass: 'active', // open
+                save: false, // leave false or nav highlighting doesn't work right
+                cookie: {
+                    name: 'navgoco',
+                    expires: false,
+                    path: '/'
+                },
+                slide: {
+                    duration: 400,
+                    easing: 'swing'
+                }
+            });
 
-      {% seo %}
-      <link rel="preconnect" href="https://fonts.gstatic.com">
-      <link rel="preload" href="https://fonts.googleapis.com/css?family=Open+Sans:400,700&display=swap" as="style" type="text/css" crossorigin>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <meta name="theme-color" content="#157878">
-      <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-      <link rel="stylesheet" href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}">
-      <link rel="shortcut icon" type="image/png" href="{{ "/favicon.png" | absolute_url }}">
+            $("#collapseAll").click(function(e) {
+                e.preventDefault();
+                $("#mysidebar").navgoco('toggle', false);
+            });
 
+            $("#expandAll").click(function(e) {
+                e.preventDefault();
+                $("#mysidebar").navgoco('toggle', true);
+            });
 
-      
-      <!-- Use relative_url because Pages prepends /MADRID/ to our pages -->
-      <link rel="stylesheet" href="{{ 'assets/css/styles.css' | relative_url }}">
-      <title>MADRID</title>
-    </head>
-  
-    <body>
-    <a id="skip-to-content" href="#content">Skip to the content.</a>
-    <header class="page-header" role="banner">
-      <h1 class="project-name"><a href="{{ page.url }}" class="header-link">{{ page.title | default: site.title | default: site.github.name }}</a></h1>
-      <!-- <h1 class="project-name">{{ page.title | default: site.title | default: site.github.name }}</h1> -->
-      <h2 class="project-tagline">{{ page.description | default: site.description | default: site.github.tagline }}</h2>
-        
-      <a href="{{ site.github.url }}" class="btn header-link" target="_blank">View on GitHub</a>
-      <a href="{{ site.docker.url }}" class="btn header-link" target="_blank">View on DockerHub</a>
-      <br>
-      <a href="https://github.com/HelikarLab/MADRID/actions/workflows/dockerhub.yml"><img src="https://github.com/HelikarLab/MADRID/actions/workflows/dockerhub.yml/badge.svg" alt="Continuous Integration"></a>
-      &nbsp; <!-- &nbsp; is a non-breaking space to provide room between SVG images -->
-      <a href="https://github.com/HelikarLab/MADRID/actions/workflows/pages/pages-build-deployment"><img src="https://github.com/HelikarLab/MADRID/actions/workflows/pages/pages-build-deployment/badge.svg?branch=master" alt="GitHub Pages Deploymenet"></a>
-      <br><br>
-      {% include navigation.html %}
-      
-      <script src="{{ "/assets/js/subheading.js" | absolute_url }}"></script>
-      
-    </header>
+        });
 
-    <main id="content" class="main-content" role="main">
-      {{ content }}
+    </script>
+    <script>
+        $(function () {
+            $('[data-toggle="tooltip"]').tooltip()
+        })
+    </script>
+    <script>
+        $(document).ready(function() {
+            $("#tg-sb-link").click(function() {
+                $("#tg-sb-sidebar").toggle();
+                $("#tg-sb-content").toggleClass('col-md-9');
+                $("#tg-sb-content").toggleClass('col-md-12');
+                $("#tg-sb-icon").toggleClass('fa-toggle-on');
+                $("#tg-sb-icon").toggleClass('fa-toggle-off');
+            });
+        });
+    </script>
+    {% if page.datatable == true %}
+    <!-- Include the standard DataTables bits -->
+    <link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.13/css/jquery.dataTables.css">
+    <script type="text/javascript" charset="utf8" src="//cdn.datatables.net/1.10.13/js/jquery.dataTables.js"></script>
+    <!-- First, this walks through the tables that occur between ...-begin
+         and ...-end and add the "datatable" class to them.
+         Then it invokes DataTable's standard initializer
+         Credit here: http://www.beardedhacker.com/blog/2015/08/28/add-class-attribute-to-markdown-table/
+      -->
+    <script>
+      $(document).ready(function(){
+          $('div.datatable-begin').nextUntil('div.datatable-end', 'table').addClass('display');
+          $('table.display').DataTable( {
+              paging: true,
+              stateSave: true,
+              searching: true
+          });
+       });
+    </script>
+    {% endif %}
 
-      <footer class="site-footer">
-        <span class="site-footer-owner"><a href="{{ site.github.url }}" class="remove-formatting" target="_blank">{{ site.github.name }}</a> is maintained by <a href="{{ site.github.brandt_url }}" class="remove-formatting" target="_blank">Brandt Bessell</a> and <a href="{{ site.github.joshl_url }}" class="remove-formatting" target="_blank">Josh Loecker</a>.</span>
-        <span class="site-footer-credits" style="font-size: 12px">This page was generated by <a href="https://pages.github.com" class="remove-formatting">GitHub Pages</a>.</span>
-      </footer>
-    </main>
-  </body>
+</head>
+<body>
+{% include topnav.html %}
+<!-- Page Content -->
+<div class="container">
+  <div id="main">
+    <!-- Content Row -->
+    <div class="row">
+        {% assign content_col_size = "col-md-12" %}
+        {% unless page.hide_sidebar %}
+            <!-- Sidebar Column -->
+            <div class="col-md-3" id="tg-sb-sidebar">
+                {% include sidebar.html %}
+            </div>
+            {% assign content_col_size = "col-md-9" %}
+        {% endunless %}
+
+        <!-- Content Column -->
+        <div class="{{content_col_size}}" id="tg-sb-content">
+            {{content}}
+        </div>
+    <!-- /.row -->
+</div>
+<!-- /.container -->
+</div>
+<!-- /#main -->
+    </div>
+
+</body>
+{% if site.google_analytics %}
+{% include google_analytics.html %}
+{% endif %}
 </html>
+
+{% comment %} Copyright 2021 Google LLC {% endcomment %}
