@@ -106,7 +106,6 @@ read_counts_matrix <- function(counts_matrix_file, config_file, info_file, conte
         SampMetrics[[group]][["GeneSizes"]] <- gene_info$size # store gene size
         SampMetrics[[group]][["StudyNumber"]] <- group
     }
-
     return(SampMetrics)
 }
 
@@ -460,92 +459,106 @@ filter_counts <- function(SampMetrics, technique, filt_options, context_name, pr
 }
 
 
-save_rnaseq_tests <- function(counts_matrix_file, config_file, out_file, info_file, context_name, prep="total",
-                              replicate_ratio=0.5, batch_ratio=0.5, replicate_ratio_high=0.9, batch_ratio_high=0.9,
-                              technique="quantile", quantile=0.9, min_count=10, min_zfpkm=-3) {
+save_rnaseq_tests <- function(
+  counts_matrix_file,
+  config_file,
+  out_file,
+  info_file,
+  context_name,
+  prep="total",
+  replicate_ratio=0.5,
+  batch_ratio=0.5,
+  replicate_ratio_high=0.9,
+  batch_ratio_high=0.9,
+  technique="quantile",
+  quantile=0.9,
+  min_count=10,
+  min_zfpkm=-3) {
 
-      # condense filter options
-      filt_options <- list()
-      if ( exists("replicate_ratio") ) {
-          filt_options$replicate_ratio <- replicate_ratio
-      } else {
-          filt_options$replicate_ratio <- 0.2
-      }
-      if ( exists("batch_ratio") ) {
-          filt_options$batch_ratio <- batch_ratio
-      } else {
-          filt_options$batch_ratio <- 0.5
-      }
-      if ( exists("quantile") ) {
-          filt_options$quantile <- quantile
-      } else {
-          filt_options$quantile <- 50
-      }
-      if ( exists("min_count") ) {
-          filt_options$min_count <- min_count
-      } else {
-          filt_options$min_count <- 1
-      }
-	  if ( exists("min_zfpkm") ) {
-          filt_options$min_zfpkm <- min_zfpkm
-      } else {
-          filt_options$min_zfpkm <- -3
-      }
-      if ( exists("replicate_ratio_high") ) {
-          filt_options$replicate_ratio_high<- replicate_ratio_high
-      } else {
-          filt_options$replicate_ratio_high <- 0.9
-      }
-      if ( exists("batch_ratio_high") ) {
-          filt_options$batch_ratio_high <- batch_ratio_high
-      } else {
-          filt_options$batch_ratio_high <- 0.9
-      }
+    # condense filter options
+    filt_options <- list()
+    if ( exists("replicate_ratio") ) {
+        filt_options$replicate_ratio <- replicate_ratio
+    } else {
+        filt_options$replicate_ratio <- 0.2
+    }
+    if ( exists("batch_ratio") ) {
+        filt_options$batch_ratio <- batch_ratio
+    } else {
+        filt_options$batch_ratio <- 0.5
+    }
+    if ( exists("quantile") ) {
+        filt_options$quantile <- quantile
+    } else {
+        filt_options$quantile <- 50
+    }
+    if ( exists("min_count") ) {
+        filt_options$min_count <- min_count
+    } else {
+        filt_options$min_count <- 1
+    }
+	if ( exists("min_zfpkm") ) {
+        filt_options$min_zfpkm <- min_zfpkm
+    } else {
+        filt_options$min_zfpkm <- -3
+    }
+    if ( exists("replicate_ratio_high") ) {
+        filt_options$replicate_ratio_high<- replicate_ratio_high
+    } else {
+        filt_options$replicate_ratio_high <- 0.9
+    }
+    if ( exists("batch_ratio_high") ) {
+        filt_options$batch_ratio_high <- batch_ratio_high
+    } else {
+        filt_options$batch_ratio_high <- 0.9
+    }
 
-      if ( prep == "scrna" ) {
+    if ( prep == "scrna" ) {
         technique = "umi"
         print("Note: Single cell filtration does not normalize and assumes counts are counted with UMI")
-      }
+    }
 
-      print("Reading Counts Matrix")
-      SampMetrics <- read_counts_matrix(counts_matrix_file, config_file, info_file, context_name) # read count matrix
-      entrez_all <- SampMetrics[[1]][["Entrez"]] #get entrez ids
-      print("Filtering Counts")
-      SampMetrics <- filter_counts(SampMetrics, technique, filt_options, context_name, prep) # normalize and filter count
-      expressedGenes <- c()
-      topGenes <- c()
+    print("Reading Counts Matrix")
 
-      for ( i in 1:length(SampMetrics) ) { # get high confidence and expressed genes for each study/batch number
-          expressedGenes <- c(expressedGenes, SampMetrics[[i]][["Entrez"]])
-          topGenes <- c(topGenes, SampMetrics[[i]][["Entrez_hc"]])
-      }
+    SampMetrics <- read_counts_matrix(counts_matrix_file, config_file, info_file, context_name) # read count matrix
 
-      expMat <- as.data.frame(table(expressedGenes)) # convert expression to df
-      topMat <- as.data.frame(table(topGenes)) # convert high confidence to df
-      nc <- length(SampMetrics) # number of columns
-      expMat <- cbind(expMat, "Prop"=expMat$Freq/nc) # calculate proportion of studies/batches expressed
-      topMat <- cbind(topMat, "Prop"=topMat$Freq/nc) # calculate proportion of studies/batch high-confidence
-      SampMetrics[["ExpressionMatrix"]] <- expMat # store expression matrix for saving
-      SampMetrics[["TopMatrix"]] <- topMat # store high confidence matrix for saving
+    entrez_all <- SampMetrics[[1]][["Entrez"]] #get entrez ids
+    print("Filtering Counts")
+    SampMetrics <- filter_counts(SampMetrics, technique, filt_options, context_name, prep) # normalize and filter count
+    expressedGenes <- c()
+    topGenes <- c()
 
-      # get genes which are expressed and high-confidence according to use defined ratio
-      SampMetrics[["ExpressedGenes"]] <- as.character(expMat$expressedGenes[expMat$Prop>=batch_ratio])
-      SampMetrics[["TopGenes"]] <- as.character(topMat$topGenes[topMat$Prop>=batch_ratio_high])
+    for ( i in 1:length(SampMetrics) ) { # get high confidence and expressed genes for each study/batch number
+        expressedGenes <- c(expressedGenes, SampMetrics[[i]][["Entrez"]])
+        topGenes <- c(topGenes, SampMetrics[[i]][["Entrez_hc"]])
+    }
 
-      # create a table to write gene expression and high confidence to
-      write_table <- data.frame(entrez_all)
-      write_table <- cbind(write_table, rep(0, nrow(write_table)))
-      write_table <- cbind(write_table, rep(0, nrow(write_table)))
-      for ( i in 1:nrow(write_table) ) {
-          if (as.character(write_table[i,1]) %in% as.character(SampMetrics$ExpressedGenes)) {
-              write_table[i,2] <- 1
-          }
-          if (as.character(write_table$entrez_all[i]) %in% as.character(SampMetrics$TopGenes)) {
-              write_table[i,3] <- 1
-          }
-      }
-      header <- c("ENTREZ_GENE_ID", "expressed", "high")
-      #write_table <- rbind(header, write_table)
-      colnames(write_table) <- header
-      write.csv(write_table, out_file, row.names=FALSE, col.names=FALSE)
+    expMat <- as.data.frame(table(expressedGenes)) # convert expression to df
+    topMat <- as.data.frame(table(topGenes)) # convert high confidence to df
+    nc <- length(SampMetrics) # number of columns
+    expMat <- cbind(expMat, "Prop"=expMat$Freq/nc) # calculate proportion of studies/batches expressed
+    topMat <- cbind(topMat, "Prop"=topMat$Freq/nc) # calculate proportion of studies/batch high-confidence
+    SampMetrics[["ExpressionMatrix"]] <- expMat # store expression matrix for saving
+    SampMetrics[["TopMatrix"]] <- topMat # store high confidence matrix for saving
+
+    # get genes which are expressed and high-confidence according to use defined ratio
+    SampMetrics[["ExpressedGenes"]] <- as.character(expMat$expressedGenes[expMat$Prop>=batch_ratio])
+    SampMetrics[["TopGenes"]] <- as.character(topMat$topGenes[topMat$Prop>=batch_ratio_high])
+
+    # create a table to write gene expression and high confidence to
+    write_table <- data.frame(entrez_all)
+    write_table <- cbind(write_table, rep(0, nrow(write_table)))
+    write_table <- cbind(write_table, rep(0, nrow(write_table)))
+    for ( i in 1:nrow(write_table) ) {
+        if (as.character(write_table[i,1]) %in% as.character(SampMetrics$ExpressedGenes)) {
+            write_table[i,2] <- 1
+        }
+        if (as.character(write_table$entrez_all[i]) %in% as.character(SampMetrics$TopGenes)) {
+            write_table[i,3] <- 1
+        }
+    }
+    header <- c("ENTREZ_GENE_ID", "expressed", "high")
+    #write_table <- rbind(header, write_table)
+    colnames(write_table) <- header
+    write.csv(write_table, out_file, row.names=FALSE, col.names=FALSE)
 }

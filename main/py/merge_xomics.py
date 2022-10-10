@@ -501,12 +501,17 @@ def main(argv):
         custom_df = pd.DataFrame([])
 
     def_exp_req = sum(
-        [1 for test in [microarray_file,
-                        trnaseq_file,
-                        mrnaseq_file,
-                        scrnaseq_file,
-                        proteomics_file]
-            if test is None]
+        [
+            1 for test in
+            [
+                microarray_file,
+                trnaseq_file,
+                mrnaseq_file,
+                scrnaseq_file,
+                proteomics_file
+            ]
+            if test is None
+        ]
     )
 
     if expression_requirement.lower() == "default":
