@@ -8,17 +8,19 @@ This is the home page for MADRID pipeline.
 
 [View the documentation](https://helikarlab.github.io/MADRID)
 
-[Create and view Issues](https://joshl.youtrack.cloud/dashboard?id=7bb0e449-3a4f-4fe8-a253-a445efd15ea4)
+[Create and view Issues](https://github.com/HelikarLab/MADRID/issues)
 
 ## How To Run application
 - [Install Docker](https://docs.docker.com/install/)
 - `sudo docker login`
 - `sudo docker pull babessell/madrid:development`
-- `sudo docker run --cpus=4 -p 4000:8888 --volume=$HOME/gurobi.lic:/opt/gurobi/gurobi.lic:ro  -v /$HOME/saghamiri/Desktop/LocalMadrid:/home/jovyan/work/data/local_files --rm --name jupyteruser --rm -it babessell/madrid:development` Run docker image and assign 2 CPUs to it.
-- Open [http://127.0.0.1:4000](http://127.0.0.1:4000) from your browser  
-- Alternatively, you can copy and paste the command under the prompt "or copy and paste one of these URLs:" and replace the "8888" port with "4000"
+- Run docker image and assign 2 CPUs to it.
+  - `sudo docker run --cpus=4 -p 8888:8888 --volume=$HOME/gurobi.lic:/opt/gurobi/gurobi.lic:ro  -v /$HOME/LocalMadrid:/home/jovyan/work/data/local_files --rm --name madrid --rm -it ghcr.io/helikarlab/madrid:latest`
+- Open [http://127.0.0.1:8888](http://127.0.0.1:8888) from your browser  
+  - Alternatively, you can copy and paste the command under the prompt "or copy and paste one of these URLs:"
 - In your jupyter notebook, open `/work/py/pipeline.ipynb`
-- Upload your configuration files `/work/data/config_files` and data files to `/work/data/data_matrices` according to the instructions in the notebook and provided templates, update the file names in the jupyter notebook accordingly.
+- Upload your configuration files to `/work/data/config_files` and data files to `/work/data/data_matrices` according to the instructions in the notebook and provided templates
+  - Update the file names in the jupyter notebook accordingly.
 - Run the notebook step by step, or run the step(s) by your needs
 
 

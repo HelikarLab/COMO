@@ -6,3 +6,6 @@
 /.gitignore
 /README.md
 /main/py/tests
+/main/py/.pytest_cache
+/main/py/rlogs
+/main/py/.Rhistory

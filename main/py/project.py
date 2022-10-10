@@ -11,7 +11,6 @@ class Configs:
         self.configdir = os.path.join(projectdir, "data", "config_sheets")
         self.outputdir = os.path.join(projectdir, "output")
         self.pydir = os.path.join(projectdir, "py")
-        self.docdir = os.path.join(projectdir, "doc")
 
 
 current_dir = os.getcwd()

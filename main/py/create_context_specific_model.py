@@ -16,6 +16,8 @@ from troppo.methods.reconstruction.imat import IMAT, IMATProperties
 from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
 from project import configs
 
+from utilities import stringlist_to_list
+
 sys.setrecursionlimit(1500)  # for re.search
 
 
@@ -567,16 +569,12 @@ def print_filetype_help():
         "Note the outer quotes required to be interpreted by cmd. This a string, not a python list"
     )
 
-
-def main():
-    """
-    Seed a context-specific model from a list of expressed genes, a reference
-    """
+def parse_args(argv):
     parser = argparse.ArgumentParser(
         prog="create_context_specific_model.py",
         description="Seed a context-specific model from a list of expressed genes, a reference",
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
-        "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
+               "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
     )
     parser.add_argument(
         "-n",
@@ -593,8 +591,8 @@ def main():
         required=True,
         dest="modelfile",
         help="Name of Genome-scale metabolic model to seed the context model to. For example, the "
-        "GeneralModelUpdatedV2.mat, is a modified Recon3D model. We also provide iMM_madrid for mouse."
-        "OT can be .mat, .xml, or .json.",
+             "GeneralModelUpdatedV2.mat, is a modified Recon3D model. We also provide iMM_madrid for mouse."
+             "OT can be .mat, .xml, or .json.",
     )
     parser.add_argument(
         "-g",
@@ -603,9 +601,9 @@ def main():
         required=True,
         dest="genefile",
         help="Path to logical table of active genes output from merge_xomics.py called "
-        "ActiveGenes_contextName_Merged.csv. Should be in the corresponding context/context folder "
-        "inside /main/data/results/contextName/. The json file output from the function using "
-        "the context of interest as the key can be used here.",
+             "ActiveGenes_contextName_Merged.csv. Should be in the corresponding context/context folder "
+             "inside /main/data/results/contextName/. The json file output from the function using "
+             "the context of interest as the key can be used here.",
     )
     parser.add_argument(
         "-o",
@@ -624,10 +622,10 @@ def main():
         default=None,
         dest="bound_rxns_file",
         help="Path to file contains the exchange (media), sink, and demand reactions which "
-        "the model should use to fulfill the reactions governed by transcriptomic and proteomics "
-        "data inputs. It must be a csv or xlsx with three columns: Rxn, Lowerbound, Upperbound. If not "
-        "specified, MADRID will allow ALL BOUNDARY REACTIONS THAT ARE OPEN IN THE REFERENCE MODEL "
-        "TO BE USED!",
+             "the model should use to fulfill the reactions governed by transcriptomic and proteomics "
+             "data inputs. It must be a csv or xlsx with three columns: Rxn, Lowerbound, Upperbound. If not "
+             "specified, MADRID will allow ALL BOUNDARY REACTIONS THAT ARE OPEN IN THE REFERENCE MODEL "
+             "TO BE USED!",
     )
     parser.add_argument(
         "-x",
@@ -637,9 +635,9 @@ def main():
         default=None,
         dest="exclude_rxns_file",
         help="Filepath to file that contains reactions which will be removed from active reactions "
-        "the model to use when seeding, even if considered active from transcriptomic and "
-        "proteomics data inputs. It must be a csv or xlsx with one column of reaction IDs consistent with "
-        "the reference model",
+             "the model to use when seeding, even if considered active from transcriptomic and "
+             "proteomics data inputs. It must be a csv or xlsx with one column of reaction IDs consistent with "
+             "the reference model",
     )
     parser.add_argument(
         "-f",
@@ -649,9 +647,9 @@ def main():
         default=None,
         dest="force_rxns_file",
         help="Filepath to file that contains reactions which will be added to active reactions for "
-        "the model to use when seeding (unless it causes the model to be unsolvable), regardless "
-        "of results of transcriptomic and proteomics data inputs. It must be a csv or xlsx with one "
-        "column of reaction IDs consistent with the reference model",
+             "the model to use when seeding (unless it causes the model to be unsolvable), regardless "
+             "of results of transcriptomic and proteomics data inputs. It must be a csv or xlsx with one "
+             "column of reaction IDs consistent with the reference model",
     )
     parser.add_argument(
         "-a",
@@ -661,7 +659,7 @@ def main():
         default="GIMME",
         dest="algorithm",
         help="Algorithm used to seed context specific model to the Genome-scale model. Can be either "
-        "GIMME, FASTCORE, iMAT, or tINIT.",
+             "GIMME, FASTCORE, iMAT, or tINIT.",
     )
     parser.add_argument(
         "-lt",
@@ -680,7 +678,7 @@ def main():
         default=-3,
         dest="high_threshold",
         help="Mid to high bin cutoff for iMAT solution"
-    )      
+    )
     parser.add_argument(
         "-s",
         "--solver",
@@ -689,9 +687,9 @@ def main():
         default="glpk",
         dest="solver",
         help="Solver used to seed model and attempt to solve objective. Default is GLPK, also takes "
-        "GUROBI but you must mount a container license to the Docker to use. An academic license "
-        "can be obtained for free. See the README on the Github or Dockerhub for information on "
-        "mounting this license.",
+             "GUROBI but you must mount a container license to the Docker to use. An academic license "
+             "can be obtained for free. See the README on the Github or Dockerhub for information on "
+             "mounting this license.",
     )
     parser.add_argument(
         "-t",
@@ -701,11 +699,19 @@ def main():
         default="mat",
         dest="output_filetypes",
         help="Filetypes to save seeded model type. Can be either a string with one filetype such as "
-        "'xml' or multiple in the format \"['extension1', 'extension2', ... etc]\". If you want "
-        "to output in all 3 accepted formats,  would be: \"['mat', 'xml', 'json']\" "
-        "Note the outer quotes required to be interpreted by cmd. This a string, not a python list",
+             "'xml' or multiple in the format \"['extension1', 'extension2', ... etc]\". If you want "
+             "to output in all 3 accepted formats,  would be: \"['mat', 'xml', 'json']\" "
+             "Note the outer quotes required to be interpreted by cmd. This a string, not a python list",
     )
     args = parser.parse_args()
+    return args
+
+
+def main(argv):
+    """
+    Seed a context-specific model from a list of expressed genes, a reference
+    """
+    args = parse_args(argv)
 
     context_name = args.context_name
     reference_model = args.modelfile
@@ -718,7 +724,7 @@ def main():
     low_threshold = args.low_threshold
     high_threshold = args.high_threshold
     solver = args.solver.upper()
-    output_filetypes = args.output_filetypes
+    output_filetypes = stringlist_to_list(args.output_filetypes)
 
     if not os.path.exists(reference_model):
         raise FileNotFoundError(f"Reference model not found at {reference_model}")
@@ -941,4 +947,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1:])

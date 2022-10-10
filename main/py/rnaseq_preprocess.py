@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import pandas as pd
+
 from project import configs
 import re
 import os
@@ -360,15 +361,13 @@ def parse_args(argv):
 
     parser.add_argument("-n", "--context-names",
                         type=str,
-                        nargs="+",
                         required=True,
                         dest="context_names",
                         help="""Tissue/cell name of models to generate. These names should correspond to the folders
                              in 'MADRID_inputs/' if creating count matrix files, or to
                              'work/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv' if supplying
                              the count matrix as an imported .csv file. If making multiple models in a batch, then
-                             use the format: \"['context1', 'context2', ... etc]\". Note the outer double-quotes and the 
-                             inner single-quotes are required to be interpreted. This a string, not a python list"""
+                             use the format: "context1,context2,context3". """
                         )
 
     parser.add_argument("-f", "--gene-format",
@@ -422,28 +421,12 @@ def parse_args(argv):
 
 def main(argv):
     args = parse_args(argv)
-    context_names = args.context_names
-    gene_format: str = args.gene_format
+    context_names = utilities.stringlist_to_list(args.context_names)
+    gene_format = args.gene_format
     taxon_id = args.taxon_id
     provide_matrix = args.provide_matrix
     make_matrix = args.make_matrix
     provided_matrix_fname = args.provided_matrix_fname
-
-    # ----------
-    # We are attempting to move to a new method of gathering a list of items from the command line
-    # In doing so, we must deprecate the use of the current method
-    # ----------
-    # If '[' and ']' are present in the first and last items of the list, assume we are using the "old" method of providing context names
-    if "[" in context_names[0] and "]" in context_names[-1]:
-        print("DEPRECATED: Please use the new method of providing context names, i.e. --context-names 'context1 context2 context3'.")
-        print("This can be done by setting the 'context_names' variable to a simple string separated by lists: context_names='context1 context2 context3'")
-        print("Your current method of passing context names will be removed in the future. Please update your variables above accordingly!")
-        temp_context_names: list[str] = []
-        for name in context_names:
-            temp_name = name.replace("'", "").replace(" ", "")
-            temp_name = temp_name.strip("[],")
-            temp_context_names.append(temp_name)
-        context_names = temp_context_names
 
     if gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
         gene_format_database: InputDatabase = InputDatabase.ENSEMBL_GENE_ID
@@ -483,5 +466,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    # print(sys.argv)
     main(sys.argv[1:])

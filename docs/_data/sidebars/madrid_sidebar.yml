@@ -1,0 +1,87 @@
+# This is your sidebar TOC. The sidebar code loops through sections here and provides the appropriate formatting.
+
+entries:
+- title: sidebar
+  product:
+  version:
+
+  folders:
+  - title:
+    output: pdf
+    type: frontmatter
+    folderitems:
+    - title:
+      url: /titlepage.html
+      output: pdf
+      type: frontmatter
+    - title:
+      url: /tocpage.html
+      output: pdf
+      type: frontmatter
+
+  - title: Overview
+    output: web, pdf
+    folderitems:
+
+      - title: Getting Started
+        url: /index.html
+        output: web, pdf
+        type: homepage
+
+      - title: Example Workflow
+        url: /madrid_example_workflow.html
+        output: web, pdf
+
+      - title: Flow Charts
+        url: /madrid_flowcharts.html
+        output: web, pdf
+
+      - title: Resources
+        url: /madrid_resources.html
+        output: web, pdf
+
+      - title: Repository Structure
+        url: /madrid_repository_structure.html
+        output: web, pdf
+
+  - title: Arguments
+    output: web
+    folderitems:
+
+      - title: Arguments Overview
+        url: /madrid_arguments_overview.html
+        output: web, pdf
+
+        subfolders:
+          - title: Python Arguments
+            url: /madrid_python_arguments.html
+            output: web, pdf
+            subfolderitems:
+
+              - title: Create Context Specific Model
+                url: /madrid_args_create_context_specific_model.html
+                output: web, pdf
+
+              - title: Disease Analysis
+                url: /madrid_args_disease_analysis.html
+                output: web, pdf
+
+              - title: Knockout Simulation
+                url: /madrid_args_knockout_simulation.html
+                output: web, pdf
+
+              - title: Merge Omics
+                url: /madrid_args_merge_xomics.html
+                output: web, pdf
+
+              - title: Proteomics Gen
+                url: /madrid_args_proteomics_gen.html
+                output: web, pdf
+
+              - title: RNA Seq Gen
+                url: /madrid_args_rnaseq_gen.html
+                output: web, pdf
+
+              - title: RNA Seq Preprocess
+                url: /madrid_args_rnaseq_preprocess.html
+                output: web, pdf
