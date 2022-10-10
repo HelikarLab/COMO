@@ -36,7 +36,8 @@ class TestDatabases:
         assert OutputDatabase.UNIPROT_ACCESSION.value == "UniProt Accession"
 
     def test_taxon_ids(self):
-        assert TaxonIDs.HUMAN.value == 9606
+        assert TaxonIDs.HOMO_SAPIENS.value == 9606
+        assert TaxonIDs.MUS_MUSCULUS.value == 10090
 
 
 def test_conversion():
@@ -61,7 +62,7 @@ def test_conversion():
         input_values=input_values,
         input_db=input_db,
         output_db=output_db,
-        taxon_id=9606
+        taxon_id=TaxonIDs.HOMO_SAPIENS
     )
 
     assert static_dataframe.equals(test_dataframe)
