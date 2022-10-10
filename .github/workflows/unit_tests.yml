@@ -23,7 +23,7 @@ jobs:
         - name: Install Conda environment
           uses: mamba-org/provision-with-micromamba@main
           with:
-            environment-file: py/tests/environment.yaml
+            environment-file: main/py/tests/environment.yaml
             environment-name: madrid_tests
             extra-specs: |
               python=${{ matrix.python-version }}
