@@ -15,7 +15,7 @@ async def _async_fetch_info(
         taxon_id: int,
         delay: int = 5
 ):
-    database_convert = await event_loop.run_in_executor(
+    conversion = await event_loop.run_in_executor(
         None,  # Defaults to ThreadPoolExecutor, uses threads instead of processes. No need to modify
         biodbnet.db2db,  # The function to call
         input_db,  # The following are arguments passed to the function
