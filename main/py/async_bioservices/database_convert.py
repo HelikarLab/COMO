@@ -10,23 +10,16 @@ async def _async_fetch_info(
         biodbnet: BioDBNet,
         event_loop: asyncio.AbstractEventLoop,
         input_values: list[str],
-        input_db: InputDatabase,
-        output_db: list[OutputDatabase] = None,
-        taxon_id: TaxonIDs | int = TaxonIDs.HOMO_SAPIENS,
+        input_db: str,
+        output_db: list[str],
+        taxon_id: int,
         delay: int = 5
 ):
-    # Get the value from InputDatabase, OutputDatabase, and taxon id
-    output_db_values: list[str] = [i.value for i in output_db]
-
-    # No need to set taxon_id if it is an integer
-    if isinstance(taxon_id, TaxonIDs):
-        taxon_id = taxon_id.value
-
     database_convert = await event_loop.run_in_executor(
         None,  # Defaults to ThreadPoolExecutor, uses threads instead of processes. No need to modify
         biodbnet.db2db,  # The function to call
-        input_db.value,  # The following are arguments passed to the function
-        output_db_values,
+        input_db,  # The following are arguments passed to the function
+        output_db,
         input_values,
         taxon_id
     )
@@ -84,6 +77,7 @@ def fetch_gene_info(
 
     :return: A dataframe with specified columns as "output_db" (Default is HUGO symbol, Entrez ID, and chromosome start and end positions)
     """
+    input_db_value = input_db.value
     if output_db is None:
         output_db: list[str] = [
             OutputDatabase.GENE_SYMBOL.value,
@@ -113,7 +107,7 @@ def fetch_gene_info(
             _async_fetch_info(
                 biodbnet=biodbnet,
                 input_values=input_values[i:upper_range],
-                input_db=input_db,
+                input_db=input_db_value,
                 output_db=output_db,
                 taxon_id=taxon_id,
                 delay=delay,
