@@ -3,7 +3,7 @@ from bioservices import BioDBNet
 import pandas as pd
 from .input_database import InputDatabase
 from .output_database import OutputDatabase
-from .taxon_id import TaxonId
+from .taxon_ids import TaxonIDs
 
 
 async def _async_fetch_info(
@@ -12,14 +12,14 @@ async def _async_fetch_info(
         input_values: list[str],
         input_db: InputDatabase,
         output_db: list[OutputDatabase] = None,
-        taxon_id: TaxonId | int = TaxonId.HOMO_SAPIENS,
+        taxon_id: TaxonIDs | int = TaxonIDs.HOMO_SAPIENS,
         delay: int = 5
 ):
     # Get the value from InputDatabase, OutputDatabase, and taxon id
     output_db_values: list[str] = [i.value for i in output_db]
 
     # No need to set taxon_id if it is an integer
-    if isinstance(taxon_id, TaxonId):
+    if isinstance(taxon_id, TaxonIDs):
         taxon_id = taxon_id.value
 
     database_convert = await event_loop.run_in_executor(
@@ -69,7 +69,7 @@ def fetch_gene_info(
         input_values: list[str],
         input_db: InputDatabase,
         output_db: list[OutputDatabase] = None,
-        taxon_id: TaxonId | int = TaxonId.HOMO_SAPIENS,
+        taxon_id: TaxonIDs | int = TaxonIDs.HOMO_SAPIENS,
         delay: int = 5
 ) -> pd.DataFrame:
     """
@@ -97,7 +97,7 @@ def fetch_gene_info(
     dataframe_maps: pd.DataFrame = pd.DataFrame([], columns=output_db)
     dataframe_maps.index.name = input_db.value
 
-    if taxon_id == TaxonId.HOMO_SAPIENS:
+    if taxon_id == TaxonIDs.HOMO_SAPIENS:
         batch_len = 500
     else:
         batch_len = 300

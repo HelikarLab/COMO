@@ -14,7 +14,7 @@ from pathlib import Path
 import async_bioservices
 from async_bioservices.output_database import OutputDatabase
 from async_bioservices.input_database import InputDatabase
-from async_bioservices.taxon_id import TaxonId
+from async_bioservices.taxon_ids import TaxonIDs
 import rpy2_api
 
 # import R libraries
@@ -463,9 +463,9 @@ def main(argv):
     # handle species alternative ids
     if type(taxon_id) == str:
         if taxon_id.upper() == "HUMAN" or taxon_id.upper() == "HOMO SAPIENS":
-            taxon_id = TaxonId.HOMO_SAPIENS
+            taxon_id = TaxonIDs.HOMO_SAPIENS
         elif taxon_id.upper() == "MOUSE" or taxon_id.upper() == "MUS MUSCULUS":
-            taxon_id = TaxonId.MUS_MUSCULUS
+            taxon_id = TaxonIDs.MUS_MUSCULUS
         else:
             print("--taxon-id must be either an integer, or accepted string ('mouse', 'human')")
             sys.exit()
