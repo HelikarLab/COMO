@@ -40,7 +40,7 @@ def load_rnaseq_tests(filename, context_name, lib_type):
     """
     def load_dummy_dict():
         savepath = os.path.join(
-            configs.rootdir, "data", "data_matrices", "dummy", "dummy_rnaseq_data.csv"
+            configs.rootdir, "data", "data_matrices", "placeholder", "placeholder_empty_data.csv"
         )
         dat = pd.read_csv(savepath, index_col="ENTREZ_GENE_ID")
         return "dummy", dat

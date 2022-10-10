@@ -24,6 +24,7 @@ parse_contexts_zfpkm <- function(wd, contexts, prep) {
     batches = list()
     for ( context in contexts ) {
         files <- Sys.glob(file.path(wd, context, prep, paste0("zFPKM_Matrix_", prep, "_*.csv")))
+        print(files)
         batches[[context]] <- unlist(lapply(files, get_batch_name))
     }
 
@@ -305,7 +306,7 @@ combine_omics_zdistros <- function(
     if ( !file.exists(fig_path) ) { dir.create(fig_path) }
     plot_name_pdf = file.path(fig_path, paste0("plot_", context, "_combine_omics_distro", ".pdf"))
 	plot_name_png = file.path(fig_path, paste0("plot_", context, "_combine_omics_distro", ".png"))
-	
+
     weights <- c()
     names <- c()
     dfs <- list()
