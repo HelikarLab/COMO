@@ -102,7 +102,7 @@ docker run \
   --cpus=4 \
   -p 8888:8888 \
   --volume=$HOME/gurobi.lic:/opt/gurobi/gurobi.lic:ro \
-  --volume=$HOME/madrid_local:/home/jovyan/work/data/local_files \
+  --volume=$HOME/madrid_local:/home/jovyan/main/data/local_files \
   --name madrid \
   --rm \
   -it \
