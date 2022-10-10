@@ -15,7 +15,7 @@ from async_bioservices.input_database import InputDatabase
 from async_bioservices.output_database import OutputDatabase
 
 
-def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, test_all):
+def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, test_all, pars_flag):
     if ref_flux_file is not None:
         try:
             ref_flux_df = pd.read_csv(ref_flux_file)
