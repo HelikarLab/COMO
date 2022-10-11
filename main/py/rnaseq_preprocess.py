@@ -17,6 +17,7 @@ from async_bioservices.output_database import OutputDatabase
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.taxon_ids import TaxonIDs
 import rpy2_api
+import utilities
 
 # import R libraries
 tidyverse = importr("tidyverse")
