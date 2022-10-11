@@ -1,11 +1,16 @@
 # A list of items to ignore when building the docker image
-/.github
+
+/**/*.Rhistory
+/**/.DS_Store
+/**/.idea
+/**/.ipynb_checkpoints
+/**/.jekyll-cache
+/**/.mypy_cache
+/**/.pytest_cache
+/**/__pycache__
+/docker_old/*
 /docs
-/docker_old
-/.gitattributes
-/.gitignore
-/README.md
-/main/py/tests
-/main/py/.pytest_cache
+/main/output
 /main/py/rlogs
-/main/py/.Rhistory
+/main/py/tests
+~$*

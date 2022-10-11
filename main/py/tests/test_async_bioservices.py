@@ -36,7 +36,8 @@ class TestDatabases:
         assert OutputDatabase.UNIPROT_ACCESSION.value == "UniProt Accession"
 
     def test_taxon_ids(self):
-        assert TaxonIDs.HUMAN.value == 9606
+        assert TaxonIDs.HOMO_SAPIENS.value == 9606
+        assert TaxonIDs.MUS_MUSCULUS.value == 10090
 
 
 def test_conversion():
@@ -48,9 +49,10 @@ def test_conversion():
     # "data" is of type Ensembl Gene IDS
     # "index" is of type Gene Symbols
     static_dataframe: pd.DataFrame = pd.DataFrame(
-        data={"Ensembl Gene ID": ["ENSG00000141510", "ENSG00000232810", "ENSG00000146648"]},
-        index=["TP53", "TNF", "EGFR"]
+        data={"Ensembl Gene ID": ["ENSG00000141510", "ENSG00000146648"]},
+        index=["TP53", "EGFR"]
     )
+    static_dataframe.index.name = "Gene Symbol"
 
     input_values: list[str] = static_dataframe.index.to_list()
     input_db: InputDatabase = InputDatabase.GENE_SYMBOL
@@ -61,7 +63,7 @@ def test_conversion():
         input_values=input_values,
         input_db=input_db,
         output_db=output_db,
-        taxon_id=9606
+        taxon_id=TaxonIDs.HOMO_SAPIENS
     )
 
     assert static_dataframe.equals(test_dataframe)

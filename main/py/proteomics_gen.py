@@ -3,17 +3,15 @@
 import argparse
 import sys
 import os
-import time
-import unidecode
 import pandas as pd
 import numpy as np
 import instruments
 from project import configs
-import rpy2.robjects as ro
 from rpy2.robjects.packages import importr
-from rpy2.robjects import r, pandas2ri
-from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
-from rpy2.robjects.conversion import localconverter
+from rpy2.robjects import pandas2ri
+from pathlib import Path
+
+import rpy2_api
 
 pandas2ri.activate()
 
@@ -22,10 +20,11 @@ tidyverse = importr("tidyverse")
 ggplot = importr("ggplot2")
 
 # read and translate R functions
-f = open(os.path.join(configs.rootdir, "py", "rscripts", "protein_transform.R"), "r")
-string = f.read()
-f.close()
-protein_transform_io = SignatureTranslatedAnonymousPackage(string, "protein_transform_io")
+# f = open(os.path.join(configs.rootdir, "py", "rscripts", "protein_transform.R"), "r")
+# string = f.read()
+# f.close()
+# protein_transform_io = SignatureTranslatedAnonymousPackage(string, "protein_transform_io")
+r_file_path = Path(configs.rootdir, "py", "rscripts", "protein_transform.R")
 
 
 # Load Proteomics
@@ -101,7 +100,13 @@ def abundance_to_bool_group(context_name, group_name, abundance_matrix, rep_rati
     abundance_matrix.to_csv(abundance_filepath, index_label="ENTREZ_GENE_ID")
 
     # Z-tranform
-    protein_transform_io.protein_transform_main(abundance_filepath, output_dir, group_name)
+    rpy2_api.Rpy2(
+        r_file_path,
+        abundance_filepath,
+        output_dir,
+        group_name
+    ).call_function("protein_transform_main")
+    # protein_transform_io.protein_transform_main(abundance_filepath, output_dir, group_name)
     
     # Logical Calculation
     thresholds = abundance_matrix.quantile(quantile, axis=0)

@@ -2,10 +2,10 @@
 This is the main driver-file for downloading proteomics data
 """
 import argparse
-import Crux
+from . import Crux
 import csv
-from FileInformation import FileInformation
-import FTPManager
+from .FileInformation import FileInformation
+from . import FTPManager
 import os
 import sys
 from pathlib import Path

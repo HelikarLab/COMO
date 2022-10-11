@@ -4,28 +4,30 @@ This file is responsible downloading data found at FTP links
 TODO: Find a way to mark a file as "downloaded"
     - Keep a list of file names in a ".completd" hidden folder?
 """
-from FileInformation import FileInformation
-from FileInformation import clear_print
+from .FileInformation import FileInformation
+from .FileInformation import clear_print
 
 import aioftp
 import asyncio
 import multiprocessing
 from multiprocessing.sharedctypes import Synchronized
 import time
+import typing
 from urllib.parse import urlparse
 
 
-async def aioftp_client(host: str, username: str = "anonymous", password: str = "guest", max_attempts: int = 3) -> aioftp.Client:
+async def aioftp_client(host: str, username: str = "anonymous", password: str = "guest", port: int = 21, max_attempts: int = 3) -> aioftp.Client:
     """
     This class is responsible for creating a "client" connection
     """
     connection_successful: bool = False
     attempt_num: int = 1
+
     # Attempt to connect, throw error if unable to do so
     while not connection_successful and attempt_num <= max_attempts:
         try:
             client: aioftp.Client = aioftp.Client()
-            await client.connect(host, 21)
+            await client.connect(host, port)
             await client.login(user=username, password=password)
             connection_successful = True
         except ConnectionResetError:
@@ -46,12 +48,17 @@ async def aioftp_client(host: str, username: str = "anonymous", password: str = 
 
 
 class Reader:
-    def __init__(self, root_link: str, file_extensions: list[str]):
+    def __init__(self, root_link: str, file_extensions: list[str], max_attempts: int = 3, port: int = 21, user: str = "anonymous", passwd: str = "guest"):
         """
         This class is responsible for reading data about root FTP links
         """
         self._root_link: str = root_link
         self._extensions: list[str] = file_extensions
+        self._max_attempts: int = max_attempts
+        self._port: int = port
+        self._user: str = user
+        self._passwd: str = passwd
+
         self._files: list[str] = []
         self._file_sizes: list[int] = []
         
@@ -81,12 +88,16 @@ class Reader:
                 self._file_sizes.append(int(info["size"]))
 
     @property
-    def files(self):
-        return self._files
-    
+    def files(self) -> typing.Iterator[str]:
+        yield self._files
+
     @property
-    def file_sizes(self):
-        return self._file_sizes
+    def file_names(self) -> typing.Iterator[str]:
+        yield from [file.split("/")[-1] for file in self._files]
+
+    @property
+    def file_sizes(self) -> typing.Iterable[str]:
+        yield self._file_sizes
 
 
 class Download:

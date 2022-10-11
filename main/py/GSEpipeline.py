@@ -7,7 +7,6 @@ import numpy as np
 import GEOparse
 import urllib.request
 import tarfile
-# from instruments import affyio
 from instruments import AffyIO
 
 

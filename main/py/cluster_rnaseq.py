@@ -3,11 +3,13 @@
 import os
 import sys
 from rpy2.robjects.packages import importr
-from rpy2.robjects import r, pandas2ri
-from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
+from rpy2.robjects import pandas2ri
 from project import configs
 import argparse
+from pathlib import Path
 
+
+import rpy2_api
 # enable r to py conversion
 pandas2ri.activate()
 
@@ -15,14 +17,14 @@ pandas2ri.activate()
 ggplot2 = importr("ggplot2")
 ggrepel = importr("ggrepel")
 tidyverse = importr("tidyverse")
-# factoMineR = importr("FactoMineR")
 uwot = importr("uwot")
 
 # read and translate R functions
-f = open(os.path.join(configs.rootdir, "py", "rscripts", "cluster_samples.R"), "r")
-string = f.read()
-f.close()
-cluster_io = SignatureTranslatedAnonymousPackage(string, "cluster_io")
+r_file_path = Path(configs.rootdir, "py", "rscripts", "cluster_samples.R")
+# f = open(os.path.join(configs.rootdir, "py", "rscripts", "cluster_samples.R"), "r")
+# string = f.read()
+# f.close()
+# cluster_io = SignatureTranslatedAnonymousPackage(string, "cluster_io")
 
 
 def main(argv):
@@ -277,7 +279,9 @@ def main(argv):
         )
         sys.exit()
 
-    cluster_io.cluster_samples_main(
+    cluster_io = rpy2_api.Rpy2(r_file_path=r_file_path)
+    cluster_io_function = cluster_io.call_function("cluster_samples_main")
+    cluster_io_function(
         wd,
         context_names,
         technique,
@@ -293,7 +297,23 @@ def main(argv):
         min_count=min_count,
         seed=seed,
     )
-    return
+
+    # cluster_io.cluster_samples_main(
+    #     wd,
+    #     context_names,
+    #     technique,
+    #     clust_algo,
+    #     label,
+    #     min_dist=min_dist,
+    #     n_neigh_rep=n_neigh_rep,
+    #     n_neigh_batch=n_neigh_batch,
+    #     n_neigh_cont=n_neigh_cont,
+    #     rep_ratio=rep_ratio,
+    #     batch_ratio=batch_ratio,
+    #     quantile=quantile,
+    #     min_count=min_count,
+    #     seed=seed
+    # )
 
 
 if __name__ == "__main__":
