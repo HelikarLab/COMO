@@ -4,12 +4,13 @@ import os
 import sys
 import pandas as pd
 from rpy2.robjects.packages import importr
-from rpy2.robjects import r, pandas2ri
-from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
+from rpy2.robjects import pandas2ri
 from project import configs
 import argparse
 import re
+from pathlib import Path
 
+import rpy2_api
 
 # enable r to py conversion
 pandas2ri.activate()
@@ -26,10 +27,11 @@ zfpkm = importr("zFPKM")
 stringr = importr("stringr")
 
 # read and translate R functions
-f = open(os.path.join(configs.rootdir, "py", "rscripts", "rnaseq.R"), "r")
-string = f.read()
-f.close()
-rnaseq_io = SignatureTranslatedAnonymousPackage(string, "rnaseq_io")
+# f = open(os.path.join(configs.rootdir, "py", "rscripts", "rnaseq.R"), "r")
+# string = f.read()
+# f.close()
+# rnaseq_io = SignatureTranslatedAnonymousPackage(string, "rnaseq_io")
+r_file_path = Path(configs.rootdir, "py", "rscripts", "rnaseq.R")
 
 
 def load_rnaseq_tests(filename, context_name, lib_type):
@@ -120,7 +122,8 @@ def handle_context_batch(
         print('Input count matrix is at "{}"'.format(rnaseq_input_filepath))
         print('Gene info file is at "{}"'.format(gene_info_filepath))
 
-        rnaseq_io.save_rnaseq_tests(
+        rpy2_api.Rpy2(
+            r_file_path,
             rnaseq_input_filepath,
             rnaseq_config_filepath,
             rnaseq_output_filepath,
@@ -135,11 +138,26 @@ def handle_context_batch(
             quantile=quantile,
             min_count=min_count,
             min_zfpkm=min_zfpkm
-        )
+        ).call_function("save_rnaseq_tests")
+
+        # rnaseq_io.save_rnaseq_tests(
+        #     rnaseq_input_filepath,
+        #     rnaseq_config_filepath,
+        #     rnaseq_output_filepath,
+        #     gene_info_filepath,
+        #     context_name,
+        #     prep=prep,
+        #     replicate_ratio=replicate_ratio,
+        #     batch_ratio=batch_ratio,
+        #     replicate_ratio_high=replicate_ratio_high,
+        #     batch_ratio_high=batch_ratio_high,
+        #     technique=technique,
+        #     quantile=quantile,
+        #     min_count=min_count,
+        #     min_zfpkm=min_zfpkm
+        # )
 
         print("Test data saved to " + rnaseq_output_filepath)
-
-    return
 
 
 def main(argv):
@@ -315,8 +333,6 @@ def main(argv):
         min_zfpkm,
         prep,
     )
-
-    return
 
 
 if __name__ == "__main__":

@@ -7,14 +7,7 @@ if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
     dir.create(str_interp("${work_dir}/py/rlogs"))
 }
 
-<<<<<<< HEAD:main/py/rscripts/fitAffy.R
-zz <- file(file.path("/home", username, "main", "py", "rlogs", "generate_counts_matrix.Rout"), open="wt")
 zz <- file(file.path("/home", username, "main", "py", "rlogs", "fitAffy.Rout"), open="wt")
-=======
-
-zz <- file(file.path("/home", username, "work", "py", "rlogs", "generate_counts_matrix.Rout"), open="wt")
-zz <- file(file.path("/home", username, "work", "py", "rlogs", "fitAffy.Rout"), open="wt")
->>>>>>> origin/master:work/py/rscripts/fitAffy.R
 sink(zz, type="message")
 
 readaffydir <- function(addr){

@@ -7,25 +7,27 @@ import re
 import os
 import sys
 import argparse
-# from rpy2.robjects.packages import importr, SignatureTranslatedAnonymousPackage
+from rpy2.robjects.packages import importr
 import glob
 import numpy as np
 from pathlib import Path
 
-import utilities
 import async_bioservices
 from async_bioservices.output_database import OutputDatabase
+from async_bioservices.input_database import InputDatabase
+from async_bioservices.taxon_ids import TaxonIDs
 import rpy2_api
+import utilities
 
 # import R libraries
-#tidyverse = importr("tidyverse")
+# tidyverse = importr("tidyverse")
+r_file_path: Path = Path(configs.rootdir, "py", "rscripts", "generate_counts_matrix.R")
 
-# read and translate R functions
-r_file_path: Path = Path(os.path.join(configs.rootdir, "py", "rscripts", "generate_counts_matrix.R"))
-#f = open(os.path.join(configs.rootdir, "py", "rscripts", "generate_counts_matrix.R"), "r")
-#string = f.read()
-#f.close()
-#generate_counts_matrix_io = SignatureTranslatedAnonymousPackage(string, 'generate_counts_matrix_io')
+# # read and translate R functions
+# f = open(os.path.join(configs.rootdir, "py", "rscripts", "generate_counts_matrix.R"), "r")
+# string = f.read()
+# f.close()
+# generate_counts_matrix_io = SignatureTranslatedAnonymousPackage(string, 'generate_counts_matrix_io')
 
 
 def create_counts_matrix(context_name):
@@ -37,9 +39,12 @@ def create_counts_matrix(context_name):
     print(f"Looking for STAR gene count tables in '{input_dir}'")
     matrix_output_dir = os.path.join(configs.rootdir, 'data', 'data_matrices', context_name)
     print(f"Creating Counts Matrix for '{context_name}'")
+
     # call generate_counts_matrix.R to create count matrix from MADRID_input folder
-    robject = rpy2_api.Rpy2(r_file_path, data_dir=input_dir, out_dir=matrix_output_dir)
-    robject.call_function("generate_counts_matrix_main")
+    rpy2_hook = rpy2_api.Rpy2(r_file_path=r_file_path, data_dir=input_dir, out_dir=matrix_output_dir)
+    rpy2_hook.call_function("generate_counts_matrix_main")
+
+
     # generate_counts_matrix_io.generate_counts_matrix_main(input_dir, matrix_output_dir)
 
 
@@ -58,7 +63,8 @@ def create_config_df(context_name):
         try:
             # Match S___R___r___
             # \d{1,3} matches 1-3 digits
-            label = re.findall(r"S\d{1,3}R\d{1,3}r\d{1,3}?", gcfilename)[0]
+            # (r\d{1,3})? matches an option "r" followed by three digits
+            label = re.findall(r"S\d{1,3}R\d{1,3}(?:r\d{1,3})?", gcfilename)[0]
 
         except IndexError:
             print(f"\nfilename of {gcfilename} is not valid. Should be 'contextName_SXRYrZ.tab', where X is the "
@@ -215,7 +221,7 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     return matrix_total, matrix_mrna
 
 
-def create_gene_info_file(matrix_file_list, form, taxon_id):
+def create_gene_info_file(matrix_file_list, form: InputDatabase, taxon_id):
     """
     Create gene info file for specified context by reading first column in its count matrix file at
      /work/data/results/<context name>/gene_info_<context name>.csv
@@ -235,7 +241,7 @@ def create_gene_info_file(matrix_file_list, form, taxon_id):
 
     # Create our output database format
     # Do not include values equal to "form"
-    # Note: This is a refactor; I'm not sure why we are removing "form"
+    # Note: This is a refactor; I'm not sure why we are removing values not equal to "form"
     output_db: list[OutputDatabase] = [
         i for i in [
             OutputDatabase.ENSEMBL_GENE_ID,
@@ -243,10 +249,8 @@ def create_gene_info_file(matrix_file_list, form, taxon_id):
             OutputDatabase.GENE_ID,
             OutputDatabase.CHROMOSOMAL_LOCATION
         ]
-        if i.value != form
+        if i.value != form.value
     ]
-
-    print(f"Gathering {len(genes)} genes. Please wait...")
 
     gene_info = async_bioservices.database_convert.fetch_gene_info(
         input_values=genes,
@@ -264,7 +268,7 @@ def create_gene_info_file(matrix_file_list, form, taxon_id):
     print(f"Gene Info file written at '{gene_info_file}'")
 
 
-def handle_context_batch(context_names, mode, form, taxon_id, provided_matrix_file):
+def handle_context_batch(context_names, mode, form: InputDatabase, taxon_id, provided_matrix_file):
     """
     Handle iteration through each context type and create files according to flag used (config, matrix, info)
     """
@@ -358,13 +362,14 @@ def parse_args(argv):
 
     parser.add_argument("-n", "--context-names",
                         type=str,
+                        nargs="+",
                         required=True,
                         dest="context_names",
                         help="""Tissue/cell name of models to generate. These names should correspond to the folders
                              in 'MADRID_inputs/' if creating count matrix files, or to
                              'work/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv' if supplying
                              the count matrix as an imported .csv file. If making multiple models in a batch, then
-                             use the format: "context1,context2,context3". """
+                             use the format: "context1 context2 context3". """
                         )
 
     parser.add_argument("-f", "--gene-format",
@@ -412,54 +417,55 @@ def parse_args(argv):
                              "/work/data/data_matrices/<context name>/<NAME OF FILE>.csv"
                         )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    args.context_names = utilities.stringlist_to_list(args.context_names[0])
+
     return args
 
 
 def main(argv):
     args = parse_args(argv)
-    context_names = utilities.stringlist_to_list(args.context_names)
-    gene_format = args.gene_format
-    taxon_id = args.taxon_id
-    provide_matrix = args.provide_matrix
-    make_matrix = args.make_matrix
-    provided_matrix_fname = args.provided_matrix_fname
 
-    if gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
-        gene_format = "Ensembl Gene ID"
+    if args.gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
+        gene_format_database: InputDatabase = InputDatabase.ENSEMBL_GENE_ID
 
-    elif gene_format.upper() in ["HGNC SYMBOL", "HUGO", "HUGO SYMBOL", "SYMBOL", "HGNC", "GENE SYMBOL"]:
-        gene_format = "Gene Symbol"
+    elif args.gene_format.upper() in ["HGNC SYMBOL", "HUGO", "HUGO SYMBOL", "SYMBOL", "HGNC", "GENE SYMBOL"]:
+        gene_format_database: InputDatabase = InputDatabase.GENE_SYMBOL
 
-    elif gene_format.upper() in ["ENTREZ", "ENTRES", "ENTREZ ID", "ENTREZ NUMBER" "GENE ID"]:
-        gene_format = "Gene ID"
+    elif args.gene_format.upper() in ["ENTREZ", "ENTRES", "ENTREZ ID", "ENTREZ NUMBER" "GENE ID"]:
+        gene_format_database: InputDatabase = InputDatabase.GENE_ID
 
     else:  # provided invalid gene format
         print("Gene format (--gene_format) is invalid")
         print("Accepts 'Ensembl', 'Entrez', and 'HGNC symbol'")
-        print(f"You provided: {gene_format}")
+        print(f"You provided: {args.gene_format}")
         sys.exit()
 
     # handle species alternative ids
-    if type(taxon_id) == str:
-        if taxon_id.upper() == "HUMAN" or taxon_id.upper() == "HOMO SAPIENS":
-            taxon_id = 9606
-        elif taxon_id.upper() == "MOUSE" or taxon_id.upper() == "MUS MUSCULUS":
-            taxon_id = 10090
+    if type(args.taxon_id) == str:
+        if args.taxon_id.upper() == "HUMAN" or args.taxon_id.upper() == "HOMO SAPIENS":
+            taxon_id = TaxonIDs.HOMO_SAPIENS
+        elif args.taxon_id.upper() == "MOUSE" or args.taxon_id.upper() == "MUS MUSCULUS":
+            taxon_id = TaxonIDs.MUS_MUSCULUS
         else:
-            print("--taxon-id must be either an integer, or accepted string (\"mouse\", \"human\")")
-            sys.exit()
-    elif type(taxon_id) != int:
-        print("--taxon-id must be either an integer, or accepted string (\"mouse\", \"human\")")
-        sys.exit()
+            print("--taxon-id must be either an integer, or accepted string ('mouse', 'human')")
+            sys.exit(1)
+    elif type(args.taxon_id) == int:
+        taxon_id = args.taxon_id
+    else:
+        print("--taxon-id must be either an integer, or accepted string ('mouse', 'human')")
+        sys.exit(1)
 
     # use mutually exclusive flag to set mode which tells which files to generate
-    if provide_matrix:
+    if args.provide_matrix:
         mode = "provide"
-    elif make_matrix:
+    elif args.make_matrix:
         mode = "make"
+    else:
+        print("--provide-matrix or --create-matrix must be set")
+        sys.exit(1)
 
-    handle_context_batch(context_names, mode, gene_format, taxon_id, provided_matrix_fname)
+    handle_context_batch(args.context_names, mode, gene_format_database, taxon_id, args.provided_matrix_fname)
 
 
 if __name__ == "__main__":
