@@ -2,18 +2,18 @@
 This file tests the proteomics module
 """
 
-import os
-import sys
-import time
 from pathlib import Path
 
+import aioftp
+import pytest
 from proteomics.Crux import MZMLtoSQT, RAWtoMZML, SQTtoCSV
 from proteomics.FileInformation import FileInformation
-from proteomics.FTPManager import Download, Reader, ftp_client
+from proteomics.FTPManager import Download, Reader, aioftp_client
 from proteomics.proteomics_preprocess import ParseCSVInput, PopulateInformation
 
 from fixtures.fixture_ftp_server import fixture_ftp_server
 from fixtures.fixture_ftp_server import ftp_file_names
+
 
 class TestCrux:
     pass
@@ -67,16 +67,19 @@ class TestFileInformation:
 
 
 class TestFTPManager:
-    def test_ftp_client(self):
+    @pytest.mark.asyncio
+    async def test_ftp_client(self):
         """
         This test checks that the ftp_client function works as expected
         """
         host: str = "ftp.pride.ebi.ac.uk"
         port: int = 21
-        client = ftp_client(host=host, port=port, user="anonymous", passwd="guest")
+        client: aioftp.Client = await aioftp_client(host=host, port=port, username="anonymous", password="guest")
 
-        assert client.host == host
-        assert client.port == port
+        assert client.server_host == host
+        assert client.server_port == port
+        assert await client.get_current_directory() == Path("/")
+        assert await client.quit() is None
 
     def test_reader(self, ftpserver, fixture_ftp_server, ftp_file_names):
         # Use pytest_localftpserver and fixtures.fixture_ftp_server.fix
@@ -106,6 +109,7 @@ class TestFTPManager:
         """
         This checks that the Download class works as expected
         """
+
 
 class TestProteomicsPreprocess:
     pass
