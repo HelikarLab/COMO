@@ -52,4 +52,4 @@ jobs:
           run: |
             # Initialize micromamba and activate madrid_tests environment
             eval "$(micromamba shell hook --shell=bash)" && micromamba activate madrid_tests
-            pytest
+            python -m pytest
