@@ -7,3 +7,8 @@ if "pytest" not in sys.modules:
     import input_database
     import output_database
     import taxon_ids
+else:
+    from . import database_convert
+    from . import input_database
+    from . import output_database
+    from . import taxon_ids

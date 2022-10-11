@@ -7,3 +7,8 @@ if "pytest" not in sys.modules:
     import FileInformation
     import FTPManager
     import proteomics_preprocess
+else:
+    from . import Crux
+    from . import FileInformation
+    from . import FTPManager
+    from . import proteomics_preprocess
