@@ -41,16 +41,15 @@ jobs:
 
         - name: Lint with flake8
           run: |
-            # Activate micromamba
-            eval "$(micromamba shell hook --shell=bash)"
-            # Activate madrid_tests
-            micromamba activate madrid_tests
-            flake8 --version
+            # Initialize micromamba and activate madrid_tests environment
+            eval "$(micromamba shell hook --shell=bash)" && micromamba activate madrid_tests
             # stop the build if there are Python syntax errors or undefined names
             flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
             # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
             flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
-        # Change into the GITHUB_WORKSPACE /home/runner/work/REPO/REPO and execute tests
         - name: Run tests
-          run: pytest
+          run: |
+            # Initialize micromamba and activate madrid_tests environment
+            eval "$(micromamba shell hook --shell=bash)" && micromamba activate madrid_tests
+            pytest
