@@ -20,7 +20,7 @@ import rpy2_api
 import utilities
 
 # import R libraries
-tidyverse = importr("tidyverse")
+# tidyverse = importr("tidyverse")
 r_file_path: Path = Path(configs.rootdir, "py", "rscripts", "generate_counts_matrix.R")
 
 # # read and translate R functions
