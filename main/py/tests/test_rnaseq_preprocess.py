@@ -13,27 +13,27 @@ import rnaseq_preprocess
     "args",
     [
         # Test using data in MADRID_input data
-        [
-            "--context-names", "naiveB,immNK",
-            "--gene-format", "Ensembl",
-            "--taxon-id", 9606,
-            "--create-matrix"  # Create a matrix with provided data
-        ],
+        ["-n", "naiveB immNK", "--gene-format", "Ensembl", "--taxon-id", "9606", "--create-matrix"],
+        ["-n", "dimNK brightNK", "--gene-format", "SYMBOL", "--taxon-id", "human", "--provide-matrix", "--matrix", "MADRID_input/counts_matrix.tsv"],
     ]
 )
 def test_arg_input(args):
     """
     This function asserts that the arguments passed into the function are correct
     """
-    print(args)
-    # --context-names -> naiveB,immNK
-    # --gene-format -> Ensembl
-    # --taxon-id
-    # --provide-matrix
-    # --create-matrix
-    # --matrix
+    context_names = args[1]
+    gene_format = args[3]
+    taxon_id = args[5]
+    matrix_mode = args[6]
 
-    parsed_args = rnaseq_preprocess.parse_args(args)
-    print(parsed_args)
-    assert 0
+    parsed = rnaseq_preprocess.parse_args(args)
 
+    assert [context_name in parsed.context_names for context_name in context_names.split()]
+    assert parsed.gene_format == gene_format
+    assert parsed.taxon_id == taxon_id
+
+    if matrix_mode == "--create-matrix":
+        assert parsed.make_matrix is True
+    elif matrix_mode == "--provide-matrix":
+        assert parsed.make_matrix is False
+        assert parsed.provided_matrix_fname == args[8]

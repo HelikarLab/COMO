@@ -1,23 +1,22 @@
 #!/usr/bin/python3
 
+import sys
 import argparse
 import os
-import sys
-#import unidecode
-import time
 import pandas as pd
-import numpy as np
 import json
 from collections import Counter
-from project import configs
-from microarray_gen import *
-from proteomics_gen import *
-from rnaseq_gen import *
-from create_context_specific_model import split_gene_expression_data
 from warnings import warn
 from rpy2.robjects.packages import importr
-from rpy2.robjects import r, pandas2ri
-from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
+from rpy2.robjects import pandas2ri
+from pathlib import Path
+
+from create_context_specific_model import split_gene_expression_data
+import microarray_gen
+from project import configs
+import proteomics_gen
+import rnaseq_gen
+import rpy2_api
 
 
 # enable r to py conversion
@@ -28,10 +27,11 @@ ggplot2 = importr("ggplot2")
 tidyverse = importr("tidyverse")
 
 # read and translate R functions
-f = open(os.path.join(configs.rootdir, "py", "rscripts", "combine_distributions.R"), "r")
-string = f.read()
-f.close()
-combine_dist_io = SignatureTranslatedAnonymousPackage(string, "combine_dist_io")
+# f = open(os.path.join(configs.rootdir, "py", "rscripts", "combine_distributions.R"), "r")
+# string = f.read()
+# f.close()
+# combine_dist_io = SignatureTranslatedAnonymousPackage(string, "combine_dist_io")
+r_file_path = Path(configs.rootdir, "py", "rscripts", "combine_distributions.R")
 
 
 def merge_xomics(
@@ -62,11 +62,11 @@ def merge_xomics(
     """
     print(f"Merging data for {sheet}")
     # load data for each source if it exists. IF not load an empty dummy dataset
-    microarray = load_microarray_tests(filename=microarray_file, context_name=sheet)
-    proteomics = load_proteomics_tests(filename=proteomics_file, context_name=sheet)
-    trnaseq = load_rnaseq_tests(filename=trnaseq_file, context_name=sheet, lib_type="total")  # total RNA-seq
-    mrnaseq = load_rnaseq_tests(filename=mrnaseq_file, context_name=sheet, lib_type="mrna")  # mRNA-seq
-    scrnaseq = load_rnaseq_tests(filename=scrnaseq_file, context_name=sheet, lib_type="scrna")  # Single-cell RNA-seq
+    microarray = microarray_gen.load_microarray_tests(filename=microarray_file, context_name=sheet)
+    proteomics = proteomics_gen.load_proteomics_tests(filename=proteomics_file, context_name=sheet)
+    trnaseq = rnaseq_gen.load_rnaseq_tests(filename=trnaseq_file, context_name=sheet, lib_type="total")  # total RNA-seq
+    mrnaseq = rnaseq_gen.load_rnaseq_tests(filename=mrnaseq_file, context_name=sheet, lib_type="mrna")  # mRNA-seq
+    scrnaseq = rnaseq_gen.load_rnaseq_tests(filename=scrnaseq_file, context_name=sheet, lib_type="scrna")  # Single-cell RNA-seq
 
     files_dict = dict()
 
@@ -120,7 +120,7 @@ def merge_xomics(
         else:
             merge_data = merge_data.join(scrnaseq_data, how="outer")
 
-    merge_data = mergeLogicalTable(merge_data)
+    merge_data = microarray_gen.mergeLogicalTable(merge_data)
 
     num_sources = len(exp_list)
     merge_data["Active"] = 0
@@ -209,7 +209,8 @@ def handle_context_batch(
     min_inputs = min(counts.values())
 
     if merge_distro:
-        combine_dist_io.combine_zscores_main(
+        rpy2_api.Rpy2(
+            r_file_path,
             os.path.join(configs.datadir, "results"),
             sheet_names,
             use_mrna,
@@ -221,7 +222,21 @@ def handle_context_batch(
             mweight,
             sweight,
             pweight
-        )
+        ).call_function("combine_zscores_main")
+        # combine_dist_io.call_function("combine_zscores_main")
+        # combine_dist_io.combine_zscores_main(
+        #     os.path.join(configs.datadir, "results"),
+        #     sheet_names,
+        #     use_mrna,
+        #     use_trna,
+        #     use_scrna,
+        #     use_proteins,
+        #     keep_gene_score,
+        #     tweight,
+        #     mweight,
+        #     sweight,
+        #     pweight
+        # )
 
     files_json = os.path.join(configs.rootdir, "data", "results", "step1_results_files.json")
     for context_name in sheet_names:
@@ -503,16 +518,16 @@ def main(argv):
             expression_requirement = int(expression_requirement)
             if int(expression_requirement) < 1:
                 print("Expression requirement must be at least 1!")
-                sys.out()
+                sys.exit(1)
         except ValueError:
             print("Expression requirement must be able to be converted to an integer!")
-            sys.out()
+            sys.exit(1)
 
     if adjust_method not in ["progressive", "regressive", "flat", "custom"]:
         print(
             "Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'"
         )
-        sys.exit()
+        sys.exit(1)
 
     handle_context_batch(
         microarray_file,
