@@ -7,6 +7,8 @@ import pandas as pd
 import numpy as np
 from project import configs
 import GSEpipelineFast
+import rpy2_api
+import GSEpipelineFast
 
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 from rpy2.robjects.packages import importr
@@ -16,6 +18,10 @@ import rpy2.robjects as ro
 from async_bioservices import database_convert
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.output_database import OutputDatabase
+from rpy2.robjects.packages import importr
+from pathlib import Path
+import os
+import pandas as pd
 
 pandas2ri.activate()
 
@@ -25,21 +31,23 @@ edgeR = importr("edgeR")
 readxl = importr("readxl")
 
 # read and translate R functions
-f = open(os.path.join(configs.rootdir, "py", "rscripts", "DGE.R"), "r")
-string = f.read()
-f.close()
-DGEio = SignatureTranslatedAnonymousPackage(string, "DGEio")
+# f = open(os.path.join(configs.rootdir, "py", "rscripts", "DGE.R"), "r")
+# string = f.read()
+# f.close()
+# DGEio = SignatureTranslatedAnonymousPackage(string, "DGEio")
+DGEio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "py", "rscripts", "DGE.R"))
 
-f = open(os.path.join(configs.rootdir, "py", "rscripts", "fitAffy.R"), "r")
-string = f.read()
-f.close()
-affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
+# f = open(os.path.join(configs.rootdir, "py", "rscripts", "fitAffy.R"), "r")
+# string = f.read()
+# f.close()
+# affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
+affyio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "py", "rscripts", "fitAffy.R"))
 
-
-f = open(os.path.join(configs.rootdir, "py", "rscripts", "fitAgilent.R"), "r")
-string = f.read()
-f.close()
-agilentio = SignatureTranslatedAnonymousPackage(string, "agilentio")
+# f = open(os.path.join(configs.rootdir, "py", "rscripts", "fitAgilent.R"), "r")
+# string = f.read()
+# f.close()
+# agilentio = SignatureTranslatedAnonymousPackage(string, "agilentio")
+agilentio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "py", "rscripts", "fitAgilent.R"))
 
 
 def breakDownEntrezs(disease):
@@ -67,42 +75,41 @@ def breakDownEntrezs(disease):
     return gene_expressions
 
 
-def get_entrez_id(regulated, output_full_path, in_db, taxon_id, full_flag=False):
-    """
-    Fetch entrez ids using bioDbNet
-    param: regulated -  df, with columns:
-    param: output_full_path - path to
-    param: in_db - bioDBnet input database query name
-    param: taxon_id - bioDBnet taxon id
-    param: full_flag - boolean, True if breaking down multi- entrez ids into seperate rows
-    return: df,
-    """
-    disease = database_convert.fetch_gene_info(
-        input_values=list(regulated.index.values),
-        input_db=in_db,
-        output_db=["Gene Symbol"],
-        taxon_id=taxon_id,
-    )
-    # disease = fetch_gene_info(list(regulated.index.values),
-    #                           input_db=in_db,
-    #                           output_db=["Gene Symbol"],
-    #                           delay=15,
-    #                           taxon_id=taxon_id
-    #                           )
-
-    disease.reset_index(inplace=True)
-    # disease.drop(columns=["Ensembl Gene ID"], inplace=True)
-    disease.replace(to_replace="-", value=np.nan, inplace=True)
-    if not full_flag:
-        disease.dropna(how="any", subset=disease.columns[[0]], inplace=True)
-        gene_expressions = breakDownEntrezs(disease)
-        gene_expressions.set_index(gene_expressions.columns[0], inplace=True)
-    else:
-        gene_expressions = disease
-
-    # gene_expressions["Gene ID"].to_csv(outputFullPath, index=False)
-    gene_expressions[gene_expressions.columns[0]].to_csv(output_full_path, index=False)
-    return gene_expressions
+# def get_entrez_id(regulated, output_full_path, in_db, taxon_id, full_flag=False):
+#     """
+#     Fetch entrez ids using bioDbNet
+#     param: regulated -  df, with columns:
+#     param: output_full_path - path to
+#     param: in_db - bioDBnet input database query name
+#     param: taxon_id - bioDBnet taxon id
+#     param: full_flag - boolean, True if breaking down multi- entrez ids into seperate rows
+#     return: df,
+#     """
+#     disease = database_convert.fetch_gene_info(
+#         input_values=list(regulated.index.values),
+#         input_db=in_db,
+#         output_db=["Gene Symbol"],
+#         taxon_id=taxon_id,
+#     )
+#     # disease = fetch_gene_info(list(regulated.index.values),
+#     #                           input_db=in_db,
+#     #                           output_db=["Gene Symbol"],
+#     #                           delay=15,
+#     #                           taxon_id=taxon_id
+#     #                           )
+#     disease.reset_index(inplace=True)
+#     # disease.drop(columns=["Ensembl Gene ID"], inplace=True)
+#     disease.replace(to_replace="-", value=np.nan, inplace=True)
+#     if not full_flag:
+#         disease.dropna(how="any", subset=disease.columns[[0]], inplace=True)
+#         gene_expressions = breakDownEntrezs(disease)
+#         gene_expressions.set_index(gene_expressions.columns[0], inplace=True)
+#     else:
+#         gene_expressions = disease
+#
+#     # gene_expressions["Gene ID"].to_csv(outputFullPath, index=False)
+#     gene_expressions[gene_expressions.columns[0]].to_csv(output_full_path, index=False)
+#     return gene_expressions
 
 
 def pharse_configs(config_filepath, sheet):
@@ -155,7 +162,9 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
         raw_dir = os.path.join(gseXXX.gene_dir, key)
         print(f"{key}:{val}, {raw_dir}")
         if inst_name == "affy":
-            diff_exp_df = affyio.fitaffydir(raw_dir, target_path)
+            affy_function = affyio.call_function("fitaffydir")
+            diff_exp_df = affy_function(raw_dir, target_path)
+            # diff_exp_df = affyio.fitaffydir(raw_dir, target_path)
         elif inst_name == "agilent":
             diff_exp_df = agilentio.fitagilent(raw_dir, target_path)
         diff_exp_df = ro.conversion.rpy2py(diff_exp_df)

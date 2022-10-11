@@ -1,14 +1,18 @@
 #!/usr/bin/python3
 
 import os
-import time
 import pandas as pd
-from rpy2.robjects.packages import importr
-from rpy2.robjects import r, pandas2ri
 import rpy2.robjects as ro
-from rpy2.robjects.conversion import localconverter
-from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
+import time
 from bioservices import BioDBNet
+from rpy2.robjects import pandas2ri
+from rpy2.robjects.packages import importr
+from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
+import rpy2_api
+from pathlib import Path
+
+affy_r_file_path = Path("./rscripts/fitAffy.R")
+agilent_r_file = Path("./rscript/fitAgilent.R")
 
 
 class RObject:
@@ -82,8 +86,14 @@ def agilent_raw(datadir, gsms):
     cols = dict(zip(txts, keys))
 
     targets = pd.DataFrame(gzs, columns=["FileName"], index=txts)
-    df_agilent = RObject().agilent
-    df_agilent = RObject().agilent.readagilent(datadir, targets)  # Error shows because this is an R object, PyCharm doesn't know this
+
+    df_agilent = rpy2_api.Rpy2(
+        agilent_r_file,
+        datadir,
+        targets
+    ).call_function("readagilent")
+
+    # df_agilent = RObject().agilent.readagilent(datadir, targets)
     df_agilent = ro.conversion.rpy2py(df_agilent)
     df_temp = pd.read_csv(os.path.join(datadir, "ydf_temp.csv"), header=0)
     df_agilent["ProbeName"] = df_temp["ProbeName"].to_list()
@@ -165,6 +175,7 @@ if __name__ == '__main__':
     # This is done using a class because the GSEpipeline also utilizes the R-affyio object
     # This is the best method of keeping this information segregated in a "main" statement,
     # while allowing access to other functions
+    # affyio = rpy2_api.Rpy2(r_file_path=affy_r_file_path)
     affyio = AffyIO().affyio
 
     # read and translate R functions for handling agilent
