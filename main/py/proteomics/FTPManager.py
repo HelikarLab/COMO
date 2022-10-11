@@ -4,8 +4,8 @@ This file is responsible downloading data found at FTP links
 TODO: Find a way to mark a file as "downloaded"
     - Keep a list of file names in a ".completd" hidden folder?
 """
-from FileInformation import FileInformation
-from FileInformation import clear_print
+from .FileInformation import FileInformation
+from .FileInformation import clear_print
 
 import aioftp
 import asyncio
@@ -16,7 +16,7 @@ import typing
 from urllib.parse import urlparse
 
 
-async def aioftp_client(host: str, username: str = "anonymous", password: str = "guest", max_attempts: int = 3) -> aioftp.Client:
+async def aioftp_client(host: str, username: str = "anonymous", password: str = "guest", port: int = 21, max_attempts: int = 3) -> aioftp.Client:
     """
     This class is responsible for creating a "client" connection
     """
@@ -27,7 +27,7 @@ async def aioftp_client(host: str, username: str = "anonymous", password: str = 
     while not connection_successful and attempt_num <= max_attempts:
         try:
             client: aioftp.Client = aioftp.Client()
-            await client.connect(host, 21)
+            await client.connect(host, port)
             await client.login(user=username, password=password)
             connection_successful = True
         except ConnectionResetError:

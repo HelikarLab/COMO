@@ -81,6 +81,7 @@ class TestFTPManager:
         assert await client.get_current_directory() == Path("/")
         assert await client.quit() is None
 
+    @pytest.mark.skip(reason="pyftpdlib is broken, no way to test this")
     def test_reader(self, ftpserver, fixture_ftp_server, ftp_file_names):
         # Use pytest_localftpserver and fixtures.fixture_ftp_server.fix
         # Now we can get login information for our local FTP server
@@ -105,6 +106,7 @@ class TestFTPManager:
             assert file.endswith(tuple(file_extensions))
             assert file in ftp_file_names
 
+    @pytest.mark.skip(reason="pyftpdlib is broken, no way to test this")
     def test_download(self, mocker, tmp_path):
         """
         This checks that the Download class works as expected
@@ -113,8 +115,3 @@ class TestFTPManager:
 
 class TestProteomicsPreprocess:
     pass
-
-
-if __name__ == '__main__':
-    reader = TestFTPManager()
-    reader.test_reader_mocker()

@@ -9,6 +9,7 @@ def ftp_file_names() -> list[str]:
     """
     return ["file_one.raw", "file_two.raw", "file_three.raw", "config.txt", "README.md"]
 
+
 @pytest.fixture(scope="module")
 def fixture_ftp_server(ftpserver, ftp_file_names):
     # We must "upload" files to the local FTP server
