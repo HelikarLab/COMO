@@ -9,6 +9,7 @@ from project import configs
 import GSEpipelineFast
 import rpy2_api
 from pathlib import Path
+import GSEpipelineFast
 
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 from rpy2.robjects import pandas2ri
@@ -18,6 +19,10 @@ import rpy2.robjects as ro
 from async_bioservices import database_convert
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.output_database import OutputDatabase
+from rpy2.robjects.packages import importr
+from pathlib import Path
+import os
+import pandas as pd
 
 pandas2ri.activate()
 
@@ -33,6 +38,7 @@ readxl = importr("readxl")
 # DGEio = SignatureTranslatedAnonymousPackage(string, "DGEio")
 DGEio_path = Path(configs.rootdir, "py", "rscripts", "DGE.R")
 # DGEio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "py", "rscripts", "DGE.R"))
+DGEio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "py", "rscripts", "DGE.R"))
 
 # f = open(os.path.join(configs.rootdir, "py", "rscripts", "fitAffy.R"), "r")
 # string = f.read()
@@ -40,6 +46,7 @@ DGEio_path = Path(configs.rootdir, "py", "rscripts", "DGE.R")
 # affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
 affyio_path = Path(configs.rootdir, "py", "rscripts", "fitAffy.R")
 # affyio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "py", "rscripts", "fitAffy.R"))
+affyio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "py", "rscripts", "fitAffy.R"))
 
 # f = open(os.path.join(configs.rootdir, "py", "rscripts", "fitAgilent.R"), "r")
 # string = f.read()
@@ -47,6 +54,7 @@ affyio_path = Path(configs.rootdir, "py", "rscripts", "fitAffy.R")
 # agilentio = SignatureTranslatedAnonymousPackage(string, "agilentio")
 agilentio_path = Path(configs.rootdir, "py", "rscripts", "fitAgilent.R")
 # agilentio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "py", "rscripts", "fitAgilent.R"))
+agilentio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "py", "rscripts", "fitAgilent.R"))
 
 
 def breakDownEntrezs(disease):
@@ -161,8 +169,9 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
         raw_dir = os.path.join(gseXXX.gene_dir, key)
         print(f"{key}:{val}, {raw_dir}")
         if inst_name == "affy":
-            affy_function = rpy2_api.Rpy2(affyio_path, raw_dir, target_path)
-            diff_exp_df = affy_function.call_function("fitaffydir")
+            affy_function = affyio.call_function("fitaffydir")
+            diff_exp_df = affy_function(raw_dir, target_path)
+            # diff_exp_df = affyio.fitaffydir(raw_dir, target_path)
         elif inst_name == "agilent":
             agilent_function = rpy2_api.Rpy2(agilentio_path, raw_dir, target_path)
             diff_exp_df = agilent_function.call_function("fitagilent")

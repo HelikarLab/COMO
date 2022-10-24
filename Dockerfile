@@ -15,7 +15,7 @@ COPY --chown=1000:100 main "${HOME}"/main
 RUN conda config --quiet --add channels conda-forge \
     && conda config --quiet --add channels bioconda \
     && conda config --quiet --add channels r \
-    # Remove python from pinned versions; this allows us to update python. From: https://stackoverflow.com/a/11245372/13885200 \
+    # Remove python from pinned versions; this allows us to update python. From: https://stackoverflow.com/a/11245372 \
     && sed -i "s/^python 3.*//" /opt/conda/conda-meta/pinned \
     && mamba install --quiet --yes python=${PYTHON_VERSION} \
     && mamba env update --quiet --name=base --file="${HOME}/environment.yaml" \

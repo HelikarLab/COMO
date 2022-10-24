@@ -1,28 +1,14 @@
-docker_old/*
-/**/.DS_Store
-
-# JetBrains project files, these are user-specific
-/**/.idea
-
-# Jupyter checkpoints
-/**/.ipynb_checkpoints/
-
-# R logs
-/main/py/rlogs/
 *.Rhistory
-
-# Microsoft temporary files
-~$*
-
-# Python cache files
+/**/.DS_Store
+/**/.idea
+/**/.ipynb_checkpoints/
+/**/.jekyll-cache
+/**/.mypy_cache
+/**/.pytest_cache
 /**/__pycache__
-**/*.pytest_cache
-
-# Do not track output files
-/main/output
-
-# Local GitHub Pages build location
 /docs/_site
-**/.jekyll-cache
 /docs/Gemfile.lock
-
+/main/output
+/main/py/rlogs/
+docker_old/*
+~$*

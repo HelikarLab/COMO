@@ -11,6 +11,9 @@ import urllib.request
 from GSEpipeline import load_gse_soft
 from instruments import AffyIO
 from rpy2.robjects import pandas2ri
+from async_bioservices import database_convert
+from async_bioservices.input_database import InputDatabase
+from async_bioservices.output_database import OutputDatabase
 
 pandas2ri.activate()
 # Input: Extract Gene Info from GEO DataSets

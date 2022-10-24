@@ -12,7 +12,6 @@ import cobra
 import copy
 from cobra.flux_analysis import moma, pfba
 from project import configs
-# from instruments import fetch_entrez_gene_id
 
 import async_bioservices
 from async_bioservices import database_convert
@@ -242,12 +241,13 @@ def repurposing_hub_preproc(drug_file):
                 ignore_index=True
             )
 
-    entrez_ids = database_convert.fetch_gene_info(
+    entrez_ids = async_bioservices.database_convert.fetch_gene_info(
         input_values=drug_db_new["Target"].tolist(),
         input_db=InputDatabase.GENE_SYMBOL,
         output_db=[
+            OutputDatabase.GENE_SYMBOL,
             OutputDatabase.GENE_ID,
-            OutputDatabase.ENSEMBL_GENE_ID
+            OutputDatabase.CHROMOSOMAL_LOCATION
         ]
     )
 
@@ -261,13 +261,12 @@ def repurposing_hub_preproc(drug_file):
 def drug_repurposing(drug_db, d_score):
     d_score["Gene"] = d_score["Gene"].astype(str)
 
-    d_score_gene_sym = database_convert.fetch_gene_info(
+    d_score_gene_sym = async_bioservices.database_convert.fetch_gene_info(
         input_values=d_score["Gene"].tolist(),
         input_db=InputDatabase.GENE_ID,
         output_db=[OutputDatabase.GENE_SYMBOL]
     )
 
-    # d_score_gene_sym = fetch_entrez_gene_id(d_score["Gene"].tolist(), input_db="Gene ID", output_db=["Gene Symbol"])
     d_score.set_index("Gene", inplace=True)
     d_score["Gene Symbol"] = d_score_gene_sym["Gene Symbol"]
     d_score.reset_index(drop=False, inplace=True)
