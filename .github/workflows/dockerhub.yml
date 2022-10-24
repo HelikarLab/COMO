@@ -61,6 +61,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      - name: Clean Notebook Output
+        uses: ResearchSoftwareActions/EnsureCleanNotebooksAction@1.1
+
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
