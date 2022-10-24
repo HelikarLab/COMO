@@ -61,6 +61,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      # Fail if prehook not used
       - name: Clean Notebook Output
         uses: actions/setup-python@v4
         with:
