@@ -62,6 +62,15 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Clean Notebook Output
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10
+        run: |
+          python -m pip install --upgrade nbstripout --no-cache-dir
+          nbstripout /home/runner/work/MADRID/MADRID/*.ipynb
+
+      # Fail if prehook not used
+      - name: Clean Notebook Output
         uses: ResearchSoftwareActions/EnsureCleanNotebooksAction@1.1
 
       - name: Build and push
