@@ -77,22 +77,28 @@ def fetch_gene_info(
     """
     input_db_value = input_db.value
     if output_db is None:
-        output_db: list[str] = [
+        
+        output_db: list = [
             OutputDatabase.GENE_SYMBOL.value,
             OutputDatabase.GENE_ID.value,
             OutputDatabase.CHROMOSOMAL_LOCATION.value
         ]
     else:
-        output_db: list[str] = [i.value for i in output_db]
+        output_db: list = [i.value for i in output_db]
 
     biodbnet = BioDBNet()
     dataframe_maps: pd.DataFrame = pd.DataFrame([], columns=output_db)
     dataframe_maps.index.name = input_db.value
 
-    if taxon_id == TaxonIDs.HOMO_SAPIENS:
-        batch_len = 500
+    if type(taxon_id) == TaxonIDs:
+        taxon_id_value = taxon_id.value
+        if taxon_id == TaxonIDs.HOMO_SAPIENS:
+            batch_len: int = 500
+        else:
+            batch_len: int = 300
     else:
-        batch_len = 300
+        taxon_id_value = taxon_id
+        batch_len: int = 300
 
     # Create a list of tasks to be awaited
     event_loop = asyncio.new_event_loop()
@@ -107,7 +113,7 @@ def fetch_gene_info(
                 input_values=input_values[i:upper_range],
                 input_db=input_db_value,
                 output_db=output_db,
-                taxon_id=taxon_id,
+                taxon_id=taxon_id_value,
                 delay=delay,
                 event_loop=event_loop
             )

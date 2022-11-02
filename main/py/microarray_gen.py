@@ -305,8 +305,8 @@ def load_microarray_tests(filename, context_name):
             configs.rootdir,
             "data",
             "data_matrices",
-            "dummy",
-            "dummy_microarray_data.csv",
+            "placeholder",
+            "placeholder_empty_data.csv",
         )
         dat = pd.read_csv(savepath, index_col="ENTREZ_GENE_ID")
         
