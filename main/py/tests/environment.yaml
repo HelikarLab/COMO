@@ -17,3 +17,4 @@ dependencies:
   - tqdm==4.64.1
   - pip:
     - bioservices==1.10.1
+    - GEOparse==2.0.3
