@@ -19,9 +19,6 @@ RUN conda config --quiet --add channels conda-forge \
     && sed -i "s/^python 3.*//" /opt/conda/conda-meta/pinned \
     && mamba install --quiet --yes python=${PYTHON_VERSION} \
     && mamba env update --quiet --name=base --file="${HOME}/environment.yaml" \
-    # && mamba install --file "${HOME}/mamba_install.txt" \
-    # && python3 -m pip install -r "${HOME}/pip_install.txt" \
-    #&& mamba env update --name base --file "${ENVIRONMENT_FILE}" \
     && mamba clean --quiet --all --force-pkgs-dirs --yes \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
     # Install jupyter extensions
