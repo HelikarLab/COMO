@@ -90,12 +90,15 @@ def fetch_gene_info(
     dataframe_maps: pd.DataFrame = pd.DataFrame([], columns=output_db)
     dataframe_maps.index.name = input_db.value
 
-    if taxon_id == TaxonIDs.HOMO_SAPIENS:
-        batch_len = 500
+    if type(taxon_id) == TaxonIDs:
         taxon_id_value = taxon_id.value
+        if taxon_id == TaxonIDs.HOMO_SAPIENS:
+            batch_len: int = 500
+        else:
+            batch_len: int = 300
     else:
-        batch_len = 300
         taxon_id_value = taxon_id
+        batch_len: int = 300
 
     # Create a list of tasks to be awaited
     event_loop = asyncio.new_event_loop()
