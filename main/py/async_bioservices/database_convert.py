@@ -76,8 +76,6 @@ def fetch_gene_info(
     :return: A dataframe with specified columns as "output_db" (Default is HUGO symbol, Entrez ID, and chromosome start and end positions)
     """
     
-    val: str = OutputDatabase.GENE_SYMBOL.value
-    
     input_db_value = input_db.value
     if output_db is None:
         
