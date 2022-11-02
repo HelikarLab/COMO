@@ -378,8 +378,7 @@ umi_filter <- function(SampMetrics, filt_options, context_name) {
         nas <- is.na(udf) == 1
         zmat <- zFPKM(udf, min_thresh=0, assayName="UMI") # calculate zFPKM
         zmat[minimums] <- -4 # instead of -inf set to lower limit
-        zumi_fname <- file.path("/home", username, "main", "data", "results",
-                                 context_name, prep, paste0("zUMI_Matrix_", prep, "_", study_number, ".csv"))
+        zumi_fname <- file.path("/home", username, "main", "data", "results", context_name, prep, paste0("zUMI_Matrix_", prep, "_", study_number, ".csv"))
 
         write_zumi <- cbind(ent, zmat)
         colnames(write_zumi)[1] <- "ENTREZ_GENE_ID"
@@ -404,7 +403,6 @@ umi_filter <- function(SampMetrics, filt_options, context_name) {
         } else {
 
             for ( j in 1:(plot_batches-1) ) {
-                breakout <- FALSE
                 zumi_plotname <- file.path(zumi_plot_dir, paste0("zumi_plot_", study_number, "_", j, ".pdf"))
                 pdf(zumi_plotname)
                 samps <- c()
@@ -456,60 +454,6 @@ filter_counts <- function(SampMetrics, technique, filt_options, context_name, pr
     )
 }
 
-
-save_rnaseq_tests <- function(
-  counts_matrix_file,
-  config_file,
-  out_file,
-  info_file,
-  context_name,
-  prep="total",
-  replicate_ratio=0.5,
-  batch_ratio=0.5,
-  replicate_ratio_high=0.9,
-  batch_ratio_high=0.9,
-  technique="quantile",
-  quantile=0.9,
-  min_count=10,
-  min_zfpkm=-3) {
-
-    # condense filter options
-    filt_options <- list()
-    if ( exists("replicate_ratio") ) {
-        filt_options$replicate_ratio <- replicate_ratio
-    } else {
-        filt_options$replicate_ratio <- 0.2
-    }
-    if ( exists("batch_ratio") ) {
-        filt_options$batch_ratio <- batch_ratio
-    } else {
-        filt_options$batch_ratio <- 0.5
-    }
-    if ( exists("quantile") ) {
-        filt_options$quantile <- quantile
-    } else {
-        filt_options$quantile <- 50
-    }
-    if ( exists("min_count") ) {
-        filt_options$min_count <- min_count
-    } else {
-        filt_options$min_count <- 1
-    }
-	if ( exists("min_zfpkm") ) {
-        filt_options$min_zfpkm <- min_zfpkm
-    } else {
-        filt_options$min_zfpkm <- -3
-    }
-    if ( exists("replicate_ratio_high") ) {
-        filt_options$replicate_ratio_high<- replicate_ratio_high
-    } else {
-        filt_options$replicate_ratio_high <- 0.9
-    }
-    if ( exists("batch_ratio_high") ) {
-        filt_options$batch_ratio_high <- batch_ratio_high
-    } else {
-        filt_options$batch_ratio_high <- 0.9
-    }
 save_rnaseq_tests <- function(
   counts_matrix_file,
   config_file,
@@ -568,10 +512,6 @@ save_rnaseq_tests <- function(
       technique = "umi"
       print("Note: Single cell filtration does not normalize and assumes counts are counted with UMI")
     }
-    if ( prep == "scrna" ) {
-        technique = "umi"
-        print("Note: Single cell filtration does not normalize and assumes counts are counted with UMI")
-    }
 
     print("Reading Counts Matrix")
     SampMetrics <- read_counts_matrix(counts_matrix_file, config_file, info_file, context_name) # read count matrix
@@ -613,7 +553,6 @@ save_rnaseq_tests <- function(
 
     # create a table to write gene expression and high confidence to
     write_table <- data.frame(entrez_all)
-    write_table <- cbind(write_table, rep(0, nrow(write_table)))
     write_table <- cbind(write_table, rep(0, nrow(write_table)))
     for ( i in 1:nrow(write_table) ) {
         if (as.character(write_table[i,1]) %in% as.character(SampMetrics$ExpressedGenes)) {
