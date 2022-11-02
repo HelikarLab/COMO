@@ -1,7 +1,7 @@
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
 library("stringr")
 username <- Sys.info()["user"]
-work_dir <- str_interp("/home/${username}/work")
+work_dir <- str_interp("/home/${username}/main")
 
 if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
     dir.create(str_interp("${work_dir}/py/rlogs"))
@@ -167,13 +167,11 @@ create_counts_matrix <- function(counts_files, replicate_names, n_replicates, st
     # If the length of n_replicates is 1, then all samples are replicates of the same study
     # Show a warning and exit the script; we cannot have less than 2 replicates
     # Show the replicate name in the warning
-
-    if (length(n_replicates) == 1) {
+    if (n_replicates == 1) {
         warning("There is only one replicate for study ", replicate_names[1], ". Please provide at least two replicates.")
         stop()
     }
-
-
+    
     i_adjust <- 0  # adjusted index, subtracts number of multiruns processed
     counts <- prepare_sample_counts(counts_files[1], counts_files, strand_files[1]) # get first column of counts to add
     

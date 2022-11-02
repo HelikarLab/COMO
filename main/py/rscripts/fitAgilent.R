@@ -1,7 +1,7 @@
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
 library("stringr")
 username <- Sys.info()["user"]
-work_dir <- str_interp("/home/${username}/work")
+work_dir <- str_interp("/home/${username}/main")
 
 if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
     dir.create(str_interp("${work_dir}/py/rlogs"))

@@ -168,8 +168,8 @@ def load_proteomics_tests(filename, context_name):
             configs.rootdir,
             "data",
             "data_matrices",
-            "dummy",
-            "dummy_proteomics_data.csv",
+            "placeholder",
+            "placeholder_empty_data.csv",
         )
         dat = pd.read_csv(savepath, index_col="ENTREZ_GENE_ID")
         return "dummy", dat
