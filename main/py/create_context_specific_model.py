@@ -844,22 +844,29 @@ def main(argv):
     else:
         force_rxns = []
 
-    if output_filetypes not in ["xml", "mat", "json"]:
-        try:
-            output_filetypes = (
-                output_filetypes.strip("[")
-                .strip("]")
-                .replace("'", "")
-                .replace(" ", "")
-                .split(",")
-            )
-            if any(form not in ["xml", "json", "mat"] for form in output_filetypes):
-                print_filetype_help()
-                sys.exit()
-        except BaseException:
-            print_filetype_help()
-    else:
-        output_filetypes = [output_filetypes]
+    print(f"HERE: {output_filetypes}")
+    # Assert output types are valid
+    for output_type in output_filetypes:
+        if output_type not in ["xml", "mat", "json"]:
+            print(f"Output file type {output_type} not recognized.")
+            print("Output file types must be one of the following: xml, mat, json")
+            sys.exit(1)
+    # if output_filetypes not in ["xml", "mat", "json"]:
+    #     try:
+    #         output_filetypes = (
+    #             output_filetypes.strip("[")
+    #             .strip("]")
+    #             .replace("'", "")
+    #             .replace(" ", "")
+    #             .split(",")
+    #         )
+    #         if any(form not in ["xml", "json", "mat"] for form in output_filetypes):
+    #             print_filetype_help()
+    #             sys.exit()
+    #     except BaseException:
+    #         print_filetype_help()
+    # else:
+    #     output_filetypes = [output_filetypes]
 
     if recon_alg not in ["FASTCORE", "GIMME", "IMAT"]:
         print(
@@ -943,7 +950,6 @@ def main(argv):
     print(pfba(context_model))
     #print(context_model.optimize())
     print("len rxns: ", len(context_model.reactions))
-    return None
 
 
 if __name__ == "__main__":

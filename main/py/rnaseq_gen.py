@@ -16,15 +16,15 @@ import rpy2_api
 pandas2ri.activate()
 
 # import R libraries
-limma = importr("limma")
-tidyverse = importr("tidyverse")
-edgeR = importr("edgeR")
-genefilter = importr("genefilter")
-biomaRt = importr("biomaRt")
-sjmisc = importr("sjmisc")
-readxl = importr("readxl")
-zfpkm = importr("zFPKM")
-stringr = importr("stringr")
+#limma = importr("limma")
+#tidyverse = importr("tidyverse")
+#edgeR = importr("edgeR")
+#genefilter = importr("genefilter")
+#biomaRt = importr("biomaRt")
+#sjmisc = importr("sjmisc")
+#readxl = importr("readxl")
+#zfpkm = importr("zFPKM")
+#stringr = importr("stringr")
 
 # read and translate R functions
 # f = open(os.path.join(configs.rootdir, "py", "rscripts", "rnaseq.R"), "r")
