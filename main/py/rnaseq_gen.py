@@ -45,7 +45,7 @@ def load_rnaseq_tests(filename, context_name, lib_type):
         dat = pd.read_csv(savepath, index_col="ENTREZ_GENE_ID")
         return "dummy", dat
 
-    if (not filename or filename == "None"):  # not using this data type, use empty dummy data matrix
+    if not filename or filename == "None":  # not using this data type, use empty dummy data matrix
         return load_dummy_dict()
 
     inquiry_full_path = os.path.join(configs.rootdir, "data", "config_sheets", filename)

@@ -5,13 +5,13 @@ library(stringr)
 
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
 username <- Sys.info()["user"]
-work_dir <- stringr::str_interp("/home/${username}/work")
+work_dir <- stringr::str_interp("/home/${username}/main")
 
 if (!dir.exists(stringr::str_interp("${work_dir}/py/rlogs"))) {
     dir.create(stringr::str_interp("${work_dir}/py/rlogs"))
 }
 
-zz <- file(file.path("/home", username, "work", "py", "rlogs", "DGE.Rout"), open="wt")
+zz <- file(file.path("/home", username, "main", "py", "rlogs", "DGE.Rout"), open="wt")
 sink(zz, type="message")
 
 
