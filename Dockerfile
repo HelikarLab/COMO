@@ -4,6 +4,11 @@ ARG GRB_SHORT_VERSION=9.5
 ARG GRB_VERSION=9.5.0
 ARG PYTHON_VERSION=3.10
 
+# Set gurobi environment variables
+ENV GUROBI_HOME "/usr/local/bin/gurobi/linux64"
+ENV PATH "$PATH:$GUROBI_HOME/bin"
+ENV LD_LIBRARY_PATH "$LD_LIBRARY_PATH:$GUROBI_HOME/lib"
+
 COPY /environment.yaml "${HOME}/environment.yaml"
 
 # Give ownership to jovyan user
@@ -28,14 +33,10 @@ RUN conda config --quiet --add channels conda-forge & \
 # Install gurbori
 RUN wget --quiet https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
     && tar -xf gurobi${GRB_VERSION}_linux64.tar.gz \
-    && rm -f gurobi${GRB_VERSION}_linux64.tar.gz & \
     && mv -f gurobi* gurobi \
-    && rm -rf gurobi/linux64/docs \
-    # Set up gurobi environment items
-    && echo "export GUROBI_HOME=${HOME}/gurobi" >> "${HOME}/.bashrc" \
-    && echo "export PATH='${PATH}:${GUROBI_HOME}/bin'"  >> "${HOME}/.bashrc" \
-    && echo "export LD_LIBRARY_PATH='${LD_LIBRARY_PATH}:${GUROBI_HOME}/lib'" >> "${HOME}/.bashrc" \
-    && wait
+    && mv gurobi /usr/local/bin/ \
+    && rm -f gurobi${GRB_VERSION}_linux64.tar.gz \
+    && rm -rf gurobi/linux64/docs
 
 
 
@@ -46,3 +47,4 @@ RUN echo "c.ServerApp.ip = '0.0.0.0'" >> "${HOME}/.jupyter/jupyter_notebook_conf
     && echo "c.ServerApp.password = ''" >> "${HOME}/.jupyter/jupyter_notebook_config.py"
 
 VOLUME /home/joyvan/main
+VOLUME /usr/local/bin/gurobi/linux64/gurobi.lic
