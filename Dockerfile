@@ -35,7 +35,7 @@ RUN wget --quiet https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VE
     # Set up gurobi environment items
     echo "export GUROBI_HOME=${HOME}/gurobi" >> "${HOME}/.bashrc" && \
     echo "export PATH='${PATH}:${GUROBI_HOME}/bin'"  >> "${HOME}/.bashrc" && \
-    echo "export LD_LIBRARY_PATH='${LD_LIBRARY_PATH}:${GUROBI_HOME}/lib'" >> "${HOME}/.bashrc" && \
+    echo "export LD_LIBRARY_PATH='${LD_LIBRARY_PATH}:${GUROBI_HOME}/lib'" >> "${HOME}/.bashrc"
 
 
 
