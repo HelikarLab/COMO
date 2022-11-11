@@ -4,8 +4,6 @@ ARG GRB_SHORT_VERSION=9.5
 ARG GRB_VERSION=9.5.0
 ARG PYTHON_VERSION=3.10
 
-COPY /build_scripts/pip_install.txt "${HOME}/pip_install.txt"
-COPY /build_scripts/mamba_install.txt "${HOME}/mamba_install.txt"
 COPY /environment.yaml "${HOME}/environment.yaml"
 
 # Give ownership to jovyan user
