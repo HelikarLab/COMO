@@ -25,11 +25,8 @@ RUN conda config --quiet --add channels conda-forge \
     && mamba clean --quiet --all --force-pkgs-dirs --yes \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
     # Install jupyter extensions
-    && jupyter labextension install @jupyter-widgets/jupyterlab-manager \
-    && jupyter labextension install escher \
-    && jupyter labextension install jupyterlab-spreadsheet \
-    && jupyter trust "${HOME}/main/py/pipeline.ipynb" \
-    && wait
+    && jupyter labextension install escher jupyterlab-spreadsheet @jupyter-widgets/jupyterlab-manager \
+    && jupyter trust "${HOME}/main/py/pipeline.ipynb"
 
 # Install gurbori
 RUN wget --quiet https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
