@@ -112,7 +112,6 @@ Now we can run the container.
 GRB_LICENSE_FILE=/your/gurobi/license/file/location/gurobi.lic
 LOCAL_FILES=/path/to/your/local/files
 
-
 docker run \
   --cpus=6 \
   -p 8888:8888 \
