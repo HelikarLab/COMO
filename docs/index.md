@@ -116,7 +116,7 @@ LOCAL_FILES=/path/to/your/local/files
 docker run \
   --cpus=6 \
   -p 8888:8888 \
-  --mount type=bind,source="${GRB_LICENSE_FILE}",target=/home/jovyan/gurobi/gurobi.lic,readonly \
+  --mount type=bind,source="${GRB_LICENSE_FILE}",target=/home/jovyan/gurobi.lic,readonly \
   --volume="${LOCAL_FILES}":/home/jovyan/main/data/local_files \
   --name madrid \
   -it \
