@@ -68,8 +68,22 @@ Configuration Excel files should be uploaded to [`{{ site.data.terms.data_dir }}
 In the Docker image, some exemplary input files are included to build metabolic models of naïve, Th1, Th2, and Th17 subtypes, and identify drug targets for Rheumatoid arthritis. You can follow the documentation in the container, the format of these files, and the template files to create your own input files.
 
 ## Starting the Container
-
 {% include warning.html content="If you terminate your session after running the Docker, any changes you make WILL NOT BE SAVED! Please mount a local directory to the Docker image as instructed on [Docker's website](https://docs.docker.com/storage/volumes/) to prevent data loss." %}
+
+### Obtaining a Gurobi License
+From the [MathWorks Website](https://www.mathworks.com/products/connections/product_detail/gurobi-optimizer.html#:~:text=The%20Gurobi%20Optimizer%20is%20a,implementations%20of%20the%20latest%20algorithms.):
+> The Gurobi Optimizer is a state-of-the-art solver for mathematical programming. THe solvers in the Gurobi Optimizer were designed from the ground up to exploit modern architectures and multicore processors, using the most advanced implementations of the latest algorithms
+
+This is to say, Gurobi will help when attempting to calculate linear programming solutions done during flux balance analysis calculations
+
+A Gurobi license is free for academic use. To obtain a license, perform the following:
+1. Access the [Web License Manager](https://license.gurobi.com/manager/keys), and log in (or create an account)
+2. Click on "API Keys" on the left sidebar
+3. Click "Create API Key"
+4. Enter the relevant information. The "Application Name" can be anything; I have mine set to "MADRID", with an empty description
+5. Click "Create"
+6. You **MUST** download the license file now, as it is not available later. Creating new licenses is easily done, however.
+7. Save this file to a location on your computer, and note the location. This will be used in the next step.
 
 ### Choosing a Tag
 Several tags are available for use. [Tags](https://docs.docker.com/engine/reference/commandline/tag/) are Docker's method of versioning. For this package, several tags are available (as described below), but the most useful one is most likely `latest`.
@@ -81,48 +95,45 @@ A list of available tags can be found [here](https://github.com/HelikarLab/MADRI
 |   `latest`    |            Latest stable release            |
 | `master-1.0`  |  Any stable changes under the 1.0 release   |
 
+Other tags are available that are not listed here. These tags are either unstable, or are not intended for use by the general public.
+
 To start the container, [docker](https://docs.docker.com/) must be installed.
 
 Execute the following tasks in a terminal to download the container, where `CHOSEN-TAG` is the tag chosen from the table above
 
 ```bash
 sudo docker login
-sudo docker pull ghcr.io/helikarlab/madrid:CHOSEN-TAG
-```
-
-For example, if I chose the `latest` tag, I would execute the following:
-```bash
-sudo docker login
-sudo docker pull ghcr.io/helikarlab/madrid:latest
+sudo docker pull ghcr.io/helikarlab/madrid:latest  # Or your chosen tag instead of "latest"
 ```
 
 Now we can run the container.
 ```bash
+# We are going to export the license file location to an environment variable for use when running the docker container
+GRB_LICENSE_FILE=/your/gurobi/license/file/location/gurobi.lic
+LOCAL_FILES=/path/to/your/local/files
+
 docker run \
-  --cpus=4 \
+  --cpus=6 \
   -p 8888:8888 \
-  --volume=$HOME/gurobi.lic:/opt/gurobi/gurobi.lic:ro \
-  --volume=$HOME/madrid_local:/home/jovyan/main/data/local_files \
+  --mount type=bind,source="${GRB_LICENSE_FILE}",target=/home/jovyan/gurobi.lic,readonly \
+  --volume="${LOCAL_FILES}":/home/jovyan/main/data/local_files \
   --name madrid \
-  --rm \
   -it \
-  "ghcr.io/helikarlab/madrid:CHOSEN-TAG"
+  "ghcr.io/helikarlab/madrid:latest"  # Or your chosen tag instead of "latest"
 ```
-{% include important.html content="Make sure to use the tag you chose from the table in the `docker run...` command, replacing `CHOSEN-TAG` with your tag." %}
 
 Below is a list of options included in the above `docker run` command. These can be removed or changed as-needed, as long as you are aware of their implications
 If you have questions, don't be afraid to ask on our [Issues Page](https://github.com/HelikarLab/MADRID/issues)!
 
-|                 Option                 |  Required?  |                                                       Description                                                        |
-|:--------------------------------------:|:-----------:|:------------------------------------------------------------------------------------------------------------------------:|
-|               `--cpus=4`               |     No      |                   The number of CPUs to allocate to the container. This is optional, but recommended.                    |
-|             `-p 8888:8888`             |     Yes     |                                        The port to use for the Jupyter Notebook.                                         |
-|      `--volume=$HOME/gurobi.lic`       |     Yes     | The path to your Gurobi license file. This is required to run the [Gurobi Optimizer](https://www.gurobi.com/) in MADRID. |
-|     `--volume=$HOME/madrid_local`      | Recommended |            The path to store local MADRID files at. This is not required, but recommended to negate data loss            |
-|                `--name`                |     No      |                                What the container should be named for easy identification                                |
-|                 `--rm`                 |     No      |                                   Remove the container after you are finished with it                                    |
-|                 `-it`                  |     No      |                                             Run the container interactively                                              |
-| `ghcr.io/helikarlab/madrid:CHOSEN-TAG` |     Yes     |                                           The container image and tag to start                                           |
+|               Option               |  Required?  |                                                       Description                                                        |
+|:----------------------------------:|:-----------:|:------------------------------------------------------------------------------------------------------------------------:|
+|             `--cpus=6`             |     No      |                   The number of CPUs to allocate to the container. This is optional, but recommended.                    |
+|           `-p 8888:8888`           |     Yes     |                                        The port to use for the Jupyter Notebook.                                         |
+|            `--mount ..`            |     Yes     | The path to your Gurobi license file. This is required to run the [Gurobi Optimizer](https://www.gurobi.com/) in MADRID. |
+|   `--volume=$HOME/madrid_local`    | Recommended |            The path to store local MADRID files at. This is not required, but recommended to negate data loss            |
+|              `--name`              |     No      |                                What the container should be named for easy identification                                |
+|               `-it`                |     No      |                                             Run the container interactively                                              |
+| `ghcr.io/helikarlab/madrid:latest` |     Yes     |                                         Run the container with the "latest" tag                                          |
 
 ## Accessing MADRID
 Navigate to [http://localhost:8888](http://localhost:8888) in your browser
