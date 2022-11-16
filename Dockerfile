@@ -33,7 +33,6 @@ RUN conda config --quiet --add channels conda-forge \
 RUN wget --quiet https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
     && tar -xf gurobi${GRB_VERSION}_linux64.tar.gz \
     && rm -f gurobi${GRB_VERSION}_linux64.tar.gz \
-    && rm -rf gurobi/linux64/docs \
     && mv -f gurobi* "${HOME}/gurobi"
 
 
