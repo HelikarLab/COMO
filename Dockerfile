@@ -5,7 +5,7 @@ ARG GRB_VERSION=9.5.0
 ARG PYTHON_VERSION=3.10
 
 # Set gurobi environment variables
-ENV GUROBI_HOME "${HOME}/gurobi/linux64"
+ENV GUROBI_HOME "${HOME}/linux64"
 ENV PATH "$PATH:$GUROBI_HOME/bin"
 ENV LD_LIBRARY_PATH "$LD_LIBRARY_PATH:$GUROBI_HOME/lib"
 
@@ -26,16 +26,15 @@ RUN conda config --quiet --add channels conda-forge \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
     # Install jupyter extensions
     && jupyter labextension install escher jupyterlab-spreadsheet @jupyter-widgets/jupyterlab-manager \
-    && jupyter trust "${HOME}/main/py/pipeline.ipynb"
+    && jupyter trust "${HOME}/main/py/pipeline.ipynb" \
+    && rm -rf "${HOME}/environment.yaml"
 
 # Install gurbori
 RUN wget --quiet https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
     && tar -xf gurobi${GRB_VERSION}_linux64.tar.gz \
     && rm -f gurobi${GRB_VERSION}_linux64.tar.gz \
     && rm -rf gurobi/linux64/docs \
-    && mv -f gurobi* "${HOME}/gurobi" \
-    && echo "$PATH"
-    # && mv gurobi /usr/local/bin/
+    && mv -f gurobi* "${HOME}/gurobi"
 
 
 # Update jupyter notebook configuration \
