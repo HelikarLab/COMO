@@ -305,41 +305,41 @@ zfpkm_filter <- function(SampMetrics, filt_options, context_name, prep) {
     cutoff <- filt_options$min_zfpkm
     
     SampMetrics <- calculate_fpkm(SampMetrics)
-    
+    write.csv(data.frame(SampMetrics[[1]][["FPKM_Matrix"]]), "/home/jovyan/main/samp_metrix_matrix_one.csv")
+    write.csv(data.frame(SampMetrics[[2]][["FPKM_Matrix"]]), "/home/jovyan/main/samp_metrix_matrix_two.csv")
+    write.csv(data.frame(SampMetrics[[3]][["FPKM_Matrix"]]), "/home/jovyan/main/samp_metrix_matrix_three.csv")
     for ( i in 1:length(SampMetrics) ) {
-
         study_number <- SampMetrics[[i]][["StudyNumber"]]
-        ent <- SampMetrics[[i]][["Entrez"]] # get entrez ids
-        fmat <- SampMetrics[[i]][["FPKM_Matrix"]] # get fpkm matrix
-        fdf <- data.frame(fmat) # convert to df
-        fdf[rowSums(fdf[])>0,]
-        fpkm_fname <- file.path("/home", username, "main", "data", "results",
-                                 context_name, prep, paste0("FPKM_Matrix_", prep, "_", study_number, ".csv"))
-        write_fpkm <- cbind(ent, fdf)
+        entrez_ids <- SampMetrics[[i]][["Entrez"]] # get entrez ids
+        fpkm_matrix <- SampMetrics[[i]][["FPKM_Matrix"]] # get fpkm matrix
+        fpkm_df <- data.frame(fpkm_matrix) # convert to df
+        fpkm_df[rowSums(fpkm_df[])>0,]
+        fpkm_filename <- file.path("/home", username, "main", "data", "results", context_name, prep, paste0("FPKM_Matrix_", prep, "_", study_number, ".csv"))
+        write_fpkm <- cbind(entrez_ids, fpkm_df)
         colnames(write_fpkm)[1] <- "ENTREZ_GENE_ID"
-        write.csv(write_fpkm, fpkm_fname, row.names=FALSE)
-        minimums <- fdf == 0
-        nas <- is.na(fdf)==1
-        zmat <- zFPKM(fdf, min_thresh=0, assayName="FPKM") # calculate zFPKM
+        write.csv(write_fpkm, fpkm_filename, row.names=FALSE)
+        
+        minimums <- fpkm_df == 0
+        nas <- is.na(fpkm_df) == 1
+        
+        zmat <- zFPKM(fpkm_df, min_thresh=0, assayName="FPKM") # calculate zFPKM
         zmat[minimums] <- -4 # instead of -inf set to lower limit
-        zfpkm_fname <- file.path("/home", username, "main", "data", "results",
-                                 context_name, prep, paste0("zFPKM_Matrix_", prep, "_", study_number, ".csv"))
-        write_zfpkm <- cbind(ent, zmat)
+        zfpkm_fname <- file.path("/home", username, "main", "data", "results", context_name, prep, paste0("zFPKM_Matrix_", prep, "_", study_number, ".csv"))
+        write_zfpkm <- cbind(entrez_ids, zmat)
         colnames(write_zfpkm)[1] <- "ENTREZ_GENE_ID"
         write.csv(write_zfpkm, zfpkm_fname, row.names=FALSE)
 
-        zfpkm_plot_dir <- file.path("/home", username, "main", "data", "results",
-                                    context_name, prep, "figures")
-
+        zfpkm_plot_dir <- file.path("/home", username, "main", "data", "results", context_name, prep, "figures")
+        
         if ( !file.exists(zfpkm_plot_dir) ) {
             dir.create(zfpkm_plot_dir)
         }
-
+        
         zfpkm_plotname <- file.path(zfpkm_plot_dir, paste0("zFPKM_plot_", study_number, ".pdf"))
         pdf(zfpkm_plotname)
-        zFPKMPlot(fdf, min_thresh=min(fdf), assayName="FPKM")
+        zFPKMPlot(fpkm_df, min_thresh=min(fpkm_df), assayName="FPKM")
         dev.off()
-
+        
         min.samples <- round(N_exp * ncol(zmat)) # min number of samples for active
         top.samples <- round(N_top * ncol(zmat)) # top number of samples for high-confidence
 
@@ -347,15 +347,14 @@ zfpkm_filter <- function(SampMetrics, filt_options, context_name, prep) {
         f1 <- genefilter::kOverA(min.samples, cutoff)
         flist <- genefilter::filterfun(f1)
         keep <- genefilter::genefilter(zmat, flist)
-        SampMetrics[[i]][["Entrez"]] <- ent[keep]
+        SampMetrics[[i]][["Entrez"]] <- entrez_ids[keep]
 
         # top percentile genes
         f1_top <- genefilter::kOverA(top.samples, cutoff)
         flist_top <- genefilter::filterfun(f1_top)
         keep_top <- genefilter::genefilter(zmat, flist_top)
 
-        SampMetrics[[i]][["Entrez_hc"]] <- ent[keep_top]
-
+        SampMetrics[[i]][["Entrez_hc"]] <- entrez_ids[keep_top]
     }
 
     return(SampMetrics)
