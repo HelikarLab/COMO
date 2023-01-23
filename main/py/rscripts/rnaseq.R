@@ -303,8 +303,9 @@ zfpkm_filter <- function(SampMetrics, filt_options, context_name, prep) {
     N_exp <- filt_options$replicate_ratio # ratio replicates for active
     N_top <- filt_options$replicate_ratio_high # ratio of replicates for high-confidence
     cutoff <- filt_options$min_zfpkm
+    
     SampMetrics <- calculate_fpkm(SampMetrics)
-
+    
     for ( i in 1:length(SampMetrics) ) {
 
         study_number <- SampMetrics[[i]][["StudyNumber"]]
@@ -446,11 +447,12 @@ umi_filter <- function(SampMetrics, filt_options, context_name) {
 
 
 filter_counts <- function(SampMetrics, technique, filt_options, context_name, prep) {
-    switch(technique,
-         cpm = cpm_filter(SampMetrics, filt_options, context_name, prep),
-         zfpkm = zfpkm_filter(SampMetrics, filt_options, context_name, prep),
-         quantile = TPM_quant_filter(SampMetrics, filt_options, context_name, prep),
-         umi = umi_filter(SampMetrics, filt_options, context_name)
+    switch(
+      technique,
+      cpm = cpm_filter(SampMetrics, filt_options, context_name, prep),
+      zfpkm = zfpkm_filter(SampMetrics, filt_options, context_name, prep),
+      quantile = TPM_quant_filter(SampMetrics, filt_options, context_name, prep),
+      umi = umi_filter(SampMetrics, filt_options, context_name)
     )
 }
 
@@ -509,7 +511,7 @@ save_rnaseq_tests <- function(
     }
 
     if ( prep == "scrna" ) {
-      technique = "umi"
+      technique <- "umi"
       print("Note: Single cell filtration does not normalize and assumes counts are counted with UMI")
     }
 
@@ -525,7 +527,6 @@ save_rnaseq_tests <- function(
         topGenes <- c(topGenes, SampMetrics[[i]][["Entrez_hc"]])
     }
     print("Reading Counts Matrix")
-
     SampMetrics <- read_counts_matrix(counts_matrix_file, config_file, info_file, context_name) # read count matrix
 
     entrez_all <- SampMetrics[[1]][["Entrez"]] #get entrez ids
