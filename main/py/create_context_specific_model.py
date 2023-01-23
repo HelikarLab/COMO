@@ -844,7 +844,6 @@ def main(argv):
     else:
         force_rxns = []
 
-    print(f"HERE: {output_filetypes}")
     # Assert output types are valid
     for output_type in output_filetypes:
         if output_type not in ["xml", "mat", "json"]:
