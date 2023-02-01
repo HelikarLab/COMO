@@ -175,7 +175,6 @@ def create_config_df(context_name):
                     mean_fragment_sizes = np.array([])
                     library_sizes = np.array([])
                     for ff in frag_files:
-                        print(ff)
                         frag_df = pd.read_table(ff, low_memory=False, sep="\t", on_bad_lines="skip")
                         frag_df['meanxcount'] = frag_df['frag_mean'] * frag_df['frag_count']
                         mean_fragment_size = sum(frag_df['meanxcount'] / sum(frag_df['frag_count']))
