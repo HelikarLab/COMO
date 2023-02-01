@@ -563,8 +563,7 @@ def create_context_specific_model(
 def print_filetype_help():
     print("Unsupported model format. Current support is for: 'xml', 'mat', and 'json'."
           "Or use multiple with: 'xml mat json'")
-
-
+    
 def parse_args(argv):
     parser = argparse.ArgumentParser(
         prog="create_context_specific_model.py",
@@ -839,14 +838,14 @@ def main(argv):
             sys.exit()
     else:
         force_rxns = []
-    
+
     # Assert output types are valid
     for output_type in output_filetypes:
         if output_type not in ["xml", "mat", "json"]:
             print(f"Output file type {output_type} not recognized.")
             print("Output file types must be one of the following: xml, mat, json")
             sys.exit(1)
-    
+
     if recon_alg not in ["FASTCORE", "GIMME", "IMAT"]:
         print(
             f"Algorithm {recon_alg} not supported. Please use one of: GIMME, FASTCORE, or IMAT"
