@@ -92,13 +92,9 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, tes
 
     # flux_solution
     flux_solution[abs(flux_solution) < 1e-8] = 0.0
-
     flux_solution_ratios = flux_solution.div(model_opt["fluxes"], axis=0)  # ko / original : inf means
-    # flux_solution_ratios
     flux_solution_diffs = flux_solution.sub(model_opt["fluxes"], axis=0)  # ko - original
-    # flux_solution_diffs
 
-    # has_effects_gene
     return (
         model,
         gene_ind2genes,
@@ -117,11 +113,11 @@ def create_gene_pairs(
         flux_solution_ratios,
         flux_solution_diffs,
         has_effects_gene,
-        disease_down,
+        disease_genes,
 ):
-    disease_down = pd.read_csv(os.path.join(datadir, disease_down))
+    disease_genes = pd.read_csv(os.path.join(datadir, disease_genes))
     DAG_dis_genes = pd.DataFrame()  # data analysis genes
-    DAG_dis_genes["Gene ID"] = disease_down.iloc[:, 0].astype(str)
+    DAG_dis_genes["Gene ID"] = disease_genes.iloc[:, 0].astype(str)
     # DAG_dis_genes
     DAG_dis_met_genes = set(DAG_dis_genes["Gene ID"].tolist()).intersection(
         gene_ind2genes
@@ -328,7 +324,7 @@ def main(argv):
         "--disease-down",
         type=str,
         required=True,
-        dest="disease_down",
+        dest="disease_genes",
         help="The name of the disease down-regulated file"
     )
     parser.add_argument(
@@ -410,15 +406,14 @@ def main(argv):
         drug_db = pd.read_csv(drug_file, sep="\t")
 
     # Knock Out Simulation
-    model, gene_ind2genes, has_effects_gene, fluxsolution, flux_solution_ratios, flux_solution_diffs = \
-        knock_out_simulation(
-            model=cobra_model,
-            inhibitors_filepath=inhibitors_file,
-            drug_db=drug_db,
-            ref_flux_file=ref_flux_file,
-            test_all=test_all,
-            pars_flag=pars_flag
-        )
+    model, gene_ind2genes, has_effects_gene, fluxsolution, flux_solution_ratios, flux_solution_diffs = knock_out_simulation(
+        model=cobra_model,
+        inhibitors_filepath=inhibitors_file,
+        drug_db=drug_db,
+        ref_flux_file=ref_flux_file,
+        test_all=test_all,
+        pars_flag=pars_flag
+    )
 
     flux_solution_diffs.to_csv(os.path.join(output_dir, "flux_diffs_KO.csv"))
     flux_solution_ratios.to_csv(os.path.join(output_dir, "flux_ratios_KO.csv"))
@@ -431,7 +426,7 @@ def main(argv):
         flux_solution_ratios,
         flux_solution_diffs,
         has_effects_gene,
-        disease_down=disease_down_file,
+        disease_genes=disease_down_file,
     )
 
     gene_pairs_down.to_csv(os.path.join(output_dir, "Gene_Pairs_Inhi_Fratio_DOWN.txt"), index=False)
@@ -444,7 +439,7 @@ def main(argv):
         flux_solution_ratios,
         flux_solution_diffs,
         has_effects_gene,
-        disease_down=disease_up_file,
+        disease_genes=disease_up_file,
     )
     gene_pairs_up.to_csv(os.path.join(output_dir, "Gene_Pairs_Inhi_Fratio_UP.txt"), index=False)
     d_score_down = score_gene_pairs(gene_pairs_down, os.path.join(output_dir, "d_score_DOWN.csv"), input_reg="down")

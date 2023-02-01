@@ -260,13 +260,13 @@ def seed_imat(
         core=idx_force,
         epsilon=0.01
     )
-    print("Set props")
+    print("Setting properties")
     algorithm = IMAT(s_matrix, lb, ub, properties)
-    print("set algo")
+    print("Setting algorithm")
     context_rxns = algorithm.run()
-    print("run")
+    print("Running")
     fluxes = algorithm.sol.to_series()
-    print("got fluxes")
+    print("Obtained flux values")
     context_cobra_model = cobra_model.copy()
     r_ids = [r.id for r in context_cobra_model.reactions]
     pd.DataFrame({"rxns": r_ids}).to_csv(os.path.join(configs.datadir, "rxns_test.csv"))
@@ -561,14 +561,9 @@ def create_context_specific_model(
 
 
 def print_filetype_help():
-    print("Unsupported model format. Supports 'xml', 'mat', and 'json''.")
-    print("Or use multiple with: \"['.extension1', 'extention2', ... etc]\"")
-    print("For example, if you want to output in all 3 accepted formats:")
-    print("\"['mat', 'xml', 'json']\"")
-    print(
-        "Note the outer quotes required to be interpreted by cmd. This a string, not a python list"
-    )
-
+    print("Unsupported model format. Current support is for: 'xml', 'mat', and 'json'."
+          "Or use multiple with: 'xml mat json'")
+    
 def parse_args(argv):
     parser = argparse.ArgumentParser(
         prog="create_context_specific_model.py",
@@ -850,22 +845,6 @@ def main(argv):
             print(f"Output file type {output_type} not recognized.")
             print("Output file types must be one of the following: xml, mat, json")
             sys.exit(1)
-    # if output_filetypes not in ["xml", "mat", "json"]:
-    #     try:
-    #         output_filetypes = (
-    #             output_filetypes.strip("[")
-    #             .strip("]")
-    #             .replace("'", "")
-    #             .replace(" ", "")
-    #             .split(",")
-    #         )
-    #         if any(form not in ["xml", "json", "mat"] for form in output_filetypes):
-    #             print_filetype_help()
-    #             sys.exit()
-    #     except BaseException:
-    #         print_filetype_help()
-    # else:
-    #     output_filetypes = [output_filetypes]
 
     if recon_alg not in ["FASTCORE", "GIMME", "IMAT"]:
         print(
@@ -947,7 +926,6 @@ def main(argv):
     print("Number of Reactions: " + str(len(context_model.reactions)))
     print(context_model.objective._get_expression())
     print(pfba(context_model))
-    #print(context_model.optimize())
     print("len rxns: ", len(context_model.reactions))
 
 
