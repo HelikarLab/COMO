@@ -563,7 +563,8 @@ def create_context_specific_model(
 def print_filetype_help():
     print("Unsupported model format. Current support is for: 'xml', 'mat', and 'json'."
           "Or use multiple with: 'xml mat json'")
-    
+
+
 def parse_args(argv):
     parser = argparse.ArgumentParser(
         prog="create_context_specific_model.py",
@@ -728,7 +729,10 @@ def main(argv):
         raise FileNotFoundError(f"Active genes file not found at {genefile}")
     
     print(f"Active genes file found at {genefile}")
-    
+
+    bound_rxns = []
+    bound_ub = []
+    bound_lb = []
     if bound_rxns_file:
         try:
             print(f"Reading {bound_rxns_file} for boundary reactions")
@@ -738,7 +742,7 @@ def main(argv):
             elif bound_rxns_file[-5:] == ".xlsx" or bound_rxns_file[-4:] == ".xls":
                 df = pd.read_excel(bound_rxns_file, header=0)
             else:
-                print(
+                raise ValueError(
                     "Boundary reactions file must be a csv or xlsx with three columns: Rxn, Lowerbound, Upperbound"
                 )
             
@@ -756,11 +760,8 @@ def main(argv):
             print(
                 "Boundary reactions file must be a csv or xlsx with three columns: Rxn, Lowerbound, Upperbound"
             )
-    else:
-        bound_rxns = []
-        bound_ub = []
-        bound_lb = []
-    
+
+    exclude_rxns = []
     if exclude_rxns_file:
         try:
             print(f"Reading {exclude_rxns_file} for exclude reactions")
@@ -796,9 +797,8 @@ def main(argv):
                 + "included in the context specific model, regardless of omics expression"
             )
             sys.exit()
-    else:
-        exclude_rxns = []
-    
+
+    force_rxns = []
     if force_rxns_file:
         try:
             print(f"Reading {force_rxns_file} for force reactions")
@@ -817,7 +817,7 @@ def main(argv):
                 sys.exit()
             
             force_rxns = df.iloc[:, 0].tolist()
-        
+
         except FileNotFoundError:
             print(
                 "--force-reactions-file must be a path to a csv or xlsx file with one column."
@@ -836,8 +836,6 @@ def main(argv):
                 + "causes the model to be infeasible)."
             )
             sys.exit()
-    else:
-        force_rxns = []
 
     # Assert output types are valid
     for output_type in output_filetypes:
@@ -927,6 +925,8 @@ def main(argv):
     print(context_model.objective._get_expression())
     print(pfba(context_model))
     print("len rxns: ", len(context_model.reactions))
+    
+    print("\nModel successfully created!")
 
 
 if __name__ == "__main__":
