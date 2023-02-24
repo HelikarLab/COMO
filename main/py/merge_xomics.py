@@ -202,7 +202,17 @@ def handle_context_batch(
 
     counts = Counter(sheet_names)
     sheet_names = sorted(list(set(sheet_names)))
-    print(f"Will merge data for: {sheet_names}")
+    print("The data provided for each context listed will be merged. Data BETWEEN contexts will not be merged, only WITHIN a context")
+    for i in sheet_names:
+        # Print the sheet names in a list, like so
+        # name1, name2, and name3
+        print(i, end="")w
+        if counts[i] > 1:
+            print(f" ({counts[i]}x)", end="")
+        print(", ", end="")
+    print("\b\b")
+    
+    
     dict_list = {}
 
     max_inputs = max(counts.values())

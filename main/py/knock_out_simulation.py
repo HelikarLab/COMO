@@ -429,7 +429,7 @@ def main(argv):
         disease_genes=disease_down_file,
     )
 
-    gene_pairs_down.to_csv(os.path.join(output_dir, "Gene_Pairs_Inhi_Fratio_DOWN.txt"), index=False)
+    gene_pairs_down.to_csv(os.path.join(output_dir, f"{context}_Gene_Pairs_Inhi_Fratio_DOWN.txt"), index=False)
 
     gene_pairs_up = create_gene_pairs(
         configs.datadir,
@@ -441,16 +441,16 @@ def main(argv):
         has_effects_gene,
         disease_genes=disease_up_file,
     )
-    gene_pairs_up.to_csv(os.path.join(output_dir, "Gene_Pairs_Inhi_Fratio_UP.txt"), index=False)
-    d_score_down = score_gene_pairs(gene_pairs_down, os.path.join(output_dir, "d_score_DOWN.csv"), input_reg="down")
-    d_score_up = score_gene_pairs(gene_pairs_up, os.path.join(output_dir, "d_score_UP.csv"), input_reg="up")
+    gene_pairs_up.to_csv(os.path.join(output_dir, f"{context}_Gene_Pairs_Inhi_Fratio_UP.txt"), index=False)
+    d_score_down = score_gene_pairs(gene_pairs_down, os.path.join(output_dir, f"{context}_d_score_DOWN.csv"), input_reg="down")
+    d_score_up = score_gene_pairs(gene_pairs_up, os.path.join(output_dir, f"{context}_d_score_UP.csv"), input_reg="up")
     pertubation_effect_score = (d_score_up + d_score_down).sort_values(by="score", ascending=False)
-    pertubation_effect_score.to_csv(os.path.join(output_dir, "d_score.csv"))
+    pertubation_effect_score.to_csv(os.path.join(output_dir, f"{context}_d_score.csv"))
     pertubation_effect_score.reset_index(drop=False, inplace=True)
 
     # last step: output drugs based on d score
     drug_score = drug_repurposing(drug_db, pertubation_effect_score)
-    drug_score_file = os.path.join(output_dir, "drug_score.csv")
+    drug_score_file = os.path.join(output_dir, f"{context}_drug_score.csv")
     drug_score.to_csv(drug_score_file, index=False)
     print("Gene D score mapped to repurposing drugs saved to\n{}".format(drug_score_file))
 
