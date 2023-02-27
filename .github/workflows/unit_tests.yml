@@ -24,7 +24,7 @@ jobs:
           uses: mamba-org/provision-with-micromamba@main
           with:
             environment-file: main/py/tests/environment.yaml
-            environment-name: madrid_tests
+            environment-name: como_tests
             extra-specs: |
               python=${{ matrix.python-version }}
               
@@ -41,8 +41,8 @@ jobs:
 
         - name: Lint with flake8
           run: |
-            # Initialize micromamba and activate madrid_tests environment
-            eval "$(micromamba shell hook --shell=bash)" && micromamba activate madrid_tests
+            # Initialize micromamba and activate como_tests environment
+            eval "$(micromamba shell hook --shell=bash)" && micromamba activate como_tests
             # stop the build if there are Python syntax errors or undefined names
             flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
             # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
@@ -50,6 +50,6 @@ jobs:
 
         - name: Run tests
           run: |
-            # Initialize micromamba and activate madrid_tests environment
-            eval "$(micromamba shell hook --shell=bash)" && micromamba activate madrid_tests
+            # Initialize micromamba and activate como_tests environment
+            eval "$(micromamba shell hook --shell=bash)" && micromamba activate como_tests
             python -m pytest
