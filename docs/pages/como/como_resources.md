@@ -1,8 +1,8 @@
 ---
 title: Resources
-sidebar: madrid_sidebar
-permalink: madrid_resources.html
-folder: madrid
+sidebar: como_sidebar
+permalink: como_resources.html
+folder: como
 last_updated: Sept 14, 2022
 ---
 <link rel="stylesheet" href="{{ '/assets/css/styles.css' | absolute_url }}">
@@ -34,7 +34,7 @@ last_updated: Sept 14, 2022
     </ul>
   <li><a href="https://clue.io/repurposing-app" class="body-link" target="_blank">Drug Repurposing Hub</a></li>
   <li><a href="https://bioconductor.org/packages/release/bioc/html/limma.html" class="body-link" target="_blank">Limma</a> (R package)</li>
-  <li><a href="https://github.com/HelikarLab/MADRID#:~:text=Create%20Python%20Packages%20from%20Matlab%20code" class="body-link" target="_blank">MatLab Runtime and Creating Python Packages from MatLab code</a></li>
+  <li><a href="https://github.com/HelikarLab/COMO#:~:text=Create%20Python%20Packages%20from%20Matlab%20code" class="body-link" target="_blank">MatLab Runtime and Creating Python Packages from MatLab code</a></li>
   <li><a href="https://www.ncbi.nlm.nih.gov/geo/" class="body-link" target="_blank">NCBI GEO</a></li>
     <ul>
       <li><a href="https://geoparse.readthedocs.io/en/latest/" class="body-link" target="_blank">Python GEOparse</a></li>

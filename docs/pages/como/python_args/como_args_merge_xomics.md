@@ -1,8 +1,8 @@
 ---
 title: Merge Omics Gen
-sidebar: madrid_sidebar
-permalink: madrid_args_merge_xomics.html
-folder: madrid
+sidebar: como_sidebar
+permalink: como_args_merge_xomics.html
+folder: como
 summary: "The arguments used in the `/main/py/merge_xomics.py` file"
 last_updated: September 21, 2022
 ---

@@ -6,385 +6,385 @@
     "Argument": "--context-name",
     "Default Value": "`None`",
     "Description": "Name of context or context used consistent with outputs of merge_xomics.py",
-    "Permalink": "madrid_args_create_context_specific_model.html",
+    "Permalink": "como_args_create_context_specific_model.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--reference-model-filepath",
     "Default Value": "`None`",
-    "Description": "Name of Genome-scale metabolic model to seed the context model to.<br>For example, the GeneralModelUpdatedV2.mat, is a modified Recon3D model.<br>We also provide iMM_madrid for mouse. OT can be .mat, .xml, or .json.",
-    "Permalink": "madrid_args_create_context_specific_model.html",
+    "Description": "Name of Genome-scale metabolic model to seed the context model to.<br>For example, the GeneralModelUpdatedV2.mat, is a modified Recon3D model.<br>We also provide iMM_mouse for mouse. OT can be .mat, .xml, or .json.",
+    "Permalink": "como_args_create_context_specific_model.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--active-genes-filepath",
     "Default Value": "`None`",
     "Description": "Path to logical table of active genes output from merge_xomics.py called ActiveGenes_contextName_Merged.csv.<br>Should be in the corresponding context/context folder inside /main/data/results/contextName/.<br>The json file output from the function using the context of interest as the key can be used here.",
-    "Permalink": "madrid_args_create_context_specific_model.html",
+    "Permalink": "como_args_create_context_specific_model.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--objective",
     "Default Value": "`\"biomass_reaction\"`",
     "Description": "Reaction ID of the objective function in the model. Generally a biomass function.",
-    "Permalink": "madrid_args_create_context_specific_model.html",
+    "Permalink": "como_args_create_context_specific_model.html",
     "Required?": "No"
   },
   {
     "Argument": "--boundary-reactions-filepath",
     "Default Value": "`None`",
-    "Description": "Path to file contains the exchange (media), sink, and demand reactions<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;which the model should use to fulfill the reactions governed by transcriptomic and proteomics data inputs.<br>It must be a csv or xlsx with three columns: `Rxn`, `Lowerbound`, `Upperbound`.<br>If not specified, MADRID will allow ALL BOUNDARY REACTIONS THAT ARE OPEN IN THE REFERENCE MODEL TO BE USED!",
-    "Permalink": "madrid_args_create_context_specific_model.html",
+    "Description": "Path to file contains the exchange (media), sink, and demand reactions<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;which the model should use to fulfill the reactions governed by transcriptomic and proteomics data inputs.<br>It must be a csv or xlsx with three columns: `Rxn`, `Lowerbound`, `Upperbound`.<br>If not specified, COMO will allow ALL BOUNDARY REACTIONS THAT ARE OPEN IN THE REFERENCE MODEL TO BE USED!",
+    "Permalink": "como_args_create_context_specific_model.html",
     "Required?": "No"
   },
   {
     "Argument": "--exclude-reactions-filepath",
     "Default Value": "`None`",
     "Description": "Filepath to file that contains reactions which will be removed from active reactions the model to use when seeding,<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;even if considered active from transcriptomic and proteomics data inputs.<br>It must be a csv or xlsx with one column of reaction IDs consistent with the reference model",
-    "Permalink": "madrid_args_create_context_specific_model.html",
+    "Permalink": "como_args_create_context_specific_model.html",
     "Required?": "No"
   },
   {
     "Argument": "--force-reactions-filepath",
     "Default Value": "`None`",
     "Description": "Filepath to file that contains reactions which will be added to active reactions for the model to use when seeding<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(unless it causes the model to be unsolvable),<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;regardless of results of transcriptomic and proteomics data inputs.<br>It must be a csv or xlsx with one column of reaction IDs consistent with the reference model",
-    "Permalink": "madrid_args_create_context_specific_model.html",
+    "Permalink": "como_args_create_context_specific_model.html",
     "Required?": "No"
   },
   {
     "Argument": "--algorithm",
     "Default Value": "`\"GIMME\"`",
     "Description": "Algorithm used to seed context specific model to the Genome-scale model.<br>Can be either GIMME, FASTCORE, iMAT, or tINIT.",
-    "Permalink": "madrid_args_create_context_specific_model.html",
+    "Permalink": "como_args_create_context_specific_model.html",
     "Required?": "No"
   },
   {
     "Argument": "--low-threshold",
     "Default Value": "`-5`",
     "Description": "Low to mid bin cutoff for iMAT solution",
-    "Permalink": "madrid_args_create_context_specific_model.html",
+    "Permalink": "como_args_create_context_specific_model.html",
     "Required?": "No"
   },
   {
     "Argument": "--high-threshold",
     "Default Value": "`-3`",
     "Description": "Mid to high bin cutoff for iMAT solution",
-    "Permalink": "madrid_args_create_context_specific_model.html",
+    "Permalink": "como_args_create_context_specific_model.html",
     "Required?": "No"
   },
   {
     "Argument": "--solver",
     "Default Value": "`\"glpk\"`",
     "Description": "Solver used to seed model and attempt to solve objective.<br>Default is GLPK. Also takes GUROBI but you must mount a container license to the Docker to use.<br>An academic license can be obtained for free.<br>See the README on the Github or Dockerhub for information on mounting this license.",
-    "Permalink": "madrid_args_create_context_specific_model.html",
+    "Permalink": "como_args_create_context_specific_model.html",
     "Required?": "No"
   },
   {
     "Argument": "--output-filetypes",
     "Default Value": "`\"mat\"`",
     "Description": "Filetypes to save seeded model type.<br>Can be either a string with one filetype such as 'xml' or multiple in the format \"['extension1', 'extension2', ... etc]\".<br>If you want to output in all 3 accepted formats,  would be: \"['mat', 'xml', 'json']\"<br>NOTE: Outer quotes are required to be interpreted by cmd. This a string, not a python list",
-    "Permalink": "madrid_args_create_context_specific_model.html",
+    "Permalink": "como_args_create_context_specific_model.html",
     "Required?": ""
   },
   {
     "Argument": "--config-file",
     "Default Value": "`None`",
     "Description": "The path to the configuration file specified under<br>`/main/data/config_sheets/disease/diease_data_inputs_<tissue_name>`",
-    "Permalink": "madrid_args_disease_analysis.html",
+    "Permalink": "como_args_disease_analysis.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--context-name",
     "Default Value": "`None`",
     "Description": "The type of context being used (i.e., naiveB, smB, etc.)",
-    "Permalink": "madrid_args_disease_analysis.html",
+    "Permalink": "como_args_disease_analysis.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--data-source",
     "Default Value": "`None`",
     "Description": "Source of data being used, either rnaseq or microarray",
-    "Permalink": "madrid_args_disease_analysis.html",
+    "Permalink": "como_args_disease_analysis.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--taxon-id",
     "Default Value": "`9096`",
     "Description": "BioDbNet taxon ID number, also accepts 'human', or 'mouse'",
-    "Permalink": "madrid_args_disease_analysis.html",
+    "Permalink": "como_args_disease_analysis.html",
     "Required?": "No"
   },
   {
     "Argument": "--context-model",
     "Default Value": "`None`",
     "Description": "The context-specific model file, (must be .mat, .xml, or .json",
-    "Permalink": "madrid_args_knockout_simulation.html",
+    "Permalink": "como_args_knockout_simulation.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--context-name",
     "Default Value": "`None`",
     "Description": "Name of context, tissue, cell-type, etc.",
-    "Permalink": "madrid_args_knockout_simulation.html",
+    "Permalink": "como_args_knockout_simulation.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--disease-name",
     "Default Value": "`None`",
     "Description": "The name of the disease",
-    "Permalink": "madrid_args_knockout_simulation.html",
+    "Permalink": "como_args_knockout_simulation.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--disease-up",
     "Default Value": "`None`",
     "Description": "The name of the disease up-regulated file",
-    "Permalink": "madrid_args_knockout_simulation.html",
+    "Permalink": "como_args_knockout_simulation.html",
     "Required?": "yes"
   },
   {
     "Argument": "--disease-down",
     "Default Value": "`None`",
     "Description": "The name of the disease down-regulated file",
-    "Permalink": "madrid_args_knockout_simulation.html",
+    "Permalink": "como_args_knockout_simulation.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--raw-drug-file",
     "Default Value": "`None`",
     "Description": "The name of the raw drug file",
-    "Permalink": "madrid_args_knockout_simulation.html",
+    "Permalink": "como_args_knockout_simulation.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--reference-flux-file",
     "Default Value": "`None`",
     "Description": "The name of the reference flux file",
-    "Permalink": "madrid_args_knockout_simulation.html",
+    "Permalink": "como_args_knockout_simulation.html",
     "Required?": "No"
   },
   {
     "Argument": "--test-all",
     "Default Value": "`False`",
     "Description": "Test all genes, even ones predicted to have little no effect",
-    "Permalink": "madrid_args_knockout_simulation.html",
+    "Permalink": "como_args_knockout_simulation.html",
     "Required?": "No"
   },
   {
     "Argument": "--merge-distribution",
     "Default Value": "`False`",
     "Description": "Flag to merge zFPKM distributions.<br>Required if using iMAT reconstruction algorithm in create_context_specific_model.py.<br>Must have run rnaseq_gen.py with 'zFPKM' as `--technique`.<br>If `--proteomics-config-file` is given will merge proteomics distributions with<br>zFPKM distributions using a weighted scheme.",
-    "Permalink": "madrid_args_merge_xomics.html",
+    "Permalink": "como_args_merge_xomics.html",
     "Required?": "No"
   },
   {
     "Argument": "--microarray-config-file",
     "Default Value": "`False`",
     "Description": "Name of microarray Excel configuration file found under `/main/data/config_files/`",
-    "Permalink": "madrid_args_merge_xomics.html",
+    "Permalink": "como_args_merge_xomics.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--total-rnaseq-config-file",
     "Default Value": "`None`",
     "Description": "The name of the total RNA-seq Excel configuration file found under `/main/data/config_files/`",
-    "Permalink": "madrid_args_merge_xomics.html",
+    "Permalink": "como_args_merge_xomics.html",
     "Required?": "No"
   },
   {
     "Argument": "--mrnaseq-config-file",
     "Default Value": "`None`",
     "Description": "The name of the mRNA-seq Excel configuration file found under `/main/data/config_files/`",
-    "Permalink": "madrid_args_merge_xomics.html",
+    "Permalink": "como_args_merge_xomics.html",
     "Required?": "No"
   },
   {
     "Argument": "--scrnaseq-config-file",
     "Default Value": "`None`",
     "Description": "The name of the single cell RNA-seq Excel configuration file found under `/main/data/config_files/`",
-    "Permalink": "madrid_args_merge_xomics.html",
+    "Permalink": "como_args_merge_xomics.html",
     "Required?": "No"
   },
   {
     "Argument": "--proteomics-config-file",
     "Default Value": "`None`",
     "Description": "The name of the proteomics Excel configuration file found udner `/main/data/config_files/`",
-    "Permalink": "madrid_args_merge_xomics.html",
+    "Permalink": "como_args_merge_xomics.html",
     "Required?": "No"
   },
   {
     "Argument": "--expression-requirement",
     "Default Value": "`None`",
     "Description": "Number of sources with active gene for it to be considered active even if it is not a high confidence-gene",
-    "Permalink": "madrid_args_merge_xomics.html",
+    "Permalink": "como_args_merge_xomics.html",
     "Required?": "No"
   },
   {
     "Argument": "--requirement-adjust",
     "Default Value": "`flat`",
     "Description": "Technique to adjust expression requirement based on differences in number of provided data source types",
-    "Permalink": "madrid_args_merge_xomics.html",
+    "Permalink": "como_args_merge_xomics.html",
     "Required?": "No"
   },
   {
     "Argument": "--total-rnaseq-weight",
     "Default Value": "`1`",
     "Description": "Total RNA-seq weight for merging zFPKM distribution",
-    "Permalink": "madrid_args_merge_xomics.html",
+    "Permalink": "como_args_merge_xomics.html",
     "Required?": "No"
   },
   {
     "Argument": "--mrnaseq-weight",
     "Default Value": "`1`",
     "Description": "PolyA enriched (messenger) RNA-seq weight for merging zFPKM distribution",
-    "Permalink": "madrid_args_merge_xomics.html",
+    "Permalink": "como_args_merge_xomics.html",
     "Required?": "No"
   },
   {
     "Argument": "--single-cell-rnaseq-weight",
     "Default Value": "`1`",
     "Description": "Single-cell RNA-seq weight for merging zFPKM distribution",
-    "Permalink": "madrid_args_merge_xomics.html",
+    "Permalink": "como_args_merge_xomics.html",
     "Required?": "No"
   },
   {
     "Argument": "--protein-weight",
     "Default Value": "`2`",
     "Description": "Proteomics weight for merging z-score distribution",
-    "Permalink": "madrid_args_merge_xomics.html",
+    "Permalink": "como_args_merge_xomics.html",
     "Required?": "No"
   },
   {
     "Argument": "--no-hc",
     "Default Value": "`False`",
     "Description": "Flag to prevent high-confidence genes forcing a gene to be used in final model irrespective of other other data sources",
-    "Permalink": "madrid_args_merge_xomics.html",
+    "Permalink": "como_args_merge_xomics.html",
     "Required?": "No"
   },
   {
     "Argument": "--config-file",
     "Default": "proteomics_data_inputs_paper.xlsx",
     "Description": "The configuration file name to use",
-    "Permalink": "madrid_args_proteomics_gen.html",
+    "Permalink": "como_args_proteomics_gen.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--replicate-ratio",
     "Default": 0.75,
     "Description": "The ratio of replicates required for a gene to be considered active in that sample",
-    "Permalink": "madrid_args_proteomics_gen.html",
+    "Permalink": "como_args_proteomics_gen.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--high-replicate-ratio",
     "Default": 1,
     "Description": "The ratio of replicates to be considered \"high confidence\".<br>High confidence genes are considered expressed no matter what other data sources say",
-    "Permalink": "madrid_args_proteomics_gen.html",
+    "Permalink": "como_args_proteomics_gen.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--batch-ratio",
     "Default": 0.75,
     "Description": "The ratio of batches required for a gene to be considered active in that sample",
-    "Permalink": "madrid_args_proteomics_gen.html",
+    "Permalink": "como_args_proteomics_gen.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--high-batch-ratio",
     "Default": 1,
     "Description": "The ratio of batches to be considered \"high confidence\".<br>High confidence genes are considered expressed no matter what other data sources say",
-    "Permalink": "madrid_args_proteomics_gen.html",
+    "Permalink": "como_args_proteomics_gen.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--quantile",
     "Default": 25,
     "Description": "The percentage to be considered for each quantile",
-    "Permalink": "madrid_args_proteomics_gen.html",
+    "Permalink": "como_args_proteomics_gen.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--config-file",
     "Default": "`trnaseq_data_inputs_paper_rm.xlsx`",
     "Description": "The configuration file name to use",
-    "Permalink": "madrid_args_rnaseq_gen.html",
+    "Permalink": "como_args_rnaseq_gen.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--replicate-ratio",
     "Default": "`0.75`",
     "Description": "The proportion of replicates with expression required for high-confidence",
-    "Permalink": "madrid_args_rnaseq_gen.html",
+    "Permalink": "como_args_rnaseq_gen.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--batch-ratio",
     "Default": "`0.75`",
     "Description": "The proportion of samples with expression required for gene",
-    "Permalink": "madrid_args_rnaseq_gen.html",
+    "Permalink": "como_args_rnaseq_gen.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--high-replicate-ratio",
     "Default": "`1.0`",
     "Description": "The proportion of replicates with expression required for high-confidence",
-    "Permalink": "madrid_args_rnaseq_gen.html",
+    "Permalink": "como_args_rnaseq_gen.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--high-batch-ratio",
     "Default": "`1.0`",
     "Description": "The proportion of replicates with expression required for high-confidence",
-    "Permalink": "madrid_args_rnaseq_gen.html",
+    "Permalink": "como_args_rnaseq_gen.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--filt-technique",
     "Default": "`\"zfpkm\"`",
     "Description": "The filtering technique; one of: (1) `\"quantile\"`, (2) `\"cpm\"`, or (3) `\"zfpkm\"`",
-    "Permalink": "madrid_args_rnaseq_gen.html",
+    "Permalink": "como_args_rnaseq_gen.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--min-zfpkm",
     "Default": "`-3`",
     "Description": "The cutoff for CPM filtering, if using zFPKM as the `--filt-technique`",
-    "Permalink": "madrid_args_rnaseq_gen.html",
+    "Permalink": "como_args_rnaseq_gen.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--library-prep",
     "Default": "`\"total\"`",
     "Description": "The library prepartion method; one of: (1) `\"total\"`, (2) `\"mRNA\"`, or `\"SC\"`",
-    "Permalink": "madrid_args_rnaseq_gen.html",
+    "Permalink": "como_args_rnaseq_gen.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--context-names",
     "Default": "\"['naiveB', 'smB']\"",
     "Description": "A list of cell types",
-    "Permalink": "madrid_args_rnaseq_preprocess.html",
+    "Permalink": "como_args_rnaseq_preprocess.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--gene-format",
     "Default": "\"Ensembl\"",
     "Description": "The format your gene input is in",
-    "Permalink": "madrid_args_rnaseq_preprocess.html",
+    "Permalink": "como_args_rnaseq_preprocess.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--taxon-id",
     "Default": "\"human\"",
     "Description": "The BioDBNet Taxon ID",
-    "Permalink": "madrid_args_rnaseq_preprocess.html",
+    "Permalink": "como_args_rnaseq_preprocess.html",
     "Required?": "Yes"
   },
   {
     "Argument": "--create-matrix OR --provide-matrix",
     "Default": "\"create-matrix\"",
     "Description": "Should the gene matrix be created, <br>or are you providing a matrix?",
-    "Permalink": "madrid_args_rnaseq_preprocess.html",
+    "Permalink": "como_args_rnaseq_preprocess.html",
     "Required?": "Yes"
   }
 ]

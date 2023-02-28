@@ -237,7 +237,7 @@ def repurposing_hub_preproc(drug_file):
         input_values=drug_db_new["Target"].tolist(),
         input_db=InputDatabase.GENE_SYMBOL,
         output_db=[
-            OutputDatabase.GENE_SYMBOL,
+            # OutputDatabase.GENE_SYMBOL,
             OutputDatabase.GENE_ID,
             OutputDatabase.CHROMOSOMAL_LOCATION
         ]
@@ -285,7 +285,7 @@ def main(argv):
         prog="knock_out_simulation.py",
         description="This script is responsible for mapping drug targets in metabolic models, performing knock out simulations, and comparing simulation results with disease genes. It also identified drug targets and repurposable drugs.",
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
-               "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
+               "https://github.com/HelikarLab/COMO",
     )
     parser.add_argument(
         "-m",
@@ -324,7 +324,7 @@ def main(argv):
         "--disease-down",
         type=str,
         required=True,
-        dest="disease_genes",
+        dest="disease_down",
         help="The name of the disease down-regulated file"
     )
     parser.add_argument(

@@ -1,8 +1,8 @@
 ---
 title: Create Context Specific Model
-sidebar: madrid_sidebar
-permalink: madrid_args_create_context_specific_model.html
-folder: madrid
+sidebar: como_sidebar
+permalink: como_args_create_context_specific_model.html
+folder: como
 summary: "The arguments used in the `/main/py/create_context_specific_model.py` file"
 last_updated: September 21, 2022
 ---
