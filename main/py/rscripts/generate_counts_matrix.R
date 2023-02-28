@@ -13,20 +13,20 @@ sink(zz, type="message")
 
 library(tidyverse)
 
-# fetch and organize MADRID_input
+# fetch and organize COMO_input
 organize_gene_counts_files <- function(data_dir) {
-    # fetch and organize MADRID_input
+    # fetch and organize COMO_input
     # accepts path to data directory, normalization technique
 
     study_metrics <- list() # list storing all the samples
     tissue_name <- basename(data_dir) # get tissue name from directory name
 
     # collect paths to  files
-    count_dir_i <- file.path(data_dir, "geneCounts") # MADRID_inputs/tissueName/geneCounts
+    count_dir_i <- file.path(data_dir, "geneCounts") # COMO_input/tissueName/geneCounts
     count_dir <- list.dirs(path = count_dir_i, full.names = TRUE, recursive = FALSE) %>%
-      Filter(function(x) !any(grepl(".ipynb_checkpoints", x)), .) # MADRID_inputs/tissueName/geneCounts/SX
+      Filter(function(x) !any(grepl(".ipynb_checkpoints", x)), .) # COMO_input/tissueName/geneCounts/SX
 
-    strand_dir_i <- file.path(data_dir, "strandedness") # MADRID_inputs/tissueName/strandedness
+    strand_dir_i <- file.path(data_dir, "strandedness") # COMO_input/tissueName/strandedness
     strand_dir <- list.dirs(path = strand_dir_i, full.names = TRUE, recursive = FALSE) # tissueName/strandedness/SX
 
     # for each study, collect gene count files, frag files, insert size files, layouts, and strand info
