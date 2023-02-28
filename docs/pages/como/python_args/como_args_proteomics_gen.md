@@ -1,8 +1,8 @@
 ---
 title: Proteomics Gen
-sidebar: madrid_sidebar
-permalink: madrid_args_proteomics_gen.html
-folder: madrid
+sidebar: como_sidebar
+permalink: como_args_proteomics_gen.html
+folder: como
 summary: "The arguments used in the `/main/py/proteomics_gen.py` file"
 last_updated: September 21, 2022
 ---

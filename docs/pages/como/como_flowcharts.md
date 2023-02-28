@@ -1,8 +1,8 @@
 ---
 title: Flow Charts
-sidebar: madrid_sidebar
-permalink: madrid_flowcharts.html
-folder: madrid
+sidebar: COMO_sidebar
+permalink: como_flowcharts.html
+folder: como
 last_updated: September 14, 2022
 ---
 

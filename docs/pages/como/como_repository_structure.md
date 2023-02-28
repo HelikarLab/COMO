@@ -1,9 +1,9 @@
 ---
 title: Repository Structure
-sidebar: madrid_sidebar
-permalink: madrid_repository_structure.html
-folder: madrid
-summary: The list of files in MADRID as of September 19, 2022.
+sidebar: como_sidebar
+permalink: como_repository_structure.html
+folder: como
+summary: The list of files in COMO as of September 19, 2022.
 last_updated: September 19, 2022
 ---
 
@@ -46,9 +46,9 @@ work/
 │   │   └── bcell_force_rxns.csv
 │   ├── GeneralModelUpdatedV2.mat
 │   ├── human_proteome_UP000005640_database.fasta
-│   ├── iMM_madrid.mat
+│   ├── iMM_mouse.mat
 │   ├── local_files
-│   ├── MADRID_input
+│   ├── COMO_input
 │   │   ├── naiveB
 │   │   │   ├── fragmentSizes
 │   │   │   │   ├── S1

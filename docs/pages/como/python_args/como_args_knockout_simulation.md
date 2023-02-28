@@ -1,8 +1,8 @@
 ---
 title: Knockout Simulation
-sidebar: madrid_sidebar
-permalink: madrid_args_knockout_simulation.html
-folder: madrid
+sidebar: como_sidebar
+permalink: como_args_knockout_simulation.html
+folder: como
 summary: "The arguments used in the `/main/py/knock_out_simulation.py` file"
 last_updated: September 21, 2022
 ---

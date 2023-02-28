@@ -1,21 +1,21 @@
 # This theme is modified from: https://idratherbewriting.com/documentation-theme-jekyll/
 
-repository: HelikarLab/MADRID
+repository: HelikarLab/COMO
 
 # this property is useful for conditional filtering of content that is separate from the PDF.
 output: web
 
 # this appears on the top navigation bar next to the home button
-topnav_title: MADRID Documentation
+topnav_title: COMO Documentation
 
 # this appears in the html browser tab for the site title (seen mostly by search engines, not users)
-site_title: MADRID Documentation
+site_title: COMO Documentation
 
 # this appears in the footer
 company_name: Helikar Lab
 
 # if you're using Github, provide the basepath to the branch you've created for reviews, following the sample here. if not, leave this value blank.
-github_editme_path: HelikarLab/MADRID/blob/master/
+github_editme_path: HelikarLab/COMO/blob/master/
 
 # if you have google-analytics ID, put it in. if not, edit this value to blank.
 google_analytics:
@@ -32,7 +32,7 @@ exclude:
   - .gitignore
   - vendor
 
-feedback_subject_line: MADRID Documentation Feedback
+feedback_subject_line: COMO Documentation Feedback
 
 # used as a contact email for the Feedback link in the top navigation bar
 feedback_email: jloecker3@huskers.unl.edu
@@ -44,7 +44,7 @@ feedback_email: jloecker3@huskers.unl.edu
 # if you uncomment the previous line, it changes the Feedback text
 
 # if you uncomment the following line, it changes where the feedback link points to
-feedback_link: "https://github.com/HelikarLab/MADRID/issues"
+feedback_link: "https://github.com/HelikarLab/COMO/issues"
 
 # library used for syntax highlighting
 highlighter: rouge
@@ -99,7 +99,7 @@ defaults:
 
 
 sidebars:
-- madrid_sidebar
+- como_sidebar
 
 # the description is used in the feed.xml file
 description: "Intended as a documentation theme based on Jekyll for technical writers documenting software and other technical products, this theme has all the elements you would need to handle multiple products with both multi-level sidebar navigation, tags, and other documentation features."
