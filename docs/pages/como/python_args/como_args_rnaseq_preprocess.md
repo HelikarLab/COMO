@@ -1,8 +1,8 @@
 ---
 title: RNASeq Preprocess Arguments
-sidebar: madrid_sidebar
-permalink: madrid_args_rnaseq_preprocess.html
-folder: madrid
+sidebar: como_sidebar
+permalink: como_args_rnaseq_preprocess.html
+folder: como
 summary: "The arguments used in the `/main/py/rnaseq_preprocess.py` file"
 last_updated: September 21, 2022
 ---

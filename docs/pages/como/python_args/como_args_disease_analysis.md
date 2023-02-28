@@ -1,8 +1,8 @@
 ---
 title: Disease Analysis
-sidebar: madrid_sidebar
-permalink: madrid_args_disease_analysis.html
-folder: madrid
+sidebar: como_sidebar
+permalink: como_args_disease_analysis.html
+folder: como
 summary: "The arguments used in the `/main/py/disease_analysis.py` file"
 last_updated: September 21, 2022
 ---

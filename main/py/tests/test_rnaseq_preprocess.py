@@ -12,9 +12,9 @@ import rnaseq_preprocess
 @pytest.mark.parametrize(
     "args",
     [
-        # Test using data in MADRID_input data
+        # Test using data in COMO_input data
         ["-n", "naiveB immNK", "--gene-format", "Ensembl", "--taxon-id", "9606", "--create-matrix"],
-        ["-n", "dimNK brightNK", "--gene-format", "SYMBOL", "--taxon-id", "human", "--provide-matrix", "--matrix", "MADRID_input/counts_matrix.tsv"],
+        ["-n", "dimNK brightNK", "--gene-format", "SYMBOL", "--taxon-id", "human", "--provide-matrix", "--matrix", "COMO_input/counts_matrix.tsv"],
     ]
 )
 def test_arg_input(args):
