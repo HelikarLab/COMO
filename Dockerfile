@@ -2,37 +2,37 @@ FROM jupyter/r-notebook:latest
 
 ARG GRB_SHORT_VERSION=10.0
 ARG GRB_VERSION=10.0.0
-ARG PYTHON_VERSION=3.10.10
+ARG PYTHON_VERSION=3.10
 
 # Set gurobi environment variables
 ENV GUROBI_HOME "${HOME}/gurobi/linux64"
 ENV PATH "$PATH:$GUROBI_HOME/bin"
 ENV LD_LIBRARY_PATH "$LD_LIBRARY_PATH:$GUROBI_HOME/lib"
 
-COPY /environment.yaml "${HOME}/environment.yaml"
-
-# Give ownership to jovyan user
-COPY --chown=1000:100 main "${HOME}"/main
-
 # Install python
-RUN apt update && \
-    apt install --yes software-properties-common && \
-    add-apt-repository ppa:deadsnakes/ppa && \
-    apt update && \
-    apt install --yes python${PYTHON_VERSION}
+USER root
+RUN apt -qqq update \
+    && apt -qqq install  --yes software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt -qqq update \
+    && apt -qqq install --yes python${PYTHON_VERSION} \
+    && apt -qqq clean \
+    && rm -rf /var/lib/apt/lists/*
+USER jovyan
+
+COPY /environment.yaml "${HOME}/environment.yaml"
+COPY --chown=1000:100 main "${HOME}"/main
 
 # Install python-related items
 RUN conda config --quiet --add channels conda-forge \
     && conda config --quiet --add channels bioconda \
     && conda config --quiet --add channels r \
     # Remove python from pinned versions; this allows us to update python. From: https://stackoverflow.com/a/11245372 \
-    # && sed -i "s/^python*//" /opt/conda/conda-meta/pinned \
+    && sed -i "s/^python*/${PYTHON_VERSION}/" /opt/conda/conda-meta/pinned \
     # && mamba install --quiet --yes python=${PYTHON_VERSION} \
     && mamba env update --quiet --name=base --file="${HOME}/environment.yaml" \
     && mamba clean --quiet --all --force-pkgs-dirs --yes \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
-    # Install jupyter extensions
-    && jupyter labextension install escher jupyterlab-spreadsheet @jupyter-widgets/jupyterlab-manager \
     && jupyter trust "${HOME}/main/COMO.ipynb" \
     && rm -rf "${HOME}/environment.yaml"
 
