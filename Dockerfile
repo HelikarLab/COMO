@@ -26,7 +26,7 @@ RUN conda config --quiet --add channels conda-forge \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
     # Install jupyter extensions
     && jupyter labextension install escher jupyterlab-spreadsheet @jupyter-widgets/jupyterlab-manager \
-    && jupyter trust "${HOME}/main/py/pipeline.ipynb" \
+    && jupyter trust "${HOME}/main/COMO.ipynb" \
     && rm -rf "${HOME}/environment.yaml"
 
 # Install gurbori
