@@ -14,13 +14,20 @@ COPY /environment.yaml "${HOME}/environment.yaml"
 # Give ownership to jovyan user
 COPY --chown=1000:100 main "${HOME}"/main
 
+# Install python
+RUN apt update && \
+    apt install --yes software-properties-common && \
+    add-apt-repository ppa:deadsnakes/ppa && \
+    apt update && \
+    apt install --yes python${PYTHON_VERSION}
+
 # Install python-related items
 RUN conda config --quiet --add channels conda-forge \
     && conda config --quiet --add channels bioconda \
     && conda config --quiet --add channels r \
     # Remove python from pinned versions; this allows us to update python. From: https://stackoverflow.com/a/11245372 \
-    && sed -i "s/^python 3.*//" /opt/conda/conda-meta/pinned \
-    && mamba install --quiet --yes python=${PYTHON_VERSION} \
+    # && sed -i "s/^python*//" /opt/conda/conda-meta/pinned \
+    # && mamba install --quiet --yes python=${PYTHON_VERSION} \
     && mamba env update --quiet --name=base --file="${HOME}/environment.yaml" \
     && mamba clean --quiet --all --force-pkgs-dirs --yes \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
