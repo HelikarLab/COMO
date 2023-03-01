@@ -2,7 +2,7 @@ FROM jupyter/r-notebook:latest
 
 ARG GRB_SHORT_VERSION=10.0
 ARG GRB_VERSION=10.0.0
-ARG PYTHON_VERSION=3.10
+ARG PYTHON_VERSION=3.10.10
 
 # Set gurobi environment variables
 ENV GUROBI_HOME "${HOME}/gurobi/linux64"
