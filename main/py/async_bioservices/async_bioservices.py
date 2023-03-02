@@ -9,6 +9,7 @@ from .taxon_ids import TaxonIDs
 async def _async_fetch_info(
         biodbnet: BioDBNet,
         event_loop: asyncio.AbstractEventLoop,
+        semaphore: asyncio.Semaphore,
         input_values: list[str],
         input_db: str,
         output_db: list[str],
@@ -106,12 +107,14 @@ def fetch_gene_info(
     event_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(event_loop)
     async_tasks = []
+    semaphore: asyncio.Semaphore = asyncio.Semaphore(5)
     for i in range(0, len(input_values), batch_len):
         # Define an upper range of values to take from input_values
         upper_range = min(i + batch_len, len(input_values))
         task = event_loop.create_task(
             _async_fetch_info(
                 biodbnet=biodbnet,
+                semaphore=semaphore,
                 input_values=input_values[i:upper_range],
                 input_db=input_db_value,
                 output_db=output_db,
