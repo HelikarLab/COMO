@@ -15,7 +15,7 @@ from rpy2.robjects.packages import importr
 from rpy2.robjects import pandas2ri
 import rpy2.robjects as ro
 
-from async_bioservices import database_convert
+from async_bioservices import async_bioservices
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.output_database import OutputDatabase
 from rpy2.robjects.packages import importr
