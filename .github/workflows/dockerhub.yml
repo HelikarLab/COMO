@@ -60,7 +60,6 @@ jobs:
       - name: Assert no outputs present in jupyter notebook
         uses: ResearchSoftwareActions/EnsureCleanNotebooksAction@1.1
 
-
       # Log into the GitHub Container Registry so we can push the image
       - name: Log in to Container Registry
         uses: docker/login-action@v2
