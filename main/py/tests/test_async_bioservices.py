@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.output_database import OutputDatabase
 from async_bioservices.taxon_ids import TaxonIDs
-from async_bioservices.database_convert import fetch_gene_info
+from async_bioservices.async_bioservices import fetch_gene_info
 
 
 class TestDatabases:
