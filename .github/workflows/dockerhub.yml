@@ -25,14 +25,6 @@ jobs:
         with:
           ref: ${{ github.GITHUB_REF }}
 
-      # Log into the GitHub Container Registry so we can push the image
-      - name: Log in to Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       # Get tag/release information for docker tags
       - name: Docker Metadata
         id: metadata
@@ -67,6 +59,14 @@ jobs:
 
       - name: Assert no outputs present in jupyter notebook
         uses: ResearchSoftwareActions/EnsureCleanNotebooksAction@1.1
+
+      # Log into the GitHub Container Registry so we can push the image
+      - name: Log in to Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
         uses: docker/build-push-action@v4
