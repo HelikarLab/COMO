@@ -2,8 +2,8 @@ FROM jupyter/r-notebook:latest
 
 ARG GRB_SHORT_VERSION=10.0
 ARG GRB_VERSION=10.0.0
-ARG PYTHON_MAIN_VERSION=3.10
-ARG PYTHON_SUB_VERSION=3.10.9
+# ARG PYTHON_MAIN_VERSION=3.10
+# ARG PYTHON_SUB_VERSION=3.10.9
 
 # Set gurobi environment variables
 ENV GUROBI_HOME "${HOME}/gurobi/linux64"
@@ -30,7 +30,7 @@ RUN conda config --quiet --add channels conda-forge \
     && conda config --quiet --add channels bioconda \
     && conda config --quiet --add channels r \
     # Remove python from pinned versions; this allows us to update python. From: https://stackoverflow.com/a/11245372 \
-    && sed -i "s|^python .*|python ${PYTHON_SUB_VERSION}|" /opt/conda/conda-meta/pinned \
+#    && sed -i "s|^python .*|python ${PYTHON_SUB_VERSION}|" /opt/conda/conda-meta/pinned \
     && mamba env update --quiet --name=base --file="${HOME}/environment.yaml" \
     && mamba clean --quiet --all --force-pkgs-dirs --yes \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
