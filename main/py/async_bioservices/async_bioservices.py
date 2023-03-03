@@ -16,48 +16,106 @@ async def _async_fetch_info(
         taxon_id: int,
         delay: int = 5,
 ):
-    conversion = await event_loop.run_in_executor(
-        None,  # Defaults to ThreadPoolExecutor, uses threads instead of processes. No need to modify
-        biodbnet.db2db,  # The function to call
-        input_db,  # The following are arguments passed to the function
-        output_db,
-        input_values,
-        taxon_id
-    )
-
+    async with semaphore:
+        if semaphore.locked():
+            print("Limit reached, waiting...")
+            await asyncio.sleep(1)
+        conversion = await event_loop.run_in_executor(
+            None,  # Defaults to ThreadPoolExecutor, uses threads instead of processes. No need to modify
+            biodbnet.db2db,  # The function to call
+            input_db,  # The following are arguments passed to the function
+            output_db,
+            input_values,
+            taxon_id
+        )
+    
     # If the above db2db conversion didn't work, try again until it does
     while not isinstance(conversion, pd.DataFrame):
         print(f"\nToo many requests to BioDBNet, waiting {delay} seconds and trying again.")
         await asyncio.sleep(delay)
-        database_convert = await event_loop.run_in_executor(
+        
+        first_half = input_values[:len(input_values) // 2]
+        second_half = input_values[len(input_values) // 2:]
+        
+        first_conversion = await event_loop.run_in_executor(
             None,  # Defaults to ThreadPoolExecutor, uses threads instead of processes. No need to modify
             _async_fetch_info,  # The function to call
             biodbnet,
             event_loop,
-            input_values,
+            semaphore,
+            first_half,
             input_db,
             output_db,
             taxon_id,
             delay
         )
+        
+        second_conversion = await event_loop.run_in_executor(
+            None,  # Defaults to ThreadPoolExecutor, uses threads instead of processes. No need to modify
+            _async_fetch_info,  # The function to call
+            biodbnet,
+            event_loop,
+            semaphore,
+            second_half,
+            input_db,
+            output_db,
+            taxon_id,
+            delay
+        )
+        conversion = pd.concat([first_conversion, second_conversion])
 
     return conversion
 
 
 async def _fetch_gene_info_manager(tasks: list[asyncio.Task], batch_length: int):
     results: list[int] = []
-
     index: int = 0
-    for task in asyncio.as_completed(tasks):
-        result = await task
 
-        # Multiply by batch length to get the approximate number of true genes being converted
-        print(f"\rCollecting genes... {(index + 1) * batch_length} of {len(tasks) * batch_length} finished", end="")
-        results.append(result)
+    for task in tasks:
+        results.append(await task)
+        print(f"\rCollecting genes... {(index + 1) * batch_length} of ~{len(tasks) * batch_length} finished", end="")
         index += 1
+
     print()
     return results
 
+
+def knockout_get_info(
+        input_values: list[str],
+        input_db: InputDatabase,
+        output_db: list[OutputDatabase] = None,
+        taxon_id: TaxonIDs | int = TaxonIDs.HOMO_SAPIENS,
+        delay: int = 5
+) -> pd.DataFrame:
+    print("In alternate biodb!")
+    input_db_value = input_db.value
+    batch_length: int = 100
+    if output_db is None:
+        
+        output_db: list = [
+            OutputDatabase.GENE_SYMBOL.value,
+            OutputDatabase.GENE_ID.value,
+            OutputDatabase.CHROMOSOMAL_LOCATION.value
+        ]
+    else:
+        output_db: list = [i.value for i in output_db]
+    
+    biodbnet = BioDBNet()
+    dataframe_maps: pd.DataFrame = pd.DataFrame([], columns=output_db)
+    dataframe_maps.index.name = input_db.value
+    
+    if type(taxon_id) == TaxonIDs:
+        taxon_id_value = taxon_id.value
+    else:
+        taxon_id_value = taxon_id
+    
+    df: pd.DataFrame = pd.DataFrame()
+    for i in range(0, 202, batch_length):
+        # results: pd.DataFrame = biodbnet.db2db(input_db=input_db.value, output_db=output_db, input_values=input_values, taxon=taxon_id_value)
+        results: pd.DataFrame = biodbnet.db2db(input_values=input_values[i:i + batch_length], input_db=input_db_value, output_db=output_db, taxon=taxon_id_value)
+        print(f"Got {i + batch_length} results ({i + batch_length} of {len(input_values)})")
+        df += results
+    return results
 
 def fetch_gene_info(
         input_values: list[str],
@@ -78,6 +136,7 @@ def fetch_gene_info(
     """
     
     input_db_value = input_db.value
+    batch_length: int = 100
     if output_db is None:
         
         output_db: list = [
@@ -94,22 +153,17 @@ def fetch_gene_info(
 
     if type(taxon_id) == TaxonIDs:
         taxon_id_value = taxon_id.value
-        if taxon_id == TaxonIDs.HOMO_SAPIENS:
-            batch_len: int = 500
-        else:
-            batch_len: int = 300
     else:
         taxon_id_value = taxon_id
-        batch_len: int = 300
 
     # Create a list of tasks to be awaited
     event_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(event_loop)
     async_tasks = []
-    semaphore: asyncio.Semaphore = asyncio.Semaphore(5)
-    for i in range(0, len(input_values), batch_len):
+    semaphore: asyncio.Semaphore = asyncio.Semaphore(10)
+    for i in range(0, len(input_values), batch_length):
         # Define an upper range of values to take from input_values
-        upper_range = min(i + batch_len, len(input_values))
+        upper_range = min(i + batch_length, len(input_values))
         task = event_loop.create_task(
             _async_fetch_info(
                 biodbnet=biodbnet,
@@ -126,7 +180,7 @@ def fetch_gene_info(
         async_tasks.append(task)
 
     # database_convert = event_loop.run_until_complete(asyncio.gather(*async_tasks))
-    database_convert = event_loop.run_until_complete(_fetch_gene_info_manager(tasks=async_tasks, batch_length=batch_len))
+    database_convert = event_loop.run_until_complete(_fetch_gene_info_manager(tasks=async_tasks, batch_length=batch_length))
     event_loop.close()  # Close the event loop to free resources
 
     # Loop over database_convert to concat them into dataframe_maps
