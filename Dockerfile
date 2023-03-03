@@ -14,7 +14,7 @@ ENV LD_LIBRARY_PATH "$LD_LIBRARY_PATH:$GUROBI_HOME/lib"
 USER root
 RUN apt -qqq update \
     && apt -qqq install  --yes software-properties-common \
-    && add-apt-repository ppa:deadsnakes/ppa \
+    && add-apt-repository --yes ppa:deadsnakes/ppa \
     && apt -qqq update \
     && apt -qqq install --yes python${PYTHON_MAIN_VERSION} \
     && apt -qqq clean \
