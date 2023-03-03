@@ -1,8 +1,8 @@
 ---
 title: User-Defined Data Workflow
-sidebar: madrid_sidebar
-permalink: madrid_user_workflow.html
-folder: madrid
+sidebar: como_sidebar
+permalink: como_user_workflow.html
+folder: como
 last_updated: Sept 14, 2022
 published: false
 ---

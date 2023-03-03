@@ -1,21 +1,21 @@
-# MADRID: a pipeline for MetAbolic Drug Repurposing IDentification
+# COMO: Constraint-based Optimizations of Metabolic Objectives 
 
-[![Continuous Integration](https://github.com/HelikarLab/MADRID/actions/workflows/dockerhub.yml/badge.svg)](https://github.com/HelikarLab/MADRID/actions/workflows/dockerhub.yml)
-[![Unit Tests](https://github.com/HelikarLab/MADRID/actions/workflows/unit_tests.yml/badge.svg?branch=master)](https://github.com/HelikarLab/MADRID/actions/workflows/unit_tests.yml)
-[![pages-build-deployment](https://github.com/HelikarLab/MADRID/actions/workflows/pages/pages-build-deployment/badge.svg?branch=master)](https://github.com/HelikarLab/MADRID/actions/workflows/pages/pages-build-deployment)
+[![Continuous Integration](https://github.com/HelikarLab/COMO/actions/workflows/dockerhub.yml/badge.svg)](https://github.com/HelikarLab/COMO/actions/workflows/dockerhub.yml)
+[![Unit Tests](https://github.com/HelikarLab/COMO/actions/workflows/unit_tests.yml/badge.svg?branch=master)](https://github.com/HelikarLab/COMO/actions/workflows/unit_tests.yml)
+[![pages-build-deployment](https://github.com/HelikarLab/COMO/actions/workflows/pages/pages-build-deployment/badge.svg?branch=master)](https://github.com/HelikarLab/COMO/actions/workflows/pages/pages-build-deployment)
 
-This is the home page for MADRID pipeline.
+This is the home page for the COMO pipeline.
 
-[View the documentation](https://helikarlab.github.io/MADRID)
+[View the documentation](https://helikarlab.github.io/COMO)
 
-[Create and view Issues](https://github.com/HelikarLab/MADRID/issues)
+[Create and view Issues](https://github.com/HelikarLab/COMO/issues)
 
 ## How To Run application
 - [Install Docker](https://docs.docker.com/install/)
 - `sudo docker login`
-- `sudo docker pull babessell/madrid:development`
+- `sudo docker pull ghcr.io/helikarlab/como:latest`
 - Run docker image and assign 2 CPUs to it.
-  - `sudo docker run --cpus=4 -p 8888:8888 --volume=$HOME/gurobi.lic:/opt/gurobi/gurobi.lic:ro  -v /$HOME/LocalMadrid:/home/jovyan/work/data/local_files --rm --name madrid --rm -it ghcr.io/helikarlab/madrid:latest`
+  - `sudo docker run --cpus=4 -p 8888:8888 --volume=$HOME/gurobi.lic:/opt/gurobi/gurobi.lic:ro  -v /$HOME/LocalComo:/home/jovyan/work/data/local_files --rm --name como --rm -it ghcr.io/helikarlab/como:latest`
 - Open [http://127.0.0.1:8888](http://127.0.0.1:8888) from your browser  
   - Alternatively, you can copy and paste the command under the prompt "or copy and paste one of these URLs:"
 - In your jupyter notebook, open `/work/py/pipeline.ipynb`
@@ -40,7 +40,7 @@ Identify drug targets against Rheumatoid arthritis using GSMN of naïve CD4+ T c
 
 Follow **How To Run application** instructions to run application and open Jupyter notebook.
 
-**Step 0.** Outputs of STAR aligner with the --GeneCounts argument can be directly interfaced with MADRID. In _"/work/data/STAR_output/"_ folder, we provide a template structure with Naive B control cells from Bulk RNAseq experiments found in GEO. We can run bulkRNAPreprocess.py with the "create_count_matrix" argument set to 'True' to merge the counts from each replicate in each study into a single matrix used in Step 1. Alternatively, you can provide a count matrix directly and run with 'create_count_matrix' to false to just fetch the necessary info for normalization.
+**Step 0.** Outputs of STAR aligner with the --GeneCounts argument can be directly interfaced with COMO. In _"/work/data/STAR_output/"_ folder, we provide a template structure with Naive B control cells from Bulk RNAseq experiments found in GEO. We can run bulkRNAPreprocess.py with the "create_count_matrix" argument set to 'True' to merge the counts from each replicate in each study into a single matrix used in Step 1. Alternatively, you can provide a count matrix directly and run with 'create_count_matrix' to false to just fetch the necessary info for normalization.
 
 **Step 1.** In _"/work/data/config_sheets/"_ folder, we included GEO accession numbers of microarray data in input file _“microarray_data_inputs.xlsx”_ and sample names of proteomics data in input file _“proteomics_data_inputs.xlsx”_. The protein abundance data is provided in input file  _“/work/data/data_matrices/ProteomicsDataMatrix_Naive.csv”_. Sample names for Bulk RNA-seq data is given in "/work/data/config_sheets/bulk_data_inputs.xlsx" Running bulkRNAPreprocess.py will create "/work/data/results/<cell type>/Gene_Info_<cell type>.csv" and "/work/data/data_matrices/BulkRNAseqMatrix_<cell type>.csv" if create_counts_matrix is set to true.
 

@@ -12,7 +12,7 @@ import glob
 import numpy as np
 from pathlib import Path
 
-import async_bioservices
+from async_bioservices import async_bioservices
 from async_bioservices.output_database import OutputDatabase
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.taxon_ids import TaxonIDs
@@ -32,15 +32,15 @@ r_file_path: Path = Path(configs.rootdir, "py", "rscripts", "generate_counts_mat
 
 def create_counts_matrix(context_name):
     """
-    Create a counts matrix by reading gene counts tables in MADRID_inputs/<context name>/<study number>/geneCounts/
+    Create a counts matrix by reading gene counts tables in COMO_input/<context name>/<study number>/geneCounts/
     Uses R in backend (generate_counts_matrix.R)
     """
-    input_dir = os.path.join(configs.rootdir, 'data', 'MADRID_input', context_name)
+    input_dir = os.path.join(configs.rootdir, 'data', 'COMO_input', context_name)
     print(f"Looking for STAR gene count tables in '{input_dir}'")
     matrix_output_dir = os.path.join(configs.rootdir, 'data', 'data_matrices', context_name)
     print(f"Creating Counts Matrix for '{context_name}'")
 
-    # call generate_counts_matrix.R to create count matrix from MADRID_input folder
+    # call generate_counts_matrix.R to create count matrix from COMO_input folder
     rpy2_hook = rpy2_api.Rpy2(r_file_path=r_file_path, data_dir=input_dir, out_dir=matrix_output_dir)
     rpy2_hook.call_function("generate_counts_matrix_main")
 
@@ -52,9 +52,9 @@ def create_config_df(context_name):
     """
     Create configuration sheet at /work/data/config_sheets/rnaseq_data_inputs_auto.xlsx
     based on the gene counts matrix. If using zFPKM normalization technique, fetch mean fragment lengths from
-    /work/data/MADRID_inputs/<context name>/<study number>/fragmentSizes/
+    /work/data/COMO_input/<context name>/<study number>/fragmentSizes/
     """
-    gene_counts_glob = os.path.join(configs.rootdir, "data", "MADRID_input", context_name, "geneCounts", "*", "*.tab")
+    gene_counts_glob = os.path.join(configs.rootdir, "data", "COMO_input", context_name, "geneCounts", "*", "*.tab")
     gene_counts_files = glob.glob(gene_counts_glob, recursive=True)
 
     out_df = pd.DataFrame(columns=['SampleName', 'FragmentLength', 'Layout', 'Strand', 'Group'])
@@ -90,7 +90,7 @@ def create_config_df(context_name):
                     r_label = re.findall(r"r\d{1,3}", r)[0]
                     R_label = re.findall(r"R\d{1,3}", r)[0]
                     frag_filename = "".join([context_name, "_", study_number, R_label, r_label, "_fragment_size.txt"])
-                    frag_files.append(os.path.join(configs.rootdir, "data", "MADRID_input", context_name,
+                    frag_files.append(os.path.join(configs.rootdir, "data", "COMO_input", context_name,
                                                    "fragmentSizes", study_number, frag_filename))
 
         layout_file = context_name + "_" + label + "_layout.txt"
@@ -98,7 +98,7 @@ def create_config_df(context_name):
         frag_file = context_name + "_" + label + "_fragment_size.txt"
         prep_file = context_name + "_" + label + "_prep_method.txt"
 
-        context_path = os.path.join(configs.rootdir, "data", "MADRID_input", context_name)
+        context_path = os.path.join(configs.rootdir, "data", "COMO_input", context_name)
         layout_path = os.path.join(context_path, "layouts", "*", layout_file)
         strand_path = os.path.join(context_path, "strandedness", "*", strand_file)
         frag_path = os.path.join(context_path, "fragmentSizes", "*", frag_file)
@@ -116,7 +116,7 @@ def create_config_df(context_name):
             layout = "UNKNOWN"
         elif len(layout_glob) > 1:
             print(f"\nMultiple matching layout files for {label}, make sure there is only one copy for each replicate "
-                  "in MADRID_input")
+                  "in COMO_input")
             sys.exit()
         else:
             with open(layout_glob[0]) as file:
@@ -130,7 +130,7 @@ def create_config_df(context_name):
             strand = "UNKNOWN"
         elif len(strand_glob) > 1:
             print(f"\nMultiple matching strandedness files for {label}, make sure there is only one copy for each "
-                  "replicate in MADRID_input")
+                  "replicate in COMO_input")
             sys.exit()
         else:
             with open(strand_glob[0]) as file:
@@ -142,7 +142,7 @@ def create_config_df(context_name):
             prep = "total"
         elif len(prep_glob) > 1:
             print(f"\nMultiple matching prep files for {label}, make sure there is only one copy for each "
-                  "replicate in MADRID_input")
+                  "replicate in COMO_input")
             sys.exit()
         else:
             with open(prep_glob[0]) as file:
@@ -159,7 +159,7 @@ def create_config_df(context_name):
             mean_fragment_size = 100
         elif len(frag_glob) > 1:
             print(f"\nMultiple matching fragment length files for {label}, make sure there is only one copy for each "
-                  "replicate in MADRID_input")
+                  "replicate in COMO_input")
             sys.exit()
         else:
 
@@ -251,7 +251,7 @@ def create_gene_info_file(matrix_file_list, form: InputDatabase, taxon_id):
         if i.value != form.value
     ]
 
-    gene_info = async_bioservices.database_convert.fetch_gene_info(
+    gene_info = async_bioservices.fetch_gene_info(
         input_values=genes,
         input_db=form,
         output_db=output_db,
@@ -350,7 +350,7 @@ def parse_args(argv):
         description="""
             Fetches additional gene information from a provided matrix or gene counts, or optionally creates this
             matrix using gene count files obtained using STAR aligner. Creation of counts matrix from STAR aligner 
-            output requires that the 'MADRID_inputs' folder exists and is correctly structured according to the 
+            output requires that the 'COMO_input' folder exists and is correctly structured according to the
             normalization technique being used. A correctly structured folder can be made using our Snakemake-based
             alignment pipeline at:
             https://github.com/HelikarLab/FastqToGeneCounts""",
@@ -365,7 +365,7 @@ def parse_args(argv):
                         required=True,
                         dest="context_names",
                         help="""Tissue/cell name of models to generate. These names should correspond to the folders
-                             in 'MADRID_inputs/' if creating count matrix files, or to
+                             in 'COMO_input/' if creating count matrix files, or to
                              'work/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv' if supplying
                              the count matrix as an imported .csv file. If making multiple models in a batch, then
                              use the format: "context1 context2 context3". """
@@ -404,7 +404,7 @@ def parse_args(argv):
                        default=False,
                        dest="make_matrix",
                        help="Flag for if you want to make a counts matrix, but not a config file. "
-                            "Requires a correctly structured MADRID_input folder in /work/data/. Can make one using: "
+                            "Requires a correctly structured COMO_input folder in /work/data/. Can make one using: "
                             "https://github.com/HelikarLab/FastqToGeneCounts"
                        )
 
