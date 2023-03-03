@@ -19,16 +19,7 @@ from async_bioservices.taxon_ids import TaxonIDs
 import rpy2_api
 import utilities
 
-# import R libraries
-# tidyverse = importr("tidyverse")
 r_file_path: Path = Path(configs.rootdir, "py", "rscripts", "generate_counts_matrix.R")
-
-# # read and translate R functions
-# f = open(os.path.join(configs.rootdir, "py", "rscripts", "generate_counts_matrix.R"), "r")
-# string = f.read()
-# f.close()
-# generate_counts_matrix_io = SignatureTranslatedAnonymousPackage(string, 'generate_counts_matrix_io')
-
 
 def create_counts_matrix(context_name):
     """
@@ -43,9 +34,6 @@ def create_counts_matrix(context_name):
     # call generate_counts_matrix.R to create count matrix from COMO_input folder
     rpy2_hook = rpy2_api.Rpy2(r_file_path=r_file_path, data_dir=input_dir, out_dir=matrix_output_dir)
     rpy2_hook.call_function("generate_counts_matrix_main")
-
-
-    # generate_counts_matrix_io.generate_counts_matrix_main(input_dir, matrix_output_dir)
 
 
 def create_config_df(context_name):
@@ -277,9 +265,10 @@ def handle_context_batch(context_names, mode, form: InputDatabase, taxon_id, pro
     tflag = False  # turn on when any total set is found to prevent writer from being init multiple times or empty
     mflag = False  # turn on when any mrna set is found to prevent writer from being init multiple times or empty
 
+    print(f"Found {len(context_names)} contexts to process: {', '.join(context_names)}")
+
     tmatrix_files = []
     mmatrix_files = []
-    # pmatrix_files = []
     for context_name in context_names:
         context_name = context_name.strip(" ")
         print(f"Preprocessing {context_name}")
@@ -417,7 +406,7 @@ def parse_args(argv):
                         )
 
     args = parser.parse_args(argv)
-    args.context_names = utilities.stringlist_to_list(args.context_names[0])
+    args.context_names = utilities.stringlist_to_list(args.context_names)
 
     return args
 
