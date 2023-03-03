@@ -691,6 +691,7 @@ def parse_args(argv):
         "-t",
         "--output-filetypes",
         type=str,
+        nargs="+",
         required=False,
         default="mat",
         dest="output_filetypes",
