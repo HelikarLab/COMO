@@ -10,18 +10,6 @@ ENV GUROBI_HOME "${HOME}/gurobi/linux64"
 ENV PATH "$PATH:$GUROBI_HOME/bin"
 ENV LD_LIBRARY_PATH "$LD_LIBRARY_PATH:$GUROBI_HOME/lib"
 
-# Install python
-# USER root
-# RUN apt -qqq update \
-#     && apt -qqq install  --yes software-properties-common \
-#     && add-apt-repository --yes ppa:deadsnakes/ppa \
-#     && apt -qqq update \
-#     && apt -qqq install --yes python${PYTHON_MAIN_VERSION} \
-#     && apt -qqq clean \
-#     && rm -rf /var/lib/apt/lists/* \
-#     && echo python3 --version
-# USER jovyan
-
 COPY /environment.yaml "${HOME}/environment.yaml"
 COPY --chown=1000:100 main "${HOME}"/main
 
