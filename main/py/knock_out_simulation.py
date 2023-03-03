@@ -10,7 +10,7 @@ import re
 import sys
 from project import configs
 
-import async_bioservices
+from async_bioservices import async_bioservices
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.output_database import OutputDatabase
 
@@ -233,7 +233,7 @@ def repurposing_hub_preproc(drug_file):
                 ignore_index=True
             )
 
-    entrez_ids = async_bioservices.database_convert.fetch_gene_info(
+    entrez_ids = async_bioservices.fetch_gene_info(
         input_values=drug_db_new["Target"].tolist(),
         input_db=InputDatabase.GENE_SYMBOL,
         output_db=[
@@ -253,7 +253,7 @@ def repurposing_hub_preproc(drug_file):
 def drug_repurposing(drug_db, d_score):
     d_score["Gene"] = d_score["Gene"].astype(str)
 
-    d_score_gene_sym = async_bioservices.database_convert.fetch_gene_info(
+    d_score_gene_sym = async_bioservices.fetch_gene_info(
         input_values=d_score["Gene"].tolist(),
         input_db=InputDatabase.GENE_ID,
         output_db=[OutputDatabase.GENE_SYMBOL]
