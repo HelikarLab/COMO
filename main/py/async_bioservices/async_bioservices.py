@@ -18,8 +18,7 @@ async def _async_fetch_info(
 ):
     async with semaphore:
         if semaphore.locked():
-            print("Limit reached, waiting...")
-            await asyncio.sleep(1)
+            await asyncio.sleep(5)
         conversion = await event_loop.run_in_executor(
             None,  # Defaults to ThreadPoolExecutor, uses threads instead of processes. No need to modify
             biodbnet.db2db,  # The function to call
@@ -160,7 +159,7 @@ def fetch_gene_info(
     event_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(event_loop)
     async_tasks = []
-    semaphore: asyncio.Semaphore = asyncio.Semaphore(10)
+    semaphore: asyncio.Semaphore = asyncio.Semaphore(20)
     for i in range(0, len(input_values), batch_length):
         # Define an upper range of values to take from input_values
         upper_range = min(i + batch_length, len(input_values))
