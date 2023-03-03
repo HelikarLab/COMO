@@ -24,7 +24,6 @@ parse_contexts_zfpkm <- function(wd, contexts, prep) {
     batches = list()
     for ( context in contexts ) {
         files <- Sys.glob(file.path(wd, context, prep, paste0("zFPKM_Matrix_", prep, "_*.csv")))
-        print(files)
         batches[[context]] <- unlist(lapply(files, get_batch_name))
     }
 
@@ -68,7 +67,6 @@ parse_contexts_zscore_prot <- function(wd, contexts) {
 
 
 merge_batch <- function(wd, context, batch) {
-    print(paste0("Merging ", batch))
     files <- Sys.glob(file.path(wd, paste0("*", batch, "*")))
     cnt <- 0
     nrep <- c()
@@ -145,7 +143,6 @@ merge_batch <- function(wd, context, batch) {
 
 
 combine_batch_zdistro <- function(wd, context, batch, zmat) {
-    print(paste0("Combining ", batch))
     plot_name_pdf = file.path(wd, "figures", paste0("plot_", context, "_", batch, "_combine_distro", ".pdf"))
 	plot_name_png = file.path(wd, "figures", paste0("plot_", context, "_", batch, "_combine_distro", ".png"))
 
@@ -215,7 +212,6 @@ combine_batch_zdistro <- function(wd, context, batch, zmat) {
 
 
 combine_context_zdistro <- function(wd, context, n_reps, zmat) {
-    print(paste0("Combining ", context, " Z-score distributions. "))
     plot_name_pdf = file.path(wd, "figures", paste0(
         "plot_", context, "_combine_batches_distro", ".pdf"))
 	plot_name_png = file.path(wd, "figures", paste0(
@@ -299,8 +295,7 @@ combine_omics_zdistros <- function(
     sweight,
     pweight,
     keep_gene_scores=TRUE) {
-
-    print(paste0("Combining -omics distributions for ", context))
+    
 
     fig_path <- file.path(wd, context, "figures")
     if ( !file.exists(fig_path) ) { dir.create(fig_path) }
@@ -449,8 +444,7 @@ combine_zscores_main <- function(
         cont_mbatches <- mbatches[[context]]
         cont_sbatches <- sbatches[[context]]
         cont_pbatches <- pbatches[[context]]
-
-        print(paste0("Context: ", context))
+        
 
         if ( length(cont_tbatches) == 0 & use_trna_flag ) {
             use_trna <- FALSE
@@ -473,12 +467,11 @@ combine_zscores_main <- function(
         }
 
         if ( use_trna ) {
-            print("Merging total RNA-seq distributions...")
+            print("Will merge total RNA-seq distributions")
             twd <- file.path(wd, context, "total")
             nreps <- c()
             cnt <- 0
             for ( batch in cont_tbatches ) {
-                print(paste0("Batch: ", batch))
                 res <- merge_batch(twd, context, batch)
                 zmat <- res[[1]]
                 nreps <- c(nreps, res[[2]])
@@ -502,12 +495,11 @@ combine_zscores_main <- function(
 
 
         if ( use_mrna ) {
-            print("Merging polyA enriched RNA-seq distributions...")
+            print("Will merge polyA enriched RNA-seq distributions")
             mwd <- file.path(wd, context, "mrna")
             nreps <- c()
             cnt <- 0
             for ( batch in cont_mbatches ) {
-                print(paste0("Batch: ", batch))
                 res <- merge_batch(mwd, context, batch)
                 zmat <- res[[1]]
                 nreps <- c(nreps, res[[2]])
@@ -531,12 +523,11 @@ combine_zscores_main <- function(
 
 
         if ( use_scrna ) {
-            print("Merging single-cell RNA-seq distributions...")
+            print("Will merge single-cell RNA-seq distributions")
             swd <- file.path(wd, context, "scrna")
             nreps <- c()
             cnt <- 0
             for ( batch in cont_sbatches ) {
-                print(paste0("Batch: ", batch))
                 res <- merge_batch(swd, context, batch)
                 zmat <- res[[1]]
                 nreps <- c(nreps, res[[2]])
@@ -560,12 +551,11 @@ combine_zscores_main <- function(
 
 
         if ( use_proteins ) {
-            print("Merging protein abundance distributions...")
+            print("Will merge protein abundance distributions")
             pwd = file.path(wd, context, "proteomics")
             nreps <- c()
             cnt <- 0
             for ( batch in cont_pbatches ) {
-                print(paste0("Batch: ", batch))
                 res <- merge_batch(pwd, context, batch)
                 zmat <- res[[1]]
                 nreps <- c(nreps, res[[2]])
