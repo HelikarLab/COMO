@@ -13,4 +13,3 @@
 docker_old/*
 ~$*
 /**/cache/
-/main/py/single_cell/cache/
