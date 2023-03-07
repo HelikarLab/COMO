@@ -12,3 +12,4 @@
 /main/py/rlogs/
 docker_old/*
 ~$*
+/**/cache/
