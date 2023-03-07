@@ -225,22 +225,23 @@ def repurposing_hub_preproc(drug_file):
             continue
         for target in row["target"].split("|"):
             drug_db_new = pd.concat(
-                [drug_db_new, pd.DataFrame([{"Name": row["pert_iname"],
-                                             "MOA": row["moa"],
-                                             "Target": target.strip(),
-                                             "Phase": row["clinical_phase"]
-                                             }])],
+                [drug_db_new,
+                 pd.DataFrame([
+                     {
+                         "Name": row["pert_iname"],
+                         "MOA": row["moa"],
+                         "Target": target.strip(),
+                         "Phase": row["clinical_phase"]
+                     }])
+                 ],
                 ignore_index=True
             )
-
+    drug_db_new.reset_index(inplace=True)
+    
     entrez_ids = async_bioservices.fetch_gene_info(
         input_values=drug_db_new["Target"].tolist(),
         input_db=InputDatabase.GENE_SYMBOL,
-        output_db=[
-            # OutputDatabase.GENE_SYMBOL,
-            OutputDatabase.GENE_ID,
-            OutputDatabase.CHROMOSOMAL_LOCATION
-        ]
+        output_db=OutputDatabase.GENE_ID
     )
 
     # entrez_ids = fetch_entrez_gene_id(drug_db_new["Target"].tolist(), input_db="Gene Symbol")
@@ -279,8 +280,6 @@ def drug_repurposing(drug_db, d_score):
 
 
 def main(argv):
-    drug_raw_file = "Repurposing_Hub_export.txt"
-
     parser = argparse.ArgumentParser(
         prog="knock_out_simulation.py",
         description="This script is responsible for mapping drug targets in metabolic models, performing knock out simulations, and comparing simulation results with disease genes. It also identified drug targets and repurposable drugs.",
@@ -369,7 +368,7 @@ def main(argv):
     disease = args.disease
     disease_up_file = args.disease_up
     disease_down_file = args.disease_down
-    drug_raw_file = args.raw_drug_file
+    raw_drug_filename = args.raw_drug_file
     ref_flux_file = args.ref_flux_file
     test_all = args.test_all
     pars_flag = args.pars_flag
@@ -393,17 +392,16 @@ def main(argv):
     cobra_model.solver = "gurobi"
 
     # preprocess repurposing hub data
-    drug_tsv_file = "Repurposing_Hub_Preproc.tsv"
-    drug_raw_file = os.path.join(configs.datadir, drug_raw_file)
-    drug_file = os.path.join(configs.datadir, drug_tsv_file)
-    if not os.path.isfile(drug_file):
+    raw_drug_filepath = os.path.join(configs.datadir, raw_drug_filename)
+    reformatted_drug_file = os.path.join(configs.datadir, "Repurposing_Hub_Preproc.tsv")
+    if not os.path.isfile(reformatted_drug_file):
         print("Preprocessing raw Repurposing Hub DB file...")
-        drug_db = repurposing_hub_preproc(drug_raw_file)
-        drug_db.to_csv(drug_file, index=False, sep="\t")
-        print(f"Preprocessed Repurposing Hub tsv file written to:\n{drug_file}")
+        drug_db = repurposing_hub_preproc(raw_drug_filepath)
+        drug_db.to_csv(reformatted_drug_file, index=False, sep="\t")
+        print(f"Preprocessed Repurposing Hub tsv file written to:\n{reformatted_drug_file}")
     else:
-        print(f"Found preprocessed Repurposing Hub tsv file at:\n{drug_file}")
-        drug_db = pd.read_csv(drug_file, sep="\t")
+        print(f"Found preprocessed Repurposing Hub tsv file at:\n{reformatted_drug_file}")
+        drug_db = pd.read_csv(reformatted_drug_file, sep="\t")
 
     # Knock Out Simulation
     model, gene_ind2genes, has_effects_gene, fluxsolution, flux_solution_ratios, flux_solution_diffs = knock_out_simulation(
