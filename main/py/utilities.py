@@ -1,3 +1,8 @@
+import io
+import contextlib
+import sys
+
+
 def stringlist_to_list(stringlist: list[str]) -> list[str]:
     """
     We are attempting to move to a new method of gathering a list of items from the command line
@@ -23,3 +28,12 @@ def stringlist_to_list(stringlist: list[str]) -> list[str]:
             for i in stringlist
         ]
     return stringlist
+
+@contextlib.contextmanager
+def suppress_stdout():
+    with io.StringIO() as buffer:
+        try:
+            sys.stdout = buffer
+            yield
+        finally:
+            sys.stdout = sys.__stdout__
