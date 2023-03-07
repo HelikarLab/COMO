@@ -61,7 +61,7 @@ async def _async_fetch_info(
             taxon_id,
             delay
         )
-        conversion: pd.DataFrame = pd.concat([first_conversion, second_conversion])
+        conversion: pd.DataFrame = pd.concat([await first_conversion, await second_conversion])
 
     return conversion
 
