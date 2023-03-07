@@ -451,6 +451,8 @@ def main(argv):
     drug_score_file = os.path.join(output_dir, f"{context}_drug_score.csv")
     drug_score.to_csv(drug_score_file, index=False)
     print("Gene D score mapped to repurposing drugs saved to\n{}".format(drug_score_file))
+    
+    print("\nDone!")
 
 
 if __name__ == "__main__":
