@@ -1,5 +1,5 @@
-data_dir: /main/data
-config_dir: /main/data/config_sheets
-data_matrices_dir: /main/data/data_matrices
-py_dir: /main/py
-results_dir: /main/data/results
+data_dir: data
+config_dir: data/config_sheets
+data_matrices_dir: data/data_matrices
+py_dir: py
+results_dir: data/results
