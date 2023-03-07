@@ -18,7 +18,7 @@ async def _async_fetch_info(
 ):
     async with semaphore:
         if semaphore.locked():
-            await asyncio.sleep(5)
+            await asyncio.sleep(3)
         conversion = await event_loop.run_in_executor(
             None,  # Defaults to ThreadPoolExecutor, uses threads instead of processes. No need to modify
             biodbnet.db2db,  # The function to call
