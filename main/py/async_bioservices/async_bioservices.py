@@ -1,9 +1,15 @@
 import asyncio
 from bioservices import BioDBNet
 import pandas as pd
-from .input_database import InputDatabase
-from .output_database import OutputDatabase
-from .taxon_ids import TaxonIDs
+
+try:
+    from .input_database import InputDatabase
+    from .output_database import OutputDatabase
+    from .taxon_ids import TaxonIDs
+except ImportError:
+    from input_database import InputDatabase
+    from output_database import OutputDatabase
+    from taxon_ids import TaxonIDs
 
 
 async def _async_fetch_info(
@@ -14,112 +20,56 @@ async def _async_fetch_info(
         input_db: str,
         output_db: list[str],
         taxon_id: int,
-        delay: int = 5,
+        delay: int = 10
 ):
-    async with semaphore:
-        if semaphore.locked():
-            await asyncio.sleep(3)
-        conversion = await event_loop.run_in_executor(
-            None,  # Defaults to ThreadPoolExecutor, uses threads instead of processes. No need to modify
-            biodbnet.db2db,  # The function to call
-            input_db,  # The following are arguments passed to the function
-            output_db,
-            input_values,
-            taxon_id
-        )
+    await semaphore.acquire()
+    conversion = await asyncio.to_thread(
+        biodbnet.db2db,
+        input_db,
+        output_db,
+        input_values,
+        taxon_id
+    )
+    semaphore.release()
     
     # If the above db2db conversion didn't work, try again until it does
-    while not isinstance(conversion, pd.DataFrame):
-        print(f"\nToo many requests to BioDBNet, waiting {delay} seconds and trying again.")
+    if not isinstance(conversion, pd.DataFrame):
+        # Errors will occur on a timeouut. If this happens, split our working dataset in two and try again
+        first_set: list[str] = input_values[:len(input_values) // 2]
+        second_set: list[str] = input_values[len(input_values) // 2:]
+        
         await asyncio.sleep(delay)
-        
-        first_half = input_values[:len(input_values) // 2]
-        second_half = input_values[len(input_values) // 2:]
-        
-        first_conversion = await event_loop.run_in_executor(
-            None,  # Defaults to ThreadPoolExecutor, uses threads instead of processes. No need to modify
-            _async_fetch_info,  # The function to call
-            biodbnet,
-            event_loop,
-            semaphore,
-            first_half,
-            input_db,
-            output_db,
-            taxon_id,
-            delay
+        first_conversion: pd.DataFrame = await _async_fetch_info(
+            biodbnet, event_loop, semaphore,
+            first_set, input_db, output_db,
+            taxon_id, delay
         )
-        
-        second_conversion = await event_loop.run_in_executor(
-            None,  # Defaults to ThreadPoolExecutor, uses threads instead of processes. No need to modify
-            _async_fetch_info,  # The function to call
-            biodbnet,
-            event_loop,
-            semaphore,
-            second_half,
-            input_db,
-            output_db,
-            taxon_id,
-            delay
+        second_conversion: pd.DataFrame = await _async_fetch_info(
+            biodbnet, event_loop, semaphore,
+            second_set, input_db, output_db,
+            taxon_id, delay,
         )
-        conversion: pd.DataFrame = pd.concat([await first_conversion, await second_conversion])
-
+        conversion: pd.DataFrame = pd.concat([first_conversion, second_conversion])
+        
     return conversion
 
 
-async def _fetch_gene_info_manager(tasks: list[asyncio.Task], batch_length: int):
-    results: list[int] = []
-    index: int = 0
+async def _fetch_gene_info_manager(tasks: list[asyncio.Task], batch_length: int) -> list[pd.DataFrame]:
+    results: list[pd.DataFrame] = []
 
-    for task in tasks:
+    print("Collecting genes... ", end="")
+    
+    task: asyncio.Task
+    for i, task in enumerate(asyncio.as_completed(tasks)):
         results.append(await task)
-        print(f"\rCollecting genes... {(index + 1) * batch_length} of ~{len(tasks) * batch_length} finished", end="")
-        index += 1
+        print(f"\rCollecting genes... {i * batch_length} of ~{len(tasks) * batch_length} finished", end="")
 
-    print()
-    return results
-
-
-def knockout_get_info(
-        input_values: list[str],
-        input_db: InputDatabase,
-        output_db: list[OutputDatabase] = None,
-        taxon_id: TaxonIDs | int = TaxonIDs.HOMO_SAPIENS,
-        delay: int = 5
-) -> pd.DataFrame:
-    print("In alternate biodb!")
-    input_db_value = input_db.value
-    batch_length: int = 100
-    if output_db is None:
-        
-        output_db: list = [
-            OutputDatabase.GENE_SYMBOL.value,
-            OutputDatabase.GENE_ID.value,
-            OutputDatabase.CHROMOSOMAL_LOCATION.value
-        ]
-    else:
-        output_db: list = [i.value for i in output_db]
-    
-    biodbnet = BioDBNet()
-    dataframe_maps: pd.DataFrame = pd.DataFrame([], columns=output_db)
-    dataframe_maps.index.name = input_db.value
-    
-    if type(taxon_id) == TaxonIDs:
-        taxon_id_value = taxon_id.value
-    else:
-        taxon_id_value = taxon_id
-    
-    df: pd.DataFrame = pd.DataFrame()
-    for i in range(0, 202, batch_length):
-        # results: pd.DataFrame = biodbnet.db2db(input_db=input_db.value, output_db=output_db, input_values=input_values, taxon=taxon_id_value)
-        results: pd.DataFrame = biodbnet.db2db(input_values=input_values[i:i + batch_length], input_db=input_db_value, output_db=output_db, taxon=taxon_id_value)
-        print(f"Got {i + batch_length} results ({i + batch_length} of {len(input_values)})")
-        df += results
     return results
 
 def fetch_gene_info(
         input_values: list[str],
         input_db: InputDatabase,
-        output_db: list[OutputDatabase] = None,
+        output_db: OutputDatabase | list[OutputDatabase] = None,
         taxon_id: TaxonIDs | int = TaxonIDs.HOMO_SAPIENS,
         delay: int = 5
 ) -> pd.DataFrame:
@@ -137,24 +87,26 @@ def fetch_gene_info(
     input_db_value = input_db.value
     batch_length: int = 100
     if output_db is None:
-        
         output_db: list = [
             OutputDatabase.GENE_SYMBOL.value,
             OutputDatabase.GENE_ID.value,
             OutputDatabase.CHROMOSOMAL_LOCATION.value
         ]
+    elif isinstance(output_db, OutputDatabase):
+        output_db: list = [output_db.value]
     else:
         output_db: list = [i.value for i in output_db]
-
-    biodbnet = BioDBNet()
-    dataframe_maps: pd.DataFrame = pd.DataFrame([], columns=output_db)
-    dataframe_maps.index.name = input_db.value
 
     if type(taxon_id) == TaxonIDs:
         taxon_id_value = taxon_id.value
     else:
         taxon_id_value = taxon_id
 
+    biodbnet = BioDBNet()
+    biodbnet.services.TIMEOUT = 60
+    dataframe_maps: pd.DataFrame = pd.DataFrame([], columns=output_db)
+    dataframe_maps.index.name = input_db.value
+    
     # Create a list of tasks to be awaited
     event_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(event_loop)
@@ -178,7 +130,6 @@ def fetch_gene_info(
     
         async_tasks.append(task)
 
-    # database_convert = event_loop.run_until_complete(asyncio.gather(*async_tasks))
     database_convert = event_loop.run_until_complete(_fetch_gene_info_manager(tasks=async_tasks, batch_length=batch_length))
     event_loop.close()  # Close the event loop to free resources
 
