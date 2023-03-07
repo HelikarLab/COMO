@@ -14,6 +14,8 @@ from async_bioservices import async_bioservices
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.output_database import OutputDatabase
 
+from utilities import suppress_stdout
+
 
 def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, test_all, pars_flag):
     if ref_flux_file is not None:
@@ -83,12 +85,13 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, tes
     flux_solution = pd.DataFrame()
     for id in has_effects_gene:
         print(f"Peforming knock-out simulation for {id}")
-        model_cp = copy.deepcopy(model)  # using model_opt instead bc it makes more sense?
-        gene = model_cp.genes.get_by_id(id)
-        gene.knock_out()
-        opt_model = cobra.flux_analysis.moma(model_cp, solution=ref_sol, linear=False).to_frame()
-        flux_solution[id] = opt_model["fluxes"]
-        del model_cp
+        with suppress_stdout():
+            model_cp = copy.deepcopy(model)  # using model_opt instead bc it makes more sense?
+            gene = model_cp.genes.get_by_id(id)
+            gene.knock_out()
+            opt_model = cobra.flux_analysis.moma(model_cp, solution=ref_sol, linear=False).to_frame()
+            flux_solution[id] = opt_model["fluxes"]
+            del model_cp
 
     # flux_solution
     flux_solution[abs(flux_solution) < 1e-8] = 0.0
