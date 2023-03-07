@@ -8,8 +8,9 @@ import os
 import pandas as pd
 import re
 import sys
-from project import configs
+from tqdm import tqdm
 
+from project import configs
 from async_bioservices import async_bioservices
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.output_database import OutputDatabase
@@ -83,8 +84,8 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, tes
                 break
     print(f"{len(has_effects_gene)} drug target genes with metabolic effects in model")
     flux_solution = pd.DataFrame()
-    for id in has_effects_gene:
-        print(f"Peforming knock-out simulation for {id}")
+    for id_ in tqdm(has_effects_gene):
+        tqdm.write(f"Performing knock-out simulation for {id_}")
         with suppress_stdout():
             model_cp = copy.deepcopy(model)  # using model_opt instead bc it makes more sense?
             gene = model_cp.genes.get_by_id(id)
@@ -364,6 +365,15 @@ def main(argv):
         dest="pars_flag",
         help="Use parsimonious FBA for optimal reference solution (only if not providing flux file)"
     )
+    parser.add_argument(
+        "-s",
+        "--solver",
+        action="store",
+        required=False,
+        default="gurobi",
+        dest="solver",
+        help="The solver to use during knock out simulations. Available options are: glpk or gurobi"
+    )
 
     args = parser.parse_args()
     tissue_spec_model_file = args.model
@@ -392,7 +402,7 @@ def main(argv):
     else:
         raise NameError("reference model format must be .xml, .mat, or .json")
 
-    cobra_model.solver = "gurobi"
+    cobra_model.solver = args.solver
 
     # preprocess repurposing hub data
     raw_drug_filepath = os.path.join(configs.datadir, raw_drug_filename)
