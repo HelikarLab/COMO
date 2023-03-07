@@ -1,14 +1,15 @@
 #!/usr/bin/python3
-import sys
-import argparse
-import cobra
-import pandas as pd
-import numpy as np
 import os
 import re
+import sys
+import cobra
 import collections
-from cobra.flux_analysis import pfba
+import argparse
+import numpy as np
+import pandas as pd
+from pathlib import Path
 from warnings import warn
+from cobra.flux_analysis import pfba
 from cobamp.wrappers import COBRAModelObjectReader
 from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
@@ -127,7 +128,7 @@ def set_boundaries(model_cobra, bound_rxns, bound_lb, bound_ub):
     
     # close sinks and demands not in boundary reactions unless no boundary reactions were given
     if not allow_all_boundary_rxns:
-        
+
         for i, rxn in enumerate(sink_rxns):  # set sinks to 0
             if rxn not in bound_rxns:  # only allow sink accumulation
                 getattr(model_cobra.reactions, rxn).lower_bound = 0
@@ -135,7 +136,7 @@ def set_boundaries(model_cobra, bound_rxns, bound_lb, bound_ub):
             else:  # set from file
                 getattr(model_cobra.reactions, rxn).lower_bound = bound_lb[i]
                 getattr(model_cobra.reactions, rxn).upper_bound = bound_ub[i]
-        
+                
         for i, rxn in enumerate(demand_rxns):
             if rxn not in bound_rxns:  # demand is one way - outside the system
                 getattr(model_cobra.reactions, rxn).lower_bound = 0
@@ -144,20 +145,16 @@ def set_boundaries(model_cobra, bound_rxns, bound_lb, bound_ub):
                 getattr(model_cobra.reactions, rxn).lower_bound = 0
                 getattr(model_cobra.reactions, rxn).upper_bound = bound_ub[i]
         
-        # Reaction media
-        medium = model_cobra.medium  # get reaction media to modify
-        for (rxn) in (exchange_rxns):  # open exchanges from exchange file, close unspecified exchanges
-            if rxn not in bound_rxns:
-                medium[rxn] = 0.0
-            else:
-                medium[rxn] = -float(bound_lb[bound_rxns.index(rxn)])
+    # Reaction media
+    medium = model_cobra.medium  # get reaction media to modify
+    for rxn in exchange_rxns:  # open exchanges from exchange file, close unspecified exchanges
+        if rxn not in bound_rxns:
+            medium[rxn] = 0.0
+        else:
+            medium[rxn] = -float(bound_lb[bound_rxns.index(rxn)])
+    model_cobra.medium = medium  # set new media
         
-        model_cobra.medium = medium  # set new media
-        # bound_rm_rxns = [
-        #    rxn for rxn in exchange_rxns + sink_rxns if rxn not in bound_rxns
-        # ]
-        
-        return model_cobra, bound_rm_rxns
+    return model_cobra, bound_rm_rxns
 
 
 def feasibility_test(model_cobra, step):
@@ -616,7 +613,7 @@ def parse_args(argv):
         type=str,
         required=False,
         default=None,
-        dest="bound_rxns_file",
+        dest="boundary_rxns_filepath",
         help="Path to file contains the exchange (media), sink, and demand reactions which "
              "the model should use to fulfill the reactions governed by transcriptomic and proteomics "
              "data inputs. It must be a csv or xlsx with three columns: Rxn, Lowerbound, Upperbound. If not "
@@ -629,7 +626,7 @@ def parse_args(argv):
         type=str,
         required=False,
         default=None,
-        dest="exclude_rxns_file",
+        dest="exclude_rxns_filepath",
         help="Filepath to file that contains reactions which will be removed from active reactions "
              "the model to use when seeding, even if considered active from transcriptomic and "
              "proteomics data inputs. It must be a csv or xlsx with one column of reaction IDs consistent with "
@@ -641,7 +638,7 @@ def parse_args(argv):
         type=str,
         required=False,
         default=None,
-        dest="force_rxns_file",
+        dest="force_rxns_filepath",
         help="Filepath to file that contains reactions which will be added to active reactions for "
              "the model to use when seeding (unless it causes the model to be unsolvable), regardless "
              "of results of transcriptomic and proteomics data inputs. It must be a csv or xlsx with one "
@@ -714,9 +711,9 @@ def main(argv):
     reference_model = args.modelfile
     genefile = args.genefile
     objective = args.objective
-    bound_rxns_file = args.bound_rxns_file
-    exclude_rxns_file = args.exclude_rxns_file
-    force_rxns_file = args.force_rxns_file
+    boundary_rxns_filepath = args.boundary_rxns_filepath
+    exclude_rxns_filepath = args.exclude_rxns_filepath
+    force_rxns_filepath = args.force_rxns_filepath
     recon_alg = args.algorithm.upper()
     low_threshold = args.low_threshold
     high_threshold = args.high_threshold
@@ -734,42 +731,59 @@ def main(argv):
     bound_rxns = []
     bound_ub = []
     bound_lb = []
-    if bound_rxns_file:
-        try:
-            print(f"Reading {bound_rxns_file} for boundary reactions")
-            print(bound_rxns_file[-5:])
-            if bound_rxns_file[-4:] == ".csv":
-                df = pd.read_csv(bound_rxns_file, header=0, sep=",")
-            elif bound_rxns_file[-5:] == ".xlsx" or bound_rxns_file[-4:] == ".xls":
-                df = pd.read_excel(bound_rxns_file, header=0)
-            else:
-                raise ValueError(
-                    "Boundary reactions file must be a csv or xlsx with three columns: Rxn, Lowerbound, Upperbound"
-                )
-            
-            bound_rxns = df["Rxn"].tolist()
-            bound_ub = df["Upperbound"].tolist()
-            bound_lb = df["Lowerbound"].tolist()
-            del df
+    
+    if boundary_rxns_filepath:
+        boundary_rxns_filepath: Path = Path(boundary_rxns_filepath)
         
-        except FileNotFoundError:
-            print(
-                "--boundary-reactions-file must be a path to a csv file with three columns: "
-                "Rxn, Lowerbound, Upperbound"
-            )
-        except BaseException:
-            print(
-                "Boundary reactions file must be a csv or xlsx with three columns: Rxn, Lowerbound, Upperbound"
-            )
+        print(f"Reading {str(boundary_rxns_filepath)} for boundary reactions")
+        if boundary_rxns_filepath.suffix == ".csv":
+            df: pd.DataFrame = pd.read_csv(boundary_rxns_filepath, header=0, sep=",")
+        elif boundary_rxns_filepath.suffix == ".xlsx" or boundary_rxns_filepath.suffix == ".xls":
+            df: pd.DataFrame = pd.read_excel(boundary_rxns_filepath, header=0)
+        else:
+            raise FileNotFoundError(f"Boundary reactions file not found! Must be a csv or xlsx file. Searching for: {boundary_rxns_filepath}")
+        
+        # Make sure the columns are named correctly. They should be "Reaction", "Abbreviation", "Compartment", "Minimum Reaction Rate", and "Maximum Reaction Rate"
+        for column in df.columns:
+            if column.lower() not in ["reaction", "abbreviation", "compartment", "minimum reaction rate", "maximum reaction rate"]:
+                raise ValueError(f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', 'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}")
+            
+        # convert all columns to lowercase
+        df.columns = [column.lower() for column in df.columns]
+        
+        reaction_type: list[str] = df["reaction"].tolist()
+        reaction_abbreviation: list[str] = df["abbreviation"].tolist()
+        reaction_compartment: list[str] = df["compartment"].tolist()
+        lower_bound: list[float] = df["minimum reaction rate"].tolist()
+        upper_bound: list[float] = df["maximum reaction rate"].tolist()
+        
+        reaction_formula: list[str] = []
+        for i in range(len(reaction_type)):
+            current_type: str = reaction_type[i]
+            temp_reaction: str = ""
+            
+            match current_type.lower():
+                case "exchange":
+                    temp_reaction += "EX_"
+                case "demand":
+                    temp_reaction += "DM_"
+                case "sink":
+                    temp_reaction += "SK_"
+            
+            temp_reaction += f"{reaction_abbreviation[i]}_{reaction_compartment[i]}"
+            reaction_formula.append(temp_reaction)
+
+        del df
 
     exclude_rxns = []
-    if exclude_rxns_file:
+    if exclude_rxns_filepath:
+        exclude_rxns_filepath: Path = Path(exclude_rxns_filepath)
         try:
-            print(f"Reading {exclude_rxns_file} for exclude reactions")
-            if exclude_rxns_file[-4:] == ".csv":
-                df = pd.read_csv(exclude_rxns_file, header=None)
-            elif exclude_rxns_file[-5:] == ".xlsx" or exclude_rxns_file[-4] == ".xls":
-                df = pd.read_excel(exclude_rxns_file, header=None)
+            print(f"Reading {exclude_rxns_filepath} for exclude reactions")
+            if exclude_rxns_filepath.suffix == ".csv":
+                df = pd.read_csv(exclude_rxns_filepath, header=0)
+            elif exclude_rxns_filepath.suffix == ".xlsx" or exclude_rxns_filepath.suffix == ".xls":
+                df = pd.read_excel(exclude_rxns_filepath, header=0)
             else:
                 print(
                     "--exclude-reactions-file must be a path to a csv or xlsx file with one column."
@@ -800,13 +814,14 @@ def main(argv):
             sys.exit()
 
     force_rxns = []
-    if force_rxns_file:
+    if force_rxns_filepath:
+        force_rxns_filepath: Path = Path(force_rxns_filepath)
         try:
-            print(f"Reading {force_rxns_file} for force reactions")
-            if force_rxns_file[-4:] == ".csv":
-                df = pd.read_csv(force_rxns_file, header=None)
-            elif force_rxns_file[-5:] == ".xlsx" or bound_rxns_file[-4:] == ".xls":
-                df = pd.read_excel(force_rxns_file, header=None)
+            print(f"Reading {force_rxns_filepath} for force reactions")
+            if force_rxns_filepath.suffix == ".csv":
+                df = pd.read_csv(force_rxns_filepath, header=0)
+            elif force_rxns_filepath.suffix == ".xlsx" or force_rxns_filepath.suffix == ".xls":
+                df = pd.read_excel(force_rxns_filepath, header=0)
             else:
                 print(
                     "--force-reactions-file must be a path to a csv or xlsx file with one column."
@@ -817,7 +832,7 @@ def main(argv):
                 )
                 sys.exit()
             
-            force_rxns = df.iloc[:, 0].tolist()
+            force_rxns = df["Abbreviation"].tolist()
 
         except FileNotFoundError:
             print(
@@ -867,8 +882,8 @@ def main(argv):
         exclude_rxns,
         force_rxns,
         bound_rxns,
-        bound_lb,
-        bound_ub,
+        lower_bound,
+        upper_bound,
         solver,
         context_name,
         low_threshold,
