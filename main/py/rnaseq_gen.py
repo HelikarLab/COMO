@@ -15,22 +15,6 @@ import rpy2_api
 # enable r to py conversion
 pandas2ri.activate()
 
-# import R libraries
-# limma = importr("limma")
-# tidyverse = importr("tidyverse")
-# edgeR = importr("edgeR")
-# genefilter = importr("genefilter")
-# biomaRt = importr("biomaRt")
-# sjmisc = importr("sjmisc")
-# readxl = importr("readxl")
-# zfpkm = importr("zFPKM")
-# stringr = importr("stringr")
-
-# read and translate R functions
-# f = open(os.path.join(configs.rootdir, "py", "rscripts", "rnaseq.R"), "r")
-# string = f.read()
-# f.close()
-# rnaseq_io = SignatureTranslatedAnonymousPackage(string, "rnaseq_io")
 r_file_path = Path(configs.rootdir, "py", "rscripts", "rnaseq.R")
 
 
@@ -100,8 +84,10 @@ def handle_context_batch(
     xl = pd.ExcelFile(rnaseq_config_filepath)
     sheet_names = xl.sheet_names
     
+    print(f"Reading config file: {rnaseq_config_filepath}")
+    
     for context_name in sheet_names:
-        print("model: ", context_name)
+        print(f"\nStarting {context_name}")
         rnaseq_output_file = "".join(["rnaseq_", prep, "_", context_name, ".csv"])
         rnaseq_output_filepath = os.path.join(
             configs.datadir, "results", context_name, prep, rnaseq_output_file
@@ -120,8 +106,8 @@ def handle_context_batch(
         gene_info_filepath = os.path.join(configs.datadir, "gene_info.csv")
         
         os.makedirs(os.path.dirname(rnaseq_output_filepath), exist_ok=True)
-        print('Input count matrix is at "{}"'.format(rnaseq_input_filepath))
-        print('Gene info file is at "{}"'.format(gene_info_filepath))
+        print(f"Gene info:          {gene_info_filepath}")
+        print(f"Count matrix:       {rnaseq_input_filepath}")
         
         rpy2_api.Rpy2(
             r_file_path=r_file_path,
@@ -141,24 +127,7 @@ def handle_context_batch(
             min_zfpkm=min_zfpkm
         ).call_function("save_rnaseq_tests")
         
-        # rnaseq_io.save_rnaseq_tests(
-        #     rnaseq_input_filepath,
-        #     rnaseq_config_filepath,
-        #     rnaseq_output_filepath,
-        #     gene_info_filepath,
-        #     context_name,
-        #     prep=prep,
-        #     replicate_ratio=replicate_ratio,
-        #     batch_ratio=batch_ratio,
-        #     replicate_ratio_high=replicate_ratio_high,
-        #     batch_ratio_high=batch_ratio_high,
-        #     technique=technique,
-        #     quantile=quantile,
-        #     min_count=min_count,
-        #     min_zfpkm=min_zfpkm
-        # )
-        
-        print("Test data saved to " + rnaseq_output_filepath)
+        print(f"Results saved at:   {rnaseq_output_filepath}")
 
 
 def main(argv):
@@ -320,8 +289,6 @@ def main(argv):
     
     prep = prep.replace(" ", "")
     
-    print('Config file is "{}"'.format(config_filename))
-    
     handle_context_batch(
         config_filename,
         replicate_ratio,
@@ -334,6 +301,7 @@ def main(argv):
         min_zfpkm,
         prep,
     )
+    print("\nDone!")
 
 
 if __name__ == "__main__":

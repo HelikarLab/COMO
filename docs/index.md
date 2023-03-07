@@ -107,6 +107,8 @@ sudo docker pull ghcr.io/helikarlab/como:latest  # Or your chosen tag instead of
 ```
 
 Now we can run the container.
+
+**docker run command**
 ```bash
 # We are going to export the license file location to an environment variable for use when running the docker container
 GRB_LICENSE_FILE=/your/gurobi/license/file/location/gurobi.lic
@@ -127,7 +129,6 @@ If you have questions, don't be afraid to ask on our [Issues Page](https://githu
 
 |              Option              |  Required?  |                                                      Description                                                       |
 |:--------------------------------:|:-----------:|:----------------------------------------------------------------------------------------------------------------------:|
-|            `--cpus=6`            |     No      |                  The number of CPUs to allocate to the container. This is optional, but recommended.                   |
 |          `-p 8888:8888`          |     Yes     |                                       The port to use for the Jupyter Notebook.                                        |
 |           `--mount ..`           |     Yes     | The path to your Gurobi license file. This is required to run the [Gurobi Optimizer](https://www.gurobi.com/) in COMO. |
 |   `--volume=$HOME/como_local`    | Recommended |            The path to store local COMO files at. This is not required, but recommended to negate data loss            |
@@ -135,11 +136,35 @@ If you have questions, don't be afraid to ask on our [Issues Page](https://githu
 |              `-it`               |     No      |                                            Run the container interactively                                             |
 | `ghcr.io/helikarlab/como:latest` |     Yes     |                                        Run the container with the "latest" tag                                         |
 
+**docker compose command**
+```yaml
+services:
+  como:
+    image: ghcr.io/helikarlab/como:latest
+    container_name: como
+    restart: unless-stopped
+    cpus: 8
+    mem_limit: 8G
+    environment:
+      - GRANT_SUDO=yes
+      - CHOWN_EXTRA="/home/jovyan/main/data/local_files"
+      - CHOWN_EXTRA_OPTS="-R"
+    ports:
+      - 8888:8888
+    volumes:
+      - ./local_files:/home/jovyan/main/data/local_files
+      - type: bind
+        source: /home/joshl/gurobi.lic
+        target: /home/jovyan/gurobi.lic
+```
+
+To run the container, simply run `docker compose up -d`. This will detach from the container, allowing it to continue running after closing the terminal
+
 ## Accessing COMO
 Navigate to [http://localhost:8888](http://localhost:8888) in your browser
 
 ## Working in the Notebook
-Open the Jupyter Notebook file, found at `/main/py/pipeline_paper_demo.ipynb` in the web interface.
+Open the Jupyter Notebook file, found at `COMO.ipynb` in the web interface.
 
 Configuration files should be uploaded to `{{ site.data.terms.data_dir }}/config_files` and data files to `{{ site.data.terms.data_dir }}/data_matrices`, according to instructions in the notebook and provided templates
 
