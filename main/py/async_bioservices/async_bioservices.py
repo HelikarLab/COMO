@@ -159,7 +159,7 @@ def fetch_gene_info(
     event_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(event_loop)
     async_tasks = []
-    semaphore: asyncio.Semaphore = asyncio.Semaphore(20)
+    semaphore: asyncio.Semaphore = asyncio.Semaphore(15)
     for i in range(0, len(input_values), batch_length):
         # Define an upper range of values to take from input_values
         upper_range = min(i + batch_length, len(input_values))
