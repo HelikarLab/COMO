@@ -26,7 +26,7 @@ library(dplyr)
 
 read_counts_matrix <- function(counts_matrix_filepath, config_filepath, info_filepath, context_name) {
 
-    print(context_name) # print tissue name
+    # print(context_name)
 
     config_object <- read_excel(config_filepath, sheet=context_name)# read configuration sheet
     counts_matrix <- read.csv(counts_matrix_filepath, header=TRUE) %>% arrange(., genes) # read counts matrix
@@ -483,7 +483,6 @@ save_rnaseq_tests <- function(
   min_count=10,
   min_zfpkm=-3
 ) {
-    print(counts_matrix_file)
     
     # condense filter options
     filt_options <- list()
@@ -528,10 +527,8 @@ save_rnaseq_tests <- function(
       print("Note: Single cell filtration does not normalize and assumes counts are counted with UMI")
     }
     
-    print("Reading Counts Matrix")
     SampMetrics <- read_counts_matrix(counts_matrix_file, config_file, info_file, context_name) # read count matrix
     entrez_all <- SampMetrics[[1]][["Entrez"]] #get entrez ids
-    print("Filtering Counts")
     
     SampMetrics <- filter_counts(SampMetrics, technique, filt_options, context_name, prep) # normalize and filter count
     expressedGenes <- c()
@@ -540,11 +537,10 @@ save_rnaseq_tests <- function(
         expressedGenes <- c(expressedGenes, SampMetrics[[i]][["Entrez"]])
         topGenes <- c(topGenes, SampMetrics[[i]][["Entrez_hc"]])
     }
-    print("Reading Counts Matrix")
     SampMetrics <- read_counts_matrix(counts_matrix_file, config_file, info_file, context_name) # read count matrix
 
     entrez_all <- SampMetrics[[1]][["Entrez"]] #get entrez ids
-    print("Filtering Counts")
+    
     SampMetrics <- filter_counts(SampMetrics, technique, filt_options, context_name, prep) # normalize and filter count
     expressedGenes <- c()
     topGenes <- c()

@@ -10,9 +10,11 @@ import re
 import sys
 from project import configs
 
-import async_bioservices
+from async_bioservices import async_bioservices
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.output_database import OutputDatabase
+
+from utilities import suppress_stdout
 
 
 def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, test_all, pars_flag):
@@ -83,12 +85,13 @@ def knock_out_simulation(model, inhibitors_filepath, drug_db, ref_flux_file, tes
     flux_solution = pd.DataFrame()
     for id in has_effects_gene:
         print(f"Peforming knock-out simulation for {id}")
-        model_cp = copy.deepcopy(model)  # using model_opt instead bc it makes more sense?
-        gene = model_cp.genes.get_by_id(id)
-        gene.knock_out()
-        opt_model = cobra.flux_analysis.moma(model_cp, solution=ref_sol, linear=False).to_frame()
-        flux_solution[id] = opt_model["fluxes"]
-        del model_cp
+        with suppress_stdout():
+            model_cp = copy.deepcopy(model)  # using model_opt instead bc it makes more sense?
+            gene = model_cp.genes.get_by_id(id)
+            gene.knock_out()
+            opt_model = cobra.flux_analysis.moma(model_cp, solution=ref_sol, linear=False).to_frame()
+            flux_solution[id] = opt_model["fluxes"]
+            del model_cp
 
     # flux_solution
     flux_solution[abs(flux_solution) < 1e-8] = 0.0
@@ -225,22 +228,23 @@ def repurposing_hub_preproc(drug_file):
             continue
         for target in row["target"].split("|"):
             drug_db_new = pd.concat(
-                [drug_db_new, pd.DataFrame([{"Name": row["pert_iname"],
-                                             "MOA": row["moa"],
-                                             "Target": target.strip(),
-                                             "Phase": row["clinical_phase"]
-                                             }])],
+                [drug_db_new,
+                 pd.DataFrame([
+                     {
+                         "Name": row["pert_iname"],
+                         "MOA": row["moa"],
+                         "Target": target.strip(),
+                         "Phase": row["clinical_phase"]
+                     }])
+                 ],
                 ignore_index=True
             )
-
-    entrez_ids = async_bioservices.database_convert.fetch_gene_info(
+    drug_db_new.reset_index(inplace=True)
+    
+    entrez_ids = async_bioservices.fetch_gene_info(
         input_values=drug_db_new["Target"].tolist(),
         input_db=InputDatabase.GENE_SYMBOL,
-        output_db=[
-            # OutputDatabase.GENE_SYMBOL,
-            OutputDatabase.GENE_ID,
-            OutputDatabase.CHROMOSOMAL_LOCATION
-        ]
+        output_db=OutputDatabase.GENE_ID
     )
 
     # entrez_ids = fetch_entrez_gene_id(drug_db_new["Target"].tolist(), input_db="Gene Symbol")
@@ -253,7 +257,7 @@ def repurposing_hub_preproc(drug_file):
 def drug_repurposing(drug_db, d_score):
     d_score["Gene"] = d_score["Gene"].astype(str)
 
-    d_score_gene_sym = async_bioservices.database_convert.fetch_gene_info(
+    d_score_gene_sym = async_bioservices.fetch_gene_info(
         input_values=d_score["Gene"].tolist(),
         input_db=InputDatabase.GENE_ID,
         output_db=[OutputDatabase.GENE_SYMBOL]
@@ -279,8 +283,6 @@ def drug_repurposing(drug_db, d_score):
 
 
 def main(argv):
-    drug_raw_file = "Repurposing_Hub_export.txt"
-
     parser = argparse.ArgumentParser(
         prog="knock_out_simulation.py",
         description="This script is responsible for mapping drug targets in metabolic models, performing knock out simulations, and comparing simulation results with disease genes. It also identified drug targets and repurposable drugs.",
@@ -369,7 +371,7 @@ def main(argv):
     disease = args.disease
     disease_up_file = args.disease_up
     disease_down_file = args.disease_down
-    drug_raw_file = args.raw_drug_file
+    raw_drug_filename = args.raw_drug_file
     ref_flux_file = args.ref_flux_file
     test_all = args.test_all
     pars_flag = args.pars_flag
@@ -393,17 +395,16 @@ def main(argv):
     cobra_model.solver = "gurobi"
 
     # preprocess repurposing hub data
-    drug_tsv_file = "Repurposing_Hub_Preproc.tsv"
-    drug_raw_file = os.path.join(configs.datadir, drug_raw_file)
-    drug_file = os.path.join(configs.datadir, drug_tsv_file)
-    if not os.path.isfile(drug_file):
+    raw_drug_filepath = os.path.join(configs.datadir, raw_drug_filename)
+    reformatted_drug_file = os.path.join(configs.datadir, "Repurposing_Hub_Preproc.tsv")
+    if not os.path.isfile(reformatted_drug_file):
         print("Preprocessing raw Repurposing Hub DB file...")
-        drug_db = repurposing_hub_preproc(drug_raw_file)
-        drug_db.to_csv(drug_file, index=False, sep="\t")
-        print(f"Preprocessed Repurposing Hub tsv file written to:\n{drug_file}")
+        drug_db = repurposing_hub_preproc(raw_drug_filepath)
+        drug_db.to_csv(reformatted_drug_file, index=False, sep="\t")
+        print(f"Preprocessed Repurposing Hub tsv file written to:\n{reformatted_drug_file}")
     else:
-        print(f"Found preprocessed Repurposing Hub tsv file at:\n{drug_file}")
-        drug_db = pd.read_csv(drug_file, sep="\t")
+        print(f"Found preprocessed Repurposing Hub tsv file at:\n{reformatted_drug_file}")
+        drug_db = pd.read_csv(reformatted_drug_file, sep="\t")
 
     # Knock Out Simulation
     model, gene_ind2genes, has_effects_gene, fluxsolution, flux_solution_ratios, flux_solution_diffs = knock_out_simulation(
@@ -429,7 +430,7 @@ def main(argv):
         disease_genes=disease_down_file,
     )
 
-    gene_pairs_down.to_csv(os.path.join(output_dir, "Gene_Pairs_Inhi_Fratio_DOWN.txt"), index=False)
+    gene_pairs_down.to_csv(os.path.join(output_dir, f"{context}_Gene_Pairs_Inhi_Fratio_DOWN.txt"), index=False)
 
     gene_pairs_up = create_gene_pairs(
         configs.datadir,
@@ -441,18 +442,20 @@ def main(argv):
         has_effects_gene,
         disease_genes=disease_up_file,
     )
-    gene_pairs_up.to_csv(os.path.join(output_dir, "Gene_Pairs_Inhi_Fratio_UP.txt"), index=False)
-    d_score_down = score_gene_pairs(gene_pairs_down, os.path.join(output_dir, "d_score_DOWN.csv"), input_reg="down")
-    d_score_up = score_gene_pairs(gene_pairs_up, os.path.join(output_dir, "d_score_UP.csv"), input_reg="up")
+    gene_pairs_up.to_csv(os.path.join(output_dir, f"{context}_Gene_Pairs_Inhi_Fratio_UP.txt"), index=False)
+    d_score_down = score_gene_pairs(gene_pairs_down, os.path.join(output_dir, f"{context}_d_score_DOWN.csv"), input_reg="down")
+    d_score_up = score_gene_pairs(gene_pairs_up, os.path.join(output_dir, f"{context}_d_score_UP.csv"), input_reg="up")
     pertubation_effect_score = (d_score_up + d_score_down).sort_values(by="score", ascending=False)
-    pertubation_effect_score.to_csv(os.path.join(output_dir, "d_score.csv"))
+    pertubation_effect_score.to_csv(os.path.join(output_dir, f"{context}_d_score.csv"))
     pertubation_effect_score.reset_index(drop=False, inplace=True)
 
     # last step: output drugs based on d score
     drug_score = drug_repurposing(drug_db, pertubation_effect_score)
-    drug_score_file = os.path.join(output_dir, "drug_score.csv")
+    drug_score_file = os.path.join(output_dir, f"{context}_drug_score.csv")
     drug_score.to_csv(drug_score_file, index=False)
     print("Gene D score mapped to repurposing drugs saved to\n{}".format(drug_score_file))
+    
+    print("\nDone!")
 
 
 if __name__ == "__main__":

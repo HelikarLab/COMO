@@ -202,13 +202,24 @@ def handle_context_batch(
 
     counts = Counter(sheet_names)
     sheet_names = sorted(list(set(sheet_names)))
-    print(f"Will merge data for: {sheet_names}")
+    print("The data provided for each context listed will be merged. Data BETWEEN contexts will not be merged, only WITHIN a context")
+    for i in sheet_names:
+        # Print the sheet names in a list, like so
+        # name1, name2, and name3
+        print(i, end="")
+        if counts[i] > 1:
+            print(f" ({counts[i]}x)", end="")
+        print(", ", end="")
+    print("\b\b")
+    
+    
     dict_list = {}
 
     max_inputs = max(counts.values())
     min_inputs = min(counts.values())
 
     if merge_distro:
+        print(f"Using {merge_distro} distribution for merging")
         rpy2_api.Rpy2(
             r_file_path,
             os.path.join(configs.datadir, "results"),
@@ -223,20 +234,6 @@ def handle_context_batch(
             sweight,
             pweight
         ).call_function("combine_zscores_main")
-        # combine_dist_io.call_function("combine_zscores_main")
-        # combine_dist_io.combine_zscores_main(
-        #     os.path.join(configs.datadir, "results"),
-        #     sheet_names,
-        #     use_mrna,
-        #     use_trna,
-        #     use_scrna,
-        #     use_proteins,
-        #     keep_gene_score,
-        #     tweight,
-        #     mweight,
-        #     sweight,
-        #     pweight
-        # )
 
     files_json = os.path.join(configs.rootdir, "data", "results", "step1_results_files.json")
     for context_name in sheet_names:
@@ -250,24 +247,17 @@ def handle_context_batch(
         else:
             exp_req = int(custom_df.iloc[custom_df["context"] == context_name, "req"].iloc[0])
 
-        print(
-            f"Expression requirement of {expression_requirement} adjusted to {exp_req} using {adjust_method} "
-            f"adjustment method for {context_name}."
-        )
+        print(f"Expression requirement of {expression_requirement} adjusted to {exp_req} using {adjust_method} adjustment method for {context_name}.")
 
         if exp_req > num_sources:
-            warn(
-                f"Expression requirement for {context_name} was calculated to be greater than max number of input "
-                f"data sources. Will be force changed to {num_sources} to prevent output from having 0 active genes. "
-                f"Consider lowering the expression requirement or changing the adjustment method."
-            )
+            print("WARNING: Expression requirement for {context_name} was calculated to be greater than max number of input data sources."
+                  "Will be force changed to {num_sources} to prevent output from having 0 active genes. "
+                  "Consider lowering the expression requirement or changing the adjustment method.")
             exp_req = num_sources
 
         if exp_req < 1:  # never allow expression requirement to be less than one
-            warn(
-                f"Expression requirement for {context_name} was calculated to be lower than 1. Will be force changed "
-                f"to 1 to prevent every gene being active."
-            )
+            print("WARNING: Expression requirement for {context_name} was calculated to be less than 1. "
+                  "Will be force changed to 1 to prevent output from having 0 active genes. ")
             exp_req = 1
 
         files_dict = merge_xomics(
@@ -553,7 +543,7 @@ def main(argv):
         keep_gene_score
     )
 
-    return
+    print("\nDone!")
 
 
 if __name__ == "__main__":

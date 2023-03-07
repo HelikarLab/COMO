@@ -296,10 +296,10 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
     print(f"Raw Data saved to '{raw_file}'")
 
     files_dict = {
-        "GSE": gse_id,
-        "UP_Reg": up_file,
-        "DN_Reg": down_file,
-        "RAW_Data": raw_file,
+        "gse": gse_id,
+        "up_regulated": up_file,
+        "down_regulated": down_file,
+        "raw_data": raw_file,
     }
 
     files_json = os.path.join(
