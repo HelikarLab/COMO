@@ -17,6 +17,8 @@ COPY --chown=1000:100 main "${HOME}"/main
 RUN conda config --quiet --add channels r \
     && conda config --quiet --add channels bioconda \
     && conda config --quiet --add channels conda-forge \
+    # Remove python from pinned versions; this allows us to update python. From: https://stackoverflow.com/a/11245372 \
+    && sed -i "s|^python .*||" /opt/conda/conda-meta/pinned \
     && mamba env update --quiet --name=base --file="${HOME}/environment.yaml" \
     && mamba clean --quiet --all --force-pkgs-dirs --yes \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
