@@ -1,9 +1,7 @@
 FROM jupyter/r-notebook:latest
 
-ARG GRB_SHORT_VERSION=10.0
-ARG GRB_VERSION=10.0.0
-ARG VERSION
-ENV VERSION=${VERSION}
+ARG COMO_VERSION
+ENV COMO_VERSION=${COMO_VERSION}
 
 # Set gurobi environment variables
 ENV GUROBI_HOME "${HOME}/gurobi/linux64"
@@ -17,6 +15,7 @@ COPY --chown=1000:100 main "${HOME}"/main
 RUN conda config --quiet --add channels conda-forge \
     && conda config --quiet --add channels bioconda \
     && conda config --quiet --add channels r \
+    && conda config --quiet --add channels gurobi \
     # Remove python from pinned versions; this allows us to update python. From: https://stackoverflow.com/a/11245372 \
     && sed -i "s|^python .*||" /opt/conda/conda-meta/pinned \
     && echo "HERE" && echo /opt/conda/conda-meta/pinned \
@@ -25,13 +24,6 @@ RUN conda config --quiet --add channels conda-forge \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
     && jupyter trust "${HOME}/main/COMO.ipynb" \
     && rm -rf "${HOME}/environment.yaml"
-
-# Install gurbori
-RUN wget --quiet https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
-    && tar -xf gurobi${GRB_VERSION}_linux64.tar.gz \
-    && rm -f gurobi${GRB_VERSION}_linux64.tar.gz \
-    && mv -f gurobi* "${HOME}/gurobi"
-
 
 # Update jupyter notebook configuration \
 RUN echo "c.ServerApp.ip = '0.0.0.0'" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
