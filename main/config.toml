@@ -1,0 +1,59 @@
+[general]
+context_names = ["naiveB", "smB"]
+taxon_id = "human"                  # accepts a bioDBnet taxon id, "human", or "mouse"
+
+[rnaseq_preprocess]
+create_counts_matrix = true         # set to false if using a pregenerated matrix file
+gene_format = "Ensembl"             # accepts "Entrez", "Ensembl", and "Symbol"
+preprocess_mode = "provide-matrix"  # "create-matrix" or "provide-matrix"
+
+
+[rna_seq_generation]
+trnaseq_config_file = "trnaseq_data_inputs_auto.xlsx"
+mrnaseq_config_file = "mrnaseq_data_inputs_auto.xlsx"
+rep_ratio = 0.75
+group_ratio = 0.75
+rep_ratio_h = 1.0
+group_ratio_h = 1.0
+technique = "zFPKM"
+quantile = 50
+min_zfpkm = -3
+
+[proteomics_analysis]
+proteomics_config_file = "proteomics_data_inputs_paper.xlsx"
+rep_ratio = 0.75
+batch_ratio = 0.75
+high_rep_ratio = 1.0
+high_batch_ratio = 1.0
+quantile = 25
+
+[merge_xomics]
+expression_requirement = 3
+requirement_adjust = "regressive"
+total_rna_weight = 6
+mrna_weight = 6
+single_cell_weight = 6
+proteomics_weight = 10
+
+[model_creation]
+low_threshold = -5
+high_threshold = -3
+output_filetypes = "xml mat json"
+objective_dict = {}
+general_model_file = "GeneralModelUpdatedV2.mat"
+recon_algorithms = ['IMAT']
+solver = "GUROBI"
+boundary_reactions_filename = "default_boundary_rxns.csv"
+force_reactions_filename = "default_force_rxns.csv"
+exclude_reactions_filename = ""
+
+[disease_analysis]
+disease_names = ["arthritis", "lupus_a", "lupus_b"]
+data_source = "rnaseq"
+
+[drug_repurposing]
+sovler = "gurobi"
+drug_raw_file = "Repurposing_Hub_export.txt"
+
+[about]
+version = "1.5.0"
