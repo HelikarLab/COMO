@@ -52,6 +52,7 @@ dependencies:
   - scipy==1.*
   - sqlalchemy==1.*
   - thermorawfileparser==1.*
+  - toml==0.10.*
   - tqdm==4.*
   - unidecode==1.*
   - wget==1.*
