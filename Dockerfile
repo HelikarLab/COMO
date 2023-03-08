@@ -1,6 +1,5 @@
 FROM jupyter/r-notebook:latest
 
-ARG PYTHON_VERSION=3.11
 ARG COMO_VERSION
 ENV COMO_VERSION=${COMO_VERSION}
 
@@ -15,10 +14,7 @@ COPY --chown=1000:100 main "${HOME}"/main
 
 # Install python-related items
 
-RUN mamba uninstall --quiet --yes python \
-    # Remove python from pinned versions; this allows us to update python. From: https://stackoverflow.com/a/11245372 \
-    && sed -i "s|^python .*|python ${PYTHON_VERSION}|" /opt/conda/conda-meta/pinned \
-    && mamba env update --quiet --name=base --file="${HOME}/environment.yaml" \
+RUN mamba env update --quiet --name=base --file="${HOME}/environment.yaml" \
     && mamba clean --quiet --all --force-pkgs-dirs --yes \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
     && rm -rf "${HOME}/environment.yaml"
