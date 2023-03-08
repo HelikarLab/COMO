@@ -5,62 +5,63 @@ channels:
   - gurobi
   - default
 dependencies:
-  - bioconductor-affy==1.72.0
-  - bioconductor-affyio==1.64.0
-  - bioconductor-biomart==2.50.0
-  - bioconductor-edger==3.36.0
-  - bioconductor-genefilter==1.76.0
-  - bioconductor-limma==3.50.1
-  - bioconductor-deseq2==1.34.0
-  - bioconductor-agilp==3.26.0
-  - bioconductor-hgu133acdf==2.18.0
-  - r-uwot==0.1.11
-  - r-irkernel==1.3
-  - r-irdisplay==1.1
-  - r-biocmanager==1.30.18
-  - r-devtools==2.4.3
-  - r-ggrepel==0.9.1
-  - r-locfit==1.5_9.5
-  - r-readxl==1.4.0
-  - r-repr==1.1.4
-  - r-rzmq==0.9.8
-  - r-sjmisc==2.8.9
-  - r-stringr==1.4.0
-  - r-tidyverse==1.3.1
-  - r-zoo==1.8_10
+  - aioftp==0.*
+  - bioconductor-affy==1.*
+  - bioconductor-affyio==1.*
+  - bioconductor-agilp==3.*
+  - bioconductor-biomart==2.*
+  - bioconductor-deseq2==1.*
+  - bioconductor-edger==3.*
+  - bioconductor-genefilter==1.*
+  - bioconductor-hgu133acdf==2.*
+  - bioconductor-limma==3.*
+  - bioservices==1.*
+  - cobra==0.*
+  - crux-toolkit==4.*
+  - escher==1.*
+  - geoparse==2.*
+  - git==2.*
   - gurobi==10.*
-  - geoparse==2.0.3
-  - lxml==4.9.1
+  - jupyterlab-spreadsheet-editor==0.*
+  - lxml==4.*
   - markupsafe==2.0.1
   - numpy==1.*
+  - openpyxl==3.*
+  - optlang==1.*
   - pandas==1.*
+  - pytest==7.*
+  - python-libsbml==5.*
   - python==3.*
-  - requests==2.28.1
-  - rpy2==3.5.1
-  - scipy==1.*
-  - sqlalchemy==1.4.39
-  - unidecode==1.3.4
-  - xlrd==2.0.1
-  - wget==1.20.3
-  - git==2.*
-  - thermorawfileparser==1.4.0
-  - crux-toolkit==4.1
-  - bioservices==1.10.0
-  - tqdm==4.*
+  - r-biocmanager==1.*
+  - r-devtools==2.*
+  - r-ggrepel==0.*
+  - r-irdisplay==1.*
+  - r-irkernel==1.*
+  - r-locfit==1.*
+  - r-readxl==1.*
+  - r-repr==1.*
+  - r-rzmq==0.*
+  - r-sjmisc==2.*
+  - r-stringr==1.*
+  - r-tidyverse==1.*
+  - r-uwot==0.*
+  - r-zoo==1.*
+  - requests==2.*
+  - rpy2==3.*
   - scanpy==1.*
+  - scipy==1.*
+  - sqlalchemy==1.*
+  - thermorawfileparser==1.*
+  - tqdm==4.*
+  - unidecode==1.*
+  - wget==1.*
+  - xlrd==2.*
   - pip==23.*
   - pip:
-    - aioftp==0.21.2
-    - python-libsbml==5.19.2
-    - optlang==1.5.2
-    - cobra==0.25.0
     - git+https://github.com/babessell1/cobamp.git@master#egg=cobamp
-    - git+https://github.com/cokelaer/bioservices.git@main#egg=bioservices
     - git+https://github.com/babessell1/troppo.git@master#egg=troppo
-    - memote==0.13.0
-    - framed==0.5.2
-    - pytest==4.6.11
-    - escher==1.7.3
+    - memote==0.*
+    - framed==0.*
+#    - pytest==4.6.11
     - gurobipy==10.*
-    - openpyxl==3.0.10
-    - jupyterlab-spreadsheet-editor==0.6
+
