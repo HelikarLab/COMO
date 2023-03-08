@@ -58,11 +58,11 @@ dependencies:
   - xlrd==2.*
   - pip==23.*
   - pip:
-#    - git+https://github.com/babessell1/cobamp.git@master#egg=cobamp
-#    - git+https://github.com/babessell1/troppo.git@master#egg=troppo
-#    - memote==0.*
-    - framed==0.*
-    - gurobipy==10.*
+    - git+https://github.com/babessell1/cobamp.git@master#egg=cobamp
+    - git+https://github.com/babessell1/troppo.git@master#egg=troppo
+    - memote==0.*
+#    - framed==0.*
+#    - gurobipy==10.*
 
 
 #    - pytest==4.6.11
