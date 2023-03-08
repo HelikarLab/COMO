@@ -2,7 +2,6 @@
 
 import pandas as pd
 
-from project import configs
 import re
 import os
 import sys
@@ -12,6 +11,7 @@ import glob
 import numpy as np
 from pathlib import Path
 
+from project import configs
 from async_bioservices import async_bioservices
 from async_bioservices.output_database import OutputDatabase
 from async_bioservices.input_database import InputDatabase
@@ -412,48 +412,49 @@ def parse_args(argv):
 
 
 def main(argv):
-    args = parse_args(argv)
+    context_names: list[str] = configs.general.context_names
+    gene_format: str = configs.rnaseq_preprocess.gene_format
+    taxon_id: str = configs.rnaseq_preprocess.taxon_id
+    preprocess_mode: str = configs.rnaseq_preprocess.preprocess_mode
+    matrix_filename: str = configs.rnaseq_preprocess.matrix_filename
 
-    if args.gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
+    if gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
         gene_format_database: InputDatabase = InputDatabase.ENSEMBL_GENE_ID
 
-    elif args.gene_format.upper() in ["HGNC SYMBOL", "HUGO", "HUGO SYMBOL", "SYMBOL", "HGNC", "GENE SYMBOL"]:
+    elif gene_format.upper() in ["HGNC SYMBOL", "HUGO", "HUGO SYMBOL", "SYMBOL", "HGNC", "GENE SYMBOL"]:
         gene_format_database: InputDatabase = InputDatabase.GENE_SYMBOL
 
-    elif args.gene_format.upper() in ["ENTREZ", "ENTRES", "ENTREZ ID", "ENTREZ NUMBER" "GENE ID"]:
+    elif gene_format.upper() in ["ENTREZ", "ENTRES", "ENTREZ ID", "ENTREZ NUMBER" "GENE ID"]:
         gene_format_database: InputDatabase = InputDatabase.GENE_ID
 
     else:  # provided invalid gene format
         print("Gene format (--gene_format) is invalid")
         print("Accepts 'Ensembl', 'Entrez', and 'HGNC symbol'")
-        print(f"You provided: {args.gene_format}")
+        print(f"You provided: {gene_format}")
         sys.exit()
 
     # handle species alternative ids
-    if type(args.taxon_id) == str:
-        if args.taxon_id.upper() == "HUMAN" or args.taxon_id.upper() == "HOMO SAPIENS":
-            taxon_id = TaxonIDs.HOMO_SAPIENS
-        elif args.taxon_id.upper() == "MOUSE" or args.taxon_id.upper() == "MUS MUSCULUS":
-            taxon_id = TaxonIDs.MUS_MUSCULUS
+    if isinstance(taxon_id, str):
+        if taxon_id.upper() == "HUMAN" or taxon_id.upper() == "HOMO SAPIENS":
+            taxon_id: TaxonIDs = TaxonIDs.HOMO_SAPIENS
+        elif taxon_id.upper() == "MOUSE" or taxon_id.upper() == "MUS MUSCULUS":
+            taxon_id: TaxonIDs = TaxonIDs.MUS_MUSCULUS
         else:
             print("--taxon-id must be either an integer, or accepted string ('mouse', 'human')")
             sys.exit(1)
-    elif type(args.taxon_id) == int:
-        taxon_id = args.taxon_id
+    elif isinstance(taxon_id, int):
+        taxon_id: int = int(taxon_id)
     else:
         print("--taxon-id must be either an integer, or accepted string ('mouse', 'human')")
         sys.exit(1)
 
-    # use mutually exclusive flag to set mode which tells which files to generate
-    if args.provide_matrix:
-        mode = "provide"
-    elif args.make_matrix:
-        mode = "make"
-    else:
-        print("--provide-matrix or --create-matrix must be set")
-        sys.exit(1)
-
-    handle_context_batch(args.context_names, mode, gene_format_database, taxon_id, args.provided_matrix_fname)
+    handle_context_batch(
+        context_names=context_names,
+        mode=preprocess_mode,
+        form=gene_format_database,
+        taxon_id=taxon_id,
+        provided_matrix_file=matrix_filename
+    )
 
 
 if __name__ == "__main__":

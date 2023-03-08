@@ -6,7 +6,7 @@ taxon_id = "human"                  # accepts a bioDBnet taxon id, "human", or "
 create_counts_matrix = true         # set to false if using a pregenerated matrix file
 gene_format = "Ensembl"             # accepts "Entrez", "Ensembl", and "Symbol"
 preprocess_mode = "provide-matrix"  # "create-matrix" or "provide-matrix"
-
+matrix_filename = ""                # This is required if preprocess_mode is "create-matrix"
 
 [rna_seq_generation]
 trnaseq_config_file = "trnaseq_data_inputs_auto.xlsx"

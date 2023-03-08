@@ -31,7 +31,7 @@ dependencies:
   - pandas==1.*
   - pytest==7.*
   - python-libsbml==5.*
-  - python==3.11.*
+  - python==3.10.*
   - r-biocmanager==1.*
   - r-devtools==2.*
   - r-ggrepel==0.*
