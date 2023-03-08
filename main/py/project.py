@@ -80,7 +80,7 @@ class about:
         self.date = datetime.now().strftime("%B %d, %Y")
         
         # Get "VERSION" from the environment
-        self.version = os.environ["VERSION"]
+        self.version = os.environ["COMO_VERSION"]
 
 
 class Configs:

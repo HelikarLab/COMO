@@ -78,4 +78,4 @@ jobs:
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
           build-args: |
-            VERSION=${{ github.ref }}
+            COMO_VERSION=${{ github.ref }}
