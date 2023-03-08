@@ -14,9 +14,9 @@ COPY /environment.yaml "${HOME}/environment.yaml"
 COPY --chown=1000:100 main "${HOME}"/main
 
 # Install python-related items
-RUN conda config --quiet --add channels conda-forge \
+RUN conda config --quiet --add channels r \
     && conda config --quiet --add channels bioconda \
-    && conda config --quiet --add channels r \
+    && conda config --quiet --add channels conda-forge \
     && mamba env update --quiet --name=base --file="${HOME}/environment.yaml" \
     && mamba clean --quiet --all --force-pkgs-dirs --yes \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
