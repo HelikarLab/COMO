@@ -158,13 +158,13 @@ def to_bool_context(context_name, group_ratio, hi_group_ratio, group_names):
 
 
 # read data from csv files
-def load_proteomics_tests(filename, context_name):
+def load_proteomics_tests(filepath: Path, context_name):
     """
     Description....
     """
     
     def load_empty_dict():
-        savepath = os.path.join(
+        savepath = Path(
             configs.rootdir,
             "data",
             "data_matrices",
@@ -175,27 +175,23 @@ def load_proteomics_tests(filename, context_name):
         return "dummy", placeholder_data
 
     # if not using proteomics load empty dummy data matrix
-    if not filename or filename == "None":
+    if filepath.name == "":
         return load_empty_dict()
 
-    inquiry_full_path = os.path.join(configs.rootdir, "data", "config_sheets", filename)
-    if not os.path.isfile(inquiry_full_path):  # check that config file exists
-        print("Error: file not found {}".format(inquiry_full_path))
-        sys.exit()
+    # inquiry_full_path = os.path.join(configs.rootdir, "data", "config_sheets", filepath)
+    if not filepath.exists():
+        raise FileNotFoundError(f"Proteomics file not found: {filepath}")
 
-    filename = f"Proteomics_{context_name}.csv"
-    fullsavepath = os.path.join(
-        configs.rootdir, "data", "results", context_name, "proteomics", filename
-    )
-    if os.path.isfile(fullsavepath):
-        data = pd.read_csv(fullsavepath, index_col="ENTREZ_GENE_ID")
-        print(f"Read from {fullsavepath}")
+    full_save_path: Path = Path(configs.rootdir, "data", "results", context_name, "proteomics", filepath.name)
+    if full_save_path.exists():
+        data = pd.read_csv(full_save_path, index_col="ENTREZ_GENE_ID")
+        print(f"Read from {full_save_path}")
         
         return context_name, data
         
     else:
         print(
-            f"Proteomics gene expression file for {context_name} was not found at {fullsavepath}. This may be "
+            f"Proteomics gene expression file for {context_name} was not found at {full_save_path}. This may be "
             f"intentional. Contexts where microarray data can be found in /work/data/results/{context_name}/ will "
             f"still be used for other contexts if found."
         )

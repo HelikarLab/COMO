@@ -6,7 +6,6 @@ import os
 import pandas as pd
 import json
 from collections import Counter
-from warnings import warn
 from rpy2.robjects.packages import importr
 from rpy2.robjects import pandas2ri
 from pathlib import Path
@@ -17,7 +16,6 @@ from project import configs
 import proteomics_gen
 import rnaseq_gen
 import rpy2_api
-
 
 # enable r to py conversion
 pandas2ri.activate()
@@ -35,25 +33,25 @@ r_file_path = Path(configs.rootdir, "py", "rscripts", "combine_distributions.R")
 
 
 def merge_xomics(
-    sheet,
-    expression_requirement,
-    microarray_file=None,
-    proteomics_file=None,
-    trnaseq_file=None,
-    mrnaseq_file=None,
-    scrnaseq_file=None,
-    no_hc=False,
-    no_na=False,
+        sheet,
+        expression_requirement,
+        microarray_filepath: Path = None,
+        proteomics_filepath: Path = None,
+        trnaseq_filepath: Path = None,
+        mrnaseq_filepath: Path = None,
+        scrnaseq_filepath: Path = None,
+        no_hc=False,
+        no_na=False,
 ):
     """
     Merges microarray, rnaseq, and/or proteomics active gene logicals from outputs of their respective "_gen.py"
     scripts.
 
-    :param microarray_file: filename of microarray config file in /main/data/config_sheets/
-    :param proteomics_file: filename of proteomics config file in /main/data/config_sheets/
-    :param trnaseq_file: filename of Total RNA-seq config file in /main/data/config_sheets/
-    :param mrnaseq_file: filename of mRNA-seq config file in /main/data/config_sheets/
-    :param scrnaseq_file: filename of single-cell RNA-seq config file in /main/data/config_sheets/
+    :param microarray_filepath: filename of microarray config file in /main/data/config_sheets/
+    :param proteomics_filepath: filename of proteomics config file in /main/data/config_sheets/
+    :param trnaseq_filepath: filename of Total RNA-seq config file in /main/data/config_sheets/
+    :param mrnaseq_filepath: filename of mRNA-seq config file in /main/data/config_sheets/
+    :param scrnaseq_filepath: filename of single-cell RNA-seq config file in /main/data/config_sheets/
     :param no_hc: True if not adjusting for NA values (happens when gene missing from data source)
     :param no_na: filename of single-cell RNA-seq config file in /main/data/config_sheets/
     :param sheet: sheet name to use, should be context, context, cell type, etc
@@ -62,24 +60,24 @@ def merge_xomics(
     """
     print(f"Merging data for {sheet}")
     # load data for each source if it exists. IF not load an empty dummy dataset
-    microarray = microarray_gen.load_microarray_tests(filename=microarray_file, context_name=sheet)
-    proteomics = proteomics_gen.load_proteomics_tests(filename=proteomics_file, context_name=sheet)
-    trnaseq = rnaseq_gen.load_rnaseq_tests(filename=trnaseq_file, context_name=sheet, lib_type="total")  # total RNA-seq
-    mrnaseq = rnaseq_gen.load_rnaseq_tests(filename=mrnaseq_file, context_name=sheet, lib_type="mrna")  # mRNA-seq
-    scrnaseq = rnaseq_gen.load_rnaseq_tests(filename=scrnaseq_file, context_name=sheet, lib_type="scrna")  # Single-cell RNA-seq
-
+    microarray = microarray_gen.load_microarray_tests(filepath=microarray_filepath, context_name=sheet)
+    proteomics = proteomics_gen.load_proteomics_tests(filepath=proteomics_filepath, context_name=sheet)
+    trnaseq = rnaseq_gen.load_rnaseq_tests(filepath=trnaseq_filepath, context_name=sheet, lib_type="total")
+    mrnaseq = rnaseq_gen.load_rnaseq_tests(filepath=mrnaseq_filepath, context_name=sheet, lib_type="mrna")
+    scrnaseq = rnaseq_gen.load_rnaseq_tests(filepath=scrnaseq_filepath, context_name=sheet, lib_type="scrna")
+    
     files_dict = dict()
-
+    
     exp_list = []
     high_list = []
-
+    
     if proteomics[0] != "dummy":
         exp_list.append("prote_exp")
         high_list.append("prote_high")
         prote_data = proteomics[1].loc[:, ["expressed", "high"]]
         prote_data.rename(columns={"expressed": "prote_exp", "high": "prote_high"}, inplace=True)
         merge_data = prote_data
-
+    
     if microarray[0] != "dummy":
         exp_list.append("trans_exp")
         high_list.append("trans_high")
@@ -89,7 +87,7 @@ def merge_xomics(
             merge_data = micro_data
         else:
             merge_data = merge_data.join(micro_data, how="outer")
-
+    
     if trnaseq[0] != "dummy":
         exp_list.append("trnaseq_exp")
         high_list.append("trnaseq_high")
@@ -99,7 +97,7 @@ def merge_xomics(
             merge_data = trnaseq_data
         else:
             merge_data = merge_data.join(trnaseq_data, how="outer")
-
+    
     if mrnaseq[0] != "dummy":
         exp_list.append("mrnaseq_exp")
         high_list.append("mrnaseq_high")
@@ -109,7 +107,7 @@ def merge_xomics(
             merge_data = mrnaseq_data
         else:
             merge_data = merge_data.join(mrnaseq_data, how="outer")
-
+    
     if scrnaseq[0] != "dummy":
         exp_list.append("scrnaseq_exp")
         high_list.append("scrnaseq_high")
@@ -119,13 +117,13 @@ def merge_xomics(
             merge_data = scrnaseq_data
         else:
             merge_data = merge_data.join(scrnaseq_data, how="outer")
-
+    
     merge_data = microarray_gen.mergeLogicalTable(merge_data)
-
+    
     num_sources = len(exp_list)
     merge_data["Active"] = 0
     merge_data["Required"] = 0
-
+    
     if no_na:  # dont adjust for na values
         merge_data.loc[:, "Required"] = merge_data[exp_list].apply(
             lambda x: expression_requirement
@@ -140,69 +138,74 @@ def merge_xomics(
             else 1,
             axis=1,
         )
-
+    
     # count number of sources gene is active in. Set to active in final output if at least adjusted expression reqirmnt
     merge_data["TotalExpressed"] = merge_data[exp_list].sum(axis=1)
     merge_data.loc[merge_data[exp_list].sum(axis=1) >= merge_data["Required"], "Active"] = 1
-
+    
     if not no_hc:  # set genes that are high-confidence in at least one data source to active
         merge_data.loc[merge_data[high_list].sum(axis=1) > 0, "Active"] = 1
-
-    #merge_data = merge_data.astype(int)
+    
+    # merge_data = merge_data.astype(int)
     merge_data = merge_data
-
+    
     filepath = os.path.join(configs.rootdir, "data", "results", sheet, f"merged_{sheet}.csv")
     merge_data.to_csv(filepath, index_label="ENTREZ_GENE_ID")
-
+    
     filepath = os.path.join(configs.rootdir, "data", "results", sheet, f"ActiveGenes_{sheet}_Merged.csv")
     merge_data.reset_index(drop=False, inplace=True)
-
+    
     split_entrez = split_gene_expression_data(merge_data)
     split_entrez.rename(columns={"Gene": "ENTREZ_GENE_ID", "Data": "Active"}, inplace=True)
     split_entrez.to_csv(filepath, index_label="ENTREZ_GENE_ID")
     files_dict[sheet] = filepath
-
+    
     print(f"{sheet}: save to {filepath}\n")
-
+    
     return files_dict
 
 
 def handle_context_batch(
-    microarray_file,
-    trnaseq_file,
-    mrnaseq_file,
-    scrnaseq_file,
-    proteomics_file,
-    tweight,
-    mweight,
-    sweight,
-    pweight,
-    expression_requirement,
-    adjust_method,
-    no_hc,
-    no_na,
-    custom_df,
-    merge_distro,
-    keep_gene_score
+        microarray_file,
+        trnaseq_file,
+        mrnaseq_file,
+        scrnaseq_file,
+        proteomics_file,
+        tweight,
+        mweight,
+        sweight,
+        pweight,
+        expression_requirement,
+        adjust_method,
+        no_hc,
+        no_na,
+        custom_df,
+        merge_distro,
+        keep_gene_score
 ):
     """
     Handle merging of different data sources for each context type
     """
     sheet_names = []
+    
+    file: Path
     for file in [microarray_file, trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file]:
-        if file is not None:
+        if file.name != "":
+            # if file is not None:
+            print(file)
             config_filepath = os.path.join(configs.rootdir, "data", "config_sheets", file)
             xl = pd.ExcelFile(config_filepath)
             sheet_names += xl.sheet_names
-
+    
     use_trna = True if trnaseq_file is not None else False
     use_mrna = True if mrnaseq_file is not None else False
     use_scrna = True if scrnaseq_file is not None else False
     use_proteins = True if proteomics_file is not None else False
-
-    counts = Counter(sheet_names)
+    
+    counts: dict = Counter(sheet_names)
     sheet_names = sorted(list(set(sheet_names)))
-    print("The data provided for each context listed will be merged. Data BETWEEN contexts will not be merged, only WITHIN a context")
+    print(
+        "The data provided for each context listed will be merged. Data BETWEEN contexts will not be merged, only WITHIN a context")
     for i in sheet_names:
         # Print the sheet names in a list, like so
         # name1, name2, and name3
@@ -210,14 +213,12 @@ def handle_context_batch(
         if counts[i] > 1:
             print(f" ({counts[i]}x)", end="")
         print(", ", end="")
-    print("\b\b")
-    
     
     dict_list = {}
-
+    
     max_inputs = max(counts.values())
     min_inputs = min(counts.values())
-
+    
     if merge_distro:
         print(f"Using {merge_distro} distribution for merging")
         rpy2_api.Rpy2(
@@ -234,7 +235,7 @@ def handle_context_batch(
             sweight,
             pweight
         ).call_function("combine_zscores_main")
-
+    
     files_json = os.path.join(configs.rootdir, "data", "results", "step1_results_files.json")
     for context_name in sheet_names:
         num_sources = counts[context_name]
@@ -246,37 +247,39 @@ def handle_context_batch(
             exp_req = expression_requirement
         else:
             exp_req = int(custom_df.iloc[custom_df["context"] == context_name, "req"].iloc[0])
-
-        print(f"Expression requirement of {expression_requirement} adjusted to {exp_req} using {adjust_method} adjustment method for {context_name}.")
-
+        
+        print(
+            f"Expression requirement of {expression_requirement} adjusted to {exp_req} using {adjust_method} adjustment method for {context_name}.")
+        
         if exp_req > num_sources:
-            print("WARNING: Expression requirement for {context_name} was calculated to be greater than max number of input data sources."
-                  "Will be force changed to {num_sources} to prevent output from having 0 active genes. "
-                  "Consider lowering the expression requirement or changing the adjustment method.")
+            print(
+                "WARNING: Expression requirement for {context_name} was calculated to be greater than max number of input data sources."
+                "Will be force changed to {num_sources} to prevent output from having 0 active genes. "
+                "Consider lowering the expression requirement or changing the adjustment method.")
             exp_req = num_sources
-
+        
         if exp_req < 1:  # never allow expression requirement to be less than one
             print("WARNING: Expression requirement for {context_name} was calculated to be less than 1. "
                   "Will be force changed to 1 to prevent output from having 0 active genes. ")
             exp_req = 1
-
+        
         files_dict = merge_xomics(
             context_name,
             expression_requirement=exp_req,
-            microarray_file=microarray_file,
-            proteomics_file=proteomics_file,
-            trnaseq_file=trnaseq_file,
-            mrnaseq_file=mrnaseq_file,
-            scrnaseq_file=scrnaseq_file,
+            microarray_filepath=microarray_file,
+            proteomics_filepath=proteomics_file,
+            trnaseq_filepath=trnaseq_file,
+            mrnaseq_filepath=mrnaseq_file,
+            scrnaseq_filepath=scrnaseq_file,
             no_hc=no_hc,
             no_na=no_na,
         )
-
+        
         dict_list.update(files_dict)
-
+    
     with open(files_json, "w") as fp:
         json.dump(dict_list, fp)
-
+    
     return
 
 
@@ -291,9 +294,9 @@ def main(argv):
         prog="merge_xomics.py",
         description="Merge expression tables of multiple sources, microarray, RNA-seq, and/or proteomics into one",
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
-        "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
+               "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
     )
-
+    
     parser.add_argument(
         "-d",
         "--merge-distribution",
@@ -302,11 +305,11 @@ def main(argv):
         default=False,
         dest="merge_distro",
         help="Flag to merge zFPKM distributions. Required if using iMAT reconstruction algorithm in "
-        "create_context_specific_model.py. Must have run rnaseq_gen.py with 'zFPKM' as "
-        "'--technique'. If --proteomics-config-file is given will merge proteomics distributions "
-        "with zFPKM distributions using a weighted scheme.",
+             "create_context_specific_model.py. Must have run rnaseq_gen.py with 'zFPKM' as "
+             "'--technique'. If --proteomics-config-file is given will merge proteomics distributions "
+             "with zFPKM distributions using a weighted scheme.",
     )
-
+    
     parser.add_argument(
         "-k",
         "--keep-gene-scores",
@@ -318,7 +321,7 @@ def main(argv):
              "flag true if you wish to keep z-score of genes with no protein data, flag false if you wish to discard "
              "and treat as no expression"
     )
-
+    
     parser.add_argument(
         "-a",
         "--microarray-config-file",
@@ -328,7 +331,7 @@ def main(argv):
         dest="microarray_file",
         help="Name of microarray config .xlsx file in the /main/data/config_files/.",
     )
-
+    
     parser.add_argument(
         "-t",
         "--total-rnaseq-config-file",
@@ -338,7 +341,7 @@ def main(argv):
         dest="trnaseq_file",
         help="Name of total RNA-seq config .xlsx file in the /main/data/config_files/.",
     )
-
+    
     parser.add_argument(
         "-m",
         "--mrnaseq-config-file",
@@ -348,7 +351,7 @@ def main(argv):
         dest="mrnaseq_file",
         help="Name of mRNA-seq config .xlsx file in the /main/data/config_files/.",
     )
-
+    
     parser.add_argument(
         "-s",
         "--scrnaseq-config-file",
@@ -358,7 +361,7 @@ def main(argv):
         dest="scrnaseq_file",
         help="Name of RNA-seq config .xlsx file in the /main/data/config_files/.",
     )
-
+    
     parser.add_argument(
         "-p",
         "--proteomics-config-file",
@@ -368,7 +371,7 @@ def main(argv):
         dest="proteomics_file",
         help="Name of proteomics config .xlsx file in the /main/data/config_files/.",
     )
-
+    
     parser.add_argument(
         "-e",
         "--expression-requirement",
@@ -377,9 +380,9 @@ def main(argv):
         default=None,
         dest="expression_requirement",
         help="Number of sources with active gene for it to be considered active even if it is not a "
-        "high confidence-gene",
+             "high confidence-gene",
     )
-
+    
     parser.add_argument(
         "-r",
         "--requirement-adjust",
@@ -388,9 +391,9 @@ def main(argv):
         default="flat",
         dest="adjust_method",
         help="Technique to adjust expression requirement based on differences in number of provided "
-        "data source types.",
+             "data source types.",
     )
-
+    
     parser.add_argument(
         "-c",
         "--custom-requirement-file",
@@ -398,9 +401,9 @@ def main(argv):
         dest="custom_file",
         default="SKIP",
         help="Name of .xlsx file where first column is context names and second column is expression "
-        "requirement for that context, in /main/data/",
+             "requirement for that context, in /main/data/",
     )
-
+    
     parser.add_argument(
         "-hc",
         "--no-hc",
@@ -409,9 +412,9 @@ def main(argv):
         default=False,
         dest="no_hc",
         help="Flag to prevent high-confidence genes forcing a gene to be used in final model "
-        "irrespective of other other data sources",
+             "irrespective of other other data sources",
     )
-
+    
     parser.add_argument(
         "-na",
         "--no-na-adjustment",
@@ -420,9 +423,9 @@ def main(argv):
         default=False,
         dest="no_na",
         help="Flag to prevent genes missing in a data source library, but present in others from "
-        "subtracting 1 from the expression requirement per data source that gene is missing in",
+             "subtracting 1 from the expression requirement per data source that gene is missing in",
     )
-
+    
     parser.add_argument(
         "-tw",
         "--total-rnaseq-weight",
@@ -432,7 +435,7 @@ def main(argv):
         dest="tweight",
         help="Total RNA-seq weight for merging zFPKM distribution",
     )
-
+    
     parser.add_argument(
         "-mw",
         "--mrnaseq-weight",
@@ -442,7 +445,7 @@ def main(argv):
         dest="mweight",
         help="PolyA enriched (messenger) RNA-seq weight for merging zFPKM distribution",
     )
-
+    
     parser.add_argument(
         "-sw",
         "--single-cell-rnaseq-weight",
@@ -452,7 +455,7 @@ def main(argv):
         dest="sweight",
         help="Single-cell RNA-seq weight for merging zFPKM distribution",
     )
-
+    
     parser.add_argument(
         "-pw",
         "--protein-weight",
@@ -462,10 +465,9 @@ def main(argv):
         dest="pweight",
         help="Proteomics weight for merging z-score distribution",
     )
-
-
+    
     args = parser.parse_args(argv)
-
+    
     microarray_file = args.microarray_file
     proteomics_file = args.proteomics_file
     trnaseq_file = args.trnaseq_file
@@ -482,7 +484,7 @@ def main(argv):
     mweight = args.mweight
     sweight = args.sweight
     pweight = args.pweight
-
+    
     # read custom expression requirment file if used
     if custom_file != "SKIP":
         custom_filepath = os.path.join(configs.datadir, custom_file)
@@ -490,7 +492,7 @@ def main(argv):
         custom_df.columns = ["context", "req"]
     else:
         custom_df = pd.DataFrame([])
-
+    
     def_exp_req = sum(
         [
             1 for test in
@@ -504,10 +506,10 @@ def main(argv):
             if test is None
         ]
     )
-
+    
     if expression_requirement.lower() == "default":
         expression_requirement = def_exp_req
-
+    
     else:
         try:
             expression_requirement = int(expression_requirement)
@@ -517,13 +519,13 @@ def main(argv):
         except ValueError:
             print("Expression requirement must be able to be converted to an integer!")
             sys.exit(1)
-
+    
     if adjust_method not in ["progressive", "regressive", "flat", "custom"]:
         print(
             "Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'"
         )
         sys.exit(1)
-
+    
     handle_context_batch(
         microarray_file,
         trnaseq_file,
@@ -542,9 +544,98 @@ def main(argv):
         merge_distro,
         keep_gene_score
     )
+    
+    print("\nDone!")
 
+
+def new_main():
+    """
+    Merge expression tables of multiple sources, microarray, RNA-seq, and/or proteomics into one list
+    User can specify the number of sources with an active gene in order for it to be considered active in the model.
+    Otherwise, it defaults to the number of sources provided. High-confidence genes from any source will be considered
+    active in the model, regardless of agreement with other sources.
+    """
+    
+    microarray_filepath: Path = configs.merge_xomics.microarray_config_filepath
+    proteomics_filepath: Path = configs.proteomics_analysis.proteomics_config_file
+    trnaseq_filepath: Path = configs.rna_seq_generation.trnaseq_config_filepath
+    mrnaseq_filepath: Path = configs.rna_seq_generation.mrnaseq_config_filepath
+    scrnaseq_filepath: Path = configs.rna_seq_generation.single_cell_config_filepath
+    custom_requirement_filepath: Path = configs.merge_xomics.custom_requirement_filepath
+    expression_requirement: int = configs.merge_xomics.expression_requirement
+    adjust_method: str = configs.merge_xomics.requirement_adjust
+    no_hc: bool = configs.merge_xomics.no_high_confidence
+    no_NA: bool = configs.merge_xomics.no_NA
+    merge_distribution: bool = configs.merge_xomics.merge_distribution
+    keep_gene_score: bool = configs.merge_xomics.keep_gene_score
+    tweight: int = configs.merge_xomics.total_rna_weight
+    mweight: int = configs.merge_xomics.mrna_weight
+    sweight: int = configs.merge_xomics.single_cell_weight
+    pweight: int = configs.merge_xomics.proteomics_weight
+    
+    # microarray_file = args.microarray_file
+    # proteomics_file = args.proteomics_file
+    # trnaseq_file = args.trnaseq_file
+    # mrnaseq_file = args.mrnaseq_file
+    # scrnaseq_file = args.scrnaseq_file
+    # expression_requirement = args.expression_requirement
+    # adjust_method = args.adjust_method.lower()
+    # custom_file = args.custom_file
+    # no_hc = args.no_hc
+    # no_na = args.no_na
+    # merge_distro = args.merge_distro
+    # keep_gene_score = args.keep_gene_score
+    # tweight = args.tweight
+    # mweight = args.mweight
+    # sweight = args.sweight
+    # pweight = args.pweight
+    
+    # read custom expression requirment file if used
+    custom_df: pd.DataFrame
+    if custom_requirement_filepath.name == "":
+        custom_df = pd.DataFrame([])
+    else:
+        custom_df = pd.read_excel(custom_requirement_filepath, sheet_name=0)
+        custom_df.columns = ["context", "req"]
+    
+    def_exp_req = sum(
+        [
+            1 for path in
+            [
+                microarray_filepath,
+                trnaseq_filepath,
+                mrnaseq_filepath,
+                scrnaseq_filepath,
+                proteomics_filepath
+            ]
+            if path.name == ""
+        ]
+    )
+    if expression_requirement == -1:
+        expression_requirement = def_exp_req
+    
+    handle_context_batch(
+        microarray_filepath,
+        trnaseq_filepath,
+        mrnaseq_filepath,
+        scrnaseq_filepath,
+        proteomics_filepath,
+        tweight,
+        mweight,
+        sweight,
+        pweight,
+        expression_requirement,
+        adjust_method,
+        no_hc,
+        no_NA,
+        custom_df,
+        merge_distribution,
+        keep_gene_score
+    )
+    
     print("\nDone!")
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    # main(sys.argv[1:])
+    new_main()

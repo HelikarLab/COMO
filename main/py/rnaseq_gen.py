@@ -18,46 +18,49 @@ pandas2ri.activate()
 r_file_path = Path(configs.rootdir, "py", "rscripts", "rnaseq.R")
 
 
-def load_rnaseq_tests(filename, context_name, lib_type):
+def load_rnaseq_tests(filepath: Path, context_name, lib_type):
     """
     Load rnaseq results returning a dictionary of test (context, context, cell, etc ) names and rnaseq expression data
     """
     
     def load_dummy_dict():
-        savepath = os.path.join(
-            configs.rootdir, "data", "data_matrices", "placeholder", "placeholder_empty_data.csv"
+        placeholder = Path(
+            configs.rootdir,
+            "data",
+            "data_matrices",
+            "placeholder",
+            "placeholder_empty_data.csv"
         )
-        dat = pd.read_csv(savepath, index_col="ENTREZ_GENE_ID")
-        return "dummy", dat
-    
-    if not filename or filename == "None":  # not using this data type, use empty dummy data matrix
+        placeholder_data = pd.read_csv(placeholder, index_col="ENTREZ_GENE_ID")
+        return "dummy", placeholder_data
+
+    # If not using this data type, use empty dummy data matrix
+    if filepath.name == "":
         return load_dummy_dict()
     
-    inquiry_full_path = os.path.join(configs.rootdir, "data", "config_sheets", filename)
-    if not os.path.isfile(inquiry_full_path):  # check that config file exist (isn't needed to load, but helps user)
-        print(f"Error: Config file not found at {inquiry_full_path}")
-        sys.exit()
+    # check that config file exist (isn't needed to load, but helps user)
+    if not filepath.exists():
+        raise FileNotFoundError(f"RNA Seq file for '{lib_type}' not found at {filepath}")
     
     if lib_type == "total":  # if using total RNA-seq library prep
-        filename = f"rnaseq_total_{context_name}.csv"
+        file_name = f"rnaseq_total_{context_name}.csv"
     elif lib_type == "mrna":  # if using mRNA-seq library prep
-        filename = f"rnaseq_mrna_{context_name}.csv"
+        file_name = f"rnaseq_mrna_{context_name}.csv"
     elif lib_type == "scrna":  # if using single-cell RNA-seq
-        filename = f"rnaseq_scrna_{context_name}.csv"
+        file_name = f"rnaseq_scrna_{context_name}.csv"
     else:
-        print(f"Unsupported RNA-seq library type: {lib_type}. Must be one of 'total', 'mrna', 'sc'.")
-        sys.exit()
+        raise ValueError("Unsupported RNA-seq library type: {lib_type}. Must be one of 'total', 'mrna', 'sc'.")
     
-    fullsavepath = os.path.join(configs.rootdir, "data", "results", context_name, lib_type, filename)
+    full_save_path: Path = Path(configs.rootdir, "data", "results", context_name, lib_type, file_name)
     
-    if os.path.isfile(fullsavepath):
-        data = pd.read_csv(fullsavepath, index_col="ENTREZ_GENE_ID")
-        print(f"Read from {fullsavepath}")
+    if os.path.isfile(full_save_path):
+        data = pd.read_csv(full_save_path, index_col="ENTREZ_GENE_ID")
+        print(f"Read from {full_save_path}")
         return context_name, data
     
     else:
         print(
-            f"{lib_type} gene expression file for {context_name} was not found at {fullsavepath}. This may be "
+            f"{lib_type} gene expression file for {context_name} was not found at {full_save_path}. This may be "
             f"intentional. Contexts where {lib_type} data can be found in /work/data/results/{context_name}/ will "
             "still be used if found for other contexts."
         )

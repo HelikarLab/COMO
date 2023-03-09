@@ -11,7 +11,7 @@ matrix_filename = ""                # This is required if preprocess_mode is "pr
 [rna_seq_generation]
 trnaseq_config_file = "trnaseq_data_inputs_auto.xlsx"
 mrnaseq_config_file = "mrnaseq_data_inputs_auto.xlsx"
-single_cell_config_file = "scrnaseq_data_inputs_auto.xlsx"
+single_cell_config_file = "None"  # Set to "scrnaseq_data_inputs.xlsx" to use single cell data
 replicate_ratio = 0.75
 group_ratio = 0.75
 high_replicate_ratio = 1.0
@@ -22,7 +22,7 @@ min_zfpkm = -3
 min_cpm_count = 0  # Use "0" to use a default value
 
 [proteomics_analysis]
-proteomics_config_file = "proteomics_data_inputs_paper.xlsx"
+proteomics_config_file = "None"  # Set to "proteomics_data_inputs_paper.xlsx" to use proteomics data
 rep_ratio = 0.75
 batch_ratio = 0.75
 high_rep_ratio = 1.0
@@ -30,12 +30,18 @@ high_batch_ratio = 1.0
 quantile = 25
 
 [merge_xomics]
-expression_requirement = 3
+microarray_config_file = "None"  # Set to "microarray_data_inputs.xlsx" to use microarray data
+custom_requirement_file = "None"
 requirement_adjust = "regressive"
+expression_requirement = 3  # Set to -1 to use a default value
 total_rna_weight = 6
 mrna_weight = 6
 single_cell_weight = 6
 proteomics_weight = 10
+no_high_confidence = true
+no_NA = false
+merge_distribution = false
+keep_gene_score = true
 
 [model_creation]
 low_threshold = -5

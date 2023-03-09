@@ -6,6 +6,7 @@ import os
 import sys
 import pandas as pd
 import numpy as np
+from pathlib import Path
 from scipy import stats
 from sqlalchemy import Column, ForeignKey, Integer, String, Float
 from sqlalchemy.ext.declarative import declarative_base
@@ -299,7 +300,7 @@ def mergeLogicalTable(df_results):
     return df_output
 
 
-def load_microarray_tests(filename, context_name):
+def load_microarray_tests(filepath: Path, context_name):
     def load_empty_dict():
         savepath = os.path.join(
             configs.rootdir,
@@ -312,28 +313,24 @@ def load_microarray_tests(filename, context_name):
         
         return "dummy", dat
 
-    if (not filename or filename == "None"):  # if not using microarray use empty dummy matrix
-    
+    # if not using microarray use empty dummy matrix
+    if filepath.stem == "":
         return load_empty_dict()
 
-    inquiry_full_path = os.path.join(configs.rootdir, "data", "config_sheets", filename)
-    if not os.path.isfile(inquiry_full_path): 
-        print("Error: file not found {}".format(inquiry_full_path))
-        sys.exit()
+    # inquiry_full_path = os.path.join(configs.rootdir, "data", "config_sheets", filename)
+    if not filepath.exists():
+        raise FileNotFoundError(f"Microarray file not found: {filepath}")
 
-    filename = "Microarray_{}.csv".format(context_name)
-    fullsavepath = os.path.join(
-        configs.rootdir, "data", "results", context_name, "microarray", filename
-    )
-    if os.path.isfile(fullsavepath):
-        data = pd.read_csv(fullsavepath, index_col="ENTREZ_GENE_ID")
-        print("Read from {}".format(fullsavepath))
+    full_save_path: Path = Path(configs.rootdir, "data", "results", context_name, "microarray", filepath.name)
+    if full_save_path.exists():
+        data = pd.read_csv(full_save_path, index_col="ENTREZ_GENE_ID")
+        print(f"Read from {full_save_path}")
         
         return context_name, data
         
     else:
         print(
-            f"Microarray gene expression file for {context_name} was not found at {fullsavepath}. This may be "
+            f"Microarray gene expression file for {context_name} was not found at {full_save_path}. This may be "
             f"intentional. Contexts where microarray data can be found in /work/data/results/{context_name}/ will "
             f"still be used for other contexts if found."
         )

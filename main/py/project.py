@@ -30,6 +30,7 @@ class rnaseq_preprocess:
 class rna_seq_generation:
     trnaseq_config_filepath: Path
     mrnaseq_config_filepath: Path
+    single_cell_config_filepath: Path
     technique: str
     replicate_ratio: float
     group_ratio: float
@@ -50,12 +51,18 @@ class proteomics_analysis:
     
 @dataclass
 class merge_xomics:
+    custom_requirement_filepath: Path
+    microarray_config_filepath: Path
     expression_requirement: int
     requirement_adjust: str
     total_rna_weight: int
     mrna_weight: int
     single_cell_weight: int
     proteomics_weight: int
+    no_high_confidence: bool
+    no_NA: bool
+    merge_distribution: bool
+    keep_gene_score: bool
     
 @dataclass
 class model_creation:
@@ -180,6 +187,15 @@ class Configs:
         return data
 
     def _get_rna_seq_generation(self) -> rna_seq_generation:
+        scrnaseq_file = self._toml_data["rna_seq_generation"]["single_cell_config_file"]
+        if scrnaseq_file == "None":
+            scrnaseq_config_filepath: Path = Path()
+        else:
+            scrnaseq_config_filepath: Path = Path(
+                self.configdir,
+                self._toml_data["rna_seq_generation"]["single_cell_config_file"]
+            )
+
         trnaseq_config_filepath: Path = Path(self.configdir, self._toml_data["rna_seq_generation"]["trnaseq_config_file"])
         mrnaseq_config_filepath: Path = Path(self.configdir, self._toml_data["rna_seq_generation"]["mrnaseq_config_file"])
         technique: str = self._toml_data["rna_seq_generation"]["technique"]
@@ -190,6 +206,8 @@ class Configs:
         quantile: int = self._toml_data["rna_seq_generation"]["quantile"]
         min_zfpkm: int = self._toml_data["rna_seq_generation"]["min_zfpkm"]
         min_cpm_count = self._toml_data["rna_seq_generation"]["min_cpm_count"]
+        
+        
         
         if technique.lower() not in ["quantile", "zfpkm", "cpm"]:
             raise ValueError("The technique setting under 'rna_seq_generation' must be either 'quantile', 'zfpkm', or 'cpm'.\nPlease edit `config.toml`")
@@ -203,6 +221,7 @@ class Configs:
         data: rna_seq_generation = rna_seq_generation(
             trnaseq_config_filepath=trnaseq_config_filepath,
             mrnaseq_config_filepath=mrnaseq_config_filepath,
+            single_cell_config_filepath=scrnaseq_config_filepath,
             technique=technique,
             replicate_ratio=rep_ratio,
             group_ratio=group_ratio,
@@ -215,7 +234,12 @@ class Configs:
         return data
 
     def _get_proteomics_analysis(self) -> proteomics_analysis:
-        proteomics_config_file: Path = Path(self.configdir, self._toml_data["proteomics_analysis"]["proteomics_config_file"])
+        proteomics_file = self._toml_data["proteomics_analysis"]["proteomics_config_file"]
+        if proteomics_file == "None":
+            proteomics_config_file: Path = Path()
+        else:
+            proteomics_config_file: Path = Path(self.configdir, self._toml_data["proteomics_analysis"]["proteomics_config_file"])
+        
         rep_ratio = self._toml_data["proteomics_analysis"]["rep_ratio"]
         batch_ratio = self._toml_data["proteomics_analysis"]["batch_ratio"]
         high_rep_ratio = self._toml_data["proteomics_analysis"]["high_rep_ratio"]
@@ -233,20 +257,54 @@ class Configs:
         return data
 
     def _get_merge_xomics(self) -> merge_xomics:
-        expression_requirement = self._toml_data["merge_xomics"]["expression_requirement"]
+        microarray_file = self._toml_data["merge_xomics"]["microarray_config_file"]
+        custom_requirement_file = self._toml_data["merge_xomics"]["custom_requirement_file"]
+        if microarray_file == "None":
+            microarray_config_filepath: Path = Path()
+        else:
+            microarray_config_filepath: Path = Path(
+                self.configdir,
+                self._toml_data["merge_xomics"]["microarray_config_file"]
+            )
+            
+        if custom_requirement_file == "None":
+            custom_requirement_filepath: Path = Path()
+        else:
+            custom_requirement_filepath: Path = Path(
+                self.configdir,
+                self._toml_data["merge_xomics"]["custom_requirement_file"]
+            )
+
+        expression_requirement: int = self._toml_data["merge_xomics"]["expression_requirement"]
         requirement_adjust = self._toml_data["merge_xomics"]["requirement_adjust"]
         total_rna_weight = self._toml_data["merge_xomics"]["total_rna_weight"]
         mrna_weight = self._toml_data["merge_xomics"]["mrna_weight"]
         single_cell_weight = self._toml_data["merge_xomics"]["single_cell_weight"]
         proteomics_weight = self._toml_data["merge_xomics"]["proteomics_weight"]
+        no_high_confidence = self._toml_data["merge_xomics"]["no_high_confidence"]
+        no_NA = self._toml_data["merge_xomics"]["no_NA"]
+        merge_distribution = self._toml_data["merge_xomics"]["merge_distribution"]
+        keep_gene_score = self._toml_data["merge_xomics"]["keep_gene_score"]
+        
+        if expression_requirement < 1:
+            raise ValueError("The expression requirement must be at least 1.\nPlease edit `config.toml`")
+        
+        if requirement_adjust not in ["progressive", "regressive", "flat", "custom"]:
+            raise ValueError("The requirement adjust setting under 'merge_xomics' must be either 'progressive', 'regressive', 'flat', or 'custom'.\nPlease edit `config.toml`")
         
         data: merge_xomics = merge_xomics(
+            custom_requirement_filepath=custom_requirement_filepath,
+            microarray_config_filepath=microarray_config_filepath,
             expression_requirement=expression_requirement,
             requirement_adjust=requirement_adjust,
             total_rna_weight=total_rna_weight,
             mrna_weight=mrna_weight,
             single_cell_weight=single_cell_weight,
             proteomics_weight=proteomics_weight,
+            no_high_confidence=no_high_confidence,
+            no_NA=no_NA,
+            merge_distribution=merge_distribution,
+            keep_gene_score=keep_gene_score
         )
         return data
 
