@@ -1,15 +1,15 @@
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
-library("stringr")
-library("tidyverse")
-library("limma")
-library("edgeR")
-library("genefilter")
-library("biomaRt")
-library("sjmisc")
-library("zFPKM")
-library("stringr")
-library("readxl")
-library("dplyr")
+suppressMessages(library("stringr"))
+suppressMessages(library("tidyverse"))
+suppressMessages(library("limma"))
+suppressMessages(library("edgeR"))
+suppressMessages(library("genefilter"))
+suppressMessages(library("biomaRt"))
+suppressMessages(library("sjmisc"))
+suppressMessages(library("zFPKM"))
+suppressMessages(library("stringr"))
+suppressMessages(library("readxl"))
+suppressMessages(library("dplyr"))
 
 
 username <- Sys.info()["user"]
@@ -482,7 +482,6 @@ save_rnaseq_tests <- function(
   min_count=10,
   min_zfpkm=-3
 ) {
-    print(paste0("Using technique: ", technique))
     # condense filter options
     filt_options <- list()
     if ( exists("replicate_ratio") ) { filt_options$replicate_ratio <- replicate_ratio }

@@ -1,7 +1,7 @@
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
-library("stringr", verbose = FALSE)
-library("dplyr", verbose = FALSE)
-library("tidyverse", verbose = FALSE)
+suppressMessages(library("stringr"))
+suppressMessages(library("dplyr"))
+suppressMessages(library("tidyverse"))
 
 work_dir <- getwd()  # /home/jovyan/main
 if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
