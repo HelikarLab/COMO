@@ -79,12 +79,11 @@ def handle_context_batch(
     """
     Handle iteration through each context type and create rnaseq expression file by calling rnaseq.R
     """
-    
     rnaseq_config_filepath = os.path.join(configs.rootdir, "data", "config_sheets", config_filename)
+    print(f"Reading config file: {rnaseq_config_filepath}")
+
     xl = pd.ExcelFile(rnaseq_config_filepath)
     sheet_names = xl.sheet_names
-    
-    print(f"Reading config file: {rnaseq_config_filepath}")
     
     for context_name in sheet_names:
         print(f"\nStarting {context_name}")
@@ -130,24 +129,7 @@ def handle_context_batch(
         print(f"Results saved at:   {rnaseq_output_filepath}")
 
 
-def main(argv):
-    """
-    Generate a list of active and high-confidence genes from a counts matrix using a user defined
-    at normalization-technique at /work/data/results/<context name>/rnaseq_<context_name>.csv
-    Currently, can filter raw RNA-seq counts using three normalization techniques. Which are defined in rnaseq.R
-    TPM Quantile, where each replicate is normalized with Transcripts-per-million and an upper quantile is taken to
-    create a boolean list of active genes for the replicate. Replicates are compared for consensus within the
-    study/batch number according to user-defined ratios and then study/batch numbers are checked for consensus
-    according to different user defined ratios.   **CITATION NEEDED** **Recomended if user wants more control over the
-    size of the model, like a smaller model that allows for only the most expressed reactions, or a larger more
-    encompassing one that contains less essential reactions.
-    zFPKM method outlined in: https://pubmed.ncbi.nlm.nih.gov/24215113/ can be used. Counts will be normalized using
-    zFPKM and genes > -3 will be considered expressed per thier recommendation. Expressed genes will be checked for
-    consensus at the replicate and study/batch levels the same as TPM Quantile. **Recommended if user wants to give
-    least input over gene essentially determination and use the most standardized method of active gene determination.
-    flat cutoff of CPM (counts per million) normalized values, check for consensus the same as other methods.
-    """
-    
+def parse_args(argv):
     parser = argparse.ArgumentParser(
         prog="rnaseq_gen.py",
         description="Generate a list of active and high-confidence genes from a counts matrix using a user defined "
@@ -260,33 +242,54 @@ def main(argv):
     )
     
     args = parser.parse_args(argv)
-    
-    config_filename = args.config_filename
-    replicate_ratio = args.replicate_ratio
-    batch_ratio = args.batch_ratio
-    replicate_ratio_high = args.replicate_ratio_high
-    batch_ratio_high = args.batch_ratio_high
-    technique = args.technique
-    quantile = args.quantile
-    min_count = args.min_count
-    prep = args.prep
-    min_zfpkm = args.min_zfpkm
-    
-    if re.search("tpm", technique.lower()) or re.search("quantile", technique.lower()):
-        technique = "quantile"
-    elif re.search("cpm", technique.lower()):
-        technique = "cpm"
-    elif re.search("zfpkm", technique.lower()):
-        technique = "zfpkm"
+    return args
+
+def main(argv):
+    """
+    Generate a list of active and high-confidence genes from a counts matrix using a user defined
+    at normalization-technique at /work/data/results/<context name>/rnaseq_<context_name>.csv
+    Currently, can filter raw RNA-seq counts using three normalization techniques. Which are defined in rnaseq.R
+    TPM Quantile, where each replicate is normalized with Transcripts-per-million and an upper quantile is taken to
+    create a boolean list of active genes for the replicate. Replicates are compared for consensus within the
+    study/batch number according to user-defined ratios and then study/batch numbers are checked for consensus
+    according to different user defined ratios.   **CITATION NEEDED** **Recomended if user wants more control over the
+    size of the model, like a smaller model that allows for only the most expressed reactions, or a larger more
+    encompassing one that contains less essential reactions.
+    zFPKM method outlined in: https://pubmed.ncbi.nlm.nih.gov/24215113/ can be used. Counts will be normalized using
+    zFPKM and genes > -3 will be considered expressed per thier recommendation. Expressed genes will be checked for
+    consensus at the replicate and study/batch levels the same as TPM Quantile. **Recommended if user wants to give
+    least input over gene essentially determination and use the most standardized method of active gene determination.
+    flat cutoff of CPM (counts per million) normalized values, check for consensus the same as other methods.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-p",
+        "--library-prep",
+        required=False,
+        default="",
+        dest="preparation_method",
+        help="Library preparation used, will separate samples into groups to only compare similarly "
+             "prepared libraries. For example, mRNA, total-rna, scRNA, etc",
+    )
+    args = parser.parse_args()
+    if args.preparation_method.lower() == "total":
+        config_filename = configs.rna_seq_generation.trnaseq_config_filepath
+    elif args.preparation_method.lower() == "mrna":
+        config_filename = configs.rna_seq_generation.mrnaseq_config_filepath
+    elif args.preparation_method.lower() == "sc":
+        config_filename = configs.rna_seq_generation.sc_rnaseq_config_filepath
     else:
-        print(
-            "Normalization-filtration technique not recognized. Must be 'tpm-quantile', 'cpm', or 'zfpkm'."
-        )
-        sys.exit()
+        raise ValueError("Preparation method not recognized. Must be 'total', 'mrna', or 'sc'")
     
-    if int(quantile) > 100 or int(quantile) < 1:
-        print("Quantile must be between 1 - 100")
-    
+    replicate_ratio = configs.rna_seq_generation.replicate_ratio
+    batch_ratio = configs.rna_seq_generation.group_ratio
+    replicate_ratio_high = configs.rna_seq_generation.high_replicate_ratio
+    batch_ratio_high = configs.rna_seq_generation.high_group_ratio
+    technique = configs.rna_seq_generation.technique
+    quantile = configs.rna_seq_generation.quantile
+    min_count = configs.rna_seq_generation.min_cpm_count
+    min_zfpkm = configs.rna_seq_generation.min_zfpkm
+    prep = args.preparation_method.lower()
     prep = prep.replace(" ", "")
     
     handle_context_batch(

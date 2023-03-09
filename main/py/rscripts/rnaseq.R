@@ -1,28 +1,27 @@
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
 library("stringr")
-username <- Sys.info()["user"]
-work_dir <- str_interp("/home/${username}/main")
+library("tidyverse")
+library("limma")
+library("edgeR")
+library("genefilter")
+library("biomaRt")
+library("sjmisc")
+library("zFPKM")
+library("stringr")
+library("readxl")
+library("dplyr")
 
-if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
-    dir.create(str_interp("${work_dir}/py/rlogs"))
+
+username <- Sys.info()["user"]
+work_dir <- getwd()
+
+if (!dir.exists(stringr::str_interp("${work_dir}/py/rlogs"))) {
+    dir.create(stringr::str_interp("${work_dir}/py/rlogs"))
 }
 
 # prevent messy messages from repeatedly writing to juypter
-zz <- file(file.path("/home", username, "main", "py", "rlogs", "rnaseq.Rout"), open="wt")
+zz <- file(file.path(work_dir, "py", "rlogs", "rnaseq.Rout"), open="wt")
 sink(zz, type="message")
-
-library(tidyverse)
-library(limma)
-library(edgeR)
-library(genefilter)
-library(biomaRt)
-library(sjmisc)
-library(zFPKM)
-library(zFPKM)
-library(stringr)
-library(readxl)
-library(dplyr)
-
 
 read_counts_matrix <- function(counts_matrix_filepath, config_filepath, info_filepath, context_name) {
 
@@ -483,44 +482,29 @@ save_rnaseq_tests <- function(
   min_count=10,
   min_zfpkm=-3
 ) {
-    
+    print(paste0("Using technique: ", technique))
     # condense filter options
     filt_options <- list()
-    if ( exists("replicate_ratio") ) {
-    filt_options$replicate_ratio <- replicate_ratio
-    } else {
-    filt_options$replicate_ratio <- 0.2
-    }
-    if ( exists("batch_ratio") ) {
-    filt_options$batch_ratio <- batch_ratio
-    } else {
-    filt_options$batch_ratio <- 0.5
-    }
-    if ( exists("quantile") ) {
-    filt_options$quantile <- quantile
-    } else {
-    filt_options$quantile <- 50
-    }
-    if ( exists("min_count") ) {
-    filt_options$min_count <- min_count
-    } else {
-    filt_options$min_count <- 1
-    }
-    if ( exists("min_zfpkm") ) {
-    filt_options$min_zfpkm <- min_zfpkm
-    } else {
-    filt_options$min_zfpkm <- -3
-    }
-    if ( exists("replicate_ratio_high") ) {
-    filt_options$replicate_ratio_high<- replicate_ratio_high
-    } else {
-    filt_options$replicate_ratio_high <- 0.9
-    }
-    if ( exists("batch_ratio_high") ) {
-    filt_options$batch_ratio_high <- batch_ratio_high
-    } else {
-    filt_options$batch_ratio_high <- 0.9
-    }
+    if ( exists("replicate_ratio") ) { filt_options$replicate_ratio <- replicate_ratio }
+    else { filt_options$replicate_ratio <- 0.2 }
+    
+    if ( exists("batch_ratio") ) { filt_options$batch_ratio <- batch_ratio }
+     else { filt_options$batch_ratio <- 0.5 }
+    
+    if ( exists("quantile") ) { filt_options$quantile <- quantile }
+    else { filt_options$quantile <- 50 }
+    
+    if ( exists("min_count") ) { filt_options$min_count <- min_count }
+    else { filt_options$min_count <- 1 }
+    
+    if ( exists("min_zfpkm") ) { filt_options$min_zfpkm <- min_zfpkm }
+    else { filt_options$min_zfpkm <- -3 }
+    
+    if ( exists("replicate_ratio_high") ) { filt_options$replicate_ratio_high<- replicate_ratio_high }
+    else { filt_options$replicate_ratio_high <- 0.9 }
+    
+     if ( exists("batch_ratio_high") ) { filt_options$batch_ratio_high <- batch_ratio_high }
+    else { filt_options$batch_ratio_high <- 0.9 }
 
     if ( prep == "scrna" ) {
       technique <- "umi"
@@ -533,22 +517,25 @@ save_rnaseq_tests <- function(
     SampMetrics <- filter_counts(SampMetrics, technique, filt_options, context_name, prep) # normalize and filter count
     expressedGenes <- c()
     topGenes <- c()
+    
     for ( i in 1:length(SampMetrics) ) { # get high confidence and expressed genes for each study/batch number
         expressedGenes <- c(expressedGenes, SampMetrics[[i]][["Entrez"]])
         topGenes <- c(topGenes, SampMetrics[[i]][["Entrez_hc"]])
     }
+    
     SampMetrics <- read_counts_matrix(counts_matrix_file, config_file, info_file, context_name) # read count matrix
-
+    
     entrez_all <- SampMetrics[[1]][["Entrez"]] #get entrez ids
     
     SampMetrics <- filter_counts(SampMetrics, technique, filt_options, context_name, prep) # normalize and filter count
     expressedGenes <- c()
     topGenes <- c()
-
+    
     for ( i in 1:length(SampMetrics) ) { # get high confidence and expressed genes for each study/batch number
         expressedGenes <- c(expressedGenes, SampMetrics[[i]][["Entrez"]])
         topGenes <- c(topGenes, SampMetrics[[i]][["Entrez_hc"]])
     }
+    
 
     expMat <- as.data.frame(table(expressedGenes)) # convert expression to df
     topMat <- as.data.frame(table(topGenes)) # convert high confidence to df
@@ -557,24 +544,23 @@ save_rnaseq_tests <- function(
     topMat <- cbind(topMat, "Prop"=topMat$Freq/nc) # calculate proportion of studies/batch high-confidence
     SampMetrics[["ExpressionMatrix"]] <- expMat # store expression matrix for saving
     SampMetrics[["TopMatrix"]] <- topMat # store high confidence matrix for saving
-
+    
     # get genes which are expressed and high-confidence according to use defined ratio
     SampMetrics[["ExpressedGenes"]] <- as.character(expMat$expressedGenes[expMat$Prop>=batch_ratio])
     SampMetrics[["TopGenes"]] <- as.character(topMat$topGenes[topMat$Prop>=batch_ratio_high])
 
     # create a table to write gene expression and high confidence to
     write_table <- data.frame(entrez_all)
-    write_table <- cbind(write_table, rep(0, nrow(write_table)))
-    for ( i in 1:nrow(write_table) ) {
-        if (as.character(write_table[i,1]) %in% as.character(SampMetrics$ExpressedGenes)) {
+    write_table <- cbind(write_table, rep(0, nrow(write_table)), rep(0, nrow(write_table)))
+    colnames(write_table) <- c("ENTREZ_GENE_ID", "expressed", "high")
+
+    for ( i in seq_len(nrow(write_table))) {
+        if (as.character(write_table$ENTREZ_GENE_ID[i]) %in% as.character(SampMetrics$ExpressedGenes)) {
             write_table[i,2] <- 1
         }
-        if (as.character(write_table$entrez_all[i]) %in% as.character(SampMetrics$TopGenes)) {
+        if (as.character(write_table$ENTREZ_GENE_ID[i]) %in% as.character(SampMetrics$TopGenes)) {
             write_table[i,3] <- 1
         }
     }
-    header <- c("ENTREZ_GENE_ID", "expressed", "high")
-    #write_table <- rbind(header, write_table)
-    colnames(write_table) <- header
     write.csv(write_table, out_file, row.names=FALSE, col.names=FALSE)
 }
