@@ -1,23 +1,22 @@
 #!/usr/bin/python3
 
-import pandas as pd
-
 import re
 import os
 import sys
-import argparse
-from rpy2.robjects.packages import importr
 import glob
+import argparse
 import numpy as np
+import pandas as pd
 from pathlib import Path
 
-from project import configs
-from async_bioservices import async_bioservices
-from async_bioservices.output_database import OutputDatabase
-from async_bioservices.input_database import InputDatabase
-from async_bioservices.taxon_ids import TaxonIDs
 import rpy2_api
 import utilities
+import project
+from project import configs, PreprocessMode
+from async_bioservices import async_bioservices
+from async_bioservices.input_database import InputDatabase
+from async_bioservices.output_database import OutputDatabase
+
 
 r_file_path: Path = Path(configs.rootdir, "py", "rscripts", "generate_counts_matrix.R")
 
@@ -208,7 +207,7 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     return matrix_total, matrix_mrna
 
 
-def create_gene_info_file(matrix_file_list, form: InputDatabase, taxon_id):
+def create_gene_info_file(matrix_file_list: list, form: InputDatabase, taxon_id):
     """
     Create gene info file for specified context by reading first column in its count matrix file at
      /work/data/results/<context name>/gene_info_<context name>.csv
@@ -255,10 +254,11 @@ def create_gene_info_file(matrix_file_list, form: InputDatabase, taxon_id):
     print(f"Gene Info file written at '{gene_info_file}'")
 
 
-def handle_context_batch(context_names, mode, form: InputDatabase, taxon_id, provided_matrix_file):
+def handle_context_batch(context_names, preproces_mode: project.PreprocessMode, form: InputDatabase, taxon_id, provided_matrix_file):
     """
     Handle iteration through each context type and create files according to flag used (config, matrix, info)
     """
+    
     trnaseq_config_filename = os.path.join(configs.rootdir, "data", "config_sheets", "trnaseq_data_inputs_auto.xlsx")
     mrnaseq_config_filename = os.path.join(configs.rootdir, "data", "config_sheets", "mrnaseq_data_inputs_auto.xlsx")
 
@@ -283,7 +283,7 @@ def handle_context_batch(context_names, mode, form: InputDatabase, taxon_id, pro
         matrix_path_mrna = os.path.join(matrix_output_dir, ("gene_counts_matrix_mrna_" + context_name + ".csv"))
         matrix_path_prov = os.path.join(matrix_output_dir, provided_matrix_file)
 
-        if mode == "make":
+        if preproces_mode == project.PreprocessMode.CREATE_MATRIX:
             create_counts_matrix(context_name)
             # TODO: warn user or remove samples that are all 0 to prevent density plot error in zFPKM
             df = create_config_df(context_name)
@@ -311,7 +311,7 @@ def handle_context_batch(context_names, mode, form: InputDatabase, taxon_id, pro
             if len(mmatrix.columns) > 1:
                 mmatrix.to_csv(matrix_path_mrna, header=True, index=False)
 
-    if mode == "make":
+    if preproces_mode == project.PreprocessMode.CREATE_MATRIX:
         if tflag:
             twriter.close()
         if mflag:
@@ -338,7 +338,7 @@ def parse_args(argv):
         prog="rnaseq_preprocess.py",
         description="""
             Fetches additional gene information from a provided matrix or gene counts, or optionally creates this
-            matrix using gene count files obtained using STAR aligner. Creation of counts matrix from STAR aligner 
+            matrix using gene count files obtained using STAR aligner. Creation of counts matrix from STAR aligner
             output requires that the 'COMO_input' folder exists and is correctly structured according to the
             normalization technique being used. A correctly structured folder can be made using our Snakemake-based
             alignment pipeline at:
@@ -411,46 +411,16 @@ def parse_args(argv):
     return args
 
 
-def main(argv):
+def main():
+    taxon_id: str = configs.general.taxon_id
     context_names: list[str] = configs.general.context_names
-    gene_format: str = configs.rnaseq_preprocess.gene_format
-    taxon_id: str = configs.rnaseq_preprocess.taxon_id
-    preprocess_mode: str = configs.rnaseq_preprocess.preprocess_mode
+    preprocess_mode: PreprocessMode = configs.rnaseq_preprocess.preprocess_mode
     matrix_filename: str = configs.rnaseq_preprocess.matrix_filename
-
-    if gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
-        gene_format_database: InputDatabase = InputDatabase.ENSEMBL_GENE_ID
-
-    elif gene_format.upper() in ["HGNC SYMBOL", "HUGO", "HUGO SYMBOL", "SYMBOL", "HGNC", "GENE SYMBOL"]:
-        gene_format_database: InputDatabase = InputDatabase.GENE_SYMBOL
-
-    elif gene_format.upper() in ["ENTREZ", "ENTRES", "ENTREZ ID", "ENTREZ NUMBER" "GENE ID"]:
-        gene_format_database: InputDatabase = InputDatabase.GENE_ID
-
-    else:  # provided invalid gene format
-        print("Gene format (--gene_format) is invalid")
-        print("Accepts 'Ensembl', 'Entrez', and 'HGNC symbol'")
-        print(f"You provided: {gene_format}")
-        sys.exit()
-
-    # handle species alternative ids
-    if isinstance(taxon_id, str):
-        if taxon_id.upper() == "HUMAN" or taxon_id.upper() == "HOMO SAPIENS":
-            taxon_id: TaxonIDs = TaxonIDs.HOMO_SAPIENS
-        elif taxon_id.upper() == "MOUSE" or taxon_id.upper() == "MUS MUSCULUS":
-            taxon_id: TaxonIDs = TaxonIDs.MUS_MUSCULUS
-        else:
-            print("--taxon-id must be either an integer, or accepted string ('mouse', 'human')")
-            sys.exit(1)
-    elif isinstance(taxon_id, int):
-        taxon_id: int = int(taxon_id)
-    else:
-        print("--taxon-id must be either an integer, or accepted string ('mouse', 'human')")
-        sys.exit(1)
+    gene_format_database: InputDatabase = configs.rnaseq_preprocess.gene_format
 
     handle_context_batch(
         context_names=context_names,
-        mode=preprocess_mode,
+        preproces_mode=preprocess_mode,
         form=gene_format_database,
         taxon_id=taxon_id,
         provided_matrix_file=matrix_filename
@@ -458,4 +428,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()

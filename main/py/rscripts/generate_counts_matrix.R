@@ -1,44 +1,57 @@
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
-library("stringr")
-username <- Sys.info()["user"]
-work_dir <- str_interp("/home/${username}/main")
+library("stringr", verbose = FALSE)
+library("dplyr", verbose = FALSE)
+library("tidyverse", verbose = FALSE)
 
+work_dir <- getwd()  # /home/jovyan/main
 if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
     dir.create(str_interp("${work_dir}/py/rlogs"))
 }
 
 # prevent messy messages from repeatedly writing to juypter
-zz <- file(file.path("/home", username, "main", "py", "rlogs", "generate_counts_matrix.Rout"), open="wt")
+zz <- file(file.path(work_dir, "py", "rlogs", "generate_counts_matrix.Rout"), open="wt")
 sink(zz, type="message")
 
-library(tidyverse)
 
 # fetch and organize COMO_input
 organize_gene_counts_files <- function(data_dir) {
     # fetch and organize COMO_input
     # accepts path to data directory, normalization technique
 
-    study_metrics <- list() # list storing all the samples
-    tissue_name <- basename(data_dir) # get tissue name from directory name
+    # list storing all the samples
+    study_metrics <- list()
+    tissue_name <- basename(data_dir)
 
     # collect paths to  files
-    count_dir_i <- file.path(data_dir, "geneCounts") # COMO_input/tissueName/geneCounts
+    # check under: COMO_input/tissueName/geneCounts, get "COMO_input/tissueName/geneCounts/SX"
+    count_dir_i <- file.path(data_dir, "geneCounts")
     count_dir <- list.dirs(path = count_dir_i, full.names = TRUE, recursive = FALSE) %>%
-      Filter(function(x) !any(grepl(".ipynb_checkpoints", x)), .) # COMO_input/tissueName/geneCounts/SX
+      Filter(function(x) !any(grepl(".ipynb_checkpoints", x)), .)
 
-    strand_dir_i <- file.path(data_dir, "strandedness") # COMO_input/tissueName/strandedness
-    strand_dir <- list.dirs(path = strand_dir_i, full.names = TRUE, recursive = FALSE) # tissueName/strandedness/SX
+    # check under: # COMO_input/tissueName/strandedness, get "tissueName/strandedness/SX"
+    strand_dir_i <- file.path(data_dir, "strandedness")
+    strand_dir <- list.dirs(path = strand_dir_i, full.names = TRUE, recursive = FALSE)
 
     # for each study, collect gene count files, frag files, insert size files, layouts, and strand info
-    for ( j in 1:length(count_dir) ) {
-        cnt_d <- count_dir[j] # study's gene count folder
-        sname <- basename(cnt_d) # get study name from directory name
-        entry <- list() # list specific to a study, top level of SampleMetrics
-        str_d <- file.path(data_dir, "strandedness", sname) # strandedness file directory
+    for ( j in seq_along(count_dir)) {
+        
+        # study's gene count folder
+        cnt_d <- count_dir[j]
+        
+        # get study name from directory name
+        sname <- basename(cnt_d)
+        
+        # list specific to a study, top level of SampleMetrics
+        entry <- list()
+        
+        # strandedness file directory
+        str_d <- file.path(data_dir, "strandedness", sname)
 
         #counts_glob <- paste(c(cnt_d, "/*.tab"), collapse="")
         counts_glob <- file.path(cnt_d, "*.tab")
-        counts_files <- Sys.glob(counts_glob) # outputs of STAR
+        
+         # outputs of STAR
+        counts_files <- Sys.glob(counts_glob)
 
         n_replicates <- length(counts_files) # number of replicates for this study
         replicate_names <- rep(0,n_replicates) # initialize empty array to store rep names
@@ -128,7 +141,9 @@ prepare_sample_counts <- function(counts_file, counts_files, strand_file) {
     }
 
     else if ( grepl("R\\d+r", counts_file)==TRUE ) { # multirun files handled when the first run is iterated on, skip
-        return("skip")
+        # return an empty dataframe with length 0
+        return(data.frame(0))
+        # return("skip")
     }
 
     else { # if not multirun, handle normally
@@ -172,37 +187,55 @@ create_counts_matrix <- function(counts_files, replicate_names, n_replicates, st
         stop()
     }
     
-    i_adjust <- 0  # adjusted index, subtracts number of multiruns processed
-    counts <- prepare_sample_counts(counts_files[1], counts_files, strand_files[1]) # get first column of counts to add
+    # adjusted index, subtracts number of multiruns processed
+    i_adjust <- 0
     
-    if ( grepl("R\\d+r1", replicate_names[1], ignore.case=FALSE) ) { # if first of a set of multiruns
-        colnames(counts)[2] <- unlist(strsplit(replicate_names[1], "r\\d+"))[1] # remove run number tag
-
+    # get first column of counts to add
+    counts <- prepare_sample_counts(
+      counts_file = counts_files[1],
+      counts_files = counts_files,
+      strand_file = strand_files[1]
+    )
+    if ( grepl("R\\d+r1", replicate_names[1], ignore.case=FALSE) ) {
+         # if first of a set of multiruns, remove run number tag
+        colnames(counts)[2] <- unlist(strsplit(replicate_names[1], "r\\d+"))[1]
     } else {
-        colnames(counts)[2] <- replicate_names[1] # if not multirun, header is okay
+        # if not multirun, header is ok
+        colnames(counts)[2] <- replicate_names[1]
     }
 
-    
-    for (i in 2:n_replicates) { # iterate through rest of replicates after handling the first and initializing matrix
-        new_cnts <- prepare_sample_counts(counts_files[i], counts_files, strand_files[i]) # get next column of counts to add
-        options(warn=-1) # turn off warnings
-        
-        if ( new_cnts=="skip" ) { # handle skipped multirun calls
-            i_adjust <- i_adjust+1
+    # Iterate through the remainder of replicates
+    for (i in 2:n_replicates) {
+        # get next column of counts to add
+        new_cnts <- prepare_sample_counts(
+          counts_file = counts_files[i],
+          counts_files = counts_files,
+          strand_file = strand_files[i]
+        )
+        options(warn=-1)
+
+        # handle skipped multirun calls
+        if (ncol(new_cnts) == 0) {
+            i_adjust <- i_adjust + 1
             next
         }
 
-        counts <- merge(counts, new_cnts, by="genes", all=TRUE) # merge new count list with matrix
-        counts[is.na(counts)] <- 0 # if gene lists differ (could be the case if aligment platforms differ) make na's 0
+         # merge new count list with matrix
+        counts <- merge(counts, new_cnts, by="genes", all=TRUE)
+        # if gene lists differ (could be the case if aligment platforms differ) make na's 0
+        counts[is.na(counts)] <- 0
 
-        if ( grepl("R\\d+r1", replicate_names[i], ignore.case=FALSE) ) { # remove run number from multirun name
+        # remove run number from multirun name
+        if ( grepl("R\\d+r1", replicate_names[i], ignore.case=FALSE) ) {
             samp_name <- unlist(strsplit(replicate_names[i], "r\\d+"))[1]
         }
         else {
-            samp_name <- replicate_names[i] # if not multirun, sample name is okay
+            # if not multirun, sample name is okay
+            samp_name <- replicate_names[i]
         }
 
-        colnames(counts)[i+1-i_adjust] <- samp_name # set column name of added counts
+        # set column name of added counts
+        colnames(counts)[i+1-i_adjust] <- samp_name
 
     }
 
@@ -214,24 +247,27 @@ generate_counts_matrix_main <- function(data_dir, out_dir) {
 
     print("Organizing Files")
     study_metrics <- organize_gene_counts_files(data_dir)
+
     print("Creating counts matrix")
+    for ( i in seq_along(study_metrics)) {
+        counts_matrix <- create_counts_matrix(
+          counts_files = study_metrics[[i]][["CountFiles"]],
+          replicate_names = study_metrics[[i]][["SampleNames"]],
+          n_replicates = study_metrics[[i]][["NumSamples"]],
+          strand_files = study_metrics[[i]][["StrandFiles"]]
+        )
 
-    for ( i in 1:length(study_metrics) ) { # for each study
-        res <- create_counts_matrix(study_metrics[[i]][["CountFiles"]],
-                             study_metrics[[i]][["SampleNames"]],
-                             study_metrics[[i]][["NumSamples"]],
-                             study_metrics[[i]][["StrandFiles"]]
-                             ) # create count matrix for study
+        # store count matrix, store number of samples
+        study_metrics[[i]][["CountMatrix"]] <- counts_matrix
+        study_metrics[[i]][["NumSamples"]] <- ncol(study_metrics[[i]][["CountMatrix"]])
 
-        study_metrics[[i]][["CountMatrix"]] <- res # store count matrix
-
-        study_metrics[[i]][["NumSamples"]] <- ncol(study_metrics[[i]][["CountMatrix"]]) # store number of samples
-
-        if ( i == 1 ) { # if first study
-            full_count_matrix <- study_metrics[[i]][["CountMatrix"]] # initialize supermatrix
-        } else { # for successive studies
+        if ( i == 1 ) {
+            # initialize supermatrix
+            full_count_matrix <- study_metrics[[i]][["CountMatrix"]]
+        } else {
+            # merge study matrix to super
             add_mat <- study_metrics[[i]][["CountMatrix"]]
-            full_count_matrix <- merge(full_count_matrix, add_mat, by="genes", all=TRUE) # merge study matrix to super
+            full_count_matrix <- merge(full_count_matrix, add_mat, by="genes", all=TRUE)
         }
 
     }
