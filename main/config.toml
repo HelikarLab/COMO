@@ -5,19 +5,21 @@ taxon_id = "human"                  # accepts a bioDBnet taxon id, "human", or "
 [rnaseq_preprocess]
 create_counts_matrix = true         # set to false if using a pregenerated matrix file
 gene_format = "Ensembl"             # accepts "Entrez", "Ensembl", and "Symbol"
-preprocess_mode = "provide-matrix"  # "create-matrix" or "provide-matrix"
-matrix_filename = ""                # This is required if preprocess_mode is "create-matrix"
+preprocess_mode = "create-matrix"  # "create-matrix" or "provide-matrix"
+matrix_filename = ""                # This is required if preprocess_mode is "provide-matrix"
 
 [rna_seq_generation]
 trnaseq_config_file = "trnaseq_data_inputs_auto.xlsx"
 mrnaseq_config_file = "mrnaseq_data_inputs_auto.xlsx"
-rep_ratio = 0.75
+single_cell_config_file = "scrnaseq_data_inputs_auto.xlsx"
+replicate_ratio = 0.75
 group_ratio = 0.75
-rep_ratio_h = 1.0
-group_ratio_h = 1.0
+high_replicate_ratio = 1.0
+high_group_ratio = 1.0
 technique = "zFPKM"
-quantile = 50
+quantile = 25
 min_zfpkm = -3
+min_cpm_count = 0  # Use "0" to use a default value
 
 [proteomics_analysis]
 proteomics_config_file = "proteomics_data_inputs_paper.xlsx"
@@ -54,6 +56,3 @@ data_source = "rnaseq"
 [drug_repurposing]
 sovler = "gurobi"
 drug_raw_file = "Repurposing_Hub_export.txt"
-
-[about]
-version = "1.5.0"

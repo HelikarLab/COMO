@@ -1,24 +1,29 @@
-#!/usr/bin/python3
-
 import os
 import toml
+from enum import Enum
 from pathlib import Path
 from datetime import datetime
 from dataclasses import dataclass, field
-from typing import Literal
 
 from async_bioservices.input_database import InputDatabase
+from async_bioservices.taxon_ids import TaxonIDs
+
 
 @dataclass
 class general:
-    taxon_id: str
+    taxon_id: TaxonIDs
     context_names: list[str] = field(default_factory=list)
     
+    
+class PreprocessMode(Enum):
+    CREATE_MATRIX = "create-matrix"
+    PROVIDE_MATRIX = "provide-matrix"
+
 @dataclass
 class rnaseq_preprocess:
     create_counts_matrix: bool
     gene_format: InputDatabase
-    preprocess_mode: Literal["provide-matrix", "create-matrix"]
+    preprocess_mode: PreprocessMode
     matrix_filename: Path
     
 @dataclass
@@ -26,12 +31,13 @@ class rna_seq_generation:
     trnaseq_config_filepath: Path
     mrnaseq_config_filepath: Path
     technique: str
-    rep_ratio: float
+    replicate_ratio: float
     group_ratio: float
-    rep_ratio_h: float
-    group_ratio_h: float
+    high_replicate_ratio: float
+    high_group_ratio: float
     quantile: int
     min_zfpkm: int
+    min_cpm_count: int | str
 
 @dataclass
 class proteomics_analysis:
@@ -84,7 +90,10 @@ class about:
         self.date = datetime.now().strftime("%B %d, %Y")
         
         # EXAMPLE: get "v1.0.0-BRANCH" from "refs/tags/v1.0.0-BRANCH"
-        self.version = os.environ["COMO_VERSION"].split("/")[-1]
+        try:
+            self.version = os.environ["COMO_VERSION"].split("/")[-1]
+        except KeyError:
+            self.version = "UNKNOWN"
 
 
 class Configs:
@@ -109,8 +118,7 @@ class Configs:
 
     def _read_from_toml(self):
         toml_file: str = os.path.join(self.rootdir, "config.toml")
-        with open(toml_file, "rb") as i_stream:
-            data = toml.load(i_stream)
+        data: dict = toml.loads(open(toml_file).read())
         return data
 
     def _get_general(self) -> general:
@@ -118,8 +126,12 @@ class Configs:
         context_names: list[str] = self._toml_data["general"]["context_names"]
         
         if isinstance(taxon_id, str):
-            if taxon_id.lower() not in ["human", "mouse"]:
-                raise ValueError("The taxon_id setting under 'general' must be either 'human' or 'mouse'.\nPlease edit `config.toml`")
+            if taxon_id.lower() in ["human", "homo sapiens"]:
+                taxon_id = TaxonIDs.HOMO_SAPIENS
+            elif taxon_id.lower() in ["mouse", "mus musculus"]:
+                taxon_id = TaxonIDs.MUS_MUSCULUS
+            else:
+                raise ValueError("The taxon_id setting under 'general' must be either an integer, 'human' or 'mouse'.\nPlease edit `config.toml`")
         
         if not isinstance(context_names, list):
             raise ValueError("The context_names setting under 'general' must be a list, such as `['type1', 'type2']`.\nPlease edit `config.toml`")
@@ -132,28 +144,32 @@ class Configs:
 
     def _get_rnaseq_preprocess(self) -> rnaseq_preprocess:
         create_counts_matrix = self._toml_data["rnaseq_preprocess"]["create_counts_matrix"]
-        gene_format = self._toml_data["rnaseq_preprocess"]["gene_format"]
-        preprocess_mode = self._toml_data["rnaseq_preprocess"]["preprocess_mode"]
+        gene_format: str = self._toml_data["rnaseq_preprocess"]["gene_format"].lower()
+        preprocess_mode: str = self._toml_data["rnaseq_preprocess"]["preprocess_mode"].lower()
         matrix_filename = self._toml_data["rnaseq_preprocess"]["matrix_filename"]
         
         if not isinstance(create_counts_matrix, bool):
             raise ValueError("The create_counts_matrix setting under 'rnaseq_preprocess' must be either 'true' or 'false'.\nPlease edit `config.toml`")
         
-        if gene_format.lower() not in ["Entrez", "Ensembl", "Symbol"]:
+        if gene_format not in ["entrez", "ensembl", "symbol"]:
             raise ValueError("The gene_format setting under 'rnaseq_preprocess' must be either 'Entrez', 'Ensembl', or 'Symbol'.\nPlease edit `config.toml`")
         else:
-            if gene_format.lower() in ["ensembl", "ensemble", "ensg", "ensmusg", "ensembl id", "ensembl gene id"]:
+            if gene_format in ["ensembl", "ensemble", "ensg", "ensmusg", "ensembl id", "ensembl gene id"]:
                 gene_format_database: InputDatabase = InputDatabase.ENSEMBL_GENE_ID
-            elif gene_format.lower() in ["hgnc symbol", "hugo", "hugo symbol", "symbol", "hgnc", "gene symbol"]:
+            elif gene_format in ["hgnc symbol", "hugo", "hugo symbol", "symbol", "hgnc", "gene symbol"]:
                 gene_format_database: InputDatabase = InputDatabase.GENE_SYMBOL
-            elif gene_format.lower() in ["entrez", "entres", "entrez id", "entrez number" "gene id"]:
+            elif gene_format in ["entrez", "entres", "entrez id", "entrez number" "gene id"]:
                 gene_format_database: InputDatabase = InputDatabase.GENE_ID
         
-        if preprocess_mode.lower() not in ["provide-matrix", "create-matrix"]:
+        if preprocess_mode not in ["provide-matrix", "create-matrix"]:
             raise ValueError("The preprocess_mode setting under 'rnaseq_preprocess' must be either 'provide-matrix' or 'create-matrix'.\nPlease edit `config.toml`")
-        
-        if preprocess_mode.lower() == "create-matrix" and matrix_filename == "":
+        elif preprocess_mode == "provide-matrix" and matrix_filename == "":
             raise ValueError("The matrix_filename setting under 'rnaseq_preprocess' must be set if the preprocess_mode is set to 'create-matrix'.\nPlease edit `config.toml`")
+        else:
+            if preprocess_mode == "provide-matrix":
+                preprocess_mode: PreprocessMode = PreprocessMode.PROVIDE_MATRIX
+            elif preprocess_mode == "create-matrix":
+                preprocess_mode: PreprocessMode = PreprocessMode.CREATE_MATRIX
         
         data: rnaseq_preprocess = rnaseq_preprocess(
             create_counts_matrix=create_counts_matrix,
@@ -166,27 +182,35 @@ class Configs:
     def _get_rna_seq_generation(self) -> rna_seq_generation:
         trnaseq_config_filepath: Path = Path(self.configdir, self._toml_data["rna_seq_generation"]["trnaseq_config_file"])
         mrnaseq_config_filepath: Path = Path(self.configdir, self._toml_data["rna_seq_generation"]["mrnaseq_config_file"])
-        technique = self._toml_data["rna_seq_generation"]["technique"]
-        rep_ratio = self._toml_data["rna_seq_generation"]["rep_ratio"]
-        group_ratio = self._toml_data["rna_seq_generation"]["group_ratio"]
-        rep_ratio_h = self._toml_data["rna_seq_generation"]["rep_ratio_h"]
-        group_ratio_h = self._toml_data["rna_seq_generation"]["group_ratio_h"]
-        quantile = self._toml_data["rna_seq_generation"]["quantile"]
-        min_zfpkm = self._toml_data["rna_seq_generation"]["min_zfpkm"]
+        technique: str = self._toml_data["rna_seq_generation"]["technique"]
+        rep_ratio: float = self._toml_data["rna_seq_generation"]["replicate_ratio"]
+        group_ratio: float = self._toml_data["rna_seq_generation"]["group_ratio"]
+        rep_ratio_h: float = self._toml_data["rna_seq_generation"]["high_replicate_ratio"]
+        group_ratio_h: float = self._toml_data["rna_seq_generation"]["high_group_ratio"]
+        quantile: int = self._toml_data["rna_seq_generation"]["quantile"]
+        min_zfpkm: int = self._toml_data["rna_seq_generation"]["min_zfpkm"]
+        min_cpm_count = self._toml_data["rna_seq_generation"]["min_cpm_count"]
         
         if technique.lower() not in ["quantile", "zfpkm", "cpm"]:
             raise ValueError("The technique setting under 'rna_seq_generation' must be either 'quantile', 'zfpkm', or 'cpm'.\nPlease edit `config.toml`")
         
+        if min_cpm_count == 0:
+            min_cpm_count = "default"
+
+        if int(quantile) > 100 or int(quantile) < 1:
+            raise ValueError("Quantile must be between 1 and 100.\nPlease edit `config.toml`")
+
         data: rna_seq_generation = rna_seq_generation(
             trnaseq_config_filepath=trnaseq_config_filepath,
             mrnaseq_config_filepath=mrnaseq_config_filepath,
             technique=technique,
-            rep_ratio=rep_ratio,
+            replicate_ratio=rep_ratio,
             group_ratio=group_ratio,
-            rep_ratio_h=rep_ratio_h,
-            group_ratio_h=group_ratio_h,
+            high_replicate_ratio=rep_ratio_h,
+            high_group_ratio=group_ratio_h,
             quantile=quantile,
             min_zfpkm=min_zfpkm,
+            min_cpm_count=min_cpm_count,
         )
         return data
 
@@ -293,5 +317,3 @@ work_dir = os.path.join(*directory_list[0:split_index])
 # Add leading "/", as it will not exist right now
 work_dir = os.path.join("/", work_dir)
 configs = Configs(work_dir)
-print(configs.about.version)
-print(configs.about.date)
