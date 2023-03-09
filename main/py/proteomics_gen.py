@@ -32,14 +32,14 @@ def load_proteomics_data(datafilename, context_name):
     """
     Add description......
     """
-    dataFullPath = os.path.join(configs.rootdir, "data", "data_matrices", context_name, datafilename)
-    print('Data matrix is at "{}"'.format(dataFullPath))
+    data_filepath = os.path.join(configs.rootdir, "data", "data_matrices", context_name, datafilename)
+    print(f"Data matrix is at {data_filepath}")
     
-    if os.path.isfile(dataFullPath):
-        proteomics_data = pd.read_csv(dataFullPath, header=0)
+    if os.path.isfile(data_filepath):
+        proteomics_data = pd.read_csv(data_filepath, header=0)
         
     else:
-        print("Error: file not found: {}".format(dataFullPath))
+        print("Error: file not found: {}".format(data_filepath))
         
         return None
 
@@ -67,11 +67,11 @@ def load_proteomics_data(datafilename, context_name):
 
 
 # read map to convert to entrez
-def load_gene_symbol_map(gene_symbols, filename="proteomics_entrez_map.csv"):
+def load_gene_symbol_map(gene_symbols, filename: str = "proteomics_entrez_map.csv"):
     """
     Add descirption....
     """
-    filepath = os.path.join(configs.rootdir, "data", "proteomics_entrez_map.csv")
+    filepath = os.path.join(configs.rootdir, "data", filename)
     if os.path.isfile(filepath):
         sym2id = pd.read_csv(filepath, index_col="Gene Symbol")
     else:
@@ -95,7 +95,7 @@ def abundance_to_bool_group(context_name, group_name, abundance_matrix, rep_rati
         "results",
         context_name,
         "proteomics",
-        "".join(["protein_abundance_", group_name, ".csv"])
+        f"protein_abundance_{group_name}.csv"
     )
     abundance_matrix.to_csv(abundance_filepath, index_label="ENTREZ_GENE_ID")
 
@@ -109,7 +109,7 @@ def abundance_to_bool_group(context_name, group_name, abundance_matrix, rep_rati
     # protein_transform_io.protein_transform_main(abundance_filepath, output_dir, group_name)
     
     # Logical Calculation
-    thresholds = abundance_matrix.quantile(quantile, axis=0)
+    # thresholds = abundance_matrix.quantile(quantile, axis=0)
     abundance_matrix_nozero = abundance_matrix.replace(0, np.nan)
     thresholds = abundance_matrix_nozero.quantile(quantile, axis=0)
     testbool = pd.DataFrame(0, columns=list(abundance_matrix), index=abundance_matrix.index)
@@ -148,13 +148,13 @@ def to_bool_context(context_name, group_ratio, hi_group_ratio, group_names):
             merged_hi_df = read_df["high"].to_frame()
 
     if len(merged_df.columns) > 1:
-        merged_df.apply(lambda x: sum(x)/len(merged_df.columns)>=group_ratio, axis=1, result_type="reduce")
-        merged_hi_df.apply(lambda x: sum(x)/len(merged_hi_df.columns)>=hi_group_ratio, axis=1, result_type="reduce")
+        merged_df.apply(lambda x: sum(x)/len(merged_df.columns) >= group_ratio, axis=1, result_type="reduce")
+        merged_hi_df.apply(lambda x: sum(x)/len(merged_hi_df.columns) >= hi_group_ratio, axis=1, result_type="reduce")
 
     out_df = pd.merge(merged_df, merged_hi_df, right_index=True, left_index=True)
     out_filepath = os.path.join(output_dir, f"Proteomics_{context_name}.csv")
     out_df.to_csv(out_filepath, index_label="ENTREZ_GENE_ID")
-    print("Test Data Saved to {}".format(out_filepath))
+    print(f"Test Data Saved to {out_filepath}")
 
 
 # read data from csv files
@@ -171,10 +171,11 @@ def load_proteomics_tests(filename, context_name):
             "placeholder",
             "placeholder_empty_data.csv",
         )
-        dat = pd.read_csv(savepath, index_col="ENTREZ_GENE_ID")
-        return "dummy", dat
+        placeholder_data = pd.read_csv(savepath, index_col="ENTREZ_GENE_ID")
+        return "dummy", placeholder_data
 
-    if (not filename or filename == "None"):  # if not using proteomics load empty dummy data matrix
+    # if not using proteomics load empty dummy data matrix
+    if not filename or filename == "None":
         return load_empty_dict()
 
     inquiry_full_path = os.path.join(configs.rootdir, "data", "config_sheets", filename)
@@ -182,13 +183,13 @@ def load_proteomics_tests(filename, context_name):
         print("Error: file not found {}".format(inquiry_full_path))
         sys.exit()
 
-    filename = "Proteomics_{}.csv".format(context_name)
+    filename = f"Proteomics_{context_name}.csv"
     fullsavepath = os.path.join(
         configs.rootdir, "data", "results", context_name, "proteomics", filename
     )
     if os.path.isfile(fullsavepath):
         data = pd.read_csv(fullsavepath, index_col="ENTREZ_GENE_ID")
-        print("Read from {}".format(fullsavepath))
+        print(f"Read from {fullsavepath}")
         
         return context_name, data
         
@@ -201,23 +202,12 @@ def load_proteomics_tests(filename, context_name):
         
         return load_empty_dict()
 
-
-def proteomics_gen(TEMP):
-    """
-    Description
-    """
-    return "TEMP"
-
-
-def main(argv):
-    """
-    Description
-    """
+def parse_args(argv):
     parser = argparse.ArgumentParser(
         prog="proteomics_gen.py",
         description="Description goes here",
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
-        "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
+               "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
     )
     parser.add_argument(
         "-c",
@@ -263,7 +253,7 @@ def main(argv):
         dest="hi_group_ratio",
         help="Ratio of groups (batches or studies) required for a gene to be considered high-confidence in a context",
     )
-
+    
     parser.add_argument(
         "-q",
         "--quantile",
@@ -276,35 +266,38 @@ def main(argv):
     )
     args = parser.parse_args()
 
-    suppfile = args.config_file
-    rep_ratio = args.rep_ratio
-    group_ratio = args.group_ratio
-    hi_rep_ratio = args.hi_rep_ratio
-    hi_group_ratio = args.hi_group_ratio
-    quantile = args.quantile / 100
+def main(argv):
+    """
+    Description
+    """
+
+    config_filename: str = configs.proteomics_analysis.proteomics_config_file
+    rep_ratio: float = configs.proteomics_analysis.rep_ratio
+    group_ratio: float = configs.proteomics_analysis.batch_ratio
+    hi_rep_ratio: float = configs.proteomics_analysis.high_rep_ratio
+    hi_group_ratio: float = configs.proteomics_analysis.high_batch_ratio
+    quantile: int = configs.proteomics_analysis.quantile / 100
 
     prot_config_filepath = os.path.join(
-        configs.rootdir, "data", "config_sheets", suppfile
+        configs.rootdir,
+        "data",
+        "config_sheets",
+        config_filename
     )
-    print('Config file is at "{}"'.format(prot_config_filepath))
+    print(f"Config file is at {prot_config_filepath}")
 
-    xl = pd.ExcelFile(prot_config_filepath)
-    sheet_names = xl.sheet_names
+    excel_data: pd.ExcelFile = pd.ExcelFile(prot_config_filepath)
     
-    for context_name in sheet_names:
-        datafilename = "".join(["protein_abundance_", context_name, ".csv"])
+    for context_name in excel_data.sheet_names:
+        data_filename = f"protein_abundance_{context_name}.csv"
         config_sheet = pd.read_excel(prot_config_filepath, sheet_name=context_name)
         groups = config_sheet["Group"].unique().tolist()
         
         for group in groups:
             group_idx = np.where([True if g == group else False for g in config_sheet["Group"].tolist()])
-            cols = np.take(config_sheet["SampleName"].to_numpy(), group_idx).ravel().tolist() + [
-                "Gene Symbol",
-                "uniprot"
-            ]
             cols = np.take(config_sheet["SampleName"].to_numpy(), group_idx).ravel().tolist() + ["Gene Symbol"]
 
-            proteomics_data = load_proteomics_data(datafilename, context_name)
+            proteomics_data = load_proteomics_data(data_filename, context_name)
             proteomics_data = proteomics_data.loc[:, cols]
             
             sym2id = load_gene_symbol_map(
@@ -328,10 +321,10 @@ def main(argv):
 
             # save proteomics data by test
             abundance_to_bool_group(context_name, group, proteomics_data, rep_ratio, hi_rep_ratio, quantile)
-
+            
         to_bool_context(context_name, group_ratio, hi_group_ratio, groups)
-
-    return True
+        
+    print("Done!")
 
 
 if __name__ == "__main__":
