@@ -705,20 +705,31 @@ def main(argv):
     """
     Seed a context-specific model from a list of expressed genes, a reference
     """
-    args = parse_args(argv)
-    
-    context_name = args.context_name
-    reference_model = args.modelfile
-    genefile = args.genefile
-    objective = args.objective
-    boundary_rxns_filepath = args.boundary_rxns_filepath
-    exclude_rxns_filepath = args.exclude_rxns_filepath
-    force_rxns_filepath = args.force_rxns_filepath
-    recon_alg = args.algorithm.upper()
-    low_threshold = args.low_threshold
-    high_threshold = args.high_threshold
-    solver = args.solver.upper()
-    output_filetypes = stringlist_to_list(args.output_filetypes)
+    # args = parse_args(argv)
+    # context_name = args.context_name
+    # reference_model = args.modelfile
+    # genefile = args.genefile
+    # objective = args.objective
+    # boundary_rxns_filepath = args.boundary_rxns_filepath
+    # exclude_rxns_filepath = args.exclude_rxns_filepath
+    # force_rxns_filepath = args.force_rxns_filepath
+    # recon_alg = args.algorithm.upper()
+    # low_threshold = args.low_threshold
+    # high_threshold = args.high_threshold
+    # solver = args.solver.upper()
+    # output_filetypes = stringlist_to_list(args.output_filetypes)
+
+    objective_dict = configs.model_creation.objective_dict
+    low_threshold = configs.model_creation.low_threshold
+    high_threshold = configs.model_creation.high_threshold
+    output_filetypes = configs.model_creation.output_filetypes
+    reference_model = configs.model_creation.general_model_file
+    recon_algorithms = configs.model_creation.recon_algorithms
+    solver = configs.model_creation.solver
+    boundary_reactions_filename = configs.model_creation.boundary_reactions_filename
+    force_reactions_filename = configs.model_creation.force_reactions_filename
+    exclude_reactions_filename = configs.model_creation.exclude_reactions_filename
+    configs.model_creation.update(configs, "asdf")
     
     if not os.path.exists(reference_model):
         raise FileNotFoundError(f"Reference model not found at {reference_model}")

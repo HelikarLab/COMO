@@ -44,16 +44,16 @@ merge_distribution = false
 keep_gene_score = true
 
 [model_creation]
+objective_dict = {}
 low_threshold = -5
 high_threshold = -3
 output_filetypes = "xml mat json"
-objective_dict = {}
 general_model_file = "GeneralModelUpdatedV2.mat"
 recon_algorithms = ['IMAT']
 solver = "GUROBI"
 boundary_reactions_filename = "default_boundary_rxns.csv"
 force_reactions_filename = "default_force_rxns.csv"
-exclude_reactions_filename = ""
+exclude_reactions_filename = "None"
 
 [disease_analysis]
 disease_names = ["arthritis", "lupus_a", "lupus_b"]

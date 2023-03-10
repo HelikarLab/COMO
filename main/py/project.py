@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.taxon_ids import TaxonIDs
 
-
 @dataclass
 class general:
     taxon_id: TaxonIDs
@@ -76,6 +75,18 @@ class model_creation:
     force_reactions_filepath: Path
     exclude_reactions_filepath: Path
     recon_algorithms: list[str] = field(default_factory=list[str])
+    zscore_filepath: Path = field(init=False)
+    active_genes_filepath: Path = field(init=False)
+    
+    def update(self, configs, context: str):
+        """
+        This function updates the `self.zscore_filepath` and `self.active_genes_filepath` attributes with "context"
+        """
+        self.zscore_filepath = Path(
+            configs.resultsdir,
+            context,
+            f"model_scores_{context}.csv")
+    
 
 @dataclass
 class disease_analysis:
@@ -109,6 +120,7 @@ class Configs:
         self.datadir = os.path.join(projectdir, "data")
         self.configdir = os.path.join(projectdir, "data", "config_sheets")
         self.outputdir = os.path.join(projectdir, "output")
+        self.resultsdir = os.path.join(projectdir, "results")
         self.pydir = os.path.join(projectdir, "py")
        
         self._toml_data: dict = self._read_from_toml()
@@ -313,12 +325,15 @@ class Configs:
         high_threshold = self._toml_data["model_creation"]["high_threshold"]
         output_filetypes = self._toml_data["model_creation"]["output_filetypes"]
         objective_dict = self._toml_data["model_creation"]["objective_dict"]
-        general_model_file = self._toml_data["model_creation"]["general_model_file"]
+        general_model_file: Path = self._toml_data["model_creation"]["general_model_file"]
         solver = self._toml_data["model_creation"]["solver"]
         boundary_reactions_filepath = self._toml_data["model_creation"]["boundary_reactions_filename"]
         force_reactions_filepath = self._toml_data["model_creation"]["force_reactions_filename"]
         exclude_reactions_filepath = self._toml_data["model_creation"]["exclude_reactions_filename"]
         recon_algorithms = self._toml_data["model_creation"]["recon_algorithms"]
+        
+        if not general_model_file.exists():
+            raise FileNotFoundError(f"The general model file does not exist.\nLooking for: {general_model_file}\nPlease edit `config.toml`")
         
         data: model_creation = model_creation(
             low_threshold=low_threshold,
