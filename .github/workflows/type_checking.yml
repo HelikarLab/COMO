@@ -21,7 +21,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install mypi
 
-    - name: Check for type annotations in new or modified files
+    - name: Run type checking
       run: |
-        git diff --name-only --diff-filter=AMR --cached HEAD | grep "\.py$" | xargs mypy --no-strict-optional --ignore-missing-imports
-    
+        cd $GITHUB_WORKSPACE/main/py
+        mypy --ignore-missing-imports .
