@@ -1,31 +1,33 @@
 """
 This file is the beginning of imlementing a gradient boosting classification algorithm using scikit-learn.
 """
-from pathlib import Path
 
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
+# import gzip
+from pathlib import Path
+from typing import Union
+
+# import pandas as pd
+# import numpy as np
+# import matplotlib.pyplot as plt
 
 import scanpy as sc
 from scanpy import AnnData
 
-import xgboost
 
-import sklearn
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
-
-
-def get_annotated_filtered_dataframe(data_dir: Path | str, debug: bool = False) -> sc.AnnData:
-    if isinstance(data_dir, str):
-        data_dir = Path(data_dir)
+def get_annotated_filtered_dataframe(data: Union[Path, str], debug: bool = False) -> sc.AnnData:
+    if isinstance(data, str):
+        data = Path(data)
 
     # ----- Reading -----
     if debug:
         print("Reading")
-    # adata: AnnData = sc.read_10x_mtx(data_dir, var_names="gene_symbols", cache=True)
-    adata: AnnData = sc.read_10x_h5(data_dir)
+    
+    if data.is_file():
+        if data.suffix == ".h5":
+            adata: AnnData = sc.read_hdf(data, key="matrix")
+    elif data.is_dir():
+        # If a "KeyError" occurs here, unzip the files and read them again. The "features.tsv" file should be named "genes.tsv". Everything else stays the same
+        adata: AnnData = sc.read_10x_mtx(data, cache=True)
 
     # ----- Filtering -----
     if debug:
@@ -77,7 +79,7 @@ def get_annotated_filtered_dataframe(data_dir: Path | str, debug: bool = False) 
 
     # Create clusters
     sc.pp.neighbors(adata)
-    sc.tl.leiden(adata)
+    sc.tl.leiden(adata, resolution=0.8, )
     cluster_names: list[str] = [str(i) for i in range(adata.obs["leiden"].nunique())]
     adata.rename_categories("leiden", cluster_names)
 
@@ -87,12 +89,17 @@ def get_annotated_filtered_dataframe(data_dir: Path | str, debug: bool = False) 
     sc.tl.paga(adata)
     sc.pl.paga(adata, plot=False)
     sc.tl.umap(adata, init_pos="paga")
+    sc.tl.tsne(adata, learning_rate=200)
     sc.tl.rank_genes_groups(adata, groupby="leiden", method="wilcoxon")
-
+    
     return adata
 
 
 def gradient_booster(adata: AnnData):
+    import xgboost
+    import sklearn
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import accuracy_score
 
     # Convert adata.obs["leiden"] to integers
     adata.obs["leiden"] = adata.obs["leiden"].astype(int)
@@ -116,25 +123,22 @@ def gradient_booster(adata: AnnData):
 
 
 def main():
+    print("Starting")
     # Set scanpy verbosity to minimum
     sc.settings.verbosity = 0
-    data_dir: Path = Path("/Users/joshl/PycharmProjects/MADRID/main/py/single_cell/single_cell_data/E-MTAB-9544/naive_filtered_feature_bc_matrix.h5")
-    adata: AnnData = get_annotated_filtered_dataframe(data_dir, debug=True)
-
-    sc.pl.umap(adata, color=["leiden", "CD19"])
-    exit(0)
-
-    # adata_copy = adata.copy()
-    # adata_copy.rename_categories(
-    #     "leiden",
-    #     ['CD4 T', 'CD14 Monocytes', 'B', 'CD8 T', 'NK', 'FCGR3A Monocytes', 'Dendritic', 'Megakaryocytes']
-    # )
-
-    # ----- Gradient Boosting -----
-    gradient_booster(adata)
+    
+    # NCBI aligned data
+    data_dir: Path = Path("/Users/joshl/PycharmProjects/MADRID/main/py/single_cell/single_cell_data/T Cells/GSE121267/GSM3430549")
+    
+    # self-aligned data
+    # data_dir: Path = Path("/Users/joshl/PycharmProjects/MADRID/main/py/single_cell/single_cell_data/CD4 T Cells/GSE203217/GSM6164865")
+    adata: AnnData = get_annotated_filtered_dataframe(data=data_dir, debug=False)
+    sc.pl.rank_genes_groups(adata, n_genes=25, sharey=False)
+    
+    sc.pl.umap(adata, color=["leiden", "CD4"], show=True)
+    sc.pl.tsne(adata, color=["leiden", "CD4"], show=True)
 
     print("DONE")
-
 
 
 if __name__ == '__main__':
