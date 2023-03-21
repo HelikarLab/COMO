@@ -18,4 +18,8 @@ jobs:
 
     - run: pip install --upgrade pip
     - run: pip install mypy
+
+    # Echo "$GITHUB_WORKSPACE" to see what it is
+    - run: echo $GITHUB_WORKSPACE
+    - run: echo $GITHUB_WORKSPACE/main/*.py
     - run: mypy --strict $(git ls-files '$GITHUB_WORKSPACE/main/*.py')
