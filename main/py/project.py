@@ -1,11 +1,9 @@
-#!/usr/bin/python3
-
 import os
 
 
 # find project root dir
 class Configs:
-    def __init__(self, projectdir):
+    def __init__(self, projectdir) -> None:
         self.rootdir = projectdir
         self.datadir = os.path.join(projectdir, "data")
         self.configdir = os.path.join(projectdir, "data", "config_sheets")
@@ -29,4 +27,4 @@ work_dir = os.path.join(*directory_list[0:split_index])
 
 # Add leading "/", as it will not exist right now
 work_dir = os.path.join("/", work_dir)
-configs = Configs(work_dir)
+configs: Configs = Configs(work_dir)

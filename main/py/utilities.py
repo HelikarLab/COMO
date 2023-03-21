@@ -30,7 +30,7 @@ def stringlist_to_list(stringlist: list[str]) -> list[str]:
     return stringlist
 
 @contextlib.contextmanager
-def suppress_stdout():
+def suppress_stdout() -> None:
     with io.StringIO() as buffer:
         try:
             sys.stdout = buffer
