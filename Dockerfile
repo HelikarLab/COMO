@@ -15,7 +15,12 @@ COPY --chown=1000:100 main "${HOME}"/main
 RUN git clone https://github.com/babessell1/cobamp.git \
     && git clone https://github.com/cokelaer/bioservices.git \
     && git clone https://github.com/babessell1/troppo.git \
-    && pip install ./cobamp ./bioservices ./troppo \
+    && pip install ./cobamp \
+    && echo "COBAMP DONE" \
+    && pip install ./bioservices \
+    && echo "BIOSERVICES DONE" \
+    && pip install ./troppo \
+    && echo "TROPPO DONE" \
     && rm -rf cobamp bioservices troppo \
     && pip cache purge
 
@@ -29,7 +34,7 @@ RUN conda config --quiet --add channels conda-forge \
     && wget --quiet --directory-prefix="${HOME}" https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
     && tar -xf "${HOME}/gurobi${GRB_VERSION}_linux64.tar.gz" \
     && rm -f "${HOME}/gurobi${GRB_VERSION}_linux64.tar.gz" \
-    && mv "${HOME}/gurobi*" "${HOME}/gurobi/" \
+    && mv ${HOME}/gurobi* ${HOME}/gurobi \
     && rm -f "${HOME}/environment.yaml" \
     && rm -r "${HOME}/work" \
     && pip cache purge \
