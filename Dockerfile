@@ -2,6 +2,7 @@ FROM jupyter/r-notebook:latest
 
 ARG GRB_SHORT_VERSION=10.0
 ARG GRB_VERSION=10.0.0
+ARG HOME="/home/joyvan"
 
 # Set gurobi environment variables
 ENV GUROBI_HOME "${HOME}/gurobi/linux64"
@@ -10,7 +11,6 @@ ENV LD_LIBRARY_PATH "$LD_LIBRARY_PATH:$GUROBI_HOME/lib"
 
 COPY /environment.yaml "${HOME}/environment.yaml"
 COPY --chown=1000:100 main "${HOME}"/main
-
 
 # Update jupyter notebook configuration
 RUN jupyter trust "${HOME}/main/COMO.ipynb" \
@@ -33,4 +33,4 @@ RUN conda config --quiet --add channels conda-forge \
     && rm -f "${HOME}/environment.yaml" \
     && rm -f gurobi${GRB_VERSION}_linux64.tar.gz
 
-VOLUME /home/joyvan/main
+VOLUME /home/joyvan/main/data/local_files
