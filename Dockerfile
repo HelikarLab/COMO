@@ -14,7 +14,7 @@ COPY --chown=1000:100 main "${HOME}"/main
 
 # Update jupyter notebook configuration
 RUN jupyter trust "${HOME}/main/COMO.ipynb" \
-    echo "c.ServerApp.ip = '0.0.0.0'" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
+    && echo "c.ServerApp.ip = '0.0.0.0'" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
     && echo "c.ServerApp.root_dir = '${HOME}/main'" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
     && echo "c.ServerApp.token = ''" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
     && echo "c.ServerApp.password = ''" >> "${HOME}/.jupyter/jupyter_notebook_config.py"
@@ -30,7 +30,7 @@ RUN conda config --quiet --add channels conda-forge \
     && wget --quiet https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
     && tar -xf gurobi${GRB_VERSION}_linux64.tar.gz \
     && mv -f gurobi* "${HOME}/gurobi" \
-    && rm -rf "${HOME}/environment.yaml" \
+    && rm -f "${HOME}/environment.yaml" \
     && rm -f gurobi${GRB_VERSION}_linux64.tar.gz
 
 VOLUME /home/joyvan/main
