@@ -11,6 +11,19 @@ ENV LD_LIBRARY_PATH "$LD_LIBRARY_PATH:$GUROBI_HOME/lib"
 COPY /environment.yaml "${HOME}/environment.yaml"
 COPY --chown=1000:100 main "${HOME}"/main
 
+# Install cobamp, bioservices, and troppo manually, as problems arose when installing using pip
+RUN git clone https://github.com/babessell1/cobamp.git \
+    && git clone https://github.com/cokelaer/bioservices.git \
+    && git clone https://github.com/babessell1/troppo.git \
+    && cd cobamp \
+    && python setup.py install \
+    && cd ../bioservices \
+    && python setup.py install \
+    && cd ../troppo \
+    && python setup.py install \
+    && cd .. \
+    && rm -rf cobamp bioservices troppo
+
 # Install python-related items
 RUN conda config --quiet --add channels conda-forge \
     && conda config --quiet --add channels bioconda \
@@ -20,11 +33,11 @@ RUN conda config --quiet --add channels conda-forge \
     && mamba clean --quiet --all --force-pkgs-dirs --yes \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
     # Install gurbori \
-    && wget --quiet https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz --output-file="${HOME}/gurobi.tar.gz" \
-    && tar -xf "${HOME}/gurobi.tar.gz" \
-    # && mv -f gurobi* "${HOME}/gurobi" \
+    && wget --quiet --directory-prefix="${HOME}" https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
+    && tar -xf "${HOME}/gurobi${GRB_VERSION}_linux64.tar.gz" \
+    && rm -f "${HOME}/gurobi${GRB_VERSION}_linux64.tar.gz" \
+    && mv "${HOME}/gurobi*" "${HOME}/gurobi/" \
     && rm -f "${HOME}/environment.yaml" \
-    && rm -f "${HOME}/gurobi.tar.gz" \
     && rm -r "${HOME}/work"
 
 # Update jupyter notebook configuration

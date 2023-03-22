@@ -48,13 +48,13 @@ dependencies:
   - scanpy==1.9.1
   - pip==22.1.2
   - pip:
+    - git+https://github.com/babessell1/cobamp.git@master#egg=cobamp
+    - git+https://github.com/cokelaer/bioservices.git@main#egg=bioservices
+    - git+https://github.com/babessell1/troppo.git@master#egg=troppo
     - aioftp==0.21.2
     - python-libsbml==5.19.2
     - optlang==1.5.2
     - cobra==0.25.0
-    - git+https://github.com/babessell1/cobamp.git@master#egg=cobamp
-    - git+https://github.com/cokelaer/bioservices.git@main#egg=bioservices
-    - git+https://github.com/babessell1/troppo.git@master#egg=troppo
     - memote==0.13.0
     - framed==0.5.2
     - pytest==4.6.11
