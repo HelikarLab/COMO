@@ -2,7 +2,6 @@ FROM jupyter/r-notebook:latest
 
 ARG GRB_SHORT_VERSION=10.0
 ARG GRB_VERSION=10.0.0
-# ARG HOME="/home/joyvan"
 
 # Set gurobi environment variables
 ENV GUROBI_HOME "${HOME}/gurobi/linux64"
@@ -16,6 +15,7 @@ COPY --chown=1000:100 main "${HOME}"/main
 RUN conda config --quiet --add channels conda-forge \
     && conda config --quiet --add channels bioconda \
     && conda config --quiet --add channels r \
+    && pip install --upgrade setuptools pip \
     && mamba env update --quiet --name=base --file="${HOME}/environment.yaml" \
     && mamba clean --quiet --all --force-pkgs-dirs --yes \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
