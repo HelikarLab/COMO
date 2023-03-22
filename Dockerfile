@@ -15,14 +15,11 @@ COPY --chown=1000:100 main "${HOME}"/main
 RUN git clone https://github.com/babessell1/cobamp.git \
     && git clone https://github.com/cokelaer/bioservices.git \
     && git clone https://github.com/babessell1/troppo.git \
-    && cd cobamp \
-    && python setup.py install \
-    && cd ../bioservices \
-    && python setup.py install \
-    && cd ../troppo \
-    && python setup.py install \
-    && cd .. \
-    && rm -rf cobamp bioservices troppo
+    && cd cobamp          && python setup.py install --quiet & \
+    && cd ../bioservices  && python setup.py install --quiet & \
+    && cd ../troppo       && python setup.py install --quiet & \
+    && wait \
+    && cd ..              && rm -rf cobamp bioservices troppo
 
 # Install python-related items
 RUN conda config --quiet --add channels conda-forge \
