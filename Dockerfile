@@ -12,13 +12,6 @@ ENV LD_LIBRARY_PATH "$LD_LIBRARY_PATH:$GUROBI_HOME/lib"
 COPY /environment.yaml "${HOME}/environment.yaml"
 COPY --chown=1000:100 main "${HOME}"/main
 
-# Update jupyter notebook configuration
-RUN jupyter trust "${HOME}/main/COMO.ipynb" \
-    && echo "c.ServerApp.ip = '0.0.0.0'" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
-    && echo "c.ServerApp.root_dir = '${HOME}/main'" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
-    && echo "c.ServerApp.token = ''" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
-    && echo "c.ServerApp.password = ''" >> "${HOME}/.jupyter/jupyter_notebook_config.py"
-
 # Install python-related items
 RUN conda config --quiet --add channels conda-forge \
     && conda config --quiet --add channels bioconda \
@@ -33,5 +26,12 @@ RUN conda config --quiet --add channels conda-forge \
     && rm -f "${HOME}/environment.yaml" \
     && rm -f "${HOME}/gurobi.tar.gz" \
     && rm -r "${HOME}/work"
+
+# Update jupyter notebook configuration
+RUN jupyter trust "${HOME}/main/COMO.ipynb" \
+    && echo "c.ServerApp.ip = '0.0.0.0'" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
+    && echo "c.ServerApp.root_dir = '${HOME}/main'" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
+    && echo "c.ServerApp.token = ''" >> "${HOME}/.jupyter/jupyter_notebook_config.py" \
+    && echo "c.ServerApp.password = ''" >> "${HOME}/.jupyter/jupyter_notebook_config.py"
 
 VOLUME /home/joyvan/main/data/local_files
