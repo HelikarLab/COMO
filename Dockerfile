@@ -15,9 +15,7 @@ COPY --chown=1000:100 main "${HOME}"/main
 RUN git clone https://github.com/babessell1/cobamp.git \
     && git clone https://github.com/cokelaer/bioservices.git \
     && git clone https://github.com/babessell1/troppo.git \
-    && pip install ./cobamp \
-    && pip install ./bioservices \
-    && pip install ./troppo \
+    && pip install ./cobamp ./bioservices ./troppo \
     && rm -rf cobamp bioservices troppo \
     && pip cache purge
 
@@ -25,7 +23,7 @@ RUN git clone https://github.com/babessell1/cobamp.git \
 RUN conda config --quiet --add channels conda-forge \
     && conda config --quiet --add channels bioconda \
     && conda config --quiet --add channels r \
-    && mamba env update --quiet --name=base --file="${HOME}/environment.yaml" \
+    && mamba env update --name=base --file="${HOME}/environment.yaml" \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
     # Install gurbori
     && wget --quiet --directory-prefix="${HOME}" https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
