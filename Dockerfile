@@ -27,10 +27,11 @@ RUN conda config --quiet --add channels conda-forge \
     && mamba clean --quiet --all --force-pkgs-dirs --yes \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
     # Install gurbori \
-    && wget --quiet https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
-    && tar -xf gurobi${GRB_VERSION}_linux64.tar.gz \
-    && mv -f gurobi* "${HOME}/gurobi" \
+    && wget --quiet https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz --output-file="${HOME}/gurobi.tar.gz" \
+    && tar -xf "${HOME}/gurobi.tar.gz" \
+    # && mv -f gurobi* "${HOME}/gurobi" \
     && rm -f "${HOME}/environment.yaml" \
-    && rm -f gurobi${GRB_VERSION}_linux64.tar.gz
+    && rm -f "${HOME}/gurobi.tar.gz" \
+    && rm -r "${HOME}/work"
 
 VOLUME /home/joyvan/main/data/local_files
