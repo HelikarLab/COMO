@@ -15,11 +15,12 @@ COPY --chown=1000:100 main "${HOME}"/main
 RUN git clone https://github.com/babessell1/cobamp.git \
     && git clone https://github.com/cokelaer/bioservices.git \
     && git clone https://github.com/babessell1/troppo.git \
-    && cd cobamp          && python setup.py install --quiet & \
-    && cd ../bioservices  && python setup.py install --quiet & \
-    && cd ../troppo       && python setup.py install --quiet & \
-    && wait \
-    && cd ..              && rm -rf cobamp bioservices troppo
+    && pip install ./cobamp \
+    && pip install ./bioservices \
+    && pip install ./troppo \
+    && cd .. \
+    && rm -rf cobamp bioservices troppo \
+    && pip cache purge
 
 # Install python-related items
 RUN conda config --quiet --add channels conda-forge \
@@ -27,15 +28,16 @@ RUN conda config --quiet --add channels conda-forge \
     && conda config --quiet --add channels r \
     && pip install --upgrade setuptools pip \
     && mamba env update --quiet --name=base --file="${HOME}/environment.yaml" \
-    && mamba clean --quiet --all --force-pkgs-dirs --yes \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
-    # Install gurbori \
+    # Install gurbori
     && wget --quiet --directory-prefix="${HOME}" https://packages.gurobi.com/${GRB_SHORT_VERSION}/gurobi${GRB_VERSION}_linux64.tar.gz \
     && tar -xf "${HOME}/gurobi${GRB_VERSION}_linux64.tar.gz" \
     && rm -f "${HOME}/gurobi${GRB_VERSION}_linux64.tar.gz" \
     && mv "${HOME}/gurobi*" "${HOME}/gurobi/" \
     && rm -f "${HOME}/environment.yaml" \
-    && rm -r "${HOME}/work"
+    && rm -r "${HOME}/work" \
+    && pip cache purge \
+    && conda clean --all --yes --force-pkgs-dirs
 
 # Update jupyter notebook configuration
 RUN jupyter trust "${HOME}/main/COMO.ipynb" \
