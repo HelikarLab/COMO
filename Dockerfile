@@ -18,7 +18,6 @@ RUN git clone https://github.com/babessell1/cobamp.git \
     && pip install ./cobamp \
     && pip install ./bioservices \
     && pip install ./troppo \
-    && cd .. \
     && rm -rf cobamp bioservices troppo \
     && pip cache purge
 
