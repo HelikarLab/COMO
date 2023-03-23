@@ -22,13 +22,13 @@ from utilities import stringlist_to_list
 sys.setrecursionlimit(1500)  # for re.search
 
 
-def correct_bracket(rule, name):
+def correct_bracket(rule: str, name: str) -> str:
     """
     Correct GPR rules to format readable by
     """
     rmatch = re.search(r"or|and", rule)
     nmatch = re.search(r"or|and", name)
-    if rmatch is None:
+    if rmatch is None or nmatch is None:
         lrule = rule
         lname = name.strip()
         rrule = ""
@@ -59,7 +59,7 @@ def correct_bracket(rule, name):
     return " ".join([rule_left, operator, rule_right])
 
 
-def gene_rule_logical(expression_in, level=0):
+def gene_rule_logical(expression_in, level: int = 0):
     """
     creates an expression from GPR rule which can be evaluated as true or false
     """
