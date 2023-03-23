@@ -182,7 +182,7 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
         elif inst_name == "agilent":
             input_db: InputDatabase = InputDatabase.AGILENT_ID
 
-        bdnet = database_convert.fetch_gene_info(
+        bdnet = async_bioservices.fetch_gene_info(
             input_values=list(map(str, diff_exp_df["Affy ID"].tolist())),
             input_db=input_db,
             output_db=[OutputDatabase.ENSEMBL_GENE_ID, OutputDatabase.GENE_ID, OutputDatabase.GENE_SYMBOL],
@@ -226,7 +226,7 @@ def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_
     diff_exp_df = ro.conversion.rpy2py(diff_exp_df)
     gse_id = "rnaseq"
 
-    bdnet = database_convert.fetch_gene_info(
+    bdnet = async_bioservices.fetch_gene_info(
         input_values=list(map(str, diff_exp_df["Ensembl"].tolist())),
         input_db=InputDatabase.ENSEMBL_GENE_ID,
         output_db=[OutputDatabase.GENE_ID, OutputDatabase.AFFY_ID, OutputDatabase.GENE_SYMBOL],

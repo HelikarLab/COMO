@@ -1,7 +1,7 @@
 name: Continuous Delivery
 on:
   workflow_dispatch:
-  push:
+  create:
     tags:
       - "*"
 
@@ -48,7 +48,7 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Set up jupyter notebook output cleaning
+      - name: Clearn Jupyter Notebook Outputs
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
@@ -56,9 +56,6 @@ jobs:
         run: |
           python -m pip install --upgrade nbstripout --no-cache-dir
           find $GITHUB_WORKSPACE -name "*.ipynb" -exec nbstripout "{}" \;
-
-      - name: Assert no outputs present in jupyter notebook
-        uses: ResearchSoftwareActions/EnsureCleanNotebooksAction@1.1
 
       # Log into the GitHub Container Registry so we can push the image
       - name: Log in to Container Registry

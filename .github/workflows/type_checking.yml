@@ -1,0 +1,24 @@
+name: Python Type Checking
+
+on:
+  pull_request:
+    types: [ opened, reopened, synchronize ]
+
+jobs:
+  type-check:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.x
+
+    - run: pip install --upgrade pip
+    - run: pip install mypy
+    - run: |
+          cd $GITHUB_WORKSPACE/main
+          mypy --strict --ignore-missing-imports .

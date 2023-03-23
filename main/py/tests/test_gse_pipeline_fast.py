@@ -5,7 +5,6 @@ import sys
 # From: https://stackoverflow.com/a/30536516/13885200
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import GSEpipelineFast
-from fixtures.fixture_main_dir import main_dir
 import project
 
 configs = project.configs
