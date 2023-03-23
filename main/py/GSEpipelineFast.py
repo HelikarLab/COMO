@@ -58,7 +58,7 @@ def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
     delay=30,
             """
 
-            temp = database_convert.fetch_gene_info(
+            temp = async_bioservices.fetch_gene_info(
                 input_values=input_values,
                 input_db=InputDatabase.AGILENT_ID,
                 output_db=[
@@ -232,7 +232,7 @@ class GSEproject:
 
                     outputdf = instruments.readagilent(platformdir, list(self.gsm_platform.keys()))
 
-                    gsm_maps[key] = database_convert.fetch_gene_info(
+                    gsm_maps[key] = async_bioservices.fetch_gene_info(
                         input_values=list(map(str, list(outputdf["ProbeName"]))),
                         input_db=InputDatabase.AGILENT_ID,
                         output_db=[OutputDatabase.GENE_ID]

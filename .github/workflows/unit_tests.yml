@@ -6,7 +6,7 @@ on:
 
 
 jobs:
-    unit_tests:
+    unit-tests:
       runs-on: ubuntu-latest
 
       # Using a matrix lets us define additional versions of Python to test against
