@@ -43,12 +43,12 @@ dependencies:
   - git==2.37.0
   - thermorawfileparser==1.4.0
   - crux-toolkit==4.1
-  - bioservices==1.11.2
   - tqdm==4.64.1
   - scanpy==1.9.1
   - pip==22.1.2
   - pip:
     - aioftp==0.21.2
+    - bioservices==1.11.2
     - python-libsbml==5.19.2
     - optlang==1.5.2
     - cobra==0.25.0
