@@ -43,7 +43,7 @@ dependencies:
   - git==2.37.0
   - thermorawfileparser==1.4.0
   - crux-toolkit==4.1
-  - bioservices==1.10.0
+  - bioservices==1.11.2
   - tqdm==4.64.1
   - scanpy==1.9.1
   - pip==22.1.2
