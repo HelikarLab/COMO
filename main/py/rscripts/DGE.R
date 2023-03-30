@@ -71,40 +71,11 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name) {
   
   tmm <- cpm(dgList)
 
-  tryCatch(
-    expr = {
-      dir.create(
-        file.path(
-          "/home",
-          username,
-          "main",
-          "data",
-          "results",
-          tissue_name,
-          disease_name
-        ),
-        showWarnings = FALSE
-      )
-    },
-    error = function(error) {
-      paste0("Unable to create the directory: ", file.path("/home", username, "main", "data", "results", tissue_name, disease_name))
-      print("Error in DGE Analysis")
-      stop()
-    }
+  dir.create(file.path("/home", username, "main", "data", "results", tissue_name, disease_name),
+             showWarnings = FALSE
   )
-  
-  tryCatch(
-    expr = {
-      write.csv(
-        cbind(ensembl,tmm),
-        file.path("/home", username, "main", "data", "results", tissue_name, disease_name, "TMM_Matrix.csv")
-  )
-    },
-    error = function(error) {
-      paste0("Unable to write the file: ", file.path("/home", username, "main", "data", "results", tissue_name, disease_name, "TMM_Matrix.csv"))
-      print("Error in DGE Analysis")
-      stop()
-    }
+  write.csv(cbind(ensembl,tmm),
+            file.path("/home", username, "main", "data", "results", tissue_name, disease_name, "TMM_Matrix.csv")
   )
 
   # MDS Plot
