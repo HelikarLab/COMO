@@ -14,11 +14,16 @@ class Rpy2:
         self._args = args
         self._kwargs = kwargs
 
-    def call_function(self, r_function_name):
+    def call_function(self, r_function_name, *args, **kwargs):
         """
         Call an R function
         Taken in part from: https://gist.github.com/indraniel/da11c4f79c79b5e6bfb8
         """
+        if self._args == ():  # args is empty
+            self._args = args
+        if self._kwargs == {}:
+            self._kwargs = kwargs
+        
         func_ = rpy2.robjects.packages.SignatureTranslatedAnonymousPackage(self._r_file_read, "func_")
 
         # Dynamically call the func_ function, using the arguments passed in
