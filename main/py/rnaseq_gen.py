@@ -3,7 +3,6 @@
 import os
 import sys
 import pandas as pd
-from rpy2.robjects.packages import importr
 from rpy2.robjects import pandas2ri
 from project import configs
 import argparse
@@ -106,8 +105,8 @@ def handle_context_batch(
         gene_info_filepath = os.path.join(configs.datadir, "gene_info.csv")
         
         os.makedirs(os.path.dirname(rnaseq_output_filepath), exist_ok=True)
-        print(f"Gene info:          {gene_info_filepath}")
-        print(f"Count matrix:       {rnaseq_input_filepath}")
+        print(f"Gene info:    {gene_info_filepath}")
+        print(f"Count matrix: {rnaseq_input_filepath}")
         
         rpy2_api.Rpy2(
             r_file_path=r_file_path,
