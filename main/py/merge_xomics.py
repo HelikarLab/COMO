@@ -212,7 +212,6 @@ def handle_context_batch(
         print(", ", end="")
     print("\b\b")
     
-    
     dict_list = {}
 
     max_inputs = max(counts.values())
@@ -462,7 +461,6 @@ def main(argv):
         dest="pweight",
         help="Proteomics weight for merging z-score distribution",
     )
-
 
     args = parser.parse_args(argv)
 
