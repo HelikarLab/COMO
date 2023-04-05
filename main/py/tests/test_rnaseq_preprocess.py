@@ -17,7 +17,7 @@ import rnaseq_preprocess
         ["-n", "dimNK brightNK", "--gene-format", "SYMBOL", "--taxon-id", "human", "--provide-matrix", "--matrix", "COMO_input/counts_matrix.tsv"],
     ]
 )
-def test_arg_input(args):
+def test_arg_input(args: list[str]):
     """
     This function asserts that the arguments passed into the function are correct
     """
