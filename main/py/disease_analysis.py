@@ -2,16 +2,10 @@
 import argparse
 import sys
 import json
-import os
-import pandas as pd
-import numpy as np
 from project import configs
-import GSEpipelineFast
 import rpy2_api
 import GSEpipelineFast
 
-from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
-from rpy2.robjects.packages import importr
 from rpy2.robjects import pandas2ri
 import rpy2.robjects as ro
 
@@ -166,10 +160,11 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
             diff_exp_df = affy_function(raw_dir, target_path)
             # diff_exp_df = affyio.fitaffydir(raw_dir, target_path)
         elif inst_name == "agilent":
-            diff_exp_df = agilentio.fitagilent(raw_dir, target_path)
+            diff_exp_df = agilentio.call_function("fitagilent", raw_dir, target_path)
+            # diff_exp_df = agilentio.fitagilent(raw_dir, target_path)
         diff_exp_df = ro.conversion.rpy2py(diff_exp_df)
         diff_exp_df.reset_index(inplace=True)
-        diff_exp_df = diff_exp_df.rename(columns = {'index':'Affy ID'})
+        diff_exp_df = diff_exp_df.rename(columns={'index': 'Affy ID'})
         print(diff_exp_df)
         print(type(diff_exp_df))
         data_top = diff_exp_df.head()
@@ -222,7 +217,7 @@ def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_
               f"with the correct name.")
         sys.exit()
 
-    diff_exp_df = DGEio.DGE_main(count_matrix_path, config_filepath, context_name, disease_name)
+    diff_exp_df = DGEio.call_function("DGE_main", count_matrix_path, config_filepath, context_name, disease_name)
     diff_exp_df = ro.conversion.rpy2py(diff_exp_df)
     gse_id = "rnaseq"
 
