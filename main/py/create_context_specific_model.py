@@ -204,26 +204,17 @@ def feasibility_test(
     else:
         pass
     
-    print(f"{type(incon_rxns[0])=}")
-    print(f"{type(model_cobra_rm)=}")
-    
     return incon_rxns, model_cobra_rm
 
 
 def seed_gimme(
     cobra_model: cobra.Model,
-    s_matrix,
-    lb,
-    ub,
-    idx_objective,
-    expr_vector
+    s_matrix: np.ndarray,
+    lb: list[float],
+    ub: list[float],
+    idx_objective: int,
+    expr_vector: np.ndarray
 ) -> cobra.Model:
-    items = [s_matrix, lb, ub, idx_objective, expr_vector]
-    for i in items:
-        print(f"{type(i)=}")
-        if isinstance(i, list):
-            print(f"{type(i[0])=}")
-    
     # `Becker and Palsson (2008). Context-specific metabolic networks are
     # consistent with experiments. PLoS Comput. Biol. 4, e1000082.`
     properties = GIMMEProperties(
@@ -249,7 +240,14 @@ def seed_gimme(
     return context_cobra_model
 
 
-def seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
+def seed_fastcore(
+    cobra_model: cobra.Model,
+    s_matrix: np.ndarray,
+    lb: list[float],
+    ub: list[float],
+    exp_idx_list: list[int],
+    solver: str
+) -> cobra.Model:
     # 'Vlassis, Pacheco, Sauter (2014). Fast reconstruction of compact
     # context-specific metabolic network models. PLoS Comput. Biol. 10,
     # e1003424.'
