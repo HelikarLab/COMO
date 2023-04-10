@@ -2,19 +2,51 @@
 import os
 import re
 import sys
-import copy
 import cobra
 import argparse
 import numpy as np
 import pandas as pd
 from pathlib import Path
-import cobra.flux_analysis
+import multiprocessing.pool
+import multiprocessing as mp
+from multiprocessing.sharedctypes import Synchronized
 
 from project import configs
 from utilities import suppress_stdout
 from async_bioservices import async_bioservices
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.output_database import OutputDatabase
+
+def _perform_knockout(
+    spacer: str,
+    total_knockouts: int,
+    model: cobra.Model,
+    gene_id: str,
+    reference_solution,
+) -> tuple[str, pd.DataFrame]:
+    """
+    This function will perform a single gene knockout. It will be used in multiprocessing
+    """
+    model_copy = model.copy()
+    gene: cobra.Gene = model_copy.genes.get_by_id(gene_id)
+    gene.knock_out()
+    
+    optimized_model: pd.DataFrame = cobra.flux_analysis.moma(
+        model_copy,
+        solution=reference_solution,
+        linear=False
+    ).to_frame()
+    
+    count_progress.acquire()
+    count_progress.value += 1
+    print(f"({count_progress.value:{spacer}d} of {total_knockouts}) Finished knock-out simulation for gene ID: {int(gene_id):6d}")
+    count_progress.release()
+    
+    return gene_id, optimized_model["fluxes"]
+
+def initialize_pool(synchronizer):
+    global count_progress
+    count_progress = synchronizer
 
 def knock_out_simulation(
         model: cobra.Model,
@@ -24,6 +56,7 @@ def knock_out_simulation(
         test_all: bool,
         pars_flag: bool
 ):
+    reference_solution: cobra.Solution
     if reference_flux_filepath is not None:
         try:
             reference_flux_df: pd.DataFrame = pd.read_csv(reference_flux_filepath)
@@ -60,9 +93,9 @@ def knock_out_simulation(
     
     gene_ind2genes = [x.id for x in model.genes]
     gene_ind2genes = set(gene_ind2genes)
-    print(f"{len(gene_ind2genes)} total genes in model.")
+    print(f"{len(gene_ind2genes)} genes in model")
     DT_model = list(set(DT_genes["Gene ID"].tolist()).intersection(gene_ind2genes))
-    print(f"{len(DT_model)} drug target genes in model")
+    print(f"{len(DT_model)} genes can be targeted by drugs")
     
     model_opt = cobra.flux_analysis.moma(model, solution=reference_solution, linear=False).to_frame()
     model_opt[abs(model_opt) < 1e-8] = 0.0
@@ -85,7 +118,6 @@ def knock_out_simulation(
             if not eval(gene_reaction_rule) or test_all:
                 genes_with_metabolic_effects.append(id_)
                 break
-    print(f"{len(genes_with_metabolic_effects)} drug target genes with metabolic effects in model")
     
     """
     Get the number of characters in the length of the number of genes
@@ -94,19 +126,46 @@ def knock_out_simulation(
         "2" for len(has_effects_gene) = 10 to 99
         "3" for len(has_effects_gene) = 100 to 999
     """
+    # Initialize the processing pool with a counter
+    # From: https://stackoverflow.com/questions/69907453Up
+    synchronizer = mp.Value("i", 0)
+    
+    # Require at least one core
+    num_cores: int = max(1, mp.cpu_count() - 2)
+    pool: mp.Pool = mp.Pool(num_cores, initializer=initialize_pool, initargs=(synchronizer,))
+    
     spacer: int = len(str(len(genes_with_metabolic_effects)))
-    flux_solution = pd.DataFrame()
-    for i, id_ in enumerate(genes_with_metabolic_effects):
-        # pretty-print results using spacer and length of has_effects_gene
-        print(
-            f"({i + 1:{spacer}d} of {len(genes_with_metabolic_effects)}) Peforming knock-out simulation for gene ID: {int(id_):6d}")
-        with suppress_stdout():
-            model_cp = copy.deepcopy(model)  # using model_opt instead bc it makes more sense?
-            gene = model_cp.genes.get_by_id(id_)
-            gene.knock_out()
-            opt_model = cobra.flux_analysis.moma(model_cp, solution=reference_solution, linear=False).to_frame()
-            flux_solution[id_] = opt_model["fluxes"]
-            del model_cp
+    flux_solution: pd.DataFrame = pd.DataFrame()
+    
+    print(f"Found {len(genes_with_metabolic_effects)} genes with potentially-significant metabolic impacts\n")
+    import time
+    start = time.time()
+    
+    output: list[mp.pool.ApplyResult] = []
+    for id_ in genes_with_metabolic_effects:
+        output.append(
+            pool.apply_async(
+                _perform_knockout,
+                kwds={
+                    "spacer": spacer,
+                    "total_knockouts": len(genes_with_metabolic_effects),
+                    "model": model,
+                    "gene_id": id_,
+                    "reference_solution": reference_solution,
+                }
+            )
+        )
+    pool.close()
+    pool.join()
+    
+    gene_id: str
+    knock_out_flux: pd.Series
+    for result in output:
+        gene_id, knock_out_flux = result.get()
+        flux_solution[gene_id] = knock_out_flux
+    
+    end = time.time()
+    print(f"Time elapsed: {end - start} seconds (multi core)")
     
     # flux_solution
     flux_solution[abs(flux_solution) < 1e-8] = 0.0
@@ -154,14 +213,15 @@ def create_gene_pairs(
     gene_df = pd.DataFrame(gene_i, columns=["Gene IDs"], index=DAG_dis_met_rxn_ind)
     # gene_df
     
-    dag_rxn_flux_ratio = flux_solution_ratios.loc[DAG_dis_met_rxn_ind]
-    dag_rxn_flux_diffs = flux_solution_diffs.loc[DAG_dis_met_rxn_ind]
-    dag_rxn_flux_value = flux_solution.loc[DAG_dis_met_rxn_ind]
+    dag_rxn_flux_ratio: pd.DataFrame = flux_solution_ratios.loc[DAG_dis_met_rxn_ind]
+    dag_rxn_flux_diffs: pd.DataFrame = flux_solution_diffs.loc[DAG_dis_met_rxn_ind]
+    dag_rxn_flux_value: pd.DataFrame = flux_solution.loc[DAG_dis_met_rxn_ind]
     # dag_rxn_flux_ratio
     
     gene_mat_out = []
     # gene_i = DAG_dis_met_genes
     # Rind_i = DAG_dis_met_rxn_ind
+    
     for id_ in has_effects_gene:
         pegene = pd.DataFrame()
         pegene["Gene IDs"] = gene_df["Gene IDs"].copy()
