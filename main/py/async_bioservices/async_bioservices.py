@@ -134,8 +134,9 @@ def fetch_gene_info(
     event_loop.close()  # Close the event loop to free resources
 
     # Loop over database_convert to concat them into dataframe_maps
+    print("")
     for i, df in enumerate(database_convert):
-        print(f"\rConcatenating dataframes... {i + 1} of {len(database_convert)}", end="")
+        print(f"Concatenating dataframes... {i + 1} of {len(database_convert)}" + " " * 50, end="\r")
         dataframe_maps = pd.concat([dataframe_maps, df], sort=False)
     print("")
     return dataframe_maps
