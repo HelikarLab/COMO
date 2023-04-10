@@ -11,7 +11,7 @@ from instruments import AffyIO
 
 
 # Input: Extract Gene Info from GEO DataSets
-def load_gse_soft(name="GSE2770"):
+def load_gse_soft(name: str = "GSE2770"):
     """
     Read GSE information from local soft file, otherwise read online.
     :param name: name of gse
@@ -49,7 +49,7 @@ def get_platform_probe(gse):
     return celformat
 
 
-def download_gsm_id_maps(datadir, gse, platforms: list[str] = None):
+def download_gsm_id_maps(datadir: str, gse, platforms: list[str] = None) -> dict:
     """
     download ID to ENTREZ_GENE_ID maps, create a csv file for each platform, and return dictionary
     :param gse: gse object

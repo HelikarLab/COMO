@@ -1,6 +1,7 @@
 import io
 import contextlib
 import sys
+from typing import Iterator
 
 
 def stringlist_to_list(stringlist: list[str]) -> list[str]:
@@ -30,7 +31,7 @@ def stringlist_to_list(stringlist: list[str]) -> list[str]:
     return stringlist
 
 @contextlib.contextmanager
-def suppress_stdout() -> None:
+def suppress_stdout() -> Iterator[None]:
     with io.StringIO() as buffer:
         try:
             sys.stdout = buffer

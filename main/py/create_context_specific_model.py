@@ -22,13 +22,13 @@ from utilities import stringlist_to_list
 sys.setrecursionlimit(1500)  # for re.search
 
 
-def correct_bracket(rule, name):
+def correct_bracket(rule: str, name: str) -> str:
     """
     Correct GPR rules to format readable by
     """
     rmatch = re.search(r"or|and", rule)
     nmatch = re.search(r"or|and", name)
-    if rmatch is None:
+    if rmatch is None or nmatch is None:
         lrule = rule
         lname = name.strip()
         rrule = ""
@@ -59,7 +59,7 @@ def correct_bracket(rule, name):
     return " ".join([rule_left, operator, rule_right])
 
 
-def gene_rule_logical(expression_in, level=0):
+def gene_rule_logical(expression_in: str, level: int = 0) -> str:
     """
     creates an expression from GPR rule which can be evaluated as true or false
     """
@@ -100,7 +100,7 @@ def gene_rule_logical(expression_in, level=0):
     return expression_out
 
 
-def gene_rule_evaluable(expression_in):
+def gene_rule_evaluable(expression_in: str) -> str:
     """
     Make expression rule evaluable
     """
@@ -111,7 +111,7 @@ def gene_rule_evaluable(expression_in):
     return gene_reaction_by_rule
 
 
-def set_boundaries(model_cobra, bound_rxns, bound_lb, bound_ub):
+def set_boundaries(model_cobra: cobra.Model, bound_rxns: list, bound_lb, bound_ub) -> tuple[cobra.Model, list]:
     all_rxns = model_cobra.reactions  # get all reactions
     bound_rm_rxns = []
     
@@ -157,7 +157,7 @@ def set_boundaries(model_cobra, bound_rxns, bound_lb, bound_ub):
     return model_cobra, bound_rm_rxns
 
 
-def feasibility_test(model_cobra, step):
+def feasibility_test(model_cobra: cobra.Model, step: str):
     # check number of unsolvable reactions for reference model under media assumptions
     model_cobra_rm = cobra.flux_analysis.fastcc(model_cobra, flux_threshold=15,
                                                 zero_cutoff=1e-7)  # create flux consistant model (rmemoves some reactions)
