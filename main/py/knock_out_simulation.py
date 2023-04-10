@@ -528,7 +528,8 @@ def main(argv):
         disease_genes=disease_up_file,
     )
     gene_pairs_up.to_csv(os.path.join(output_dir, f"{context}_Gene_Pairs_Inhi_Fratio_UP.txt"), index=False)
-    d_score_down = score_gene_pairs(gene_pairs_down, os.path.join(output_dir, f"{context}_d_score_DOWN.csv"), input_reg="down")
+    d_score_down = score_gene_pairs(gene_pairs_down, os.path.join(output_dir, f"{context}_d_score_DOWN.csv"),
+                                    input_reg="down")
     d_score_up = score_gene_pairs(gene_pairs_up, os.path.join(output_dir, f"{context}_d_score_UP.csv"), input_reg="up")
     pertubation_effect_score = (d_score_up + d_score_down).sort_values(by="score", ascending=False)
     pertubation_effect_score.to_csv(os.path.join(output_dir, f"{context}_d_score.csv"))
