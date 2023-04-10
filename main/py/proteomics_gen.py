@@ -7,17 +7,9 @@ import pandas as pd
 import numpy as np
 import instruments
 from project import configs
-from rpy2.robjects.packages import importr
-from rpy2.robjects import pandas2ri
 from pathlib import Path
 
 import rpy2_api
-
-pandas2ri.activate()
-
-# import R libraries
-tidyverse = importr("tidyverse")
-ggplot = importr("ggplot2")
 
 # read and translate R functions
 # f = open(os.path.join(configs.rootdir, "py", "rscripts", "protein_transform.R"), "r")
