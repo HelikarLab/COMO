@@ -1,16 +1,10 @@
 import asyncio
-from bioservices import BioDBNet
 import pandas as pd
+from bioservices import BioDBNet
 
-try:
-    from .input_database import InputDatabase
-    from .output_database import OutputDatabase
-    from .taxon_ids import TaxonIDs
-except ImportError:
-    from input_database import InputDatabase
-    from output_database import OutputDatabase
-    from taxon_ids import TaxonIDs
-
+from input_database import InputDatabase
+from output_database import OutputDatabase
+from taxon_ids import TaxonIDs
 
 async def _async_fetch_info(
         biodbnet: BioDBNet,
@@ -21,7 +15,7 @@ async def _async_fetch_info(
         output_db: list[str],
         taxon_id: int,
         delay: int = 10
-):
+) -> pd.DataFrame:
     await semaphore.acquire()
     conversion = await asyncio.to_thread(
         biodbnet.db2db,
@@ -49,17 +43,17 @@ async def _async_fetch_info(
             second_set, input_db, output_db,
             taxon_id, delay,
         )
-        conversion: pd.DataFrame = pd.concat([first_conversion, second_conversion])
+        return pd.concat([first_conversion, second_conversion])
         
     return conversion
 
 
-async def _fetch_gene_info_manager(tasks: list[asyncio.Task], batch_length: int) -> list[pd.DataFrame]:
+async def _fetch_gene_info_manager(tasks: list[asyncio.Task[pd.DataFrame]], batch_length: int) -> list[pd.DataFrame]:
     results: list[pd.DataFrame] = []
 
     print("Collecting genes... ", end="")
     
-    task: asyncio.Task
+    task: asyncio.Future[pd.DataFrame]
     for i, task in enumerate(asyncio.as_completed(tasks)):
         results.append(await task)
         print(f"\rCollecting genes... {i * batch_length} of ~{len(tasks) * batch_length} finished", end="")
@@ -86,16 +80,17 @@ def fetch_gene_info(
     
     input_db_value = input_db.value
     batch_length: int = 100
+    output_db_values: list[str]
     if output_db is None:
-        output_db: list = [
+        output_db_values = [
             OutputDatabase.GENE_SYMBOL.value,
             OutputDatabase.GENE_ID.value,
             OutputDatabase.CHROMOSOMAL_LOCATION.value
         ]
     elif isinstance(output_db, OutputDatabase):
-        output_db: list = [output_db.value]
+        output_db_values = [output_db.value]
     else:
-        output_db: list = [i.value for i in output_db]
+        output_db_values = [str(i.value) for i in output_db]
 
     if type(taxon_id) == TaxonIDs:
         taxon_id_value = taxon_id.value
@@ -121,7 +116,7 @@ def fetch_gene_info(
                 semaphore=semaphore,
                 input_values=input_values[i:upper_range],
                 input_db=input_db_value,
-                output_db=output_db,
+                output_db=output_db_values,
                 taxon_id=taxon_id_value,
                 delay=delay,
                 event_loop=event_loop
@@ -134,8 +129,9 @@ def fetch_gene_info(
     event_loop.close()  # Close the event loop to free resources
 
     # Loop over database_convert to concat them into dataframe_maps
+    print("")
     for i, df in enumerate(database_convert):
-        print(f"\rConcatenating dataframes... {i + 1} of {len(database_convert)}", end="")
+        print(f"Concatenating dataframes... {i + 1} of {len(database_convert)}" + " " * 50, end="\r")
         dataframe_maps = pd.concat([dataframe_maps, df], sort=False)
     print("")
     return dataframe_maps

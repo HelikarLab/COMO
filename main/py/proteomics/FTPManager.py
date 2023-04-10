@@ -16,7 +16,13 @@ import typing
 from urllib.parse import urlparse
 
 
-async def aioftp_client(host: str, username: str = "anonymous", password: str = "guest", port: int = 21, max_attempts: int = 3) -> aioftp.Client:
+async def aioftp_client(
+        host: str,
+        username: str = "anonymous",
+        password: str = "guest",
+        port: int = 21,
+        max_attempts: int = 3
+) -> aioftp.Client:
     """
     This class is responsible for creating a "client" connection
     """
@@ -48,7 +54,15 @@ async def aioftp_client(host: str, username: str = "anonymous", password: str = 
 
 
 class Reader:
-    def __init__(self, root_link: str, file_extensions: list[str], max_attempts: int = 3, port: int = 21, user: str = "anonymous", passwd: str = "guest"):
+    def __init__(
+            self,
+            root_link: str,
+            file_extensions: list[str],
+            max_attempts: int = 3,
+            port: int = 21,
+            user: str = "anonymous",
+            passwd: str = "guest"
+    ) -> None:
         """
         This class is responsible for reading data about root FTP links
         """
@@ -64,7 +78,7 @@ class Reader:
         
         self._get_info_wrapper()
 
-    def _get_info_wrapper(self):
+    def _get_info_wrapper(self) -> None:
         event_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(event_loop)
         async_tasks = [self._get_info()]
@@ -72,15 +86,29 @@ class Reader:
         event_loop.run_until_complete(asyncio.wait(async_tasks))
         event_loop.close()
 
-    async def _get_info(self):
+    async def _get_info(self) -> None:
         """
         This function is responsible for getting all files under the root_link
         """
-        scheme: str = urlparse(self._root_link).scheme
-        host = urlparse(self._root_link).hostname
-        folder = urlparse(self._root_link).path
+        url_parse = urlparse(self._root_link)
+        
+        scheme: str
+        host: str
+        folder: str
+        if url_parse.scheme != "":
+            scheme = url_parse.scheme
+        else:
+            scheme = ""
+        if url_parse.hostname is not None:
+            host = url_parse.hostname
+        else:
+            raise ValueError(f"Unable to identify hostname from url: {self._root_link}")
+        if url_parse.path != "":
+            folder = url_parse.path
+        else:
+            raise ValueError(f"Unable to identify folder or path from url: {self._root_link}")
 
-        client = await aioftp_client(host)
+        client = await aioftp_client(host=host)
         for path, info in (await client.list(folder, recursive=True)):
             if str(path).endswith(tuple(self._extensions)):
                 download_url: str = f"{scheme}://{host}{path}"
@@ -89,15 +117,21 @@ class Reader:
 
     @property
     def files(self) -> typing.Iterator[str]:
-        yield self._files
+        for file in self._files:
+            yield file
+        return self._files
 
     @property
     def file_names(self) -> typing.Iterator[str]:
-        yield from [file.split("/")[-1] for file in self._files]
+        for file in self._files:
+            yield file.split("/")[-1]
+        # yield from [file.split("/")[-1] for file in self._files]
 
     @property
-    def file_sizes(self) -> typing.Iterable[str]:
-        yield self._file_sizes
+    def file_sizes(self) -> typing.Iterable[int]:
+        for file in self._file_sizes:
+            yield file
+        # yield self._file_sizes
 
 
 class Download:
@@ -105,19 +139,19 @@ class Download:
         self,
         file_information: list[FileInformation],
         core_count: int = 1,
-    ):
+    ) -> None:
         """
         This function is responsible for downloading items from the FTP urls passed into it
         """
         self._file_information: list[FileInformation] = file_information
         self._core_count: int = min(core_count, 2)  # Limit to 2 downloads at a time
-        self._download_counter: Synchronized = multiprocessing.Value("i", 1)
+        self._download_counter: Synchronized = Synchronized(multiprocessing.Value("i", 1))
         self._semaphore = asyncio.Semaphore(self._core_count)
 
         # Find files to download
         self._download_data_wrapper()
-
-    def _download_data_wrapper(self):
+        
+    def _download_data_wrapper(self) -> None:
         """
         This function is responsible for "kicking off" asynchronous data downloading
         """
@@ -138,12 +172,29 @@ class Download:
         event_loop.run_until_complete(asyncio.wait(async_tasks))
         event_loop.close()
 
-    async def _aioftp_download_data(self, file_information: FileInformation, semaphore: asyncio.Semaphore) -> None:
-
-        # Define FTP-related variables
-        parsed_url = urlparse(file_information.download_url)
-        host = parsed_url.hostname
-        path = parsed_url.path
+    async def _aioftp_download_data(
+            self,
+            file_information: FileInformation,
+            semaphore: asyncio.Semaphore
+    ) -> None:
+        
+        url_parse = urlparse(file_information.download_url)
+        
+        scheme: str
+        host: str
+        folder: str
+        if url_parse.scheme != "":
+            scheme = url_parse.scheme
+        else:
+            scheme = ""
+        if url_parse.hostname is not None:
+            host = url_parse.hostname
+        else:
+            raise ValueError(f"Unable to identify hostname from url: {file_information.download_url}")
+        if url_parse.path != "":
+            folder = url_parse.path
+        else:
+            raise ValueError(f"Unable to identify folder or path from url: {file_information.download_url}")
 
         # Convert file size from byte to MB
         size_mb: int = round(file_information.file_size / (1024 ** 2))
@@ -157,7 +208,7 @@ class Download:
             self._download_counter.release()
 
             # Download file, use "write_into" to write to a file, not a directory
-            await client.download(source=path, destination=file_information.raw_file_path, write_into=True)
+            await client.download(source=folder, destination=file_information.raw_file_path, write_into=True)
 
         await client.quit()
 

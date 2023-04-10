@@ -14,7 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import project
 
 
-def clear_print(message: str, end: str = "\033[K\r", flush: bool = True):
+def clear_print(message: str, end: str = "\033[K\r", flush: bool = True) -> None:
     """
     Pass in your message exactly as you would like it printed, and this function will clear the screen and print it.
     """
@@ -30,24 +30,26 @@ class FileInformation:
     def __init__(
         self,
         cell_type: str,
-        download_url: str = None,
-        study: int | str = None,
-        raw_path: Path = None,
-        intensity_csv: Path = None,
-        mzml_path: Path = None,
-        sqt_path: Path = None,
-        file_size: int = None,
-    ):
+        download_url: str | None = None,
+        study: int | str | None = None,
+        raw_path: Path | None = None,
+        intensity_csv: Path | None = None,
+        mzml_path: Path | None = None,
+        sqt_path: Path | None = None,
+        file_size: int | None = None,
+    ) -> None:
         # File information
         self.cell_type: str = cell_type
         self.download_url: str = download_url
         self.file_size: int = file_size
         
         # Must check for "None", as we are unable to do study[0] on a None object
-        if study is not None and study[0] == "S":
+        if isinstance(study, str):
             self.study: str = study
-        else:
+        elif isinstance(study, int):
             self.study: str = f"S{study}"
+        else:
+            self.study: str = ""
         self.replicate: str = ""
         self.batch: str = f"{study}"
 

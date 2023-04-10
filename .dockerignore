@@ -11,6 +11,6 @@
 /docker_old/*
 /docs
 /main/output
-/main/py/rlogs
+/main/py/rlogs/*
 /main/py/tests
 ~$*
