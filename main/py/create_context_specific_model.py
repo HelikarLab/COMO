@@ -111,9 +111,13 @@ def gene_rule_evaluable(expression_in: str) -> str:
     return gene_reaction_by_rule
 
 
-def set_boundaries(model_cobra: cobra.Model, bound_rxns: list, bound_lb, bound_ub) -> tuple[cobra.Model, list]:
+def set_boundaries(
+    model_cobra: cobra.Model,
+    bound_rxns: list[str],
+    bound_lb: list[int],
+    bound_ub: list[int]
+) -> cobra.Model:
     all_rxns = model_cobra.reactions  # get all reactions
-    bound_rm_rxns = []
     
     # get boundary reactions
     exchange_rxns = [rxn.id for rxn in all_rxns if re.search("EX_", rxn.id)]
@@ -154,13 +158,20 @@ def set_boundaries(model_cobra: cobra.Model, bound_rxns: list, bound_lb, bound_u
             medium[rxn] = -float(bound_lb[bound_rxns.index(rxn)])
     model_cobra.medium = medium  # set new media
         
-    return model_cobra, bound_rm_rxns
+    return model_cobra
 
 
-def feasibility_test(model_cobra: cobra.Model, step: str):
+def feasibility_test(
+    model_cobra: cobra.Model,
+    step: str
+) -> tuple[set[str], cobra.Model]:
     # check number of unsolvable reactions for reference model under media assumptions
-    model_cobra_rm = cobra.flux_analysis.fastcc(model_cobra, flux_threshold=15,
-                                                zero_cutoff=1e-7)  # create flux consistant model (rmemoves some reactions)
+    # create flux consistant model (rmemoves some reactions)
+    model_cobra_rm = cobra.flux_analysis.fastcc(
+        model_cobra,
+        flux_threshold=15,
+        zero_cutoff=1e-7
+    )
     incon_rxns = set(model_cobra.reactions.list_attr("id")) - set(model_cobra_rm.reactions.list_attr("id"))
     incon_rxns_cnt = len(incon_rxns)
     
@@ -193,10 +204,26 @@ def feasibility_test(model_cobra: cobra.Model, step: str):
     else:
         pass
     
+    print(f"{type(incon_rxns[0])=}")
+    print(f"{type(model_cobra_rm)=}")
+    
     return incon_rxns, model_cobra_rm
 
 
-def seed_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
+def seed_gimme(
+    cobra_model: cobra.Model,
+    s_matrix,
+    lb,
+    ub,
+    idx_objective,
+    expr_vector
+) -> cobra.Model:
+    items = [s_matrix, lb, ub, idx_objective, expr_vector]
+    for i in items:
+        print(f"{type(i)=}")
+        if isinstance(i, list):
+            print(f"{type(i[0])=}")
+    
     # `Becker and Palsson (2008). Context-specific metabolic networks are
     # consistent with experiments. PLoS Comput. Biol. 4, e1000082.`
     properties = GIMMEProperties(
@@ -402,11 +429,11 @@ def create_context_specific_model(
         objective,
         exclude_rxns,
         force_rxns,
-        bound_rxns,
-        bound_lb,
-        bound_ub,
-        solver,
-        context_name,
+        bound_rxns: list[str],
+        bound_lb: list[int],
+        bound_ub: list[int],
+        solver: str,
+        context_name: str,
         low_thresh,
         high_thresh
 ):
@@ -431,7 +458,7 @@ def create_context_specific_model(
         force_rxns.append(objective)
     
     # set boundaries
-    cobra_model, bound_rm_rxns = set_boundaries(
+    cobra_model = set_boundaries(
         cobra_model, bound_rxns, bound_lb, bound_ub
     )
     
@@ -729,8 +756,8 @@ def main(argv):
     print(f"Active genes file found at {genefile}")
 
     bound_rxns = []
-    bound_ub = []
-    bound_lb = []
+    lower_bound = []
+    upper_bound = []
     
     if boundary_rxns_filepath:
         boundary_rxns_filepath: Path = Path(boundary_rxns_filepath)
@@ -881,7 +908,8 @@ def main(argv):
         objective,
         exclude_rxns,
         force_rxns,
-        bound_rxns,
+        # bound_rxns,
+        reaction_formula,
         lower_bound,
         upper_bound,
         solver,
