@@ -3,7 +3,7 @@ import os
 
 # find project root dir
 class Configs:
-    def __init__(self, projectdir) -> None:
+    def __init__(self, projectdir: str) -> None:
         self.rootdir = projectdir
         self.datadir = os.path.join(projectdir, "data")
         self.configdir = os.path.join(projectdir, "data", "config_sheets")

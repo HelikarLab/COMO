@@ -20,7 +20,7 @@ class TestCrux:
 
 
 class TestFileInformation:
-    def test_creating_instances(self, tmp_path):
+    def test_creating_instances(self, tmp_path: str):
         """
         This is an example instance. If anything is incorrectly changed in the FileInformation class, this test will fail.
         """
