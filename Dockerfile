@@ -16,11 +16,9 @@ RUN git clone https://github.com/babessell1/cobamp.git \
     && git clone https://github.com/babessell1/troppo.git \
     && pip install ./cobamp \
     && echo "COBAMP DONE" \
-    && pip install ./bioservices \
-    && echo "BIOSERVICES DONE" \
     && pip install ./troppo \
     && echo "TROPPO DONE" \
-    && rm -rf cobamp bioservices troppo \
+    && rm -rf cobamp troppo \
     && pip cache purge
 
 # Install python-related items
