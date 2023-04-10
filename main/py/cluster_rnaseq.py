@@ -27,7 +27,7 @@ r_file_path = Path(configs.rootdir, "py", "rscripts", "cluster_samples.R")
 # cluster_io = SignatureTranslatedAnonymousPackage(string, "cluster_io")
 
 
-def main(argv):
+def main(argv: list[str]) -> None:
     """
     Cluster RNA-seq Data
     """
