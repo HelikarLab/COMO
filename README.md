@@ -1,7 +1,7 @@
 # COMO: Constraint-based Optimizations of Metabolic Objectives 
 
-[![Continuous Integration](https://github.com/HelikarLab/COMO/actions/workflows/dockerhub.yml/badge.svg)](https://github.com/HelikarLab/COMO/actions/workflows/dockerhub.yml)
-[![Unit Tests](https://github.com/HelikarLab/COMO/actions/workflows/unit_tests.yml/badge.svg?branch=master&event=pull_request)](https://github.com/HelikarLab/COMO/actions/workflows/unit_tests.yml)
+[![Continuous Delivery](https://github.com/HelikarLab/COMO/actions/workflows/continuous_delivery.yml/badge.svg)](https://github.com/HelikarLab/COMO/actions/workflows/continuous_delivery.yml)
+[![Unit Tests](https://github.com/HelikarLab/COMO/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/HelikarLab/COMO/actions/workflows/unit_tests.yml)
 [![pages-build-deployment](https://github.com/HelikarLab/COMO/actions/workflows/pages/pages-build-deployment/badge.svg?branch=master)](https://github.com/HelikarLab/COMO/actions/workflows/pages/pages-build-deployment)
 
 This is the home page for the COMO pipeline.

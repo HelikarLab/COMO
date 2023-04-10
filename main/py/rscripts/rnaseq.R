@@ -318,7 +318,7 @@ zfpkm_filter <- function(SampMetrics, filt_options, context_name, prep) {
     cutoff <- filt_options$min_zfpkm
     
     SampMetrics <- calculate_fpkm(SampMetrics)
-    for ( i in 1:length(SampMetrics) ) {
+    for ( i in seq_along(SampMetrics)) {
         study_number <- SampMetrics[[i]][["StudyNumber"]]
         
         entrez_ids <- SampMetrics[[i]][["Entrez"]] # get entrez ids
@@ -330,12 +330,12 @@ zfpkm_filter <- function(SampMetrics, filt_options, context_name, prep) {
         colnames(write_fpkm)[1] <- "ENTREZ_GENE_ID"
         write.csv(write_fpkm, fpkm_filename, row.names=FALSE)
         
-        
         minimums <- fpkm_df == 0
         nas <- is.na(fpkm_df) == 1
-        zmat <- zFPKM(fpkm_df, min_thresh=0, assayName="FPKM") # calculate zFPKM
-        zmat[minimums] <- -4 # instead of -inf set to lower limit
         
+        # calculate zFPKM
+        zmat <- zFPKM(fpkm_df, min_thresh=0, assayName="FPKM")
+        zmat[minimums] <- -4 # instead of -inf set to lower limit
         
         zfpkm_fname <- file.path("/home", username, "main", "data", "results", context_name, prep, paste0("zFPKM_Matrix_", prep, "_", study_number, ".csv"))
         write_zfpkm <- cbind(entrez_ids, zmat)
@@ -354,7 +354,7 @@ zfpkm_filter <- function(SampMetrics, filt_options, context_name, prep) {
         
         min.samples <- round(N_exp * ncol(zmat)) # min number of samples for active
         top.samples <- round(N_top * ncol(zmat)) # top number of samples for high-confidence
-
+        
 		# active genes
         f1 <- genefilter::kOverA(min.samples, cutoff)
         flist <- genefilter::filterfun(f1)
@@ -557,7 +557,6 @@ save_rnaseq_tests <- function(
     topMat <- cbind(topMat, "Prop"=topMat$Freq/nc) # calculate proportion of studies/batch high-confidence
     SampMetrics[["ExpressionMatrix"]] <- expMat # store expression matrix for saving
     SampMetrics[["TopMatrix"]] <- topMat # store high confidence matrix for saving
-
     # get genes which are expressed and high-confidence according to use defined ratio
     SampMetrics[["ExpressedGenes"]] <- as.character(expMat$expressedGenes[expMat$Prop>=batch_ratio])
     SampMetrics[["TopGenes"]] <- as.character(topMat$topGenes[topMat$Prop>=batch_ratio_high])
