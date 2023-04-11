@@ -22,7 +22,10 @@ from utilities import stringlist_to_list
 sys.setrecursionlimit(1500)  # for re.search
 
 
-def correct_bracket(rule: str, name: str) -> str:
+def correct_bracket(
+    rule: str,
+    name: str
+) -> str:
     """
     Correct GPR rules to format readable by
     """
@@ -59,7 +62,10 @@ def correct_bracket(rule: str, name: str) -> str:
     return " ".join([rule_left, operator, rule_right])
 
 
-def gene_rule_logical(expression_in: str, level: int = 0) -> str:
+def gene_rule_logical(
+    expression_in: str,
+    level: int = 0
+) -> str:
     """
     creates an expression from GPR rule which can be evaluated as true or false
     """
@@ -111,7 +117,11 @@ def gene_rule_evaluable(expression_in: str) -> str:
     return gene_reaction_by_rule
 
 
-def set_boundaries(model_cobra: cobra.Model, bound_rxns: list, bound_lb, bound_ub) -> tuple[cobra.Model, list]:
+def set_boundaries(
+    model_cobra: cobra.Model,
+    bound_rxns: list,
+    bound_lb, bound_ub
+) -> tuple[cobra.Model, list]:
     all_rxns = model_cobra.reactions  # get all reactions
     bound_rm_rxns = []
     
@@ -157,7 +167,10 @@ def set_boundaries(model_cobra: cobra.Model, bound_rxns: list, bound_lb, bound_u
     return model_cobra, bound_rm_rxns
 
 
-def feasibility_test(model_cobra: cobra.Model, step: str):
+def feasibility_test(
+    model_cobra: cobra.Model,
+    step: str
+):
     # check number of unsolvable reactions for reference model under media assumptions
     model_cobra_rm = cobra.flux_analysis.fastcc(model_cobra, flux_threshold=15,
                                                 zero_cutoff=1e-7)  # create flux consistant model (rmemoves some reactions)
@@ -196,7 +209,14 @@ def feasibility_test(model_cobra: cobra.Model, step: str):
     return incon_rxns, model_cobra_rm
 
 
-def seed_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
+def seed_gimme(
+    cobra_model,
+    s_matrix,
+    lb,
+    ub,
+    idx_objective,
+    expr_vector
+):
     # `Becker and Palsson (2008). Context-specific metabolic networks are
     # consistent with experiments. PLoS Comput. Biol. 4, e1000082.`
     properties = GIMMEProperties(
@@ -222,7 +242,14 @@ def seed_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
     return context_cobra_model
 
 
-def seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
+def seed_fastcore(
+    cobra_model,
+    s_matrix,
+    lb,
+    ub,
+    exp_idx_list,
+    solver
+):
     # 'Vlassis, Pacheco, Sauter (2014). Fast reconstruction of compact
     # context-specific metabolic network models. PLoS Comput. Biol. 10,
     # e1003424.'
@@ -311,14 +338,10 @@ def seed_tinit(
     algorithm.build_problem()
 
 
-def seed_unsupported(recon_algorithm):
-    print(
-        f"Unsupported reconstruction algorithm: {recon_algorithm}. Must be either 'IMAT', 'GIMME', 'FASTCORE'"
-    )
-    sys.exit()
-
-
-def split_gene_expression_data(expression_data, recon_algorithm="GIMME"):
+def split_gene_expression_data(
+    expression_data,
+    recon_algorithm="GIMME"
+):
     """
     Splits genes that have mapped to multiple Entrez IDs are formated as "gene12//gene2//gene3"
     """
@@ -352,7 +375,13 @@ def split_gene_expression_data(expression_data, recon_algorithm="GIMME"):
     return gene_expressions
 
 
-def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm, low_thresh=None, high_thresh=None):
+def map_expression_to_rxn(
+    model_cobra,
+    gene_expression_file,
+    recon_algorithm,
+    low_thresh=None,
+    high_thresh=None
+):
     """
     Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules
     which are defined in general genome-scale metabolic model
@@ -538,7 +567,7 @@ def create_context_specific_model(
             cobra_model, s_matrix, lb, ub, expr_vector, solver, idx_force
         )
     else:
-        context_model_cobra = seed_unsupported(recon_algorithm)
+        raise ValueError(f"Unsupported reconstruction algorithm: {recon_algorithm}. Must be one of: 'IMAT', 'GIMME', 'FASTCORE', or 'TINIT'")
     
     # check number of unsolvable reactions for seeded model under media assumptions
     # incon_rxns_cs, context_model_cobra = feasibility_test(context_model_cobra, "after_seeding")
@@ -577,7 +606,7 @@ def print_filetype_help():
           "Or use multiple with: 'xml mat json'")
 
 
-def parse_args(argv):
+def parse_args():
     parser = argparse.ArgumentParser(
         prog="create_context_specific_model.py",
         description="Seed a context-specific model from a list of expressed genes, a reference",
@@ -720,7 +749,7 @@ def main(argv):
     """
     Seed a context-specific model from a list of expressed genes, a reference
     """
-    args = parse_args(argv)
+    args = parse_args()
     
     context_name = args.context_name
     reference_model = args.modelfile
@@ -744,9 +773,6 @@ def main(argv):
     print(f"Active genes file found at {genefile}")
 
     bound_rxns = []
-    bound_ub = []
-    bound_lb = []
-    
     if boundary_rxns_filepath:
         boundary_rxns_filepath: Path = Path(boundary_rxns_filepath)
         
@@ -797,36 +823,26 @@ def main(argv):
             print(f"Reading {exclude_rxns_filepath} for exclude reactions")
             if exclude_rxns_filepath.suffix == ".csv":
                 df = pd.read_csv(exclude_rxns_filepath, header=0)
-            elif exclude_rxns_filepath.suffix == ".xlsx" or exclude_rxns_filepath.suffix == ".xls":
+            elif exclude_rxns_filepath.suffix in [".xlsx", ".xls"]:
                 df = pd.read_excel(exclude_rxns_filepath, header=0)
             else:
-                print(
-                    "--exclude-reactions-file must be a path to a csv or xlsx file with one column."
-                )
-                print(
-                    "This column should be populated with reaction ids in the reference model which will not be "
-                    + "included in the context specific model, regardless of omics expression"
-                )
-                sys.exit()
+                raise ValueError(
+                    f"Exclude reactions file must be a csv or xlsx file with a single column of reaction names.\n"
+                    f"The reaction IDs should be populated from the reference model, which will not be included in the model, "
+                    f"no matter the expression level")
             
             exclude_rxns = df.iloc[:, 0].tolist()
         
         except FileNotFoundError:
-            print(
-                "--exclude-reactions-file must be a path to a csv or xlsx file with one column."
+            raise FileNotFoundError(
+                f"Exclude reactions file not found! Must be a csv or xlsx file. Searching for: {force_rxns_filepath}"
             )
-            print(
-                "This column should be populated with reaction ids in the reference model which will not be "
-                + "included in the context specific model, regardless of omics expression"
-            )
-            sys.exit()
+        
         except BaseException:
-            print("exclude reactions file must be a csv or xlsx with one column.")
-            print(
-                "This column should be populated with reaction ids in the reference model which will not be "
-                + "included in the context specific model, regardless of omics expression"
-            )
-            sys.exit()
+            raise Exception(
+                f"Exclude reactions file must be a csv or xlsx file with a single column of reaction names.\n"
+                    f"The reaction IDs should be populated from the reference model, which will not be included in the model, "
+                    f"no matter the expression level")
 
     force_rxns = []
     if force_rxns_filepath:
@@ -835,59 +851,37 @@ def main(argv):
             print(f"Reading {force_rxns_filepath} for force reactions")
             if force_rxns_filepath.suffix == ".csv":
                 df = pd.read_csv(force_rxns_filepath, header=0)
-            elif force_rxns_filepath.suffix == ".xlsx" or force_rxns_filepath.suffix == ".xls":
+            elif force_rxns_filepath.suffix in [".xlsx", ".xls"]:
                 df = pd.read_excel(force_rxns_filepath, header=0)
             else:
-                print(
-                    "--force-reactions-file must be a path to a csv or xlsx file with one column."
-                )
-                print(
-                    "This column should be populated with reaction ids in the reference model which will not be "
-                    + "included in the context specific model, regardless of omics expression"
-                )
-                sys.exit()
+                raise ValueError(
+                    f"Force reactions file must be a csv or xlsx file with a single column of reaction names.\n"
+                    f"The reaction IDs should be populated from the reference model, which will be forced to be included in the context specific model, "
+                    f"regardless of expression level\n")
             
             force_rxns = df["Abbreviation"].tolist()
 
         except FileNotFoundError:
-            print(
-                "--force-reactions-file must be a path to a csv or xlsx file with one column."
-            )
-            print(
-                "This column should be populated with reaction ids in the reference model which will be force "
-                + "included in the context specific model, regardless of omics expression (unless the reaction "
-                + "causes the model to be infeasible)."
-            )
-            sys.exit()
+            raise FileNotFoundError(f"Force reactions file not found! Must be a csv or xlsx file. Searching for: {force_rxns_filepath}")
+        
         except BaseException:
-            print("force reactions file must be a csv or xlsx with one column.")
-            print(
-                "This column should be populated with reaction ids in the reference model which will be force "
-                + "included in the context specific model, regardless of omics expression (unless the reaction "
-                + "causes the model to be infeasible)."
-            )
-            sys.exit()
+            raise Exception(
+                f"Force reactions file must be a csv or xlsx file with a single column of reaction names.\n"
+                f"The reaction IDs should be populated from the reference model, which will be forced to be included in the context specific model, "
+                f"regardless of expression level\n")
 
     # Assert output types are valid
     for output_type in output_filetypes:
         if output_type not in ["xml", "mat", "json"]:
-            print(f"Output file type {output_type} not recognized.")
-            print("Output file types must be one of the following: xml, mat, json")
-            sys.exit(1)
+            raise ValueError(f"Output file type '{output_type}' not recognized. Output file types must be one of the following: xml, mat, json")
 
-    if recon_alg not in ["FASTCORE", "GIMME", "IMAT"]:
-        print(
-            f"Algorithm {recon_alg} not supported. Please use one of: GIMME, FASTCORE, or IMAT"
-        )
-        sys.exit(2)
+    if recon_alg not in ["FASTCORE", "GIMME", "IMAT", "TINIT"]:
+        raise ValueError(f"Algorithm {recon_alg} not supported. Use one of: GIMME, FASTCORE, or IMAT")
     
     if solver not in ["GUROBI", "GLPK"]:
-        print(f"Solver {solver} not supported. Please use 'GLPK' or 'GUROBI'")
-        sys.exit(2)
+        raise ValueError(f"Solver {solver} not supported. Please use 'GLPK' or 'GUROBI'")
     
-    print(
-        f"Constructing model of {context_name} with {recon_alg} reconstruction algorithm using {solver} solver"
-    )
+    print(f"Constructing model of {context_name} with {recon_alg} reconstruction algorithm using {solver} solver")
     
     context_model, core_list, infeas_df = create_context_specific_model(
         reference_model,
@@ -953,8 +947,6 @@ def main(argv):
     print("Number of Genes: " + str(len(context_model.genes)))
     print("Number of Metabolites: " + str(len(context_model.metabolites)))
     print("Number of Reactions: " + str(len(context_model.reactions)))
-    print(context_model.objective._get_expression())
-    print(pfba(context_model))
     print("len rxns: ", len(context_model.reactions))
     
     print("\nModel successfully created!")
