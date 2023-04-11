@@ -246,7 +246,14 @@ def seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
 
 
 def seed_imat(
-        cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force, context_name
+    cobra_model,
+    s_matrix,
+    lower_bound,
+    upper_bound,
+    expr_vector,
+    expr_thesh,
+    idx_force,
+    context_name
 ):
     expr_vector = np.array(expr_vector)
     properties = IMATProperties(
@@ -256,7 +263,7 @@ def seed_imat(
         epsilon=0.01
     )
     print("Setting properties")
-    algorithm = IMAT(s_matrix, lb, ub, properties)
+    algorithm = IMAT(s_matrix, lower_bound, upper_bound, properties)
     
     print("Setting algorithm")
     context_rxns = algorithm.run()
