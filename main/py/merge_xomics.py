@@ -413,9 +413,9 @@ def handle_context_batch(
         
         if exp_req > num_sources:
             print(
-                "WARNING: Expression requirement for {context_name} was calculated to be greater than max number of input data sources."
-                "Will be force changed to {num_sources} to prevent output from having 0 active genes. "
-                "Consider lowering the expression requirement or changing the adjustment method.")
+                f"WARNING: Expression requirement for {context_name} was calculated to be greater than max number of input data sources."
+                f"Will be force changed to {num_sources} to prevent output from having 0 active genes. "
+                f"Consider lowering the expression requirement or changing the adjustment method.")
             exp_req = num_sources
         
         if exp_req < 1:  # never allow expression requirement to be less than one
