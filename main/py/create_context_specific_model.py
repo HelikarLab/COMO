@@ -249,8 +249,6 @@ def seed_imat(
         cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force, context_name
 ):
     expr_vector = np.array(expr_vector)
-    print("expr_vector:")
-    print(expr_vector[:10])
     properties = IMATProperties(
         exp_vector=expr_vector,
         exp_thresholds=expr_thesh,
@@ -259,10 +257,13 @@ def seed_imat(
     )
     print("Setting properties")
     algorithm = IMAT(s_matrix, lb, ub, properties)
+    
     print("Setting algorithm")
     context_rxns = algorithm.run()
+    
     print("Running")
     fluxes = algorithm.sol.to_series()
+    
     print("Obtained flux values")
     context_cobra_model = cobra_model.copy()
     r_ids = [r.id for r in context_cobra_model.reactions]
@@ -280,9 +281,16 @@ def seed_imat(
     return context_cobra_model, flux_df
 
 
-def seed_tinit(cobra_model, s_matrix, lb, ub, expr_vector, solver, idx_force):
+def seed_tinit(
+    cobra_model: cobra.Model,
+    s_matrix,
+    lb,
+    ub,
+    expr_vector,
+    solver,
+    idx_force
+) -> None:
     expr_vector = np.array(expr_vector)
-    cobra_model
     properties = tINITProperties(
         reactions_scores=expr_vector,
         solver=solver,
