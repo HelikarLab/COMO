@@ -2,22 +2,23 @@
 
 import os
 import sys
-from rpy2.robjects.packages import importr
-from rpy2.robjects import pandas2ri
-from project import configs
+# from rpy2.robjects.packages import importr
+# from rpy2.robjects import pandas2ri
 import argparse
 from pathlib import Path
 
 
 import rpy2_api
+from project import configs
+from utilities import stringlist_to_list
 # enable r to py conversion
-pandas2ri.activate()
+# pandas2ri.activate()
 
 # import R libraries
-ggplot2 = importr("ggplot2")
-ggrepel = importr("ggrepel")
-tidyverse = importr("tidyverse")
-uwot = importr("uwot")
+# ggplot2 = importr("ggplot2")
+# ggrepel = importr("ggrepel")
+# tidyverse = importr("tidyverse")
+# uwot = importr("uwot")
 
 # read and translate R functions
 r_file_path = Path(configs.rootdir, "py", "rscripts", "cluster_samples.R")
@@ -159,16 +160,10 @@ def main(argv: list[str]) -> None:
     args = parser.parse_args()
 
     wd = os.path.join(configs.datadir, "results")
-    context_names = (
-        args.context_names.strip("[")
-        .strip("]")
-        .replace("'", "")
-        .replace(" ", "")
-        .split(",")
-    )
+    context_names = stringlist_to_list(args.context_names)
     technique = args.technique.lower()
     clust_algo = args.clust_algo.lower()
-    label = args.label.upper()
+    label: bool = args.label
     rep_ratio = args.rep_ratio
     batch_ratio = args.batch_ratio
     min_count = args.min_count
@@ -265,14 +260,13 @@ def main(argv: list[str]) -> None:
             f"the total number of contexts being clustered."
         )
 
-    cluster_io = rpy2_api.Rpy2(r_file_path=r_file_path)
-    cluster_io_function = cluster_io.call_function("cluster_samples_main")
-    cluster_io_function(
-        wd,
-        context_names,
-        technique,
-        clust_algo,
-        label,
+    cluster_samples = rpy2_api.Rpy2(
+        r_file_path=r_file_path,
+        wd=wd,
+        context_names=context_names,
+        technique=technique,
+        clust_algo=clust_algo,
+        label=label,
         min_dist=min_dist,
         n_neigh_rep=n_neigh_rep,
         n_neigh_batch=n_neigh_batch,
@@ -283,6 +277,25 @@ def main(argv: list[str]) -> None:
         min_count=min_count,
         seed=seed,
     )
+    cluster_samples.call_function("cluster_samples_main")
+    # cluster_io = rpy2_api.Rpy2(r_file_path=r_file_path)
+    # cluster_io_function = cluster_io.call_function("cluster_samples_main")
+    # cluster_io_function(
+    #     wd,
+    #     context_names,
+    #     technique,
+    #     clust_algo,
+    #     label,
+    #     min_dist=min_dist,
+    #     n_neigh_rep=n_neigh_rep,
+    #     n_neigh_batch=n_neigh_batch,
+    #     n_neigh_cont=n_neigh_cont,
+    #     rep_ratio=rep_ratio,
+    #     batch_ratio=batch_ratio,
+    #     quantile=quantile,
+    #     min_count=min_count,
+    #     seed=seed,
+    # )
 
 
 if __name__ == "__main__":
