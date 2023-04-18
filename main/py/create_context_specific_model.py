@@ -3,23 +3,38 @@ import os
 import re
 import sys
 import cobra
-import collections
 import argparse
+import collections
 import numpy as np
 import pandas as pd
+from enum import Enum
 from pathlib import Path
-from warnings import warn
-from cobra.flux_analysis import pfba
-from cobamp.wrappers import COBRAModelObjectReader
-from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
-from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
 from troppo.methods.reconstruction.imat import IMAT, IMATProperties
+from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
+from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
+
 from project import configs
-
 from utilities import stringlist_to_list
-
+import cobamp_replacement
 sys.setrecursionlimit(1500)  # for re.search
+
+
+class ReactionType(Enum):
+    EXCHANGE = "EX"
+    DEMAND = "DM"
+    SINK = "SK"
+
+class Compartments(Enum):
+    CYTOSOL = "c"
+    EXTRACELLULAR = "e"
+    GOLGI = "g"
+    INTRACELLULAR = "i"
+    LYSOSOME = "l"
+    MITOCHONDRIA = "m"
+    NUCLEUS = "n"
+    ENDOPLASMIC = "r"
+    PEROXISOME = "x"
 
 
 def correct_bracket(
@@ -138,7 +153,7 @@ def set_boundaries(
     
     # close sinks and demands not in boundary reactions unless no boundary reactions were given
     if not allow_all_boundary_rxns:
-
+        
         for i, rxn in enumerate(sink_rxns):  # set sinks to 0
             if rxn not in bound_rxns:  # only allow sink accumulation
                 getattr(model_cobra.reactions, rxn).lower_bound = 0
@@ -146,7 +161,7 @@ def set_boundaries(
             else:  # set from file
                 getattr(model_cobra.reactions, rxn).lower_bound = bound_lb[i]
                 getattr(model_cobra.reactions, rxn).upper_bound = bound_ub[i]
-                
+        
         for i, rxn in enumerate(demand_rxns):
             if rxn not in bound_rxns:  # demand is one way - outside the system
                 getattr(model_cobra.reactions, rxn).lower_bound = 0
@@ -154,7 +169,7 @@ def set_boundaries(
             else:
                 getattr(model_cobra.reactions, rxn).lower_bound = 0
                 getattr(model_cobra.reactions, rxn).upper_bound = bound_ub[i]
-        
+    
     # Reaction media
     medium = model_cobra.medium  # get reaction media to modify
     for rxn in exchange_rxns:  # open exchanges from exchange file, close unspecified exchanges
@@ -163,7 +178,7 @@ def set_boundaries(
         else:
             medium[rxn] = -float(bound_lb[bound_rxns.index(rxn)])
     model_cobra.medium = medium  # set new media
-        
+    
     return model_cobra, bound_rm_rxns
 
 
@@ -226,15 +241,15 @@ def seed_gimme(
         preprocess=True,
         flux_threshold=0.9,
     )
-    algorithm = GIMME(s_matrix, lb, ub, properties)
-    gene_activity = algorithm.run()
+    gimme = GIMME(s_matrix, lb, ub, properties)
+    gene_activity = gimme.run()
     context_cobra_model = cobra_model.copy()
-    r_ids = [r.id for r in context_cobra_model.reactions]
-    to_remove_ids = [r_ids[r] for r in np.where(gene_activity == 0)[0]]
+    reaction_ids = [reaction.id for reaction in context_cobra_model.reactions]
+    to_remove_ids = [reaction_ids[i] for i in np.where(gene_activity == 0)[0]]
     
     context_cobra_model.remove_reactions(to_remove_ids, True)
-    r_ids = [r.id for r in context_cobra_model.reactions]
-    psol = pfba(context_cobra_model)
+    reaction_ids = [reaction.id for reaction in context_cobra_model.reactions]
+    psol = cobra.flux_analysis.pfba(context_cobra_model)
     # psol = context_cobra_model.optimize()
     # to_remove_ids = [r_ids[r] for r in np.where(abs(psol.fluxes) < 1e-8)[0]]
     # context_cobra_model.remove_reactions(to_remove_ids, True)
@@ -253,10 +268,7 @@ def seed_fastcore(
     # 'Vlassis, Pacheco, Sauter (2014). Fast reconstruction of compact
     # context-specific metabolic network models. PLoS Comput. Biol. 10,
     # e1003424.'
-    warn(
-        "Fastcore requires a flux consistant model is used as refererence, "
-        "to achieve this fastcc is required which is NOT reproducible."
-    )
+    print(f"WARNING: FastCore requires a flux consistent model as a reference. To achieve this, FastCC is required, which is NOT reproducible")
     print("Creating feasible model...")
     incon_rxns, cobra_model = feasibility_test(cobra_model, "other")
     properties = FastcoreProperties(core=exp_idx_list, solver=solver)
@@ -317,36 +329,53 @@ def seed_imat(
 
 def seed_tinit(
     cobra_model: cobra.Model,
-    s_matrix,
-    lb,
-    ub,
-    expr_vector,
-    solver,
-    idx_force
+    stoichiometric_matrix: np.array,
+    lower_bounds: list[float],
+    upper_bounds: list[float],
+    expr_vector: np.array,
+    solver: str,
+    idx_force: list[int]
 ) -> None:
-    expr_vector = np.array(expr_vector)
-    properties = tINITProperties(
-        reactions_scores=expr_vector,
-        solver=solver,
-        essential_reactions=idx_force,
-        production_weight=0.0,
-        allow_excretion=False,
-        no_reverse_loops=True,
+
+    algorithm = tINIT(
+        S=stoichiometric_matrix,
+        lb=lower_bounds,
+        ub=upper_bounds,
+        properties=tINITProperties(
+            reactions_scores=expr_vector,
+            solver=solver,
+            essential_reactions=idx_force,
+            production_weight=0.0,
+            allow_excretion=False,
+            no_reverse_loops=True,
+        )
     )
-    algorithm = tINIT(s_matrix, lb, ub, properties)
+    
+    print("Preprocessing")
     algorithm.preprocessing()
+    
+    print("Building")
     algorithm.build_problem()
+    
+    print("Solving")
+    result = algorithm.solve_problem()
+    print(type(result))
+    print(result)
+    
+    print("DONE")
 
 
 def split_gene_expression_data(
-    expression_data,
-    recon_algorithm="GIMME"
+    expression_data: pd.DataFrame,
+    recon_algorithm: str = "GIMME"
 ):
     """
     Splits genes that have mapped to multiple Entrez IDs are formated as "gene12//gene2//gene3"
     """
-    if recon_algorithm in ["IMAT", "TINIT"]:
+    if recon_algorithm == "IMAT":
         expression_data.rename(columns={"ENTREZ_GENE_ID": "Gene", "combine_z": "Data"}, inplace=True)
+    # elif recon_algorithm == "TINIT":
+    #     expression_data.rename(columns={"ENTREZ_GENE_ID": "Gene", "Active": "Data"}, inplace=True)
     else:
         expression_data.rename(columns={"ENTREZ_GENE_ID": "Gene", "Active": "Data"}, inplace=True)
     
@@ -420,7 +449,7 @@ def map_expression_to_rxn(
             else:
                 rep_val = f" {str(unknown_val)} "
             gene_reaction_rule = (
-                    " " + gene_reaction_rule + " "
+                " " + gene_reaction_rule + " "
             )  # pad white space to prevent gene matches inside floats
             gene_reaction_rule = gene_reaction_rule.replace(
                 " {} ".format(gid), rep_val, 1
@@ -440,19 +469,19 @@ def map_expression_to_rxn(
 
 
 def create_context_specific_model(
-        general_model_file,
-        gene_expression_file,
-        recon_algorithm,
-        objective,
-        exclude_rxns,
-        force_rxns,
-        bound_rxns,
-        bound_lb,
-        bound_ub,
-        solver,
-        context_name,
-        low_thresh,
-        high_thresh
+    general_model_filepath: str | Path,
+    gene_expression_file,
+    recon_algorithm,
+    objective,
+    exclude_rxns,
+    force_rxns,
+    bound_rxns,
+    bound_lb,
+    bound_ub,
+    solver,
+    context_name,
+    low_thresh,
+    high_thresh
 ):
     """
     Seed a context specific model. Core reactions are determined from GPR associations with gene expression logicals.
@@ -460,12 +489,18 @@ def create_context_specific_model(
     file. Metabolite exchange (media), sinks, and demands are determined from exchanges file. Reactions can also be
     force excluded even if they meet GPR association requirements using the force exclude file.
     """
-    if general_model_file[-4:] == ".mat":
-        cobra_model = cobra.io.load_matlab_model(general_model_file)
-    elif general_model_file[-4:] == ".xml":
-        cobra_model = cobra.io.load_sbml_model(general_model_file)
-    elif general_model_file[-5:] == ".json":
-        cobra_model = cobra.io.load_json_model(general_model_file)
+    if isinstance(general_model_filepath, str):
+        general_model_filepath = Path(general_model_filepath)
+    
+    if general_model_filepath.suffix == ".mat":
+        cobra_model = cobra.io.load_matlab_model(str(general_model_filepath))
+        format = "mat"
+    elif general_model_filepath.suffix == ".xml":
+        cobra_model = cobra.io.load_sbml_model(str(general_model_filepath))
+        format = "xml"
+    elif general_model_filepath.suffix == ".json":
+        cobra_model = cobra.io.load_json_model(str(general_model_filepath))
+        format = "json"
     else:
         raise NameError("reference model format must be .xml, .mat, or .json")
     
@@ -473,7 +508,7 @@ def create_context_specific_model(
     
     if objective not in force_rxns:
         force_rxns.append(objective)
-    
+        
     # set boundaries
     cobra_model, bound_rm_rxns = set_boundaries(
         cobra_model, bound_rxns, bound_lb, bound_ub
@@ -487,12 +522,16 @@ def create_context_specific_model(
     incon_rxns = []
     
     # CoBAMP methods
-    cobamp_model = COBRAModelObjectReader(cobra_model)  # load model in readable format for CoBAMP
-    cobamp_model.get_irreversibilities(True)
-    s_matrix = cobamp_model.get_stoichiometric_matrix()
-    lb, ub = cobamp_model.get_model_bounds(False, True)
-    rx_names = cobamp_model.get_reaction_and_metabolite_ids()[0]
+    reaction_ids, metabolite_ids = cobamp_replacement.get_reaction_and_metabolite_ids(cobra_model)
+    stoichiometric_matrix = cobamp_replacement.get_stoichiometric_matrix(cobra_model, reaction_ids, metabolite_ids)
+    lb, ub = cobamp_replacement.get_model_bounds(cobra_model)
     
+    # cobamp_model = COBRAModelObjectReader(cobra_model, format=format)  # load model in readable format for CoBAMP
+    # cobamp_model.get_irreversibilities(True)
+    # # stoichiometric_matrix = cobamp_model.get_stoichiometric_matrix()
+    # lb, ub = cobamp_model.get_model_bounds(as_dict=False, separate_list=True)
+    # rx_names = cobamp_model.get_reaction_and_metabolite_ids()[0]
+
     # get expressed reactions
     expression_rxns, expr_vector = map_expression_to_rxn(
         cobra_model,
@@ -504,11 +543,9 @@ def create_context_specific_model(
     
     # find reactions in the force reactions file that are not in general model and warn user
     for rxn in force_rxns:
-        if rxn not in rx_names:
-            warn(
-                f"{rxn} from force reactions not in general model, check BiGG (or relevant database used in your "
-                "general model) for synonyms"
-            )
+        if rxn not in reaction_ids:
+            print(f"WARNING: The reaction '{rxn}', from force reactions, was not found in the general model. "
+                  f"Check BiGG (or the database used in your general model) for synonyms.")
     
     # collect list of reactions that are infeasible but active in expression data or user defined
     infeas_exp_rxns = []
@@ -537,37 +574,21 @@ def create_context_specific_model(
                 low_thresh - 0.1 if recon_algorithm in ["TINIT", "IMAT"] else 0
             )
     
-    idx_obj = rx_names.index(objective)
-    idx_force = [rx_names.index(rxn) for rxn in force_rxns if rxn in rx_names]
+    idx_obj = reaction_ids.index(objective)
+    idx_force = [reaction_ids.index(rxn) for rxn in force_rxns if rxn in reaction_ids]
     exp_idx_list = [idx for (idx, val) in enumerate(expr_vector) if val > 0]
     exp_thresh = (low_thresh, high_thresh)
     
     # switch case dictionary runs the functions making it too slow, better solution then elif ladder?
-    if recon_algorithm == "GIMME":
-        context_model_cobra = seed_gimme(
-            cobra_model, s_matrix, lb, ub, idx_obj, expr_vector
-        )
-    elif recon_algorithm == "FASTCORE":
-        context_model_cobra = seed_fastcore(
-            cobra_model, s_matrix, lb, ub, exp_idx_list, solver
-        )
-    elif recon_algorithm == "IMAT":
-        context_model_cobra, flux_df = seed_imat(
-            cobra_model,
-            s_matrix,
-            lb,
-            ub,
-            expr_vector,
-            exp_thresh,
-            idx_force,
-            context_name,
-        )
-    elif recon_algorithm == "TINIT":
-        context_model_cobra = seed_tinit(
-            cobra_model, s_matrix, lb, ub, expr_vector, solver, idx_force
-        )
+    if recon_algorithm == "GIMME":      context_model_cobra = seed_gimme(cobra_model, stoichiometric_matrix, lb, ub, idx_obj, expr_vector)
+    elif recon_algorithm == "FASTCORE": context_model_cobra = seed_fastcore(cobra_model, stoichiometric_matrix, lb, ub, exp_idx_list, solver)
+    elif recon_algorithm == "IMAT":     context_model_cobra, flux_df = seed_imat(cobra_model, stoichiometric_matrix, lb, ub, expr_vector, exp_thresh, idx_force, context_name,)
+    elif recon_algorithm == "TINIT":    context_model_cobra = seed_tinit(cobra_model, stoichiometric_matrix, lb, ub, expr_vector, solver, idx_force)
     else:
-        raise ValueError(f"Unsupported reconstruction algorithm: {recon_algorithm}. Must be one of: 'IMAT', 'GIMME', 'FASTCORE', or 'TINIT'")
+        raise ValueError(
+            f"Unsupported reconstruction algorithm: {recon_algorithm}."
+            f"Must be one of: 'IMAT', 'GIMME', 'FASTCORE', or 'TINIT'"
+        )
     
     # check number of unsolvable reactions for seeded model under media assumptions
     # incon_rxns_cs, context_model_cobra = feasibility_test(context_model_cobra, "after_seeding")
@@ -752,7 +773,7 @@ def main(argv):
     args = parse_args()
     
     context_name = args.context_name
-    reference_model = args.modelfile
+    reference_model_filepath = args.modelfile
     genefile = args.genefile
     objective = args.objective
     boundary_rxns_filepath = args.boundary_rxns_filepath
@@ -764,14 +785,14 @@ def main(argv):
     solver = args.solver.upper()
     output_filetypes = stringlist_to_list(args.output_filetypes)
     
-    if not os.path.exists(reference_model):
-        raise FileNotFoundError(f"Reference model not found at {reference_model}")
+    if not os.path.exists(reference_model_filepath):
+        raise FileNotFoundError(f"Reference model not found at {reference_model_filepath}")
     
     if not os.path.exists(genefile):
         raise FileNotFoundError(f"Active genes file not found at {genefile}")
     
     print(f"Active genes file found at {genefile}")
-
+    
     bound_rxns = []
     if boundary_rxns_filepath:
         boundary_rxns_filepath: Path = Path(boundary_rxns_filepath)
@@ -782,13 +803,14 @@ def main(argv):
         elif boundary_rxns_filepath.suffix == ".xlsx" or boundary_rxns_filepath.suffix == ".xls":
             df: pd.DataFrame = pd.read_excel(boundary_rxns_filepath, header=0)
         else:
-            raise FileNotFoundError(f"Boundary reactions file not found! Must be a csv or xlsx file. Searching for: {boundary_rxns_filepath}")
+            raise FileNotFoundError(
+                f"Boundary reactions file not found! Must be a csv or xlsx file. Searching for: {boundary_rxns_filepath}")
         
         # Make sure the columns are named correctly. They should be "Reaction", "Abbreviation", "Compartment", "Minimum Reaction Rate", and "Maximum Reaction Rate"
         for column in df.columns:
             if column.lower() not in ["reaction", "abbreviation", "compartment", "minimum reaction rate", "maximum reaction rate"]:
                 raise ValueError(f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', 'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}")
-            
+        
         # convert all columns to lowercase
         df.columns = [column.lower() for column in df.columns]
         
@@ -800,22 +822,28 @@ def main(argv):
         
         reaction_formula: list[str] = []
         for i in range(len(reaction_type)):
-            current_type: str = reaction_type[i]
-            temp_reaction: str = ""
+            current_reaction_type: str = reaction_type[i].upper()
+            current_compartment: str = reaction_compartment[i].upper()
             
-            match current_type.lower():
-                case "exchange":
-                    temp_reaction += "EX_"
-                case "demand":
-                    temp_reaction += "DM_"
-                case "sink":
-                    temp_reaction += "SK_"
+            # Get the reaction type (Exchange, Demand, Sink)
+            try:
+                temp_reaction: str = ReactionType[current_reaction_type].value
+            except KeyError:
+                raise KeyError(f"Reaction type not recognized in boundary reactions: {reaction_type[i]}")
             
-            temp_reaction += f"{reaction_abbreviation[i]}_{reaction_compartment[i]}"
-            reaction_formula.append(temp_reaction)
-
+            # Get the compartment (cytosol, extracellular, etc)
+            try:
+                temp_compartment: str = Compartments[current_compartment].value
+            except KeyError:
+                raise KeyError(f"Compartment not recognized in boundary reactions: {reaction_compartment[i]}")
+            
+            # Result should be: EX_glc_D[e]
+            # ReactionType_Abbreviation[Compartment]
+            formula: str = f"{temp_reaction}_{reaction_abbreviation[i]}[{temp_compartment}]"
+            reaction_formula.append(formula)
+        
         del df
-
+    
     exclude_rxns = []
     if exclude_rxns_filepath:
         exclude_rxns_filepath: Path = Path(exclude_rxns_filepath)
@@ -841,9 +869,9 @@ def main(argv):
         except BaseException:
             raise Exception(
                 f"Exclude reactions file must be a csv or xlsx file with a single column of reaction names.\n"
-                    f"The reaction IDs should be populated from the reference model, which will not be included in the model, "
-                    f"no matter the expression level")
-
+                f"The reaction IDs should be populated from the reference model, which will not be included in the model, "
+                f"no matter the expression level")
+    
     force_rxns = []
     if force_rxns_filepath:
         force_rxns_filepath: Path = Path(force_rxns_filepath)
@@ -860,21 +888,23 @@ def main(argv):
                     f"regardless of expression level\n")
             
             force_rxns = df["Abbreviation"].tolist()
-
+        
         except FileNotFoundError:
-            raise FileNotFoundError(f"Force reactions file not found! Must be a csv or xlsx file. Searching for: {force_rxns_filepath}")
+            raise FileNotFoundError(
+                f"Force reactions file not found! Must be a csv or xlsx file. Searching for: {force_rxns_filepath}")
         
         except BaseException:
             raise Exception(
                 f"Force reactions file must be a csv or xlsx file with a single column of reaction names.\n"
                 f"The reaction IDs should be populated from the reference model, which will be forced to be included in the context specific model, "
                 f"regardless of expression level\n")
-
+    
     # Assert output types are valid
     for output_type in output_filetypes:
         if output_type not in ["xml", "mat", "json"]:
-            raise ValueError(f"Output file type '{output_type}' not recognized. Output file types must be one of the following: xml, mat, json")
-
+            raise ValueError(
+                f"Output file type '{output_type}' not recognized. Output file types must be one of the following: xml, mat, json")
+    
     if recon_alg not in ["FASTCORE", "GIMME", "IMAT", "TINIT"]:
         raise ValueError(f"Algorithm {recon_alg} not supported. Use one of: GIMME, FASTCORE, or IMAT")
     
@@ -884,19 +914,19 @@ def main(argv):
     print(f"Constructing model of {context_name} with {recon_alg} reconstruction algorithm using {solver} solver")
     
     context_model, core_list, infeas_df = create_context_specific_model(
-        reference_model,
-        genefile,
-        recon_alg,
-        objective,
-        exclude_rxns,
-        force_rxns,
-        bound_rxns,
-        lower_bound,
-        upper_bound,
-        solver,
-        context_name,
-        low_threshold,
-        high_threshold
+        general_model_filepath=reference_model_filepath,
+        gene_expression_file=genefile,
+        recon_algorithm=recon_alg,
+        objective=objective,
+        exclude_rxns=exclude_rxns,
+        force_rxns=force_rxns,
+        bound_rxns=bound_rxns,
+        bound_lb=lower_bound,
+        bound_ub=upper_bound,
+        solver=solver,
+        context_name=context_name,
+        low_thresh=low_threshold,
+        high_thresh=high_threshold
     )
     
     infeas_df.to_csv(
