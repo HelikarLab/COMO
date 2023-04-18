@@ -32,7 +32,9 @@ make_logical_matrix <- function(wd, technique, context_names) {
         # Read the file, strip white space, and set the header
         new_matrix <- read.table(f, strip.white = TRUE, header = TRUE, sep = ",", row.names = NULL) %>%
           mutate(across(-1, as.numeric)) %>%                        # Make sure all columns (excluding index 0) are numeric
-          mutate(ENTREZ_GENE_ID = as.character(ENTREZ_GENE_ID))     # Make index 0 a character
+          mutate(ENTREZ_GENE_ID = as.character(ENTREZ_GENE_ID)) %>% # Make index 0 a character
+          group_by(ENTREZ_GENE_ID) %>%                              # Group by the index 0 column
+          summarize(across(everything(), mean))                     # For the remaining columns, if there are duplicate IDs, take the average of them
         
         # Rename \"ENTREZ_GENE_ID\" to ENTREZ_GENE_ID
         colnames(new_matrix) <- gsub('\"', '', colnames(new_matrix))
@@ -48,7 +50,7 @@ make_logical_matrix <- function(wd, technique, context_names) {
               )
         }
     }
-    
+
     if (technique == "zfpkm") {
         cutoff <- -3
         logical_matrix <- do.call(
@@ -286,8 +288,7 @@ plot_UMAP_batches <- function(log_mat_batch, batches, wd, label, n_neigh, min_di
     coords <- data.frame(
       umap(
         binary_matrix,
-        n_neighbors = 2,
-        learning_rate = 0.5,
+        n_neighbors = n_neigh,
         init = "pca",
         min_dist = min_dist
       )
@@ -370,7 +371,7 @@ plot_UMAP_contexts <- function(log_mat_context, contexts, wd, label, n_neigh, mi
         print("Cannot cluster contexts if n nearest neighbors is < 1!")
         stop()
     }
-    fac_matrix <- do.call(
+    binary_matrix <- do.call(
       cbind,
       lapply(
         seq_len(ncol(log_mat_context)),
@@ -382,9 +383,9 @@ plot_UMAP_contexts <- function(log_mat_context, contexts, wd, label, n_neigh, mi
     
     coords <- data.frame(
       umap(
-        fac_matrix,
+        binary_matrix,
         n_neighbors = n_neigh,
-        metric = "euclidean",
+        init = "pca",
         min_dist = min_dist
       )
     )

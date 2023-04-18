@@ -15,34 +15,21 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
     """
     if isinstance(stringlist, str):
         
-        # Remove any brackets from the first and last items; replace quotation marks and commas with nothing
-        new_list: list[str] = stringlist.strip("[]").replace("'", "").replace(" ", "").split(",")
-        
-        # Show a warning if more than one item is present in the list (this means we are using the old method)
-        if len(new_list) > 1:
+        if stringlist.startswith("[") and stringlist.endswith("]"):
+            # Remove any brackets from the first and last items; replace quotation marks and commas with nothing
+            new_list: list[str] = stringlist.strip("[]").replace("'", "").replace(" ", "").split(",")
+            
+            # Show a warning if more than one item is present in the list (this means we are using the old method)
             print("DeprecationWarning: Please use the new method of providing context names, i.e. --output-filetypes 'type1 type2 type3'.")
             print("If you are using COMO, this can be done by setting the 'context_names' variable to a simple string separated by spaces. Here are a few examples!")
             print("context_names = 'cellType1 cellType2 cellType3'")
             print("output_filetypes = 'output1 output2 output3'")
             print("\nYour current method of passing context names will be removed in the future. Please update your variables above accordingly!\n\n")
+            
+        else:
+            new_list: list[str] = stringlist.split(" ")
 
         return new_list
-    
-    # first_context: str = stringlist[0]
-    # last_context: str = stringlist[-1]
-    #
-    # if first_context.startswith("[") and last_context.endswith("]"):
-    #     print("DeprecationWarning: Please use the new method of providing context names, i.e. --output-filetypes 'typ1 type 2 type3'.")
-    #     print("If you are using COMO, this can be done by setting the 'context_names' variable to a simple string separated by spaces. Here are a few examples!")
-    #     print("context_names = 'cellType1 cellType2 cellType3'")
-    #     print("output_filetypes = 'output1 output2 output3'")
-    #     print("\nYour current method of passing context names will be removed in the future. Please update your variables above accordingly!\n\n")
-    #
-    #     # Remove any brackets from the first and last items; replace quotation marks and commas with nothing
-    #     return [
-    #         i.strip("[]").replace("'", "").replace(",", "")
-    #         for i in stringlist
-    #     ]
     return stringlist
 
 @contextlib.contextmanager
