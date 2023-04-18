@@ -284,23 +284,6 @@ def main(argv: list[str]) -> None:
         seed=seed,
     )
 
-    # cluster_io.cluster_samples_main(
-    #     wd,
-    #     context_names,
-    #     technique,
-    #     clust_algo,
-    #     label,
-    #     min_dist=min_dist,
-    #     n_neigh_rep=n_neigh_rep,
-    #     n_neigh_batch=n_neigh_batch,
-    #     n_neigh_cont=n_neigh_cont,
-    #     rep_ratio=rep_ratio,
-    #     batch_ratio=batch_ratio,
-    #     quantile=quantile,
-    #     min_count=min_count,
-    #     seed=seed
-    # )
-
 
 if __name__ == "__main__":
     main(sys.argv[1:])
