@@ -15,7 +15,7 @@ class Rpy2:
         self._args = args
         self._kwargs = kwargs
 
-    def call_function(self, r_function_name: str) -> typing.Any:
+    def call_function(self, r_function_name: str, *args, **kwargs) -> typing.Any:
         """
         Call an R function
         Taken in part from: https://gist.github.com/indraniel/da11c4f79c79b5e6bfb8
