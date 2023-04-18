@@ -1,12 +1,11 @@
 import rpy2
 import typing
 from pathlib import Path
-from rpy2 import robjects
 from rpy2.robjects import packages
 
 
 class Rpy2:
-    def __init__(self, r_file_path: Path, *args: list, **kwargs: dict) -> None:
+    def __init__(self, r_file_path: Path, *args, **kwargs) -> None:
         """
         This class is responsible for providing access to rpy2
         """

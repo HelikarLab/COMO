@@ -6,13 +6,14 @@
 suppressPackageStartupMessages(library(ggplot2))
 suppressPackageStartupMessages(library(ggrepel))
 suppressPackageStartupMessages(library(tidyverse))
-suppressPackageStartupMessages(library(factominer))
+suppressPackageStartupMessages(library(FactoMineR))
 suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(uwot))
 
 
 make_logical_matrix <- function(wd, technique, context_names) {
     ### organize logical matrix
+    files <- NULL
     for (context in context_names) {
         if (technique == "zfpkm") {
             files <- c(files, Sys.glob(file.path(wd, context, "**", "zFPKM_Matrix_*.csv")))
@@ -26,23 +27,27 @@ make_logical_matrix <- function(wd, technique, context_names) {
         }
     }
     
-    cnt <- 0
+    is_first <- TRUE
     for (f in files) {
-        new_matrix <- read.table(f, strip.white = T, header = T, sep = ",", row.names = NULL) %>% # read expression matrix
-          mutate(across(colnames(.)[-1], as.numeric)) %>% # ensure expression values are numbers
-          mutate(across(colnames(.)[1], as.character)) %>% # ensure entrez IDs are character
-          group_by("ENTREZ_GENE_ID") %>%
-          summarise_each(funs(max)) # if multiple of same entrez, take max value
+        # Read the file, strip white space, and set the header
+        new_matrix <- read.table(f, strip.white = TRUE, header = TRUE, sep = ",", row.names = NULL) %>%
+          mutate(across(-1, as.numeric)) %>%                        # Make sure all columns (excluding index 0) are numeric
+          mutate(ENTREZ_GENE_ID = as.character(ENTREZ_GENE_ID))     # Make index 0 a character
         
-        #if ( "X" %in% colnames(new_matrix) ) {
-        #  new_matrix <- new_matrix %>% select(-X)
-        #}
-        if (!cnt) { merge_matrix <- new_matrix }
-        else { merge_matrix <- merge_matrix %>% left_join(new_matrix, by = "ENTREZ_GENE_ID") }
-        cnt <- cnt + 1
+        # Rename \"ENTREZ_GENE_ID\" to ENTREZ_GENE_ID
+        colnames(new_matrix) <- gsub('\"', '', colnames(new_matrix))
+        
+        if (is_first) {
+            merge_matrix <- new_matrix
+            is_first <- FALSE
+        } else {
+            merge_matrix <- merge_matrix %>%
+              dplyr::left_join(
+                new_matrix,
+                by = "ENTREZ_GENE_ID"
+              )
+        }
     }
-    
-    print(merge_matrix)
     
     if (technique == "zfpkm") {
         cutoff <- -3
@@ -165,12 +170,13 @@ plot_UMAP_replicates <- function(logical_matrix, contexts, wd, label, n_neigh, m
              }
       )
     )
-
+    
     coords <- data.frame(
-      uwot::umap(fac_matrix,
-           n_neighbors = n_neigh,
-           metric = "euclidean",
-           min_dist = min_dist
+      uwot::umap(
+        X = fac_matrix,
+        n_neighbors = n_neigh,
+        metric = "euclidean",
+        min_dist = min_dist
       )
     ) %>% cbind(., contexts)
     row.names(coords) <- row.names(logical_matrix)
@@ -253,10 +259,9 @@ plot_MCA_batches <- function(log_mat_batch, batches, wd, label) {
 
 
 plot_UMAP_batches <- function(log_mat_batch, batches, wd, label, n_neigh, min_dist) {
-    
     n_neigh <- ifelse(n_neigh == "default", as.integer(length(batches)), n_neigh)
     if (n_neigh < 2) {
-        print("Cannot cluster batches if n nearest neighbors is < 1!")
+        print("Cannot cluster batches if n nearest neighbors is < 2!")
         stop()
     }
     
@@ -268,7 +273,7 @@ plot_UMAP_batches <- function(log_mat_batch, batches, wd, label, n_neigh, min_di
       }
     ) %>% unlist(.)
     
-    fac_matrix <- do.call(
+    binary_matrix <- do.call(
       cbind,
       lapply(
         seq_len(ncol(log_mat_batch)),
@@ -280,9 +285,10 @@ plot_UMAP_batches <- function(log_mat_batch, batches, wd, label, n_neigh, min_di
     
     coords <- data.frame(
       umap(
-        fac_matrix,
-        n_neighbors = n_neigh,
-        metric = "euclidean",
+        binary_matrix,
+        n_neighbors = 2,
+        learning_rate = 0.5,
+        init = "pca",
         min_dist = min_dist
       )
     )
@@ -302,7 +308,6 @@ plot_UMAP_batches <- function(log_mat_batch, batches, wd, label, n_neigh, min_di
       labs(x = "Dim 1", y = "Dim 2")
     print(p)
     dev.off()
-    
 }
 
 
