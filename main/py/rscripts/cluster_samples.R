@@ -6,13 +6,13 @@
 suppressPackageStartupMessages(library(ggplot2))
 suppressPackageStartupMessages(library(ggrepel))
 suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(factominer))
 suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(uwot))
 
 
 make_logical_matrix <- function(wd, technique, context_names) {
     ### organize logical matrix
-    files <- c()
     for (context in context_names) {
         if (technique == "zfpkm") {
             files <- c(files, Sys.glob(file.path(wd, context, "**", "zFPKM_Matrix_*.csv")))
@@ -26,24 +26,26 @@ make_logical_matrix <- function(wd, technique, context_names) {
         }
     }
     
-    
     cnt <- 0
     for (f in files) {
         new_matrix <- read.table(f, strip.white = T, header = T, sep = ",", row.names = NULL) %>% # read expression matrix
           mutate(across(colnames(.)[-1], as.numeric)) %>% # ensure expression values are numbers
           mutate(across(colnames(.)[1], as.character)) %>% # ensure entrez IDs are character
-          group_by(ent) %>%
+          group_by("ENTREZ_GENE_ID") %>%
           summarise_each(funs(max)) # if multiple of same entrez, take max value
         
         #if ( "X" %in% colnames(new_matrix) ) {
         #  new_matrix <- new_matrix %>% select(-X)
         #}
         if (!cnt) { merge_matrix <- new_matrix }
-        else { merge_matrix <- merge_matrix %>% left_join(new_matrix, by = "ent") }
+        else { merge_matrix <- merge_matrix %>% left_join(new_matrix, by = "ENTREZ_GENE_ID") }
         cnt <- cnt + 1
     }
+    
+    print(merge_matrix)
+    
     if (technique == "zfpkm") {
-        cutoff = -3
+        cutoff <- -3
         logical_matrix <- do.call(
           cbind,
           lapply(
@@ -54,7 +56,7 @@ make_logical_matrix <- function(wd, technique, context_names) {
           )
         ) %>%
           as.data.frame(.) %>%
-          cbind(merge_matrix["ent"], .) %>%
+          cbind(merge_matrix["ENTREZ_GENE_ID"], .) %>%
           na.omit(.)
     } else if (technique == "quantile") {
         logical_matrix <- do.call(
@@ -62,13 +64,13 @@ make_logical_matrix <- function(wd, technique, context_names) {
           lapply(
             2:ncol(merge_matrix),
             function(j) {
-                cutoff = quantile(merge_matrix[, j], prob = 1 - quantile / 100)
+                cutoff <- quantile(merge_matrix[, j], prob = 1 - quantile / 100)
                 merge_matrix[, j] > cutoff
             }
           )
         ) %>%
           as.data.frame(.) %>%
-          cbind(merge_matrix["ent"], .) %>%
+          cbind(merge_matrix["ENTREZ_GENE_ID"], .) %>%
           na.omit(.)
     } else if (technique == "cpm") {
         logical_matrix <- do.call(
@@ -76,20 +78,21 @@ make_logical_matrix <- function(wd, technique, context_names) {
           lapply(
             2:ncol(merge_matrix),
             function(j) {
-                cutoff = ifelse(min_count == "default",
-                                10e6 / (median(sum(merge_matrix[, j]))),
-                                1e6 * min_count / (median(sum(merge_matrix[, j])))
+                cutoff <- ifelse(
+                  min_count == "default",
+                  10e6 / (median(sum(merge_matrix[, j]))),
+                  1e6 * min_count / (median(sum(merge_matrix[, j])))
                 )
                 merge_matrix[, j] > cutoff
             }
           )
         ) %>%
           as.data.frame(a.) %>%
-          cbind(merge_matrix["ent"], .) %>%
+          cbind(merge_matrix["ENTREZ_GENE_ID"], .) %>%
           na.omit(.)
     }
     colnames(logical_matrix) <- colnames(merge_matrix)
-    rsums <- rowSums(logical_matrix[, -1])
+    # rsums <- rowSums(logical_matrix[, -1])
     logical_matrix <- logical_matrix %>%
       .[rowSums(.[, -1]) < ncol(.) - 1,] %>%
       .[rowSums(.[, -1]) > 0,]
@@ -101,8 +104,8 @@ make_logical_matrix <- function(wd, technique, context_names) {
 
 
 parse_contexts <- function(logical_matrix) {
-    contexts <- c()
-    batches <- c()
+    contexts <- NULL
+    batches <- NULL
     contexts <- lapply(
       row.names(logical_matrix),
       function(r) {
@@ -156,15 +159,15 @@ plot_UMAP_replicates <- function(logical_matrix, contexts, wd, label, n_neigh, m
     
     fac_matrix <- do.call(
       cbind,
-      lapply(1:ncol(logical_matrix),
+      lapply(seq_len(ncol(logical_matrix)),
              function(n) {
                  as.numeric(logical_matrix[, n])
              }
       )
     )
-    
+
     coords <- data.frame(
-      umap(fac_matrix,
+      uwot::umap(fac_matrix,
            n_neighbors = n_neigh,
            metric = "euclidean",
            min_dist = min_dist
@@ -223,7 +226,7 @@ make_batch_logical_matrix <- function(logical_matrix, batches, ratio) {
 
 
 plot_MCA_batches <- function(log_mat_batch, batches, wd, label) {
-    contexts <- c()
+    contexts <- NULL
     contexts <- lapply(batches, function(r) {
         c(contexts, unlist(strsplit(r, "_S"))[1])
     }) %>% unlist(.)
@@ -257,7 +260,7 @@ plot_UMAP_batches <- function(log_mat_batch, batches, wd, label, n_neigh, min_di
         stop()
     }
     
-    contexts <- c()
+    contexts <- NULL
     contexts <- lapply(
       batches,
       function(r) {
@@ -268,7 +271,7 @@ plot_UMAP_batches <- function(log_mat_batch, batches, wd, label, n_neigh, min_di
     fac_matrix <- do.call(
       cbind,
       lapply(
-        1:ncol(log_mat_batch),
+        seq_len(ncol(log_mat_batch)),
         function(n) {
             as.numeric(log_mat_batch[, n])
         }
@@ -365,7 +368,7 @@ plot_UMAP_contexts <- function(log_mat_context, contexts, wd, label, n_neigh, mi
     fac_matrix <- do.call(
       cbind,
       lapply(
-        1:ncol(log_mat_context),
+        seq_len(ncol(log_mat_context)),
         function(n) {
             as.numeric(log_mat_context[, n])
         }
