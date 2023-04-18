@@ -5,6 +5,7 @@ import sys
 # from rpy2.robjects.packages import importr
 # from rpy2.robjects import pandas2ri
 import argparse
+import numpy as np
 from pathlib import Path
 
 
@@ -153,7 +154,7 @@ def main(argv: list[str]) -> None:
         "--seed",
         type=int,
         required=False,
-        default=12345,
+        default=-1,
         dest="seed",
         help="""Random seed for clustering algorithm initialization""",
     )
@@ -163,7 +164,7 @@ def main(argv: list[str]) -> None:
     context_names = stringlist_to_list(args.context_names)
     technique = args.technique.lower()
     clust_algo = args.clust_algo.lower()
-    label: bool = args.label
+    label = args.label
     rep_ratio = args.rep_ratio
     batch_ratio = args.batch_ratio
     min_count = args.min_count
@@ -172,7 +173,12 @@ def main(argv: list[str]) -> None:
     n_neigh_rep = args.n_neigh_rep
     n_neigh_batch = args.n_neigh_batch
     n_neigh_cont = args.n_neigh_cont
-    seed = args.seed
+    
+    # Set a random seed if none provided
+    if int(args.seed) == -1:
+        seed = np.random.randint(0, 100000)
+    else:
+        seed = args.seed
 
     if type(min_count) == str and not min_count.lower() == "default":
         try:
