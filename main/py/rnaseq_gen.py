@@ -98,7 +98,7 @@ def handle_context_batch(
             configs.datadir, "data_matrices", context_name, rnaseq_input_file
         )
         if not os.path.exists(rnaseq_input_filepath):
-            print(f"Gene counts matrix not found at {rnaseq_input_filepath}. \n"
+            print(f"Gene counts matrix not found at {rnaseq_input_filepath}\n"
                   f"Skipping... ")
             continue
         
