@@ -1,4 +1,4 @@
-FROM jupyter/r-notebook:latest
+FROM jupyter/docker-stacks-foundation:latest
 
 ARG GRB_SHORT_VERSION=10.0
 ARG GRB_VERSION=10.0.0
