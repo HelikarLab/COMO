@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - r
   - default
+  - gurobi
 dependencies:
   - bioconductor-affy==1.72.0
   - bioconductor-affyio==1.64.0
@@ -18,6 +19,7 @@ dependencies:
   - r-irdisplay==1.1
   - r-biocmanager==1.30.18
   - r-devtools==2.4.3
+  - conda-forge::r-factominer==2.8
   - r-ggrepel==0.9.1
   - r-locfit==1.5_9.5
   - r-readxl==1.4.0
@@ -45,17 +47,18 @@ dependencies:
   - crux-toolkit==4.1
   - tqdm==4.64.1
   - scanpy==1.9.1
+  - escher==1.7.3
+  - gurobi==10.0
+  - openpyxl==3.0.10
+  - jupyterlab-spreadsheet-editor==0.6
+  - aioftp==0.21.2
+  - bioservices==1.11.2
+  - python-libsbml==5.19.2
+  - optlang==1.5.2
+  - cobra==0.25.0
   - pip==22.1.2
   - pip:
-    - aioftp==0.21.2
-    - bioservices==1.11.2
-    - python-libsbml==5.19.2
-    - optlang==1.5.2
-    - cobra==0.25.0
     - memote==0.13.0
     - framed==0.5.2
-    - pytest==4.6.11
-    - escher==1.7.3
-    - gurobipy==9.5.2
-    - openpyxl==3.0.10
-    - jupyterlab-spreadsheet-editor==0.6
+#    - pytest==4.6.11
+
