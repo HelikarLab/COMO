@@ -1,7 +1,7 @@
-library("stringr")
-library("dplyr")
-library("tidyverse")
-library("ggplot2")
+suppressPackageStartupMessages(library("stringr"))
+suppressPackageStartupMessages(library("dplyr"))
+suppressPackageStartupMessages(library("tidyverse"))
+suppressPackageStartupMessages(library("ggplot2"))
 
 username <- Sys.info()["user"]
 work_dir <- str_interp("/home/${username}/main")

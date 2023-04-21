@@ -18,16 +18,12 @@ library(genefilter)
 library(biomaRt)
 library(sjmisc)
 library(zFPKM)
-library(zFPKM)
 library(stringr)
 library(readxl)
 library(dplyr)
 
 
 read_counts_matrix <- function(counts_matrix_filepath, config_filepath, info_filepath, context_name) {
-
-    # print(context_name)
-
     config_object <- read_excel(config_filepath, sheet=context_name)# read configuration sheet
     counts_matrix <- read.csv(counts_matrix_filepath, header=TRUE) %>% arrange(., genes) # read counts matrix
 

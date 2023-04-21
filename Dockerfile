@@ -22,9 +22,10 @@ RUN git clone https://github.com/babessell1/cobamp.git \
     && pip cache purge
 
 # Install python-related items
-RUN conda config --quiet --add channels conda-forge \
+# R channel will be placed at the bottom
+RUN conda config --quiet --add channels r \
     && conda config --quiet --add channels bioconda \
-    && conda config --quiet --add channels r \
+    && conda config --quiet --add channels conda-forge \
     && mamba env update --name=base --file="${HOME}/environment.yaml" \
     && R -e "devtools::install_github('babessell1/zFPKM')" \
     # Install gurbori
