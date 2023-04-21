@@ -2,9 +2,14 @@ import asyncio
 import pandas as pd
 from bioservices import BioDBNet
 
-from input_database import InputDatabase
-from output_database import OutputDatabase
-from taxon_ids import TaxonIDs
+try:
+    from input_database import InputDatabase
+    from output_database import OutputDatabase
+    from taxon_ids import TaxonIDs
+except ImportError:
+    from .input_database import InputDatabase
+    from .output_database import OutputDatabase
+    from .taxon_ids import TaxonIDs
 
 async def _async_fetch_info(
         biodbnet: BioDBNet,
