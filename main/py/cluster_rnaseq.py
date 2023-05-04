@@ -96,7 +96,7 @@ def main(argv: list[str]) -> None:
     parser.add_argument(
         "-b",
         "--batch-ratio",
-        type=str or float,
+        type=str,
         required=False,
         default=0.9,
         dest="batch_ratio",
@@ -105,7 +105,7 @@ def main(argv: list[str]) -> None:
     parser.add_argument(
         "-nr",
         "--n-neighbors-rep",
-        type=str or float,
+        type=str,
         required=False,
         default="default",
         dest="n_neigh_rep",
@@ -114,7 +114,7 @@ def main(argv: list[str]) -> None:
     parser.add_argument(
         "-nb",
         "--n-neighbors-batch",
-        type=str or float,
+        type=str,
         required=False,
         default="default",
         dest="n_neigh_batch",
@@ -123,7 +123,7 @@ def main(argv: list[str]) -> None:
     parser.add_argument(
         "-nc",
         "--n-neighbors-context",
-        type=str or float,
+        type=str,
         required=False,
         default="default",
         dest="n_neigh_cont",
@@ -132,7 +132,7 @@ def main(argv: list[str]) -> None:
     parser.add_argument(
         "-c",
         "--min-count",
-        type=str or int,
+        type=str,
         required=False,
         default="default",
         dest="min_count",
@@ -141,7 +141,7 @@ def main(argv: list[str]) -> None:
     parser.add_argument(
         "-q",
         "--quantile",
-        type=str or int,
+        type=str,
         required=False,
         default=0.5,
         dest="quantile",
