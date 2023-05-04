@@ -6,17 +6,19 @@ import cobra
 import collections
 import argparse
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from pathlib import Path
 from warnings import warn
+from typing import Optional
 from cobra.flux_analysis import pfba
 from cobamp.wrappers import COBRAModelObjectReader
 from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
 from troppo.methods.reconstruction.imat import IMAT, IMATProperties
 from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
-from project import configs
 
+from project import configs
 from utilities import stringlist_to_list
 
 sys.setrecursionlimit(1500)  # for re.search
@@ -209,11 +211,11 @@ def feasibility_test(
 
 def seed_gimme(
     cobra_model: cobra.Model,
-    s_matrix: np.ndarray,
+    s_matrix: npt.NDArray[np.float32],
     lb: list[float],
     ub: list[float],
     idx_objective: int,
-    expr_vector: np.ndarray
+    expr_vector: npt.NDArray[np.float32]
 ) -> cobra.Model:
     # `Becker and Palsson (2008). Context-specific metabolic networks are
     # consistent with experiments. PLoS Comput. Biol. 4, e1000082.`
@@ -242,7 +244,7 @@ def seed_gimme(
 
 def seed_fastcore(
     cobra_model: cobra.Model,
-    s_matrix: np.ndarray,
+    s_matrix: npt.NDArray[np.float32],
     lb: list[float],
     ub: list[float],
     exp_idx_list: list[int],
@@ -271,8 +273,14 @@ def seed_fastcore(
 
 
 def seed_imat(
-        cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force, context_name
-):
+    cobra_model: cobra.Model,
+    s_matrix: npt.NDArray[np.float32],
+    lb: list[float],
+    ub: list[float],
+    expr_vector: npt.NDArray[np.float32],
+    expr_thesh: tuple[float, float],
+    idx_force: list[int]
+) -> tuple[cobra.Model, pd.DataFrame]:
     expr_vector = np.array(expr_vector)
     print("expr_vector:")
     print(expr_vector[:10])
@@ -305,7 +313,15 @@ def seed_imat(
     return context_cobra_model, flux_df
 
 
-def seed_tinit(cobra_model, s_matrix, lb, ub, expr_vector, solver, idx_force):
+def seed_tinit(
+    cobra_model: cobra.Model,
+    s_matrix: npt.NDArray[np.float32],
+    lb: list[float],
+    ub: list[float],
+    expr_vector: npt.NDArray[np.float32],
+    solver: str,
+    idx_force: list[int]
+) -> cobra.Model:
     expr_vector = np.array(expr_vector)
     cobra_model
     properties = tINITProperties(
@@ -319,16 +335,17 @@ def seed_tinit(cobra_model, s_matrix, lb, ub, expr_vector, solver, idx_force):
     algorithm = tINIT(s_matrix, lb, ub, properties)
     algorithm.preprocessing()
     algorithm.build_problem()
+    return cobra_model
 
 
-def seed_unsupported(recon_algorithm):
-    print(
-        f"Unsupported reconstruction algorithm: {recon_algorithm}. Must be either 'IMAT', 'GIMME', 'FASTCORE'"
-    )
-    sys.exit()
+def seed_unsupported(recon_algorithm: str) -> None:
+    raise ValueError(f"Unsupported reconstruction algorithm: {recon_algorithm}. Must be one of 'IMAT', 'GIMME', 'FASTCORE'.")
 
 
-def split_gene_expression_data(expression_data, recon_algorithm="GIMME"):
+def split_gene_expression_data(
+    expression_data: pd.DataFrame,
+    recon_algorithm: str = "GIMME"
+) -> pd.DataFrame:
     """
     Splits genes that have mapped to multiple Entrez IDs are formated as "gene12//gene2//gene3"
     """
@@ -362,7 +379,13 @@ def split_gene_expression_data(expression_data, recon_algorithm="GIMME"):
     return gene_expressions
 
 
-def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm, low_thresh=None, high_thresh=None):
+def map_expression_to_rxn(
+    model_cobra: cobra.Model,
+    gene_expression_file: str,
+    recon_algorithm: str,
+    low_thresh: float = 0.0,
+    high_thresh: float = 0.0
+) -> tuple[collections.OrderedDict[str, float | npt.NDArray[np.float32]], npt.NDArray[np.float32]]:
     """
     Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules
     which are defined in general genome-scale metabolic model
@@ -371,13 +394,14 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm, lo
     gene_expressions = split_gene_expression_data(
         expression_data, recon_algorithm=recon_algorithm
     )
-    expression_rxns = collections.OrderedDict()
+    expression_rxns: collections.OrderedDict[str, float | npt.NDArray[np.float32]] = collections.OrderedDict()
     
-    cnt = 0
+    num_errors: int = 0
+    unknown_val: float
     if recon_algorithm in ["IMAT", "TINIT"]:
         print(gene_expressions["Data"].tolist()[0:20])
         # unknown_val = min(gene_expressions["Data"].tolist())
-        unknown_val = np.mean([low_thresh, high_thresh])  # put unknowns in mid bin
+        unknown_val = float(np.mean([low_thresh, high_thresh]))  # put unknowns in mid bin
     elif recon_algorithm == "GIMME":
         unknown_val = -1
     elif recon_algorithm == "FASTCORE":
@@ -385,9 +409,7 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm, lo
     else:
         unknown_val = 1
     
-    test_counter = 0
     for rxn in model_cobra.reactions:
-        test_counter += 1
         gene_reaction_rule = correct_bracket(
             rxn.gene_reaction_rule, rxn.gene_name_reaction_rule
         )
@@ -412,40 +434,40 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm, lo
             expression_rxns[rxn.id] = eval(gene_reaction_by_rule)
         
         except BaseException:
-            cnt += 1
+            num_errors += 1
     
-    print("Map gene expression to reactions, {} errors.".format(cnt))
+    print(f"Map gene expression to reactions, {num_errors} errors")
     expr_vector = np.array(list(expression_rxns.values()), dtype=float)
     
     return expression_rxns, expr_vector
 
 
 def create_context_specific_model(
-        general_model_file,
-        gene_expression_file,
-        recon_algorithm,
-        objective,
-        exclude_rxns,
-        force_rxns,
+        general_model_file: str | Path,
+        gene_expression_file: str | Path,
+        recon_algorithm: str,
+        objective: str,
+        exclude_rxns: list[str],
+        force_rxns: list[str],
         bound_rxns: list[str],
         bound_lb: list[int],
         bound_ub: list[int],
         solver: str,
         context_name: str,
-        low_thresh,
-        high_thresh
-):
+        low_thresh: float,
+        high_thresh: float
+) -> tuple[cobra.Model, list[int], pd.DataFrame]:
     """
     Seed a context specific model. Core reactions are determined from GPR associations with gene expression logicals.
     Core reactions that do not necessarily meet GPR association requirements can be forced if in the force reaction
     file. Metabolite exchange (media), sinks, and demands are determined from exchanges file. Reactions can also be
     force excluded even if they meet GPR association requirements using the force exclude file.
     """
-    if general_model_file[-4:] == ".mat":
+    if str(general_model_file)[-4:] == ".mat":
         cobra_model = cobra.io.load_matlab_model(general_model_file)
-    elif general_model_file[-4:] == ".xml":
+    elif str(general_model_file)[-4:] == ".xml":
         cobra_model = cobra.io.load_sbml_model(general_model_file)
-    elif general_model_file[-5:] == ".json":
+    elif str(general_model_file)[-5:] == ".json":
         cobra_model = cobra.io.load_json_model(general_model_file)
     else:
         raise NameError("reference model format must be .xml, .mat, or .json")
@@ -463,27 +485,26 @@ def create_context_specific_model(
     # set solver
     cobra_model.solver = solver.lower()
     
-    # check number of unsolvable reactions for reference model under media assumptions
-    # incon_rxns, cobra_model = feasibility_test(cobra_model, "before_seeding")
-    incon_rxns = []
-    
     # CoBAMP methods
     cobamp_model = COBRAModelObjectReader(cobra_model)  # load model in readable format for CoBAMP
     cobamp_model.get_irreversibilities(True)
     s_matrix = cobamp_model.get_stoichiometric_matrix()
     lb, ub = cobamp_model.get_model_bounds(False, True)
     rx_names = cobamp_model.get_reaction_and_metabolite_ids()[0]
-    
+
     # get expressed reactions
+    expression_rxns: collections.OrderedDict[str, float | npt.NDArray[np.float32]]
+    expr_vector: npt.NDArray[np.float32]
     expression_rxns, expr_vector = map_expression_to_rxn(
         cobra_model,
-        gene_expression_file,
+        str(gene_expression_file),
         recon_algorithm,
         high_thresh=high_thresh,
         low_thresh=low_thresh
     )
     
     # find reactions in the force reactions file that are not in general model and warn user
+    rxn: str
     for rxn in force_rxns:
         if rxn not in rx_names:
             warn(
@@ -497,6 +518,9 @@ def create_context_specific_model(
     infeas_exp_cnt = 0
     infeas_force_cnt = 0
     
+    incon_rxns: list[str] = []
+    idx: int
+    exp: float | npt.NDArray[np.float32]
     for idx, (rxn, exp) in enumerate(expression_rxns.items()):
         # log reactions in expressed and force lists that are infeasible that the user may wish to review
         if rxn in incon_rxns and expr_vector[idx] == 1:
@@ -521,7 +545,7 @@ def create_context_specific_model(
     idx_obj = rx_names.index(objective)
     idx_force = [rx_names.index(rxn) for rxn in force_rxns if rxn in rx_names]
     exp_idx_list = [idx for (idx, val) in enumerate(expr_vector) if val > 0]
-    exp_thresh = (low_thresh, high_thresh)
+    exp_thresh: tuple[float, float] = (low_thresh, high_thresh)
     
     # switch case dictionary runs the functions making it too slow, better solution then elif ladder?
     if recon_algorithm == "GIMME":
@@ -540,22 +564,28 @@ def create_context_specific_model(
             ub,
             expr_vector,
             exp_thresh,
-            idx_force,
-            context_name,
+            idx_force
         )
     elif recon_algorithm == "TINIT":
         context_model_cobra = seed_tinit(
-            cobra_model, s_matrix, lb, ub, expr_vector, solver, idx_force
+            cobra_model,
+            s_matrix,
+            lb,
+            ub,
+            expr_vector,
+            solver,
+            idx_force
         )
     else:
-        context_model_cobra = seed_unsupported(recon_algorithm)
+        seed_unsupported(recon_algorithm)
     
     # check number of unsolvable reactions for seeded model under media assumptions
     # incon_rxns_cs, context_model_cobra = feasibility_test(context_model_cobra, "after_seeding")
-    incon_rxns_cs = []
+    incon_rxns_cs: list[str] = []
     
     if recon_algorithm in ["IMAT"]:
-        final_rxns = [rxn.id for rxn in context_model_cobra.reactions]
+        reaction: cobra.Reaction
+        final_rxns = [reaction.id for reaction in context_model_cobra.reactions]
         imat_rxns = flux_df.rxn
         for rxn in imat_rxns:
             if rxn not in final_rxns:
@@ -567,7 +597,7 @@ def create_context_specific_model(
     infeas_exp_df = pd.DataFrame({"expressed_infeasible_rxns": infeas_exp_rxns})
     infeas_force_df = pd.DataFrame({"infeasible_rxns_in_force_list": infeas_exp_rxns})
     incon_df_cs = pd.DataFrame({"infeasible_rxns_from_seeding": list(incon_rxns_cs)})
-    infeasible_df = pd.concat(
+    infeasible_df: pd.DataFrame = pd.concat(
         [incon_df, infeas_exp_df, infeas_force_df, incon_df_cs],
         ignore_index=True,
         axis=1,
@@ -582,12 +612,12 @@ def create_context_specific_model(
     return context_model_cobra, exp_idx_list, infeasible_df
 
 
-def print_filetype_help():
+def print_filetype_help() -> None:
     print("Unsupported model format. Current support is for: 'xml', 'mat', and 'json'."
           "Or use multiple with: 'xml mat json'")
 
 
-def parse_args(argv):
+def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="create_context_specific_model.py",
         description="Seed a context-specific model from a list of expressed genes, a reference",
@@ -726,7 +756,7 @@ def parse_args(argv):
     return args
 
 
-def main(argv):
+def main(argv: list[str]) -> None:
     """
     Seed a context-specific model from a list of expressed genes, a reference
     """
@@ -736,9 +766,9 @@ def main(argv):
     reference_model = args.modelfile
     genefile = args.genefile
     objective = args.objective
-    boundary_rxns_filepath = args.boundary_rxns_filepath
-    exclude_rxns_filepath = args.exclude_rxns_filepath
-    force_rxns_filepath = args.force_rxns_filepath
+    boundary_rxns_filepath: Path = Path(args.boundary_rxns_filepath)
+    exclude_rxns_filepath: Path = Path(args.exclude_rxns_filepath)
+    force_rxns_filepath: Path = Path(args.force_rxns_filepath)
     recon_alg = args.algorithm.upper()
     low_threshold = args.low_threshold
     high_threshold = args.high_threshold
@@ -753,18 +783,18 @@ def main(argv):
     
     print(f"Active genes file found at {genefile}")
 
-    bound_rxns = []
-    lower_bound = []
-    upper_bound = []
+    bound_rxns: list[str] = []
+    lower_bound: list[int] = []
+    upper_bound: list[int] = []
     
-    if boundary_rxns_filepath:
-        boundary_rxns_filepath: Path = Path(boundary_rxns_filepath)
+    if boundary_rxns_filepath.name != "":
         
         print(f"Reading {str(boundary_rxns_filepath)} for boundary reactions")
+        df: pd.DataFrame
         if boundary_rxns_filepath.suffix == ".csv":
-            df: pd.DataFrame = pd.read_csv(boundary_rxns_filepath, header=0, sep=",")
+            df = pd.read_csv(boundary_rxns_filepath, header=0, sep=",")
         elif boundary_rxns_filepath.suffix == ".xlsx" or boundary_rxns_filepath.suffix == ".xls":
-            df: pd.DataFrame = pd.read_excel(boundary_rxns_filepath, header=0)
+            df = pd.read_excel(boundary_rxns_filepath, header=0)
         else:
             raise FileNotFoundError(f"Boundary reactions file not found! Must be a csv or xlsx file. Searching for: {boundary_rxns_filepath}")
         
@@ -779,8 +809,8 @@ def main(argv):
         reaction_type: list[str] = df["reaction"].tolist()
         reaction_abbreviation: list[str] = df["abbreviation"].tolist()
         reaction_compartment: list[str] = df["compartment"].tolist()
-        lower_bound: list[float] = df["minimum reaction rate"].tolist()
-        upper_bound: list[float] = df["maximum reaction rate"].tolist()
+        lower_bound = df["minimum reaction rate"].tolist()
+        upper_bound = df["maximum reaction rate"].tolist()
         
         reaction_formula: list[str] = []
         for i in range(len(reaction_type)):
@@ -801,8 +831,7 @@ def main(argv):
         del df
 
     exclude_rxns = []
-    if exclude_rxns_filepath:
-        exclude_rxns_filepath: Path = Path(exclude_rxns_filepath)
+    if exclude_rxns_filepath.name != "":
         try:
             print(f"Reading {exclude_rxns_filepath} for exclude reactions")
             if exclude_rxns_filepath.suffix == ".csv":
@@ -839,8 +868,7 @@ def main(argv):
             sys.exit()
 
     force_rxns = []
-    if force_rxns_filepath:
-        force_rxns_filepath: Path = Path(force_rxns_filepath)
+    if force_rxns_filepath.name != "":
         try:
             print(f"Reading {force_rxns_filepath} for force reactions")
             if force_rxns_filepath.suffix == ".csv":
