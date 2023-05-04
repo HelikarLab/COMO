@@ -11,7 +11,7 @@ configs = project.configs
 madrid_work_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 
-def test_download_gsm_id_maps():
+def test_download_gsm_id_maps() -> None:
     config = project.configs
     data_dir = config.datadir
     gse = ""

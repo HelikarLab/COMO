@@ -17,7 +17,7 @@ class TestDatabases:
     We've chosen a few random input databases to test.
     These values should never change.
     """
-    def test_input_database(self):
+    def test_input_database(self) -> None:
         assert InputDatabase.GENE_ID.value == "Gene ID"
         assert InputDatabase.GENE_SYMBOL.value == "Gene Symbol"
         assert InputDatabase.TAXON_ID.value == "Taxon ID"
@@ -26,7 +26,7 @@ class TestDatabases:
         assert InputDatabase.HGNC_ID.value == "HGNC ID"
         assert InputDatabase.HOMOLOGENE_ID.value == "HomoloGene ID"
 
-    def test_output_database(self):
+    def test_output_database(self) -> None:
         assert OutputDatabase.CPDB_PROTEIN_INTERACTOR.value == "CPDB Protein Interactor"
         assert OutputDatabase.EC_NUMBER.value == "EC Number"
         assert OutputDatabase.GAD_DISEASE_INFO.value == "GAD Disease Info"
@@ -35,12 +35,12 @@ class TestDatabases:
         assert OutputDatabase.KEGG_PATHWAY_ID.value == "KEGG Pathway ID"
         assert OutputDatabase.UNIPROT_ACCESSION.value == "UniProt Accession"
 
-    def test_taxon_ids(self):
+    def test_taxon_ids(self) -> None:
         assert TaxonIDs.HOMO_SAPIENS.value == 9606
         assert TaxonIDs.MUS_MUSCULUS.value == 10090
 
 
-def test_conversion():
+def test_conversion() -> None:
     """
     This test determines if the data collected/converted from async_bioservices.database_convert.fetch_gene_info is correct.
     It does so by comparing the results of fetch_gene_info to a pre-collected dataframe, defined as `static_dataframe`
