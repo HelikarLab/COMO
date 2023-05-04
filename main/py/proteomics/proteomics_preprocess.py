@@ -1,15 +1,17 @@
 """
 This is the main driver-file for downloading proteomics data
 """
-import argparse
-from . import Crux
-import csv
-from .FileInformation import FileInformation
-from . import FTPManager
 import os
+import multiprocessing as mp
+import csv
 import sys
+import argparse
 from pathlib import Path
+from dataclasses import dataclass, field
 
+import Crux
+from FileInformation import FileInformation
+import FTPManager
 
 class ArgParseFormatter(
     argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter
@@ -44,14 +46,15 @@ class ParseCSVInput:
     """
     def __init__(self, input_csv_file: Path):
         self._input_csv_file: Path = input_csv_file
-        self._data: [str, dict[str, list[str]]] = {}
+        self._data: dict[str, dict[str, list[str]]] = {}
         
         # Get data from CSV
         with open(self._input_csv_file, "r") as i_stream:
             reader = csv.reader(i_stream)
             next(reader)
             for line in reader:
-                if line == "" or line[0][0] == "#":  # Skip 'comments' and empty lines
+                # Skip 'comments' and empty lines
+                if line == "" or line[0][0] == "#":  # type: ignore
                     continue
                 else:
                     url = line[0]
@@ -85,7 +88,7 @@ class ParseCSVInput:
             urls = self._data[cell_type]["url"]
             master_urls.extend(urls)
         
-        return urls
+        return master_urls
     
     @property
     def input_cell_types(self) -> list[str]:
@@ -136,18 +139,20 @@ class PopulateInformation:
             file_information: list[FileInformation],
             csv_data: ParseCSVInput,
             skip_download: bool,
-            preferred_extensions: list[str] = None,
+            preferred_extensions: list[str] | None = None,
 
     ):
         self.file_information: list[FileInformation] = file_information
         self._csv_data: ParseCSVInput = csv_data
-        self._csv_data: dict[str, dict[str, list[str]]] = csv_data.csv_dict
+        self._csv_dict: dict[str, dict[str, list[str]]] = csv_data.csv_dict
         self._skip_download: bool = skip_download
 
         # Set default value for extensions to search for
-        self._preferred_extensions: list[str] = preferred_extensions
-        if self._preferred_extensions is None:
+        # self._preferred_extensions: list[str] = preferred_extensions
+        if preferred_extensions is None:
             self._preferred_extensions = ["raw"]
+        else:
+            self._preferred_extensions = preferred_extensions
 
         self._gather_data()
         self._set_replicate_numbers()
@@ -155,13 +160,13 @@ class PopulateInformation:
         if self._skip_download is False:
             self.print_download_size()
             
-    def _gather_data(self):
+    def _gather_data(self) -> None:
         # Iterate through the cell type and corresponding list of URLS
         # cell_type: naiveB
         # ftp_urls: ["url_1", "url_2"]
-        for i, cell_type in enumerate(self._csv_data.keys()):
-            ftp_urls: list[str] = self._csv_data[cell_type]["url"]
-            studies: list[str] = self._csv_data[cell_type]["study"]
+        for i, cell_type in enumerate(self._csv_dict.keys()):
+            ftp_urls: list[str] = self._csv_dict[cell_type]["url"]
+            studies: list[str] = self._csv_dict[cell_type]["study"]
             url_count = 0
         
             # Iterate through the URLs available
@@ -169,7 +174,7 @@ class PopulateInformation:
             
                 # Print updates to he screen
                 print(
-                    f"\rParsing cell type {i + 1} of {len(self._csv_data.keys())} ({cell_type}) | {j + 1} of {len(ftp_urls)} folders navigated",
+                    f"\rParsing cell type {i + 1} of {len(self._csv_dict.keys())} ({cell_type}) | {j + 1} of {len(ftp_urls)} folders navigated",
                     end="",
                     flush=True
                 )
@@ -202,7 +207,7 @@ class PopulateInformation:
             else:
                 print(f" | {url_count} files found")
             
-    def print_download_size(self):
+    def print_download_size(self) -> None:
         # Print the total size to download if we must download data
         total_size: int = 0
         for information in self.file_information:
@@ -212,7 +217,7 @@ class PopulateInformation:
         total_size = total_size // 1024 ** 2
         print(f"Total size to download: {total_size} MB")
 
-    def _set_replicate_numbers(self):
+    def _set_replicate_numbers(self) -> None:
         instances: dict[str, list[FileInformation]] = {}
         for information in self.file_information:
             if information.cell_type not in instances.keys():
@@ -232,7 +237,7 @@ class PopulateInformation:
                 elif current_info.cell_type == previous_info.cell_type and current_info.study == previous_info.study:
                     replicate_num += 1
                 else:
-                    replicate_num: int = 1
+                    replicate_num = 1
                     
                 replicate_value: str = f"R{replicate_num}"
                 current_info.set_replicate(replicate_value)
@@ -301,7 +306,7 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         required=False,
         dest="skip_download",
         default=False,
-        type=bool,
+        action="store_true",
         help="If this action is passed in, FTP data will not be downloaded.\n"
              "This assumes you have raw data under the folder specified by the option '--ftp-out-dir'",
     )
@@ -309,8 +314,8 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         "--skip-mzml",
         required=False,
         dest="skip_mzml",
-        type=bool,
         default=False,
+        action="store_true",
         help="If this action is passed in, files will not be converted from RAW to mzML format.\n"
         "This assumes you have mzML files under the folder specified by the option '--mzml-out-dir'.\n"
         "This will continue the workflow from SQT file creation -> CSV ion intensity creation.\n"
@@ -320,61 +325,76 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         "--skip-sqt",
         required=False,
         dest="skip_sqt",
-        type=bool,
         default=False,
+        action="store_true",
         help="If this action is passed in, SQT files will not be created. This assumes you have SQT files under the folder specified by the option '--sqt-out-dir'.\n"
         "This will only read data from SQT files and create a CSV ion intensity file.\n"
         "If this option is passed in, FTP data will not be downloaded, RAW files will not be converted, and SQT files will not be created.",
     )
+    
     parser.add_argument(
         "-c",
         "--cores",
         required=False,
         dest="core_count",
         metavar="cores",
-        default=os.cpu_count() // 2,
+        default=mp.cpu_count() // 2 or 1,
         help="This is the number of threads to use for downloading files.\n"
              "It will default to the minimum of: half the available CPU cores available, or the number of input files found.\n"
              "It will not use more cores than necessary\n"
              "Options are an integer or 'all' to use all available cores.\n"
-             "Note: Downloading will use a MAX of 2 threads at once, as some FTP servers do not work well with multiple connections from the same IP address at once.",
+             "Note: Downloading will use a MAX of 2 threads at once, as some FTP servers do not work well with multiple connections from the same IP address at once. Other processes will use all provided cores.",
     )
     # TODO: Add option to delete intermediate files (raw, mzml, sqt)
 
-    args: argparse.Namespace = parser.parse_args(args)
-    args.extensions = args.extensions.split(",")
-
-    # Validte the input file exists
-    if not Path(args.input_csv).is_file():
-        print(f"Input file {args.input} does not exist!")
-        raise FileNotFoundError
-
-    try:
-        # Try to get an integer, fails if "all" input
-        args.core_count = int(args.core_count)
-        if args.core_count > os.cpu_count():
-            print(f"{args.core_count} cores not available, system only has {os.cpu_count()} cores. Setting '--cores' to {os.cpu_count()}")  # fmt: skip
-            args.core_count = os.cpu_count()
-    except ValueError:
-        if args.core_count == "all":
-            args.core_count = os.cpu_count()
-        else:
-            print(f"Invalid option '{args.core_count}' for option '--cores'. Enter an integer or 'all' to use all cores")  # fmt: skip
-            exit(2)
-
-    return args
+    return parser.parse_args(args)
         
 
-def main(args: list[str]):
+@dataclass
+class Arguments:
+    input_csv: Path
+    database: Path
+    skip_download: bool
+    skip_mzml: bool
+    skip_sqt: bool
+    core_count: int | str
+    
+    # Split extensions by comma, strip whitespace, and remove empty strings
+    extensions: list[str] = field(default_factory=lambda: [x.strip() for x in os.environ.get("EXTENSIONS", "raw").split(",") if x.strip() != ""])
+
+    def __post_init__(self) -> None:
+        self.input_csv = Path(self.input_csv)
+        if not self.input_csv.is_file():
+            raise FileNotFoundError(f"Input file {self.input_csv} does not exist!")
+        
+        if isinstance(self.core_count, int) or self.core_count.isdigit():
+            self.core_count: int = int(self.core_count)
+            if self.core_count > mp.cpu_count():
+                print(f"{self.core_count} cores not available, system only has {os.cpu_count()} cores. Setting '--cores' to {os.cpu_count()}")
+                self.core_count = mp.cpu_count()
+        elif self.core_count == "all":
+            self.core_count = mp.cpu_count()
+        else:
+            raise ValueError(f"Invalid option '{self.core_count}' for option '--cores'. Enter an integer or 'all' to use all cores")
+
+
+def main(argv: list[str]) -> None:
     """
     This is the main driver function
 
-    :param args: The list of arguments collected from the command line
+    :param argv: The list of arguments collected from the command line
     """
     file_information: list[FileInformation] = []
-    args: argparse.Namespace = parse_args(args)
+    
+    # Use class for arguments to allow for type hinting; https://stackoverflow.com/a/71035314
+    args: Arguments = Arguments(**vars(parse_args(argv)))
     csv_data = ParseCSVInput(args.input_csv)
-
+    
+    # print(args)
+    # print(args.extensions)
+    # print(f"{[1,2,3]}")
+    # exit(1)
+    
     """
         This comment is for the logic surrounding "skipping" a step in the workflow
         1. skip_download (download FTP data - FTPManager)
@@ -390,11 +410,6 @@ def main(args: list[str]):
                 do_tasks
         Because we are performing tasks if the "skip" is False
         """
-    if args.skip_sqt:
-        args.skip_mzml = True
-        args.skip_download = True
-    elif args.skip_mzml:
-        args.skip_download = True
     
     # Populate the file_information list
     PopulateInformation(

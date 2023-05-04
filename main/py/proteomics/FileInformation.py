@@ -25,7 +25,7 @@ class FileInformation:
     # Create an "all_instances" variable of type list[FileInformation]
     # This allows us to search through ALL instances of every FileInformation with functions declared here
     # From: https://stackoverflow.com/a/17253634
-    instances: list = []
+    instances: list["FileInformation"] = []
     
     def __init__(
         self,
@@ -40,39 +40,46 @@ class FileInformation:
     ) -> None:
         # File information
         self.cell_type: str = cell_type
-        self.download_url: str = download_url
-        self.file_size: int = file_size
+        
+        if download_url is not None:
+            self.download_url: str = download_url
+        
+        if file_size is not None:
+            self.file_size: int = file_size
         
         # Must check for "None", as we are unable to do study[0] on a None object
+        self.study: str = ""
         if isinstance(study, str):
-            self.study: str = study
+            self.study = study
         elif isinstance(study, int):
-            self.study: str = f"S{study}"
-        else:
-            self.study: str = ""
+            self.study = f"S{study}"
         self.replicate: str = ""
         self.batch: str = f"{study}"
 
         # Base file save paths
+        self.raw_base_path: Path
         if raw_path is None:
-            self.raw_base_path: Path = Path(project.configs.datadir, "results", cell_type, "proteomics", "raw")
+            self.raw_base_path = Path(project.configs.datadir, "results", cell_type, "proteomics", "raw")
         else:
-            self.raw_base_path: Path = raw_path.parent
-        
+            self.raw_base_path = raw_path.parent
+
+        self.mzml_base_path: Path
         if mzml_path is None:
-            self.mzml_base_path: Path = Path(project.configs.datadir, "results", cell_type, "proteomics", "mzml")
+            self.mzml_base_path = Path(project.configs.datadir, "results", cell_type, "proteomics", "mzml")
         else:
-            self.mzml_base_path: Path = mzml_path.parent
+            self.mzml_base_path = mzml_path.parent
         
+        self.sqt_base_path: Path
         if sqt_path is None:
-            self.sqt_base_path: Path = Path(project.configs.datadir, "results", cell_type, "proteomics", "sqt")
+            self.sqt_base_path = Path(project.configs.datadir, "results", cell_type, "proteomics", "sqt")
         else:
-            self.sqt_base_path: Path = sqt_path.parent
+            self.sqt_base_path = sqt_path.parent
             
+        self.intensity_csv: Path
         if intensity_csv is None:
-            self.intensity_csv: Path = Path(project.configs.datadir, "data_matrices", cell_type, f"protein_abundance_matrix_{cell_type}.csv")
+            self.intensity_csv = Path(project.configs.datadir, "data_matrices", cell_type, f"protein_abundance_matrix_{cell_type}.csv")
         else:
-            self.intensity_csv: Path = intensity_csv
+            self.intensity_csv = intensity_csv
             
         # The following variables have inital values set based only on an S# batch, not a replicate
         # The set_replicate function must be called to set the values for a specific replicate, in which these variables will be reset
@@ -94,40 +101,40 @@ class FileInformation:
         
         FileInformation.instances.append(self)
 
-    def set_replicate(self, replicate: str | int):
+    def set_replicate(self, replicate: str | int) -> None:
         """
         This function sets self.replicate, and also resets values that use the "replicate" value before it is used
         """
         # Set the initial replicate value
         if isinstance(replicate, str):
-            self.replicate: str = replicate
+            self.replicate = replicate
         else:
-            self.replicate: str = f"R{replicate}"
+            self.replicate = f"R{replicate}"
         
         # "Reset" additional values
-        self.batch: str = f"{self.study}{self.replicate}"
+        self.batch = f"{self.study}{self.replicate}"
         # File names
-        self.base_name: str = f"{self.cell_type}_{self.batch}_{Path(self.download_url).stem}"
-        self.raw_file_name: str = f"{self.base_name}.raw"
-        self.mzml_file_name: str = f"{self.base_name}.mzml"
-        self.sqt_file_name: str = f"{self.base_name}.target.sqt"
+        self.base_name = f"{self.cell_type}_{self.batch}_{Path(self.download_url).stem}"
+        self.raw_file_name = f"{self.base_name}.raw"
+        self.mzml_file_name = f"{self.base_name}.mzml"
+        self.sqt_file_name = f"{self.base_name}.target.sqt"
 
         # Full file paths
-        self.raw_file_path: Path = Path(self.raw_base_path, self.raw_file_name)
-        self.mzml_file_path: Path = Path(self.mzml_base_path, self.mzml_file_name)
-        self.sqt_file_path: Path = Path(self.sqt_base_path, self.sqt_file_name)
+        self.raw_file_path = Path(self.raw_base_path, self.raw_file_name)
+        self.mzml_file_path = Path(self.mzml_base_path, self.mzml_file_name)
+        self.sqt_file_path = Path(self.sqt_base_path, self.sqt_file_name)
 
         # Intensity dataframe
-        self.base_columns: list[str] = ["uniprot"]
-        self.df_columns: list[str] = self.base_columns + [self.batch]
-        self.intensity_df: pd.DataFrame = pd.DataFrame(columns=self.df_columns)
+        self.base_columns = ["uniprot"]
+        self.df_columns = self.base_columns + [self.batch]
+        self.intensity_df = pd.DataFrame(columns=self.df_columns)
 
     @classmethod
-    def filter_instances(cls, cell_type: str):
+    def filter_instances(cls, cell_type: str) -> list["FileInformation"]:
         """
         This function finds all FileInformation objects that have the given cell type
         """
-        sorted_instances: list = sorted(cls.instances, key=lambda x: x.study)
+        sorted_instances: list[FileInformation] = sorted(cls.instances, key=lambda x: x.study)
         return [instance for instance in sorted_instances if instance.cell_type == cell_type]
 
     @staticmethod

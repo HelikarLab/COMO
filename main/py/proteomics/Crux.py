@@ -15,8 +15,8 @@ import re
 import subprocess
 import tqdm
 
-from .FileInformation import FileInformation
-from .FileInformation import clear_print
+from FileInformation import FileInformation
+from FileInformation import clear_print
 
 
 class RAWtoMZML:
@@ -28,7 +28,7 @@ class RAWtoMZML:
         self._core_count: int = core_count
 
         # These items are used to track the progress of the conversion
-        self._conversion_counter: Synchronized = Synchronized(multiprocessing.Value("i", 0))
+        self._conversion_counter: Synchronized[int] = Synchronized(multiprocessing.Value("i", 0))
 
         # ----- Function Calls -----
         self.raw_to_mzml_wrapper()  # Convert from raw files to mzML
@@ -206,7 +206,7 @@ class SQTtoCSV:
             fasta_headers: list[list[str]] = []
 
             # Use dictionary comprehension to create data dictionary
-            average_intensities_dict: dict = {
+            average_intensities_dict: dict[str, list[str | float]] = {
                 key: [] for key in list(file_information.intensity_df.columns)
             }
             # average_intensities: pd.DataFrame = pd.DataFrame(columns=["uniprot", replicate_name])  # fmt: skip
@@ -378,7 +378,7 @@ class SQTtoCSV:
                 if re.match(rf"{cell_type}_S\d+R\d+", column):
                     # Find the S# value using regex
                     # iteration: re.Match | None = int(re.search(r"S(\d+)", column).group(1))
-                    iteration: re.Match | None = re.search(r"S(\d+)", column)
+                    iteration: re.Match[str] | None = re.search(r"S(\d+)", column)
                     
                     if isinstance(iteration, re.Match):
                         iteration_num: int = int(iteration.group(1))

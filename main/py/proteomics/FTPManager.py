@@ -4,8 +4,8 @@ This file is responsible downloading data found at FTP links
 TODO: Find a way to mark a file as "downloaded"
     - Keep a list of file names in a ".completd" hidden folder?
 """
-from .FileInformation import FileInformation
-from .FileInformation import clear_print
+from FileInformation import FileInformation
+from FileInformation import clear_print
 
 import aioftp
 import asyncio
@@ -145,7 +145,10 @@ class Download:
         """
         self._file_information: list[FileInformation] = file_information
         self._core_count: int = min(core_count, 2)  # Limit to 2 downloads at a time
-        self._download_counter: Synchronized = Synchronized(multiprocessing.Value("i", 1))
+        
+        # Create a new variable to keep track of the number of downloads
+        # It should have a generic type of Synchronized
+        self._download_counter: Synchronized[int] = Synchronized(multiprocessing.Value("i", 1))
         self._semaphore = asyncio.Semaphore(self._core_count)
 
         # Find files to download
