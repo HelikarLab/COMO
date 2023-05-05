@@ -12,7 +12,7 @@ from pathlib import Path
 from warnings import warn
 from typing import Optional
 from cobra.flux_analysis import pfba
-from cobamp.wrappers import COBRAModelObjectReader
+from cobamp.wrappers.cobra import COBRAModelObjectReader
 from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
 from troppo.methods.reconstruction.imat import IMAT, IMATProperties

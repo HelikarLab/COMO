@@ -1,3 +1,5 @@
+library(stringr)
+
 username <- Sys.info()["user"]
 work_dir <- str_interp("/home/${username}/main")
 
