@@ -11,17 +11,23 @@ get_main_directory <-function() {
     #' Returns: A string, "/home/username/main"
 
     current_directory <- getwd()
-    main_directory <- ""
-    # Split the current directory by "/"
-    split_directory <- strsplit(current_directory, "/")
-    for (i in seq_along(split_directory)) {
-        if (split_directory[[i]] == "main") {
-            main_directory <- paste(main_directory, split_directory[[i]], sep="/")
+    main_directory <- c()
+    
+    # Split the current directory by "/", removing the first item
+    split_directory <- unlist(strsplit(current_directory, "/"))[-1]
+    
+    
+    for (item in split_directory) {
+        # Append current directory to main_directory
+        main_directory <- append(main_directory, item)
+        if (item == "main") {
             break
-        } else {
-            main_directory <- paste(main_directory, split_directory[[i]], sep="/")
         }
     }
+    
+    # Join main_directory by "/"
+    main_directory <- paste(main_directory, collapse="/")
+    main_directory <- paste0("/", main_directory)
     
     return(main_directory)
 }
