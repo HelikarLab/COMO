@@ -1,6 +1,7 @@
 import asyncio
 import pandas as pd
 from bioservices import BioDBNet
+import bioservices
 
 try:
     from input_database import InputDatabase
@@ -107,9 +108,21 @@ def fetch_gene_info(
     else:
         taxon_id_value = taxon_id
 
-    with suppress_stdout():
-        biodbnet = BioDBNet(cache=True)
-        biodbnet.services.TIMEOUT = 60
+    using_cache: bool = True
+    biodbnet: BioDBNet
+    try:
+        biodbnet = BioDBNet(cache=True, verbose=False)
+        _ = biodbnet.services.session.settings.cache_control
+    except ImportError:  # Error in case sqlite is not found for some reason
+        biodbnet = BioDBNet(cache=False, verbose=False)
+        using_cache = False
+    biodbnet.services.TIMEOUT = 60
+    
+    if using_cache:
+        print(f"Using cache for BioDBNet")
+    else:
+        print(f"Unable to set cache for BioDBNet")
+
     dataframe_maps: pd.DataFrame = pd.DataFrame([], columns=output_db_values)
     dataframe_maps.index.name = input_db.value
     

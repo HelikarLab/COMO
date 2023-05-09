@@ -2,7 +2,7 @@ suppressPackageStartupMessages(library(stringr))
 suppressPackageStartupMessages(library(ggplot2))
 suppressPackageStartupMessages(library(tidyverse))
 suppressPackageStartupMessages(library(zoo))
-source("rscripts/utils.R", local=TRUE)
+source(list.files(pattern = "utils.R", recursive = TRUE), local=TRUE)
 
 work_dir <- get_main_directory()
 

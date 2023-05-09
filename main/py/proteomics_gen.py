@@ -29,7 +29,7 @@ def load_proteomics_data(datafilename, context_name):
     Add description......
     """
     dataFullPath = os.path.join(configs.rootdir, "data", "data_matrices", context_name, datafilename)
-    print('Data matrix is at "{}"'.format(dataFullPath))
+    print('Reading data matrix at "{}"'.format(dataFullPath))
     
     if os.path.isfile(dataFullPath):
         proteomics_data = pd.read_csv(dataFullPath, header=0)
@@ -126,9 +126,9 @@ def abundance_to_bool_group(
 
 def to_bool_context(context_name: str, group_ratio: float, hi_group_ratio: float, group_names: list[str]):
     output_dir = os.path.join(configs.rootdir, "data", "results", context_name, "proteomics")
-    merged_df = pd.DataFrame(columns=["ENTREZ_GENE_ID", "expressed", "high"])
+    merged_df: pd.DataFrame = pd.DataFrame(columns=["ENTREZ_GENE_ID", "expressed", "high"])
     merged_df.set_index(["ENTREZ_GENE_ID"], inplace=True)
-    merged_hi_df = merged_df
+    merged_hi_df: pd.DataFrame = merged_df.copy()
     
     group: str
     for group in group_names:
@@ -136,6 +136,9 @@ def to_bool_context(context_name: str, group_ratio: float, hi_group_ratio: float
         read_df: pd.DataFrame = pd.read_csv(read_filepath)
         read_df.set_index("ENTREZ_GENE_ID", inplace=True)
         read_df = read_df[['expressed', 'high']]
+        
+        # Remove index rows that have a name "-"
+        read_df = read_df[read_df.index != "-"]
         
         if not merged_df.empty:
             merged_df = pd.merge(merged_df, read_df["expressed"], right_index=True, left_index=True)
@@ -146,13 +149,15 @@ def to_bool_context(context_name: str, group_ratio: float, hi_group_ratio: float
             merged_hi_df = read_df["high"].to_frame()
     
     if len(merged_df.columns) > 1:
-        merged_df.apply(lambda x: sum(x) / len(merged_df.columns) >= group_ratio, axis=1, result_type="reduce")
-        merged_hi_df.apply(lambda x: sum(x) / len(merged_hi_df.columns) >= hi_group_ratio, axis=1, result_type="reduce")
+        merged_df = merged_df.apply(lambda x: sum(x) / len(merged_df.columns) >= group_ratio, axis=1, result_type="reduce").to_frame()
+        merged_hi_df = merged_hi_df.apply(lambda x: sum(x) / len(merged_hi_df.columns) >= hi_group_ratio, axis=1, result_type="reduce").to_frame()
     
     out_df = pd.merge(merged_df, merged_hi_df, right_index=True, left_index=True)
+    out_df.columns = ["expressed", "high"]
+    
     out_filepath = os.path.join(output_dir, f"Proteomics_{context_name}.csv")
     out_df.to_csv(out_filepath, index_label="ENTREZ_GENE_ID")
-    print("Test Data Saved to {}".format(out_filepath))
+    print(f"Proteomics data saved to {out_filepath}")
 
 
 # read data from csv files
@@ -310,9 +315,16 @@ def main(argv):
     sheet_names = pd.ExcelFile(prot_config_filepath).sheet_names
     
     for context_name in sheet_names:
+        if context_name != "liver":
+            print(f"SKIP:  {context_name}")
+            continue
+        else:
+            print(f"START: {context_name}")
+        
         datafilename = "".join(["protein_abundance_", context_name, ".csv"])
         config_sheet = pd.read_excel(prot_config_filepath, sheet_name=context_name)
         groups = config_sheet["Group"].unique().tolist()
+        master_proteomics_data: pd.DataFrame = load_proteomics_data(datafilename, context_name)
         
         for group in groups:
             group_idx = np.where([True if g == group else False for g in config_sheet["Group"].tolist()])
@@ -322,12 +334,12 @@ def main(argv):
             ]
             cols = np.take(config_sheet["SampleName"].to_numpy(), group_idx).ravel().tolist() + ["Gene Symbol", "uniprot"]
             
-            proteomics_data = load_proteomics_data(datafilename, context_name)
-            proteomics_data = proteomics_data.loc[:, cols]
+            # proteomics_data: pd.DataFrame = load_proteomics_data(datafilename, context_name)
+            subset_proteomics_data = master_proteomics_data.copy().loc[:, cols]
             
             # Convert proteomics_data["Gene Symbol"] items to ENTREZ_GENE_ID using async_bioservices
             symbol_to_ids = async_bioservices.fetch_gene_info(
-                input_values=proteomics_data["Gene Symbol"].tolist(),
+                input_values=subset_proteomics_data["Gene Symbol"].tolist(),
                 input_db=InputDatabase.GENE_SYMBOL,
                 output_db=OutputDatabase.GENE_ID,
                 taxon_id=set_taxon_id
@@ -339,21 +351,20 @@ def main(argv):
             # )
             
             # map gene symbol to ENTREZ_GENE_ID
-            proteomics_data.dropna(subset=["Gene Symbol"], inplace=True)
+            subset_proteomics_data.dropna(subset=["Gene Symbol"], inplace=True)
             
-            try:
-                proteomics_data.drop(columns=["uniprot"], inplace=True)
+            if "uniprot" in subset_proteomics_data.columns:
+                subset_proteomics_data.drop(columns=["uniprot"], inplace=True)
             
-            except KeyError:
-                pass
-            
-            proteomics_data = proteomics_data.groupby(["Gene Symbol"]).agg("max")
-            proteomics_data["ENTREZ_GENE_ID"] = symbol_to_ids["Gene ID"]
-            proteomics_data.dropna(subset=["ENTREZ_GENE_ID"], inplace=True)
-            proteomics_data.set_index("ENTREZ_GENE_ID", inplace=True)
+            subset_proteomics_data = subset_proteomics_data.groupby(["Gene Symbol"]).agg("max")
+            subset_proteomics_data.reset_index(inplace=True, drop=True)
+            symbol_to_ids.reset_index(inplace=True, drop=True)
+            subset_proteomics_data["ENTREZ_GENE_ID"] = symbol_to_ids["Gene ID"]
+            subset_proteomics_data.dropna(subset=["ENTREZ_GENE_ID"], inplace=True)
+            subset_proteomics_data.set_index("ENTREZ_GENE_ID", inplace=True)
             
             # save proteomics data by test
-            abundance_to_bool_group(context_name, group, proteomics_data, rep_ratio, hi_rep_ratio, quantile)
+            abundance_to_bool_group(context_name, group, subset_proteomics_data, rep_ratio, hi_rep_ratio, quantile)
         
         to_bool_context(context_name, group_ratio, hi_group_ratio, groups)
     
