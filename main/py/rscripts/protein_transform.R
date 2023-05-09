@@ -1,7 +1,7 @@
-library(stringr)
-library(ggplot2)
-library(tidyverse)
-library(zoo)
+suppressPackageStartupMessages(library(stringr))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(zoo))
 source("rscripts/utils.R", local=TRUE)
 
 work_dir <- get_main_directory()

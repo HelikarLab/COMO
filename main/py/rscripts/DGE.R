@@ -1,7 +1,7 @@
-library(DESeq2)
-library(edgeR)
-library(readxl)
-library(stringr)
+suppressPackageStartupMessages(library(DESeq2))
+suppressPackageStartupMessages(library(edgeR))
+suppressPackageStartupMessages(library(readxl))
+suppressPackageStartupMessages(library(stringr))
 
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
 username <- Sys.info()["user"]
