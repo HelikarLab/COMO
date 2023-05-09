@@ -3,10 +3,11 @@ import typing
 from pathlib import Path
 from rpy2 import robjects
 from rpy2.robjects import packages
-
+from typing import Any
 
 class Rpy2:
-    def __init__(self, r_file_path: Path, *args: list, **kwargs: dict) -> None:
+    # Create an __init__ function that accepts *args. Type hint args as well
+    def __init__(self, r_file_path: Path, *args: Any, **kwargs: Any) -> None:
         """
         This class is responsible for providing access to rpy2
         """

@@ -1,28 +1,24 @@
 #!/usr/bin/python3
-import argparse
+import os
 import sys
 import json
-from project import configs
+import argparse
+import pandas as pd
+from pathlib import Path
+import rpy2.robjects as ro
+from rpy2.robjects import pandas2ri
+
+
 import rpy2_api
 import GSEpipelineFast
-
-from rpy2.robjects import pandas2ri
-import rpy2.robjects as ro
-
+from project import configs
 from async_bioservices import async_bioservices
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.output_database import OutputDatabase
+from async_bioservices.taxon_ids import TaxonIDs
 from rpy2.robjects.packages import importr
-from pathlib import Path
-import os
-import pandas as pd
 
 pandas2ri.activate()
-
-# import R libraries
-DESeq2 = importr("DESeq2")
-edgeR = importr("edgeR")
-readxl = importr("readxl")
 
 # read and translate R functions
 # f = open(os.path.join(configs.rootdir, "py", "rscripts", "DGE.R"), "r")
@@ -43,70 +39,10 @@ affyio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "py", "rscripts", "fitA
 # agilentio = SignatureTranslatedAnonymousPackage(string, "agilentio")
 agilentio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "py", "rscripts", "fitAgilent.R"))
 
-
-def breakDownEntrezs(disease):
-    """
-    Split multi-part entrez ids into multiple rows in the dataframe
-    param: disease - df with columns: Gene ID
-    return: df with columns:
-    """
-    disease["Gene ID"] = disease["Gene ID"].str.replace("///", "//")
-    single_gene_names = disease[~disease["Gene ID"].str.contains("//")].reset_index(
-        drop=True
-    )
-    multiple_gene_names = disease[
-        disease["Gene ID"].str.contains("//")
-    ].reset_index(drop=True)
-    breaks_gene_names = pd.DataFrame(columns=["Gene ID"])
-
-    for index, row in multiple_gene_names.iterrows():
-        for genename in row["Gene ID"].split("//"):
-            breaks_gene_names = breaks_gene_names.append(
-                {"Gene ID": genename}, ignore_index=True
-            )
-    gene_expressions = single_gene_names.append(breaks_gene_names, ignore_index=True)
-
-    return gene_expressions
-
-
-# def get_entrez_id(regulated, output_full_path, in_db, taxon_id, full_flag=False):
-#     """
-#     Fetch entrez ids using bioDbNet
-#     param: regulated -  df, with columns:
-#     param: output_full_path - path to
-#     param: in_db - bioDBnet input database query name
-#     param: taxon_id - bioDBnet taxon id
-#     param: full_flag - boolean, True if breaking down multi- entrez ids into seperate rows
-#     return: df,
-#     """
-#     disease = database_convert.fetch_gene_info(
-#         input_values=list(regulated.index.values),
-#         input_db=in_db,
-#         output_db=["Gene Symbol"],
-#         taxon_id=taxon_id,
-#     )
-#     # disease = fetch_gene_info(list(regulated.index.values),
-#     #                           input_db=in_db,
-#     #                           output_db=["Gene Symbol"],
-#     #                           delay=15,
-#     #                           taxon_id=taxon_id
-#     #                           )
-#     disease.reset_index(inplace=True)
-#     # disease.drop(columns=["Ensembl Gene ID"], inplace=True)
-#     disease.replace(to_replace="-", value=np.nan, inplace=True)
-#     if not full_flag:
-#         disease.dropna(how="any", subset=disease.columns[[0]], inplace=True)
-#         gene_expressions = breakDownEntrezs(disease)
-#         gene_expressions.set_index(gene_expressions.columns[0], inplace=True)
-#     else:
-#         gene_expressions = disease
-#
-#     # gene_expressions["Gene ID"].to_csv(outputFullPath, index=False)
-#     gene_expressions[gene_expressions.columns[0]].to_csv(output_full_path, index=False)
-#     return gene_expressions
-
-
-def pharse_configs(config_filepath, sheet):
+def pharse_configs(
+    config_filepath: str | Path,
+    sheet: str
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Read microarray config files
     param: config_filepath - string, path to microarray formatted disease configuration xlsx file
@@ -129,7 +65,12 @@ def pharse_configs(config_filepath, sheet):
     return df, df_target
 
 
-def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, taxon_id):
+def get_microarray_diff_gene_exp(
+    config_filepath: str | Path,
+    disease_name: str,
+    target_path: str | Path,
+    taxon_id: TaxonIDs
+) -> tuple[pd.DataFrame, str]:
     """
     Get differential gene expression for microarray data
 
@@ -156,12 +97,12 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
         raw_dir = os.path.join(gseXXX.gene_dir, key)
         print(f"{key}:{val}, {raw_dir}")
         if inst_name == "affy":
-            affy_function = affyio.call_function("fitaffydir")
-            diff_exp_df = affy_function(raw_dir, target_path)
-            # diff_exp_df = affyio.fitaffydir(raw_dir, target_path)
+            affy_function = rpy2_api.Rpy2(Path(configs.rootdir, "py", "rscripts", "DGE.R"), raw_dir, target_path)
+            affy_function.call_function("fitaffydir")
+            diff_exp_df = affyio.call_function("fitaffydir")
         elif inst_name == "agilent":
-            diff_exp_df = agilentio.call_function("fitagilent", raw_dir, target_path)
-            # diff_exp_df = agilentio.fitagilent(raw_dir, target_path)
+            agilent_function = rpy2_api.Rpy2(Path(configs.rootdir, "py", "rscripts", "fitAgilent.R"), raw_dir, target_path)
+            diff_exp_df = agilent_function.call_function("fitagilent")
         diff_exp_df = ro.conversion.rpy2py(diff_exp_df)
         diff_exp_df.reset_index(inplace=True)
         diff_exp_df = diff_exp_df.rename(columns={'index': 'Affy ID'})
@@ -192,7 +133,7 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
     return diff_exp_df, gse_id
 
 
-def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_id):
+def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_id: TaxonIDs):
     """
     Get differential gene expression for RNA-seq data
 
@@ -384,23 +325,31 @@ def main(argv):
     print("Config file is at ", config_filepath)
 
     # handle species alternative ids
-    if type(taxon_id) == str:
-        if taxon_id.upper() == "HUMAN" or taxon_id.upper() == "HOMO SAPIENS":
-            taxon_id = 9606
-        elif taxon_id.upper() == "MOUSE" or taxon_id.upper() == "MUS MUSCULUS":
-            taxon_id = 10090
+    set_taxonid: TaxonIDs
+    found_valid: bool = True
+    if str(taxon_id).isdigit():  # Check if taxon_id is an integer
+        if int(taxon_id) == 9606:
+            set_taxonid = TaxonIDs.HOMO_SAPIENS
+        elif int(taxon_id) == 10090:
+            set_taxonid = TaxonIDs.MUS_MUSCULUS
         else:
-            print('--taxon-id must be either an integer, or accepted string ("mouse", "human")')
-            sys.exit()
-    elif type(taxon_id) != int:
-        print('--taxon-id must be either an integer, or accepted string ("mouse", "human")')
-        sys.exit()
+            found_valid = False
+    else:  # Taxon id is a string
+        if taxon_id.upper() in ["HUMAN", "HOMO SAPIENS"]:
+            set_taxonid = TaxonIDs.HOMO_SAPIENS
+        elif taxon_id.upper() in ["MOUSE", "MUS MUSCULUS"]:
+            set_taxonid = TaxonIDs.MUS_MUSCULUS
+        else:
+            found_valid = False
+    
+    if not found_valid:
+        raise ValueError(f'--taxon-id must be either an integer, or accepted string ("mouse", "human"). Received: {taxon_id}')
 
     sheet_names = xl.sheet_names
     for disease_name in sheet_names:
         target_path = os.path.join(configs.rootdir, "data", targetfile)
         if data_source == "MICROARRAY":
-            diff_exp_df, gse_id = get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, taxon_id)
+            diff_exp_df, gse_id = get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, set_taxonid)
         elif data_source == "RNASEQ":
             diff_exp_df, gse_id = get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_id)
         else:
