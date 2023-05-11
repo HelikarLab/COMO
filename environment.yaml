@@ -50,7 +50,6 @@ dependencies:
   - escher==1.7.3
   - gurobi==10.0
   - openpyxl==3.0.10
-  - jupyterlab-spreadsheet-editor==0.6
   - aioftp==0.21.2
   - python-libsbml==5.19.2
   - optlang==1.5.2
@@ -60,5 +59,5 @@ dependencies:
     - memote==0.13.0
     - framed==0.5.2
     - bioservices==1.11.2
-#    - pytest==4.6.11
+    - jupyterlab-spreadsheet-editor==0.6.1
 
