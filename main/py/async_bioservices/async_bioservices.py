@@ -1,15 +1,21 @@
 import asyncio
 import pandas as pd
 from bioservices import BioDBNet
+import bioservices
 
 try:
     from input_database import InputDatabase
     from output_database import OutputDatabase
     from taxon_ids import TaxonIDs
+    from utilities import suppress_stdout
 except ImportError:
     from .input_database import InputDatabase
     from .output_database import OutputDatabase
     from .taxon_ids import TaxonIDs
+    
+    import sys
+    sys.path.append("..")
+    from utilities import suppress_stdout
 
 async def _async_fetch_info(
         biodbnet: BioDBNet,
@@ -61,7 +67,7 @@ async def _fetch_gene_info_manager(tasks: list[asyncio.Task[pd.DataFrame]], batc
     task: asyncio.Future[pd.DataFrame]
     for i, task in enumerate(asyncio.as_completed(tasks)):
         results.append(await task)
-        print(f"\rCollecting genes... {i * batch_length} of ~{len(tasks) * batch_length} finished", end="")
+        print(f"\rCollecting genes... {(i + 1) * batch_length} of ~{len(tasks) * batch_length} finished", end="")
 
     return results
 
@@ -102,9 +108,22 @@ def fetch_gene_info(
     else:
         taxon_id_value = taxon_id
 
-    biodbnet = BioDBNet()
+    using_cache: bool = True
+    biodbnet: BioDBNet
+    try:
+        biodbnet = BioDBNet(cache=True, verbose=False)
+        _ = biodbnet.services.session.settings.cache_control
+    except ImportError:  # Error in case sqlite is not found for some reason
+        biodbnet = BioDBNet(cache=False, verbose=False)
+        using_cache = False
     biodbnet.services.TIMEOUT = 60
-    dataframe_maps: pd.DataFrame = pd.DataFrame([], columns=output_db)
+    
+    if using_cache:
+        print(f"Using cache for BioDBNet")
+    else:
+        print(f"Unable to set cache for BioDBNet")
+
+    dataframe_maps: pd.DataFrame = pd.DataFrame([], columns=output_db_values)
     dataframe_maps.index.name = input_db.value
     
     # Create a list of tasks to be awaited

@@ -1,5 +1,6 @@
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
-library("stringr")
+suppressPackageStartupMessages(library("stringr"))
+
 username <- Sys.info()["user"]
 work_dir <- str_interp("/home/${username}/main")
 
