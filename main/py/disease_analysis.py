@@ -113,10 +113,11 @@ def get_microarray_diff_gene_exp(
         diff_exp_df.rename(columns={"adj.P.Val": "FDR"}, inplace=True)
         print(diff_exp_df)
 
+        input_db: InputDatabase
         if inst_name == "affy":
-            input_db: InputDatabase = InputDatabase.AFFY_ID
+            input_db = InputDatabase.AFFY_ID
         elif inst_name == "agilent":
-            input_db: InputDatabase = InputDatabase.AGILENT_ID
+            input_db = InputDatabase.AGILENT_ID
 
         bdnet = async_bioservices.fetch_gene_info(
             input_values=list(map(str, diff_exp_df["Affy ID"].tolist())),
@@ -133,7 +134,12 @@ def get_microarray_diff_gene_exp(
     return diff_exp_df, gse_id
 
 
-def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_id: TaxonIDs):
+def get_rnaseq_diff_gene_exp(
+    config_filepath: str | Path,
+    disease_name: str,
+    context_name: str,
+    taxon_id: TaxonIDs
+) -> tuple[pd.DataFrame, str]:
     """
     Get differential gene expression for RNA-seq data
 
@@ -144,12 +150,13 @@ def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_
     return: dataframe with fold changes, FDR adjusted p-values,
     """
     count_matrix_filename = "".join(["gene_counts_matrix_", disease_name, "_", context_name, ".csv"])
-    count_matrix_path = os.path.join(configs.datadir,
-                                     "data_matrices",
-                                     context_name,
-                                     "disease",
-                                     count_matrix_filename
-                                     )
+    count_matrix_path = os.path.join(
+        configs.datadir,
+        "data_matrices",
+        context_name,
+        "disease",
+        count_matrix_filename
+    )
 
     if os.path.exists(count_matrix_path):
         print("Count Matrix File is at ", count_matrix_path)
@@ -158,8 +165,9 @@ def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_
               f"with the correct name.")
         sys.exit()
 
-    diff_exp_df = DGEio.call_function("DGE_main", count_matrix_path, config_filepath, context_name, disease_name)
-    diff_exp_df = ro.conversion.rpy2py(diff_exp_df)
+    dge_call = rpy2_api.Rpy2(Path(configs.rootdir, "py", "rscripts", "DGE.R"), count_matrix_path, config_filepath, context_name, disease_name)
+    dge_results = dge_call.call_function("DGE_main")
+    diff_exp_df: pd.DataFrame = ro.conversion.rpy2py(dge_results)
     gse_id = "rnaseq"
 
     bdnet = async_bioservices.fetch_gene_info(
@@ -176,7 +184,14 @@ def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_
     return diff_exp_df, gse_id
 
 
-def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, target_path):
+def write_outputs(
+    diff_exp_df: pd.DataFrame,
+    gse_id: str,
+    context_name: str,
+    disease_name: str,
+    data_source: str,
+    target_path: str
+) -> None:
     search_col = "Ensembl" if data_source == "RNASEQ" else "Affy"
     diff_exp_df["logFC"].astype(float)
     diff_exp_df["abs_logFC"] = diff_exp_df["logFC"].abs()
@@ -255,9 +270,8 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
         os.remove(target_path)
 
 
-def main(argv):
+def main(argv: list[str]) -> None:
     targetfile = "targets.txt"
-    count_matrix = None
 
     parser = argparse.ArgumentParser(
         prog="disease_analysis.py",
@@ -351,7 +365,7 @@ def main(argv):
         if data_source == "MICROARRAY":
             diff_exp_df, gse_id = get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, set_taxonid)
         elif data_source == "RNASEQ":
-            diff_exp_df, gse_id = get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_id)
+            diff_exp_df, gse_id = get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, set_taxonid)
         else:
             print("data_source should be either 'microarray' or 'rnaseq'")
             print("Refer to example config file for either type for formatting")

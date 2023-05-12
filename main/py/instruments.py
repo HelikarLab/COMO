@@ -16,7 +16,7 @@ agilent_r_file = Path("./rscript/fitAgilent.R")
 
 
 class RObject:
-    def __init__(self):
+    def __init__(self) -> None:
         """
         This class is used to access the R-objects located at rscripts/fitAffy.R and rscripts/fitAligent.R
         This is done beacuse lines under the "if main. . ." were originally placed outside of this. This is not ideal
@@ -33,16 +33,16 @@ class RObject:
         self._agilent_R_file = open(f"{self._home_dir}/work/py/rscripts/fitAgilent.R", "r").read()
 
     @property
-    def affyio(self):
+    def affyio(self) -> SignatureTranslatedAnonymousPackage:
         return SignatureTranslatedAnonymousPackage(self._affy_R_file, "affyio")
 
     @property
-    def agilent(self):
+    def agilent(self) -> SignatureTranslatedAnonymousPackage:
         return SignatureTranslatedAnonymousPackage(self._agilent_R_file, "agilentio")
 
 
 class AffyIO:
-    def __init__(self):
+    def __init__(self) -> None:
         """
         This class is created so GSEpipeline is able to grab the "affyio" rpy2 object
         This allows us to reuse this section of the code, while allowing us to keep code relevant to this file in a "main" if-statement
@@ -60,13 +60,15 @@ class AffyIO:
         self.affy_R_file = open(f"{home_dir}/work/py/rscripts/fitAffy.R", "r").read()
 
     @property
-    def affyio(self):
-        affyio_object = SignatureTranslatedAnonymousPackage(self.affy_R_file, "affyio")
-        return affyio_object
+    def affyio(self) -> SignatureTranslatedAnonymousPackage:
+        return SignatureTranslatedAnonymousPackage(self.affy_R_file, "affyio")
 
 
 # setup agilent df
-def agilent_raw(datadir, gsms):
+def agilent_raw(
+    datadir: str | Path,
+    gsms: list[str]
+) -> pd.DataFrame:
     files = os.listdir(datadir)
     txts = []
     gzs = []
@@ -102,7 +104,12 @@ def agilent_raw(datadir, gsms):
 
 
 # read agilent outputs for each gsm
-def readagilent(datadir, gsms, scalefactor=1.1, quantile=0.95, ):
+def readagilent(
+    datadir: str | Path,
+    gsms: list[str],
+    scalefactor: float = 1.1,
+    quantile: float = 0.95
+) -> pd.DataFrame:
     df_raw = agilent_raw(datadir, gsms)
     df = df_raw.drop(columns=["Row", "Col"])
     df_negctl = df[df["ControlType"] == -1]
@@ -168,8 +175,8 @@ if __name__ == '__main__':
     pandas2ri.activate()
 
     # import R libraries
-    affy = importr("affy")
-    limma = importr("limma")
+    # affy = importr("affy")
+    # limma = importr("limma")
 
     # Process the affyio functions
     # This is done using a class because the GSEpipeline also utilizes the R-affyio object
