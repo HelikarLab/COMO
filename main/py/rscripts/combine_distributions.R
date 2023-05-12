@@ -1,3 +1,8 @@
+suppressPackageStartupMessages(library("stringr"))
+suppressPackageStartupMessages(library("dplyr"))
+suppressPackageStartupMessages(library("tidyverse"))
+suppressPackageStartupMessages(library("ggplot2"))
+
 username <- Sys.info()["user"]
 work_dir <- str_interp("/home/${username}/main")
 
@@ -5,23 +10,19 @@ if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
     dir.create(str_interp("${work_dir}/py/rlogs"))
 }
 
-# prevENTREZ_GENE_ID messy messages from repeatedly writing to juypter
+# prevent messy messages from repeatedly writing to juypter
 zz <- file(file.path("/home", username, "main", "py", "rlogs", "combine_distributions.Rout"), open="wt")
 sink(zz, type="message")
 
 
-library(tidyverse)
-library(ggplot2)
-
+get_batch_name <- function(x) {
+    basename(x)
+    return(substring(basename(x), 1, nchar(basename(x))-4))
+}
 
 parse_contexts_zfpkm <- function(wd, contexts, prep) {
-
-    get_batch_name <- function(x) {
-        basename(x)
-       return(substring(basename(x), 1, nchar(basename(x))-4))
-    }
-
-    batches = list()
+    
+    batches <- list()
     for ( context in contexts ) {
         files <- Sys.glob(file.path(wd, context, prep, paste0("zFPKM_Matrix_", prep, "_*.csv")))
         batches[[context]] <- unlist(lapply(files, get_batch_name))
@@ -33,12 +34,7 @@ parse_contexts_zfpkm <- function(wd, contexts, prep) {
 
 parse_contexts_zumi <- function(wd, contexts, prep) {
 
-    get_batch_name <- function(x) {
-        basename(x)
-       return(substring(basename(x), 1, nchar(basename(x))-4))
-    }
-
-    batches = list()
+    batches <- list()
     for ( context in contexts ) {
         files <- Sys.glob(file.path(wd, context, prep, paste0("zUMI_Matrix_", prep, "_*.csv")))
         batches[[context]] <- unlist(lapply(files, get_batch_name))
@@ -50,13 +46,8 @@ parse_contexts_zumi <- function(wd, contexts, prep) {
 
 parse_contexts_zscore_prot <- function(wd, contexts) {
 
-    get_batch_name <- function(x) {
-        basename(x)
-        return(substring(basename(x), 1, nchar(basename(x))-4))
-    }
-
-    batches = list()
-    files <- Sys.glob(file.path(wd, "*", "proteomics", "protein_zscore_Matrix_*.csv"))
+    batches <- list()
+    # files <- Sys.glob(file.path(wd, "*", "proteomics", "protein_zscore_Matrix_*.csv"))
     for ( context in contexts ) {
         files <- Sys.glob(file.path(wd, context, "proteomics", "protein_zscore_Matrix_*.csv"))
         batches[[context]] <- unlist(lapply(files, get_batch_name))
@@ -68,14 +59,13 @@ parse_contexts_zscore_prot <- function(wd, contexts) {
 
 merge_batch <- function(wd, context, batch) {
     files <- Sys.glob(file.path(wd, paste0("*", batch, "*")))
-    cnt <- 0
     nrep <- c()
     stopifnot(length(files)>0)
 
     for ( f in files ) {
         zmat <- read.table(f, strip.white=T, header=T, sep=",", row.names=NULL) %>% # read expression matrix
             mutate(across(colnames(.)[-1], as.numeric)) %>% # ensure expression values are numbers
-            mutate(across(colnames(.)[1], as.character)) %>% # ensure ENTREZ_GENE_IDrez IDs are character
+            mutate(across(colnames(.)[1], as.character)) %>% # ensure ENTREZ_GENE_IDs are character
             group_by(ENTREZ_GENE_ID) %>%
             summarise_each(funs(max)) %>% # if multiple of same ENTREZ_GENE_ID, take max value
             na.omit(.) %>%
@@ -100,41 +90,67 @@ merge_batch <- function(wd, context, batch) {
 
         stack_df$zscore <- as.numeric(as.character(stack_df$zscore))
 
-        plot_name_pdf = file.path(wd, "figures", paste0(
-            "plot_", context, "_", substring(basename(f), 1, nchar(basename(f))-4), ".pdf"))
+        plot_name_pdf <- file.path(
+          wd,
+          "figures",
+          paste0(
+            "plot_", context, "_",
+            substring(
+              basename(f),
+              1,
+              nchar(basename(f)) - 4
+            ),
+          ".pdf"
+          )
+        )
 		
-		plot_name_png = file.path(wd, "figures", paste0(
-            "plot_", context, "_", substring(basename(f), 1, nchar(basename(f))-4), ".png"))
-			
-        simplified_plot <- ifelse(length(unique(stack_df$source)) > 10, TRUE, FALSE)
-        label <- colnames(stack_df)[-1]
+		plot_name_png <- file.path(
+          wd,
+          "figures",
+          paste0(
+            "plot_",
+            context,
+            "_",
+            substring(
+              basename(f),
+              1,
+              nchar(basename(f)) - 4
+            ),
+            ".png"
+          )
+        )
+		
+        
         pdf(plot_name_pdf)
 		png(
 			plot_name_png,
-			res=1200,
-			units="in",
-			width=3.25,
-			height=3.25
+			res = 1200,
+			units = "in",
+			width = 3.25,
+			height = 3.25,
+            type = "cairo"
 		)
-        p <- ggplot(stack_df, aes(zscore, color=source)) +
+        # label <- colnames(stack_df)[-1]
+        simplified_plot <- ifelse(length(unique(stack_df$source)) > 10, TRUE, FALSE)
+        plot <- ggplot(stack_df, aes(zscore, color=source)) +
             geom_density() +
 			theme(text=element_text(size=12,  family="sans"))
-			
         if ( simplified_plot ) {
-            p <- p + theme(legend.position = "none")
+            plot <- plot + theme(legend.position = "none")
         }
         max_dens <- 0
         # get y upper limit by finding density of peak at z = 0
-        for ( source in unique(p$data$source) ) {
-            source_z <- p$data$zscore[p$data$source == source] %>% .[!is.na(.)] #%>% .[!is.nan(.)]
+        for ( source in unique(plot$data$source) ) {
+            source_z <- plot$data$zscore[plot$data$source == source] %>% .[!is.na(.)]
             source_densx <- density(source_z)$x
             source_densy <- density(source_z)$y
             idx <- min(max(which(source_densx <= 0)), min(which(source_densx == 0)))
             max_d <- source_densy[idx]
-            if ( max_d > max_dens ) { max_dens <- max_d }
+            if ( max_d > max_dens ) {
+                max_dens <- max_d
+            }
         }
-        #p <- p + ylim(0, 1.5*max_dens)
-        print(p)
+        # plot <- plot + ylim(0, 1.5*max_dens)
         dev.off()
     }
 
@@ -143,16 +159,16 @@ merge_batch <- function(wd, context, batch) {
 
 
 combine_batch_zdistro <- function(wd, context, batch, zmat) {
-    plot_name_pdf = file.path(wd, "figures", paste0("plot_", context, "_", batch, "_combine_distro", ".pdf"))
-	plot_name_png = file.path(wd, "figures", paste0("plot_", context, "_", batch, "_combine_distro", ".png"))
+    plot_name_pdf <- file.path(wd, "figures", paste0("plot_", context, "_", batch, "_combine_distro", ".pdf"))
+	plot_name_png <- file.path(wd, "figures", paste0("plot_", context, "_", batch, "_combine_distro", ".png"))
 
     weighted_z <- function(x) {
         floor_score <- -6
         ceil_score <- 6
         x <- as.numeric(x)
-        numer = sum(x)
-        denom = sqrt(length(x))
-        result = numer/denom
+        numer <- sum(x)
+        denom <- sqrt(length(x))
+        result <- numer/denom
         if ( result < floor_score ) { result <- floor_score }
         if ( result > ceil_score ) { result <- ceil_score }
         return(result)
@@ -174,10 +190,11 @@ combine_batch_zdistro <- function(wd, context, batch, zmat) {
         pdf(plot_name_pdf)
 		png(
 			plot_name_png,
-			res=1200,
-			units="in",
-			width=3.25,
-			height=3.25
+			res = 1200,
+			units = "in",
+			width = 3.25,
+			height = 3.25,
+            type = "cairo"
 		)
 		
         if ( simplified_plot ) {
@@ -212,9 +229,9 @@ combine_batch_zdistro <- function(wd, context, batch, zmat) {
 
 
 combine_context_zdistro <- function(wd, context, n_reps, zmat) {
-    plot_name_pdf = file.path(wd, "figures", paste0(
+    plot_name_pdf <- file.path(wd, "figures", paste0(
         "plot_", context, "_combine_batches_distro", ".pdf"))
-	plot_name_png = file.path(wd, "figures", paste0(
+	plot_name_png <- file.path(wd, "figures", paste0(
         "plot_", context, "_combine_batches_distro", ".png"))
 
     weighted_z <- function(x, n_reps) {
@@ -223,13 +240,13 @@ combine_context_zdistro <- function(wd, context, n_reps, zmat) {
         x <- as.numeric(x)
         nas <- sort(   unique(  c( which(is.nan(x)), which(is.na(x)) )  )   )
         weights <- c()
-        for ( i in 1:length(n_reps) ) { weights <- c(weights, (n_reps[i])/sum(n_reps)) }
+        for ( i in seq_along(n_reps) ) { weights <- c(weights, (n_reps[i])/sum(n_reps)) }
         if ( length(nas) > 0 ) {
             x <- x[-nas]
             weights <- weights[-nas]
         }
-        numer = sum(weights*x)
-        denom = sqrt(sum(weights^2))
+        numer <- sum(weights*x)
+        denom <- sqrt(sum(weights^2))
         result <- numer/denom
         if ( result < floor_score ) { result <- floor_score }
         if ( result > ceil_score ) { result <- ceil_score }
@@ -251,10 +268,11 @@ combine_context_zdistro <- function(wd, context, n_reps, zmat) {
         pdf(plot_name_pdf)
 		png(
 			plot_name_png,
-			res=1200,
-			units="in",
-			width=3.25,
-			height=3.25
+			res = 1200,
+			units = "in",
+			width = 3.25,
+			height = 3.25,
+            type = "cairo"
 		)
         p <- ggplot(stack_df, aes(zscore, color=source)) +
             geom_density() +
@@ -298,9 +316,11 @@ combine_omics_zdistros <- function(
     
 
     fig_path <- file.path(wd, context, "figures")
-    if ( !file.exists(fig_path) ) { dir.create(fig_path) }
-    plot_name_pdf = file.path(fig_path, paste0("plot_", context, "_combine_omics_distro", ".pdf"))
-	plot_name_png = file.path(fig_path, paste0("plot_", context, "_combine_omics_distro", ".png"))
+    if (!file.exists(fig_path)) {
+        dir.create(fig_path, recursive = TRUE)
+    }
+    plot_name_pdf <- file.path(fig_path, paste0("plot_", context, "_combine_omics_distro", ".pdf"))
+	plot_name_png <- file.path(fig_path, paste0("plot_", context, "_combine_omics_distro", ".png"))
 
     weights <- c()
     names <- c()
@@ -376,10 +396,11 @@ combine_omics_zdistros <- function(
     pdf(plot_name_pdf)
 	png(
 		plot_name_png,
-		res=1200,
-		units="in",
-		width=3.25,
-		height=3.25
+		res = 1200,
+		units = "in",
+		width = 3.25,
+		height = 3.25,
+        type = "cairo"
 	)
 
     p <- ggplot(stack_df, aes(zscore, color=source)) +
@@ -419,7 +440,8 @@ combine_zscores_main <- function(
     tweight_master=1,
     mweight_master=1,
     sweight_master=1,
-    pweight_master=2) {
+    pweight_master=2
+) {
 
     fig_path <- file.path(wd, "figures")
     if ( !file.exists(fig_path) ) { dir.create(fig_path) }
@@ -448,7 +470,7 @@ combine_zscores_main <- function(
 
         if ( length(cont_tbatches) == 0 & use_trna_flag ) {
             use_trna <- FALSE
-            print(paste0("No total RNA-seq zFPKM Matrix files found for ", context, " will not use for this context."))
+            print(paste0("No total RNA-seq zFPKM Matrix files found for ", context, ". Will not use for this context."))
         }
 
         if ( length(cont_mbatches) == 0 & use_mrna_flag ) {
@@ -600,3 +622,18 @@ combine_zscores_main <- function(
     }
 
 }
+
+# Call "combine_zscores_main"
+# combine_zscores_main(
+#   wd = "/Users/joshl/PycharmProjects/MADRID/main/data/results",
+#   context = c("naiveB"),
+#   use_trna = TRUE,
+#   use_mrna = TRUE,
+#   use_scrna = FALSE,
+#   use_proteins = FALSE,
+#   keep_gene_scores = TRUE,
+#   tweight = 1,
+#   mweight = 1,
+#   sweight = 1,
+#   pweight = 2
+# )

@@ -2,22 +2,24 @@
 
 import os
 import sys
-from rpy2.robjects.packages import importr
-from rpy2.robjects import pandas2ri
-from project import configs
+# from rpy2.robjects.packages import importr
+# from rpy2.robjects import pandas2ri
 import argparse
+import numpy as np
 from pathlib import Path
 
 
 import rpy2_api
+from project import configs
+from utilities import stringlist_to_list
 # enable r to py conversion
-pandas2ri.activate()
+# pandas2ri.activate()
 
 # import R libraries
-ggplot2 = importr("ggplot2")
-ggrepel = importr("ggrepel")
-tidyverse = importr("tidyverse")
-uwot = importr("uwot")
+# ggplot2 = importr("ggplot2")
+# ggrepel = importr("ggrepel")
+# tidyverse = importr("tidyverse")
+# uwot = importr("uwot")
 
 # read and translate R functions
 r_file_path = Path(configs.rootdir, "py", "rscripts", "cluster_samples.R")
@@ -136,7 +138,7 @@ def main(argv: list[str]) -> None:
         required=False,
         default="default",
         dest="min_count",
-        help="""Ratio of genes active in a batch/study to be active in the context""",
+        help="""Ratio of active genes in a batch/study to be active in the context""",
     )
     parser.add_argument(
         "-q",
@@ -145,30 +147,24 @@ def main(argv: list[str]) -> None:
         required=False,
         default=0.5,
         dest="quantile",
-        help="""Ratio of genes active in a batch/study to be active in the context""",
+        help="""Ratio of active genes in a batch/study to be active in the context""",
     )
     parser.add_argument(
         "-s",
         "--seed",
         type=int,
         required=False,
-        default=12345,
+        default=-1,
         dest="seed",
         help="""Random seed for clustering algorithm initialization""",
     )
     args = parser.parse_args()
 
     wd = os.path.join(configs.datadir, "results")
-    context_names = (
-        args.context_names.strip("[")
-        .strip("]")
-        .replace("'", "")
-        .replace(" ", "")
-        .split(",")
-    )
+    context_names = stringlist_to_list(args.context_names)
     technique = args.technique.lower()
     clust_algo = args.clust_algo.lower()
-    label = args.label.upper()
+    label = args.label
     rep_ratio = args.rep_ratio
     batch_ratio = args.batch_ratio
     min_count = args.min_count
@@ -177,116 +173,106 @@ def main(argv: list[str]) -> None:
     n_neigh_rep = args.n_neigh_rep
     n_neigh_batch = args.n_neigh_batch
     n_neigh_cont = args.n_neigh_cont
-    seed = args.seed
+    
+    # Set a random seed if none provided
+    if int(args.seed) == -1:
+        seed = np.random.randint(0, 100000)
+    else:
+        seed = args.seed
 
     if type(min_count) == str and not min_count.lower() == "default":
         try:
             min_count = int(min_count)
         except ValueError:
-            print("--min-count must be either 'default' or an integer > 0")
-            sys.exit()
+            raise ValueError("--min-count must be either 'default' or an integer > 0")
     if type(min_count) != str and min_count < 0:
-        print("--min-count must be either 'default' or an integer > 0")
-        sys.exit()
+        raise ValueError("--min-count must be either 'default' or an integer > 0")
 
     if type(quantile) == str and not quantile.lower() == "default":
         try:
             quantile = int(quantile)
         except ValueError:
-            print("--quantile must be either 'default' or an integer between 0 and 100")
-            sys.exit()
-    if type(quantile) != str and 0 > quantile > 1:
-        print("--quantile must be either 'default' or an integer between 0 and 100")
-        sys.exit()
+            raise ValueError("--quantile must be either 'default' or an integer between 0 and 100")
+    if type(quantile) != str and 0 > quantile > 100:
+        raise ValueError("--quantile must be either 'default' or an integer between 0 and 100")
 
     if type(rep_ratio) == str and not rep_ratio.lower() == "default":
         try:
             rep_ratio = float(rep_ratio)
         except ValueError:
-            print("--rep-ratio must be 'default' or a float between 0 and 1")
-            sys.exit()
+            raise ValueError("--rep-ratio must be 'default' or a float between 0 and 1")
     if type(rep_ratio) != str and 0 > rep_ratio > 1.0:
-        print("--rep-ratio must be 'default' or a float between 0 and 1")
+        raise ValueError("--rep-ratio must be 'default' or a float between 0 and 1")
 
     if type(batch_ratio) == str and not batch_ratio.lower() == "default":
         try:
             batch_ratio = float(batch_ratio)
         except ValueError:
-            print("--batch-ratio must be 'default' or a float between 0 and 1")
-            sys.exit()
+            raise ValueError("--batch-ratio must be 'default' or a float between 0 and 1")
     if type(batch_ratio) != str and 0 > batch_ratio > 1.0:
-        print("--batch-ratio must be 'default' or a float between 0 and 1")
+        raise ValueError("--batch-ratio must be 'default' or a float between 0 and 1")
 
     if technique.lower() not in ["quantile", "tpm", "cpm", "zfpkm"]:
-        print("--technique must be either 'quantile', 'cpm', 'zfpkm'")
-        sys.exit()
+        raise ValueError("--technique must be either 'quantile', 'tpm', 'cpm', 'zfpkm'")
 
     if technique.lower() == "tpm":
         technique = "quantile"
 
     if clust_algo.lower() not in ["mca", "umap"]:
-        print("--technique must be either 'umap', 'mca'")
-        sys.exit()
+        raise ValueError("--clust_algo must be either 'mca', 'umap'")
 
     if type(min_dist) != str and 0 > min_dist > 1.0:
-        print("--min_dist must be a float between 0 and 1")
+        raise ValueError("--min_dist must be a float between 0 and 1")
 
     if type(n_neigh_rep) == str and not n_neigh_rep.lower() == "default":
         try:
             n_neigh_rep = int(n_neigh_rep)
         except ValueError:
-            print(
+            raise ValueError(
                 f"--n_neigh_rep must be either 'default' or an integer greater than 1 and less than or equal to "
                 f"the total number of replicates being clustered across all contexts."
             )
-            sys.exit()
     if type(n_neigh_rep) != str and n_neigh_rep < 2:
-        print(
+        raise ValueError(
             f"--n_neigh_rep must be either 'default' or an integer greater than 1 and less than or equal to "
             f"the total number of replicates being clustered across all contexts."
         )
-        sys.exit()
 
     if type(n_neigh_batch) == str and not n_neigh_batch.lower() == "default":
         try:
             n_neigh_batch = int(n_neigh_batch)
         except ValueError:
-            print(
+            raise ValueError(
                 f"--n_neigh_batch must be either 'default' or an integer greater than 1 and less than or equal to "
                 f"the total number of batches being clustered across all contexts."
             )
-            sys.exit()
     if type(n_neigh_batch) != str and n_neigh_batch < 2:
-        print(
+        raise ValueError(
             f"--n_neigh_batch must be either 'default' or an integer greater than 1 and less than or equal to "
             f"the total number of batches being clustered across all contexts."
         )
-        sys.exit()
 
     if type(n_neigh_cont) == str and not n_neigh_cont.lower() == "default":
         try:
             n_neigh_cont = int(n_neigh_cont)
         except ValueError:
-            print(
+            raise ValueError(
                 f"--n_neigh_batch must be either 'default' or an integer greater than 1 and less than or equal to "
                 f"the total number of batches being clustered across all contexts."
             )
-            sys.exit()
     if type(n_neigh_batch) != str and n_neigh_cont < 2:
-        print(
+        raise ValueError(
             f"--n_neigh_context must be either 'default' or an integer greater than 1 and less than or equal to "
             f"the total number of contexts being clustered."
         )
-        sys.exit()
 
-    cluster_io = rpy2_api.Rpy2(r_file_path=r_file_path)
-    cluster_io_function = cluster_io.call_function("cluster_samples_main")
-    cluster_io_function(
-        wd,
-        context_names,
-        technique,
-        clust_algo,
-        label,
+    cluster_samples = rpy2_api.Rpy2(
+        r_file_path=r_file_path,
+        wd=wd,
+        context_names=context_names,
+        technique=technique,
+        clust_algo=clust_algo,
+        label=label,
         min_dist=min_dist,
         n_neigh_rep=n_neigh_rep,
         n_neigh_batch=n_neigh_batch,
@@ -297,8 +283,10 @@ def main(argv: list[str]) -> None:
         min_count=min_count,
         seed=seed,
     )
-
-    # cluster_io.cluster_samples_main(
+    cluster_samples.call_function("cluster_samples_main")
+    # cluster_io = rpy2_api.Rpy2(r_file_path=r_file_path)
+    # cluster_io_function = cluster_io.call_function("cluster_samples_main")
+    # cluster_io_function(
     #     wd,
     #     context_names,
     #     technique,
@@ -312,7 +300,7 @@ def main(argv: list[str]) -> None:
     #     batch_ratio=batch_ratio,
     #     quantile=quantile,
     #     min_count=min_count,
-    #     seed=seed
+    #     seed=seed,
     # )
 
 

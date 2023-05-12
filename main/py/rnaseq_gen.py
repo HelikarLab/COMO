@@ -86,7 +86,7 @@ def handle_context_batch(
     print(f"Reading config file: {rnaseq_config_filepath}")
     
     for context_name in sheet_names:
-        print(f"\nStarting {context_name}")
+        print(f"\nStarting '{context_name}'")
         rnaseq_output_file = "".join(["rnaseq_", prep, "_", context_name, ".csv"])
         rnaseq_output_filepath = os.path.join(
             configs.datadir, "results", context_name, prep, rnaseq_output_file
@@ -98,15 +98,15 @@ def handle_context_batch(
             configs.datadir, "data_matrices", context_name, rnaseq_input_file
         )
         if not os.path.exists(rnaseq_input_filepath):
-            print(f"Gene counts matrix not found at {rnaseq_input_filepath}. \n"
+            print(f"Gene counts matrix not found at {rnaseq_input_filepath}\n"
                   f"Skipping... ")
             continue
         
         gene_info_filepath = os.path.join(configs.datadir, "gene_info.csv")
         
         os.makedirs(os.path.dirname(rnaseq_output_filepath), exist_ok=True)
-        print(f"Gene info:    {gene_info_filepath}")
-        print(f"Count matrix: {rnaseq_input_filepath}")
+        print(f"Gene info:          {gene_info_filepath}")
+        print(f"Count matrix:       {rnaseq_input_filepath}")
         
         rpy2_api.Rpy2(
             r_file_path=r_file_path,

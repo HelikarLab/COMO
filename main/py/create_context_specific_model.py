@@ -282,8 +282,6 @@ def seed_imat(
     idx_force: list[int]
 ) -> tuple[cobra.Model, pd.DataFrame]:
     expr_vector = np.array(expr_vector)
-    print("expr_vector:")
-    print(expr_vector[:10])
     properties = IMATProperties(
         exp_vector=expr_vector,
         exp_thresholds=expr_thesh,
@@ -292,10 +290,13 @@ def seed_imat(
     )
     print("Setting properties")
     algorithm = IMAT(s_matrix, lb, ub, properties)
+    
     print("Setting algorithm")
     context_rxns = algorithm.run()
+    
     print("Running")
     fluxes = algorithm.sol.to_series()
+    
     print("Obtained flux values")
     context_cobra_model = cobra_model.copy()
     r_ids = [r.id for r in context_cobra_model.reactions]
@@ -323,7 +324,6 @@ def seed_tinit(
     idx_force: list[int]
 ) -> cobra.Model:
     expr_vector = np.array(expr_vector)
-    cobra_model
     properties = tINITProperties(
         reactions_scores=expr_vector,
         solver=solver,
@@ -809,8 +809,8 @@ def main(argv: list[str]) -> None:
         reaction_type: list[str] = df["reaction"].tolist()
         reaction_abbreviation: list[str] = df["abbreviation"].tolist()
         reaction_compartment: list[str] = df["compartment"].tolist()
-        lower_bound = df["minimum reaction rate"].tolist()
-        upper_bound = df["maximum reaction rate"].tolist()
+        lower_bound: list[float] = df["minimum reaction rate"].tolist()
+        upper_bound: list[float] = df["maximum reaction rate"].tolist()
         
         reaction_formula: list[str] = []
         for i in range(len(reaction_type)):

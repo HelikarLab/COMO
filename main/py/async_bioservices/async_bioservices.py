@@ -1,6 +1,7 @@
 import asyncio
 import pandas as pd
 from bioservices import BioDBNet
+from bioservices import BioDBNet
 import bioservices
 
 try:
@@ -20,14 +21,14 @@ except ImportError:
 
 
 async def _async_fetch_info(
-    biodbnet: BioDBNet,
-    event_loop: asyncio.AbstractEventLoop,
-    semaphore: asyncio.Semaphore,
-    input_values: list[str],
-    input_db: str,
-    output_db: list[str],
-    taxon_id: int,
-    delay: int = 10
+        biodbnet: BioDBNet,
+        event_loop: asyncio.AbstractEventLoop,
+        semaphore: asyncio.Semaphore,
+        input_values: list[str],
+        input_db: str,
+        output_db: list[str],
+        taxon_id: int,
+        delay: int = 10
 ) -> pd.DataFrame:
     await semaphore.acquire()
     conversion = await asyncio.to_thread(
@@ -72,7 +73,6 @@ async def _fetch_gene_info_manager(tasks: list[asyncio.Task[pd.DataFrame]], batc
         print(f"\rCollecting genes... {(i + 1) * batch_length} of ~{len(tasks) * batch_length} finished", end="")
     
     return results
-
 
 def fetch_gene_info(
     input_values: list[str],
@@ -149,7 +149,7 @@ def fetch_gene_info(
                 event_loop=event_loop
             )
         )
-        
+    
         async_tasks.append(task)
     
     database_convert = event_loop.run_until_complete(
