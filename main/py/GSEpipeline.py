@@ -1,36 +1,40 @@
 #!/usr/bin/python3
 
-import re
 import os
-import pandas as pd
-import numpy as np
-import GEOparse
-import urllib.request
+import re
 import tarfile
+import GEOparse
+import numpy as np
+import pandas as pd
+import urllib.request
+from typing import Any, Optional
+
+from GEOparse import GSE
 from instruments import AffyIO
 
-
 # Input: Extract Gene Info from GEO DataSets
-def load_gse_soft(name: str = "GSE2770"):
+def load_gse_soft(
+    name: str = "GSE2770",
+    silent: bool = True
+) -> GSE:
     """
     Read GSE information from local soft file, otherwise read online.
     :param name: name of gse
+    :param silent: Should GSE download be silent?
     :return: gse object by GEOparsew
     """
     softfile = "./{}_family.soft.gz".format(name)
 
+    gse: GSE
     if os.path.isfile(softfile):
-        gse = GEOparse.get_GEO(filepath=softfile)
+        gse = GEOparse.get_GEO(filepath=softfile, silent=silent)
     else:
         gse = GEOparse.get_GEO(geo=name, destdir="./")
-
+        
     return gse
 
-
-# gse = load_gse_soft(gsename)
-
 # Extract Platform Information
-def get_platform_probe(gse):
+def get_platform_probe(gse: GSE) -> dict[str, str]:
     """
     extract platform information
     :param gse: gse object
@@ -42,14 +46,16 @@ def get_platform_probe(gse):
         keys.append(gse.gpls[gpl].name)
         r1 = re.findall(r"\[.*?\]", gse.gpls[gpl].metadata["title"][0])
         values.append(r1[0][4:-1])
-        print(gse.gpls[gpl].name)
-        print(gse.gpls[gpl].metadata["title"][0])
 
-    celformat = dict(zip(keys, values))
+    celformat: dict[str, str] = dict(zip(keys, values))
     return celformat
 
 
-def download_gsm_id_maps(datadir: str, gse, platforms: list[str] = None) -> dict:
+def download_gsm_id_maps(
+    datadir: str,
+    gse: GSE,
+    platforms: Optional[list[str]] = None
+) -> dict[str, pd.DataFrame]:
     """
     download ID to ENTREZ_GENE_ID maps, create a csv file for each platform, and return dictionary
     :param gse: gse object
@@ -57,12 +63,13 @@ def download_gsm_id_maps(datadir: str, gse, platforms: list[str] = None) -> dict
     :param platforms: list of platforms
     :return: dictionary of maps indexed by platform
     """
+    print("HERE")
     # Do not allow mutable arguments
     # From: https://florimond.dev/en/posts/2018/08/python-mutable-defaults-are-the-source-of-all-evil/
     if platforms is None:
-        platforms: list[str] = ["GPL96", "GPL97", "GPL8300"]
+        platforms = ["GPL96", "GPL97", "GPL8300"]
 
-    maps_list = []
+    maps_list: list[pd.DataFrame] = []
     # gene_maps = pd.DataFrame([],columns=['GPL96','GPL97','GPL8300','ENTREZ_GENE_ID'])
     # gene_maps.set_index('ENTREZ_GENE_ID',inplace=True)
     for platform in platforms:
@@ -70,7 +77,6 @@ def download_gsm_id_maps(datadir: str, gse, platforms: list[str] = None) -> dict
         temp = table[["ID", "ENTREZ_GENE_ID"]]
         # Save to file
         filefullpath = os.path.join(datadir, "{}entrez.csv".format(platform))
-        print(filefullpath)
         temp.to_csv(filefullpath, index=False)
         # Single Table
         temp.dropna(axis=0, inplace=True)
@@ -81,7 +87,7 @@ def download_gsm_id_maps(datadir: str, gse, platforms: list[str] = None) -> dict
     return maps_dict
 
 
-def get_gsm_tables(gse):
+def get_gsm_tables(gse: GSE) -> dict[str, pd.DataFrame]:
     """
     get gsm maps in table
     :param gse:
@@ -98,15 +104,8 @@ def get_gsm_tables(gse):
     return gsm_tables
 
 
-# df_outer = create_entrez_table_default(gse)
-
-
-# initialize with platform
-# gsm_maps = get_gsm_tables(gse)
-
-
 class GSEproject:
-    def __init__(self, gsename="GSE2770", rootdir="../"):
+    def __init__(self, gsename: str = "GSE2770", rootdir: str = "../") -> None:
         self.gsename = gsename
         # Setup paths
         self.rootdir = rootdir
@@ -122,7 +121,7 @@ class GSEproject:
         self.celformat = get_platform_probe(self.gse)
         self.gsm_platform = self.get_gsm_platform()
 
-    def organize_gse_raw_data(self):
+    def organize_gse_raw_data(self) -> None:
         """
         Organize raw data at local folder
         :return:
@@ -152,14 +151,14 @@ class GSEproject:
                 cnt += 1
         print("{} raw data files moved.".format(cnt))
 
-    def get_gsm_platform(self):
+    def get_gsm_platform(self) -> dict[str, str]:
         """
         Classify the Samples by Platform
         get the platform of each gsm
         :return: dictionary key: gsm, value: platform such as 'GEL96', 'GEL97', 'GEL8300'
         """
-        keys = []
-        values = []
+        keys: list[str] = []
+        values: list[str] = []
         for gsm in self.gse.gsms:
             keys.append(self.gse.gsms[gsm].name)
             for key, val in self.celformat.items():
@@ -175,7 +174,7 @@ class GSEproject:
         return gsm_platform
 
     # create 3 tables by platform
-    def get_entrez_table_default(self, fromcsv=True):
+    def get_entrez_table_default(self, fromcsv: bool = True) -> pd.DataFrame:
         """
         Create entrez table from online data
         :param fromcsv: Is the input coming from a CSV
@@ -229,7 +228,6 @@ class GSEproject:
         df_outer = None
         for key, val in self.celformat.items():
             # df = pd.DataFrame([],columns=['ID','ENTREZ_GENE_ID'])
-            print("{}: {}".format(key, gsm_tables[key].shape))
             if df_outer is None:
                 df_outer = gsm_tables[key]
             else:
@@ -239,13 +237,12 @@ class GSEproject:
 
         # step 5: save files
         df_outer.dropna(how="all", inplace=True)
-        print("full : {}".format(df_outer.shape))
         df_outer.sort_index(inplace=True)
         df_outer.to_csv(filefullpath)
         print("Full table saved to:\n{}".format(filefullpath))
         return df_outer
 
-    def get_entrez_table_pipeline(self, fromcsv=True):
+    def get_entrez_table_pipeline(self, fromcsv: bool = True) -> pd.DataFrame:
         """
         create ENTREZ ID based table from gse
         :param fromcsv: Is the input from a CSV
@@ -263,13 +260,13 @@ class GSEproject:
         print("Create new table: {}".format(filefullpath))
         gsm_maps = get_gsm_tables(self.gse)
         # step 1: Ready Affy files from folders
-        gsm_tables_sc500 = {}
+        gsm_tables_sc500: dict[str, Any] = {}
         for key in self.celformat.keys():
             platformdir = os.path.join(self.genedir, key)
             print("Affy Read Path: {}".format(platformdir))
             if os.path.exists(platformdir):
                 # outputdf = affyio.readaffydir(platformdir)
-                outputdf = AffyIO().process_affyio()
+                outputdf = AffyIO().affyio
                 outputdf.readaffydir(platformdir)
             else:
                 print("Path not exist: {}".format(platformdir))
@@ -282,10 +279,10 @@ class GSEproject:
             gsm_tables_sc500[key].set_index("ENTREZ_GENE_ID", inplace=True)
 
         # step 3: Merge tables of platforms
-        df_outer_sc500 = None
+        df_outer_sc500: pd.DataFrame = pd.DataFrame()
         for key, val in self.celformat.items():
-            print("{}: {}".format(key, gsm_tables_sc500[key].shape))
-            if df_outer_sc500 is None:
+            # if df_outer_sc500 has no items, add current item
+            if df_outer_sc500.empty:
                 df_outer_sc500 = gsm_tables_sc500[key]
             else:
                 df_outer_sc500 = pd.merge(
@@ -296,7 +293,6 @@ class GSEproject:
                 )
 
         df_outer_sc500.dropna(how="all", inplace=True)
-        print("Full: {}".format(df_outer_sc500.shape))
         df_outer_sc500.rename(str.lower, axis="columns", inplace=True)
 
         # step 4: Remove duplicated items, keep largest VALUE for each GSM
@@ -312,7 +308,7 @@ class GSEproject:
             try:
                 temp = df_outer_sc500.loc[:, [col1, col2, col3]]
             except:
-                print("{} not in df_outer_sc500".format(key))
+                print("{} not in data frame".format(key))
                 continue
             temp.sort_values(by=["ENTREZ_GENE_ID", col1], inplace=True)
             temp = temp[~temp.index.duplicated(keep="last")]
@@ -326,7 +322,7 @@ class GSEproject:
         print("Full table saved to:\n{}".format(filefullpath))
         return df_clean_sc500
 
-    def download_raw(self, overwrite=False):
+    def download_raw(self, overwrite: bool = False) -> None:
         # check if path created
         if (not os.path.isdir(self.genedir)) or overwrite:
             os.makedirs(self.genedir, exist_ok=True)
@@ -349,7 +345,7 @@ class GSEproject:
         else:
             pass
 
-    def calculate_z_score(self, df, to_csv=False):
+    def calculate_z_score(self, df: pd.DataFrame, to_csv: bool = False) -> pd.DataFrame:
         cols = list(df)
         result = pd.DataFrame([], index=df.index)
         for col in cols:
@@ -362,3 +358,8 @@ class GSEproject:
             )
             result.to_csv(filefullpath)
         return result
+
+
+if __name__ == '__main__':
+    
+    x = GSEproject()
