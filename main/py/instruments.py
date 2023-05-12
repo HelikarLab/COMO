@@ -136,39 +136,6 @@ def readagilent(
     return df_results.drop(["ControlType", "SystematicName"], axis=1)
 
 
-# convert gene ids to entrez
-def fetch_entrez_gene_id(
-    input_values: list,
-    input_db="Agilent ID",
-    output_db: list[str] = None,
-    delay=30,
-):
-    # Set default values for list of strings
-    if output_db is None:
-        output_db: list[str] = ["Gene ID", "Ensembl Gene ID"]
-
-    s = BioDBNet()
-
-    df_maps = pd.DataFrame([], columns=output_db)
-    df_maps.index.name = input_db
-    i = 0
-
-    while i < len(input_values):
-        print("retrieve {}:{}".format(i, min(i + 500, len(input_values))))
-        df_test = s.db2db(
-            input_db, output_db, input_values[i : min(i + 500, len(input_values))], 9606
-        )
-        if isinstance(df_test, pd.DataFrame):
-            df_maps = pd.concat([df_maps, df_test], sort=False)
-        elif df_test == "414":
-            print("bioDBnet busy, try again in {} seconds".format(delay))
-            time.sleep(delay)
-            continue
-        i += 500
-        
-    return df_maps
-
-
 if __name__ == '__main__':
     home_dir = os.path.expanduser("~")
     # enable R to py conversions

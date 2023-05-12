@@ -322,7 +322,6 @@ def repurposing_hub_preproc(drug_file):
         output_db=OutputDatabase.GENE_ID
     )
     
-    # entrez_ids = fetch_entrez_gene_id(drug_db_new["Target"].tolist(), input_db="Gene Symbol")
     entrez_ids.reset_index(drop=False, inplace=True)
     drug_db_new["ENTREZ_GENE_ID"] = entrez_ids["Gene ID"]
     drug_db_new = drug_db_new[["Name", "MOA", "Target", "ENTREZ_GENE_ID", "Phase"]]
