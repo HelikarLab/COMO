@@ -1,6 +1,7 @@
 import io
-import contextlib
 import sys
+import logging
+import contextlib
 from typing import Iterator
 
 
@@ -38,5 +39,6 @@ def suppress_stdout() -> Iterator[None]:
         try:
             sys.stdout = buffer
             yield
+        
         finally:
             sys.stdout = sys.__stdout__

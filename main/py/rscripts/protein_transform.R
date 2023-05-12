@@ -1,21 +1,17 @@
-library(stringr)
+suppressPackageStartupMessages(library(stringr))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(zoo))
+source(list.files(pattern = "utils.R", recursive = TRUE), local=TRUE)
 
-username <- Sys.info()["user"]
-work_dir <- str_interp("/home/${username}/main")
+work_dir <- get_main_directory()
 
-if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
-    dir.create(str_interp("${work_dir}/py/rlogs"))
-}
+# Do not care if directory already exists, hide warnings
+dir.create(file.path(work_dir, "py", "rlogs"), showWarnings = FALSE)
 
 # prevent messy messages from repeatedly writing to juypter
-zz <- file(file.path("/home", username, "main", "py", "rlogs", "protein_transform.Rout"), open="wt")
+zz <- file(file.path(work_dir, "py", "rlogs", "protein_transform.Rout"), open="wt")
 sink(zz, type="message")
-
-
-library(ggplot2)
-library(tidyverse)
-library(zoo)
-
 
 z_result <- function(z_vector, density, mu, stdev, max_y) {
     z_res <- list(

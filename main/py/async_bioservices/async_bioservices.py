@@ -1,7 +1,6 @@
 import asyncio
 import pandas as pd
 from bioservices import BioDBNet
-from bioservices import BioDBNet
 import bioservices
 
 try:
@@ -15,10 +14,8 @@ except ImportError:
     from .taxon_ids import TaxonIDs
     
     import sys
-    
     sys.path.append("..")
     from utilities import suppress_stdout
-
 
 async def _async_fetch_info(
         biodbnet: BioDBNet,
@@ -58,28 +55,28 @@ async def _async_fetch_info(
             taxon_id, delay,
         )
         return pd.concat([first_conversion, second_conversion])
-    
+        
     return conversion
 
 
 async def _fetch_gene_info_manager(tasks: list[asyncio.Task[pd.DataFrame]], batch_length: int) -> list[pd.DataFrame]:
     results: list[pd.DataFrame] = []
-    
+
     print("Collecting genes... ", end="")
     
     task: asyncio.Future[pd.DataFrame]
     for i, task in enumerate(asyncio.as_completed(tasks)):
         results.append(await task)
         print(f"\rCollecting genes... {(i + 1) * batch_length} of ~{len(tasks) * batch_length} finished", end="")
-    
+
     return results
 
 def fetch_gene_info(
-    input_values: list[str],
-    input_db: InputDatabase,
-    output_db: OutputDatabase | list[OutputDatabase] = None,
-    taxon_id: TaxonIDs | int = TaxonIDs.HOMO_SAPIENS,
-    delay: int = 5
+        input_values: list[str],
+        input_db: InputDatabase,
+        output_db: OutputDatabase | list[OutputDatabase] = None,
+        taxon_id: TaxonIDs | int = TaxonIDs.HOMO_SAPIENS,
+        delay: int = 5
 ) -> pd.DataFrame:
     """
     This function returns a dataframe with important gene information for future operations in MADRID.
@@ -105,12 +102,12 @@ def fetch_gene_info(
         output_db_values = [output_db.value]
     else:
         output_db_values = [str(i.value) for i in output_db]
-    
+
     if type(taxon_id) == TaxonIDs:
         taxon_id_value = taxon_id.value
     else:
         taxon_id_value = taxon_id
-    
+
     using_cache: bool = True
     biodbnet: BioDBNet
     try:
@@ -121,11 +118,11 @@ def fetch_gene_info(
         using_cache = False
     biodbnet.services.TIMEOUT = 60
     
-    if not using_cache:
-        print(f"Unable to set cache for BioDBNet, continuing without it")
-    else:
+    if using_cache:
         print(f"Using cache for BioDBNet")
-    
+    else:
+        print(f"Unable to set cache for BioDBNet")
+
     dataframe_maps: pd.DataFrame = pd.DataFrame([], columns=output_db_values)
     dataframe_maps.index.name = input_db.value
     
@@ -151,11 +148,10 @@ def fetch_gene_info(
         )
     
         async_tasks.append(task)
-    
-    database_convert = event_loop.run_until_complete(
-        _fetch_gene_info_manager(tasks=async_tasks, batch_length=batch_length))
+
+    database_convert = event_loop.run_until_complete(_fetch_gene_info_manager(tasks=async_tasks, batch_length=batch_length))
     event_loop.close()  # Close the event loop to free resources
-    
+
     # Loop over database_convert to concat them into dataframe_maps
     print("")
     for i, df in enumerate(database_convert):
