@@ -138,7 +138,7 @@ def readagilent(
 
 # convert gene ids to entrez
 def fetch_entrez_gene_id(
-    input_values,
+    input_values: list,
     input_db="Agilent ID",
     output_db: list[str] = None,
     delay=30,
