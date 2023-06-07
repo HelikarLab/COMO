@@ -17,6 +17,7 @@ from async_bioservices import async_bioservices
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.output_database import OutputDatabase
 
+
 def _perform_knockout(
     spacer: str,
     total_knockouts: int,
@@ -39,22 +40,25 @@ def _perform_knockout(
     
     count_progress.acquire()
     count_progress.value += 1
-    print(f"({count_progress.value:{spacer}d} of {total_knockouts}) Finished knock-out simulation for gene ID: {int(gene_id):6d}")
+    print(
+        f"({count_progress.value:{spacer}d} of {total_knockouts}) Finished knock-out simulation for gene ID: {int(gene_id):6d}")
     count_progress.release()
     
     return gene_id, optimized_model["fluxes"]
+
 
 def initialize_pool(synchronizer):
     global count_progress
     count_progress = synchronizer
 
+
 def knock_out_simulation(
-        model: cobra.Model,
-        inhibitors_filepath: str | Path,
-        drug_db: pd.DataFrame,
-        reference_flux_filepath: str | Path | None,
-        test_all: bool,
-        pars_flag: bool
+    model: cobra.Model,
+    inhibitors_filepath: str | Path,
+    drug_db: pd.DataFrame,
+    reference_flux_filepath: str | Path | None,
+    test_all: bool,
+    pars_flag: bool
 ):
     reference_solution: cobra.Solution
     if reference_flux_filepath is not None:
@@ -65,8 +69,9 @@ def knock_out_simulation(
         except FileNotFoundError:
             raise FileNotFoundError(f"Reference flux file not found at {reference_flux_filepath}")
         except KeyError:
-            raise KeyError("Reference flux file must be a CSV file with the columns 'rxn' and 'flux' and row number equal to "
-                            "the given context-specific model!")
+            raise KeyError(
+                "Reference flux file must be a CSV file with the columns 'rxn' and 'flux' and row number equal to "
+                "the given context-specific model!")
         
         reference_solution = cobra.core.solution.Solution(model.objective, "OPTIMAL", reference_flux)
     else:
@@ -183,14 +188,14 @@ def knock_out_simulation(
 
 
 def create_gene_pairs(
-        datadir,
-        model,
-        gene_ind2genes,
-        flux_solution,
-        flux_solution_ratios,
-        flux_solution_diffs,
-        has_effects_gene,
-        disease_genes,
+    datadir,
+    model,
+    gene_ind2genes,
+    flux_solution,
+    flux_solution_ratios,
+    flux_solution_diffs,
+    has_effects_gene,
+    disease_genes,
 ):
     disease_genes = pd.read_csv(os.path.join(datadir, disease_genes))
     DAG_dis_genes = pd.DataFrame()  # data analysis genes
