@@ -54,10 +54,10 @@ dgeAnalysis <- function(SampMetrics, test_name, tissue_name, disease_name) {
   df <- data.frame(Ensembl=gene_list)
   group_list <- c(rep("control", length(SampMetrics[["control"]])), rep('patient', length(SampMetrics[["patient"]])))
   
-  for ( j in 1:length(SampMetrics[["control"]]) ) {
+  for ( j in seq_along(SampMetrics[["control"]])) {
     df <- cbind(df, SampMetrics[["control"]][[j]][["Counts"]])
   }
-  for ( j in 1:length(SampMetrics[["patient"]]) ) {
+  for ( j in seq_along(SampMetrics[["patient"]])) {
     df <- cbind(df, SampMetrics[["patient"]][[j]][["Counts"]])
   }
   
