@@ -104,7 +104,7 @@ def fetch_gene_info(
 
     biodbnet = BioDBNet()
     biodbnet.services.TIMEOUT = 60
-    dataframe_maps: pd.DataFrame = pd.DataFrame([], columns=output_db)
+    dataframe_maps: pd.DataFrame = pd.DataFrame([], columns=output_db_values)
     dataframe_maps.index.name = input_db.value
     
     # Create a list of tasks to be awaited
