@@ -67,3 +67,7 @@ def test_conversion():
     )
 
     assert static_dataframe.equals(test_dataframe)
+
+
+if __name__ == '__main__':
+    test_conversion()
