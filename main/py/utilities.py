@@ -1,10 +1,10 @@
 import io
-import contextlib
 import sys
-from typing import Iterator
+import contextlib
+from pathlib import Path
+from typing import Union, Iterator
 
-
-def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
+def stringlist_to_list(stringlist: str | list[str], return_as_path: bool = False) -> Union[list[str], list[Path]]:
     """
     We are attempting to move to a new method of gathering a list of items from the command line
     In doing so, we must deprecate the use of the current method
@@ -29,7 +29,12 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
         else:
             new_list: list[str] = stringlist.split(" ")
 
+        if return_as_path:
+            return [Path(item) for item in new_list]
         return new_list
+    
+    if return_as_path:
+        return [Path(item) for item in stringlist]
     return stringlist
 
 @contextlib.contextmanager

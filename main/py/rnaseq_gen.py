@@ -64,16 +64,16 @@ def load_rnaseq_tests(filename, context_name, lib_type):
 
 
 def handle_context_batch(
-        config_filename,
-        replicate_ratio,
-        batch_ratio,
-        replicate_ratio_high,
-        batch_ratio_high,
-        technique,
-        quantile,
-        min_count,
-        min_zfpkm,
-        prep,
+    config_filename,
+    replicate_ratio,
+    batch_ratio,
+    replicate_ratio_high,
+    batch_ratio_high,
+    technique,
+    quantile,
+    min_count,
+    min_zfpkm,
+    prep,
 ):
     """
     Handle iteration through each context type and create rnaseq expression file by calling rnaseq.R
@@ -265,23 +265,17 @@ def main(argv):
     batch_ratio = args.batch_ratio
     replicate_ratio_high = args.replicate_ratio_high
     batch_ratio_high = args.batch_ratio_high
-    technique = args.technique
+    technique = args.technique.lower()
     quantile = args.quantile
     min_count = args.min_count
     prep = args.prep
     min_zfpkm = args.min_zfpkm
     
-    if re.search("tpm", technique.lower()) or re.search("quantile", technique.lower()):
+    if technique not in ["tpm", "quantile", "tpm-quantile", "quantile-tpm", "cpm", "zfpkm"]:
+        raise ValueError(
+            "Normalization-filtration technique not recognized. Must be 'tpm-quantile', 'cpm', or 'zfpkm'.")
+    elif technique in ["tpm", "quantile", "tpm-quantile", "quantile-tpm"]:
         technique = "quantile"
-    elif re.search("cpm", technique.lower()):
-        technique = "cpm"
-    elif re.search("zfpkm", technique.lower()):
-        technique = "zfpkm"
-    else:
-        print(
-            "Normalization-filtration technique not recognized. Must be 'tpm-quantile', 'cpm', or 'zfpkm'."
-        )
-        sys.exit()
     
     if int(quantile) > 100 or int(quantile) < 1:
         print("Quantile must be between 1 - 100")

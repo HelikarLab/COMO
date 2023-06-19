@@ -47,7 +47,7 @@ organize_gene_counts_files <- function(data_dir) {
         for ( i in 1:n_replicates ) { # for each replicate, get name of replicate ex. S1R1
             replicate_file <- str_match(counts_files[i], "geneCounts/\\s*(.*?)\\s*.tab")[,2] # file path
             replicate_names[i] <- basename(replicate_file) # file name only
-            rname <- sub(pattern = "(.*)\\..*$", replacement = "\\1", basename(replicate_file)) # rem file extension
+            rname <- sub(pattern = "(.*)\\..*$", replacement = "\\1", basename(replicate_file)) # rep file extension
             strandedness_file <- paste0(rname, "_strandedness.txt") # use rep name to get matching strand
             strandedness_files[i] <- file.path(str_d, strandedness_file) # path to strand files
 

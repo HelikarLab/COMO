@@ -7,7 +7,7 @@ import re
 import os
 import sys
 import argparse
-from rpy2.robjects.packages import importr
+# from rpy2.robjects.packages import importr
 import glob
 import numpy as np
 from pathlib import Path
@@ -16,10 +16,10 @@ from async_bioservices import async_bioservices
 from async_bioservices.output_database import OutputDatabase
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.taxon_ids import TaxonIDs
-import rpy2_api
+# import rpy2_api
 import utilities
 
-r_file_path: Path = Path(configs.rootdir, "py", "rscripts", "generate_counts_matrix.R")
+# r_file_path: Path = Path(configs.rootdir, "py", "rscripts", "generate_counts_matrix.R")
 
 def create_counts_matrix(context_name):
     """
@@ -32,8 +32,8 @@ def create_counts_matrix(context_name):
     print(f"Creating Counts Matrix for '{context_name}'")
 
     # call generate_counts_matrix.R to create count matrix from COMO_input folder
-    rpy2_hook = rpy2_api.Rpy2(r_file_path=r_file_path, data_dir=input_dir, out_dir=matrix_output_dir)
-    rpy2_hook.call_function("generate_counts_matrix_main")
+    # rpy2_hook = rpy2_api.Rpy2(r_file_path=r_file_path, data_dir=input_dir, out_dir=matrix_output_dir)
+    # rpy2_hook.call_function("generate_counts_matrix_main")
 
 
 def create_config_df(context_name):
@@ -208,12 +208,14 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     return matrix_total, matrix_mrna
 
 
-def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase, taxon_id):
+def create_gene_info_file(matrix_file_list: list[Path], form: InputDatabase, taxon_id):
     """
     Create gene info file for specified context by reading first column in its count matrix file at
      /work/data/results/<context name>/gene_info_<context name>.csv
     """
 
+    print("HERE")
+    print(matrix_file_list)
     print(f"Fetching gene info")
     gene_info_file = os.path.join(configs.datadir, "gene_info.csv")
     if os.path.exists(gene_info_file):
@@ -228,7 +230,8 @@ def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase, taxo
 
     # Create our output database format
     # Do not include values equal to "form"
-    # Note: This is a refactor; I'm not sure why we are removing values not equal to "form"
+    # We are removing the value equal to "form" because that is the input format
+    # We do not need to fetch the same information twice
     output_db: list[OutputDatabase] = [
         i for i in [
             OutputDatabase.ENSEMBL_GENE_ID,
@@ -316,11 +319,15 @@ def handle_context_batch(context_names, mode, form: InputDatabase, taxon_id, pro
             twriter.close()
         if mflag:
             mwriter.close()
+        
+        path_files: list[Path] = []
+        for file in tmatrix_files + mmatrix_files:
+            path_files.append(Path(file))
 
-        create_gene_info_file(tmatrix_files + mmatrix_files, form, taxon_id)
+        create_gene_info_file(path_files, form, taxon_id)
 
     else:
-        matrix_files: list[str] = utilities.stringlist_to_list(matrix_path_prov)
+        matrix_files: list[Path] = utilities.stringlist_to_list(matrix_path_prov, return_as_path=True)
         create_gene_info_file(matrix_files, form, taxon_id)
 
 
@@ -458,4 +465,13 @@ def main(argv):
 
 
 if __name__ == "__main__":
+    sys.argv.extend(
+        [
+            "--context-names", "naiveB",
+            "--gene-format", "Ensembl",
+            "--taxon-id", "human",
+            "--provide-matrix",
+            "--matrix", "/Users/joshl/Downloads/COMO_python_output/naiveB/gene_counts_matrix_full_naiveB.csv"
+        ]
+    )
     main(sys.argv[1:])
