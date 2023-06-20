@@ -17,6 +17,7 @@ from async_bioservices import async_bioservices
 from async_bioservices.input_database import InputDatabase
 from async_bioservices.output_database import OutputDatabase
 
+
 def _perform_knockout(
     spacer: str,
     total_knockouts: int,
@@ -39,22 +40,25 @@ def _perform_knockout(
     
     count_progress.acquire()
     count_progress.value += 1
-    print(f"({count_progress.value:{spacer}d} of {total_knockouts}) Finished knock-out simulation for gene ID: {int(gene_id):6d}")
+    print(
+        f"({count_progress.value:{spacer}d} of {total_knockouts}) Finished knock-out simulation for gene ID: {int(gene_id):6d}")
     count_progress.release()
     
     return gene_id, optimized_model["fluxes"]
+
 
 def initialize_pool(synchronizer):
     global count_progress
     count_progress = synchronizer
 
+
 def knock_out_simulation(
-        model: cobra.Model,
-        inhibitors_filepath: str | Path,
-        drug_db: pd.DataFrame,
-        reference_flux_filepath: str | Path | None,
-        test_all: bool,
-        pars_flag: bool
+    model: cobra.Model,
+    inhibitors_filepath: str | Path,
+    drug_db: pd.DataFrame,
+    reference_flux_filepath: str | Path | None,
+    test_all: bool,
+    pars_flag: bool
 ):
     reference_solution: cobra.Solution
     if reference_flux_filepath is not None:
@@ -65,8 +69,9 @@ def knock_out_simulation(
         except FileNotFoundError:
             raise FileNotFoundError(f"Reference flux file not found at {reference_flux_filepath}")
         except KeyError:
-            raise KeyError("Reference flux file must be a CSV file with the columns 'rxn' and 'flux' and row number equal to "
-                            "the given context-specific model!")
+            raise KeyError(
+                "Reference flux file must be a CSV file with the columns 'rxn' and 'flux' and row number equal to "
+                "the given context-specific model!")
         
         reference_solution = cobra.core.solution.Solution(model.objective, "OPTIMAL", reference_flux)
     else:
@@ -76,7 +81,7 @@ def knock_out_simulation(
             reference_solution = model.optimize()
     
     if os.path.isfile(inhibitors_filepath):
-        print(f"Inhibitors file found at:\n{inhibitors_filepath}")
+        # print(f"Inhibitors file found at: {inhibitors_filepath}")
         DT_genes = pd.read_csv(os.path.join(configs.datadir, inhibitors_filepath), header=None, sep="\t")
         DT_genes.rename(columns={0: "Gene ID"}, inplace=True)
         DT_genes["Gene ID"] = DT_genes["Gene ID"].astype(str)
@@ -89,10 +94,11 @@ def knock_out_simulation(
         DT_genes.replace("-", np.nan, inplace=True)
         DT_genes.dropna(axis=0, inplace=True)
         DT_genes.to_csv(inhibitors_filepath, header=False, sep="\t")
-        print(f"Inhibitors file written to:\n{inhibitors_filepath}")
+        # print(f"Inhibitors file written to: {inhibitors_filepath}")
     
     gene_ind2genes = [x.id for x in model.genes]
     gene_ind2genes = set(gene_ind2genes)
+    print("\nKnock Out Simulation Details")
     print(f"{len(gene_ind2genes)} genes in model")
     DT_model = list(set(DT_genes["Gene ID"].tolist()).intersection(gene_ind2genes))
     print(f"{len(DT_model)} genes can be targeted by drugs")
@@ -100,6 +106,7 @@ def knock_out_simulation(
     model_opt = cobra.flux_analysis.moma(model, solution=reference_solution, linear=False).to_frame()
     model_opt[abs(model_opt) < 1e-8] = 0.0
     
+    print("Finding genes with potentially-significant metabolic impacts...", end="")
     genes_with_metabolic_effects = []
     for id_ in DT_model:
         gene = model.genes.get_by_id(id_)
@@ -110,22 +117,14 @@ def knock_out_simulation(
                 if gene_id == id_:
                     boolval = "False"
                 else:
-                    # boolval = "{}".format(model.genes.get_by_id(gene_id)._functional)
-                    boolval = "{}".format(model.genes.get_by_id(gene_id).functional)
+                    boolval = str(model.genes.get_by_id(gene_id).functional)
                 gene_reaction_rule = gene_reaction_rule.replace(
-                    "{}".format(gene_id), boolval, 1
+                    str(gene_id), boolval, 1
                 )
             if not eval(gene_reaction_rule) or test_all:
                 genes_with_metabolic_effects.append(id_)
                 break
     
-    """
-    Get the number of characters in the length of the number of genes
-    For example:
-        "1" for len(has_effects_gene) = 1 to 9
-        "2" for len(has_effects_gene) = 10 to 99
-        "3" for len(has_effects_gene) = 100 to 999
-    """
     # Initialize the processing pool with a counter
     # From: https://stackoverflow.com/questions/69907453Up
     synchronizer = mp.Value("i", 0)
@@ -134,12 +133,21 @@ def knock_out_simulation(
     num_cores: int = max(1, mp.cpu_count() - 2)
     pool: mp.Pool = mp.Pool(num_cores, initializer=initialize_pool, initargs=(synchronizer,))
     
+    """
+    Get the number of characters in the length of the number of genes
+    For example:
+        "1" for len(has_effects_gene) = 1 to 9
+        "2" for len(has_effects_gene) = 10 to 99
+        "3" for len(has_effects_gene) = 100 to 999
+    """
     spacer: int = len(str(len(genes_with_metabolic_effects)))
     flux_solution: pd.DataFrame = pd.DataFrame()
     
-    print(f"Found {len(genes_with_metabolic_effects)} genes with potentially-significant metabolic impacts\n")
-    import time
-    start = time.time()
+    print(f"\r{len(genes_with_metabolic_effects)} genes with potentially-significant metabolic impacts" + " " * 50)
+    if num_cores == 1:
+        print("Starting gene knockouts with 1 core...\n")
+    else:
+        print(f"Starting gene knockouts with {num_cores} cores...\n")
     
     output: list[mp.pool.ApplyResult] = []
     for id_ in genes_with_metabolic_effects:
@@ -164,9 +172,6 @@ def knock_out_simulation(
         gene_id, knock_out_flux = result.get()
         flux_solution[gene_id] = knock_out_flux
     
-    end = time.time()
-    print(f"Time elapsed: {end - start} seconds (multi core)")
-    
     # flux_solution
     flux_solution[abs(flux_solution) < 1e-8] = 0.0
     flux_solution_ratios = flux_solution.div(model_opt["fluxes"], axis=0)  # ko / original : inf means
@@ -183,16 +188,16 @@ def knock_out_simulation(
 
 
 def create_gene_pairs(
-        datadir,
-        model,
-        gene_ind2genes,
-        flux_solution,
-        flux_solution_ratios,
-        flux_solution_diffs,
-        has_effects_gene,
-        disease_genes,
+    datadir,
+    model,
+    gene_ind2genes,
+    flux_solution,
+    flux_solution_ratios,
+    flux_solution_diffs,
+    has_effects_gene,
+    disease_genes,
 ):
-    disease_genes = pd.read_csv(os.path.join(datadir, disease_genes))
+    disease_genes = pd.read_csv(disease_genes)
     DAG_dis_genes = pd.DataFrame()  # data analysis genes
     DAG_dis_genes["Gene ID"] = disease_genes.iloc[:, 0].astype(str)
     # DAG_dis_genes
