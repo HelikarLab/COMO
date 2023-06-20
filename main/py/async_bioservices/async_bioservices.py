@@ -11,15 +11,16 @@ except ImportError:
     from .output_database import OutputDatabase
     from .taxon_ids import TaxonIDs
 
+
 async def _async_fetch_info(
-        biodbnet: BioDBNet,
-        event_loop: asyncio.AbstractEventLoop,
-        semaphore: asyncio.Semaphore,
-        input_values: list[str],
-        input_db: str,
-        output_db: list[str],
-        taxon_id: int,
-        delay: int = 10
+    biodbnet: BioDBNet,
+    event_loop: asyncio.AbstractEventLoop,
+    semaphore: asyncio.Semaphore,
+    input_values: list[str],
+    input_db: str,
+    output_db: list[str],
+    taxon_id: int,
+    delay: int = 10
 ) -> pd.DataFrame:
     await semaphore.acquire()
     conversion = await asyncio.to_thread(
@@ -49,28 +50,29 @@ async def _async_fetch_info(
             taxon_id, delay,
         )
         return pd.concat([first_conversion, second_conversion])
-        
+    
     return conversion
 
 
 async def _fetch_gene_info_manager(tasks: list[asyncio.Task[pd.DataFrame]], batch_length: int) -> list[pd.DataFrame]:
     results: list[pd.DataFrame] = []
-
+    
     print("Collecting genes... ", end="")
     
     task: asyncio.Future[pd.DataFrame]
     for i, task in enumerate(asyncio.as_completed(tasks)):
         results.append(await task)
         print(f"\rCollecting genes... {i * batch_length} of ~{len(tasks) * batch_length} finished", end="")
-
+    
     return results
 
+
 def fetch_gene_info(
-        input_values: list[str],
-        input_db: InputDatabase,
-        output_db: OutputDatabase | list[OutputDatabase] = None,
-        taxon_id: TaxonIDs | int = TaxonIDs.HOMO_SAPIENS,
-        delay: int = 5
+    input_values: list[str],
+    input_db: InputDatabase,
+    output_db: OutputDatabase | list[OutputDatabase] = None,
+    taxon_id: TaxonIDs | int = TaxonIDs.HOMO_SAPIENS.value,
+    delay: int = 5
 ) -> pd.DataFrame:
     """
     This function returns a dataframe with important gene information for future operations in MADRID.
@@ -82,9 +84,10 @@ def fetch_gene_info(
     :param taxon_id: The taxon ID to use (default: 9606)
     :return: A dataframe with specified columns as "output_db" (Default is HUGO symbol, Entrez ID, and chromosome start and end positions)
     """
-    
+    input_values = [str(i) for i in input_values]
     input_db_value = input_db.value
     batch_length: int = 100
+    
     output_db_values: list[str]
     if output_db is None:
         output_db_values = [
@@ -96,12 +99,16 @@ def fetch_gene_info(
         output_db_values = [output_db.value]
     else:
         output_db_values = [str(i.value) for i in output_db]
-
+    
+    # Check if input_db_value is in output_db_values
+    if input_db_value in output_db_values:
+        raise ValueError("Input database cannot be in output database")
+    
     if type(taxon_id) == TaxonIDs:
         taxon_id_value = taxon_id.value
     else:
         taxon_id_value = taxon_id
-
+    
     biodbnet = BioDBNet()
     biodbnet.services.TIMEOUT = 60
     dataframe_maps: pd.DataFrame = pd.DataFrame([], columns=output_db_values)
@@ -127,12 +134,13 @@ def fetch_gene_info(
                 event_loop=event_loop
             )
         )
-    
+        
         async_tasks.append(task)
-
-    database_convert = event_loop.run_until_complete(_fetch_gene_info_manager(tasks=async_tasks, batch_length=batch_length))
+    
+    database_convert = event_loop.run_until_complete(
+        _fetch_gene_info_manager(tasks=async_tasks, batch_length=batch_length))
     event_loop.close()  # Close the event loop to free resources
-
+    
     # Loop over database_convert to concat them into dataframe_maps
     print("")
     for i, df in enumerate(database_convert):
