@@ -60,3 +60,4 @@ dependencies:
       - bioservices==1.11.2
       - memote==0.13.0
       - framed==0.5.2
+      - git+https://github.com/genialis/RNAnorm
