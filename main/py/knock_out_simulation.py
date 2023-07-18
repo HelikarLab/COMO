@@ -471,7 +471,7 @@ def main(argv):
     if tissue_spec_model_file[-4:] == ".mat":
         cobra_model = cobra.io.load_matlab_model(tissue_spec_model_file)
     elif tissue_spec_model_file[-4:] == ".xml":
-        cobra_model = cobra.io.load_sbml_model(tissue_spec_model_file)
+        cobra_model = cobra.io.read_sbml_model(tissue_spec_model_file)
     elif tissue_spec_model_file[-5:] == ".json":
         cobra_model = cobra.io.load_json_model(tissue_spec_model_file)
     else:
