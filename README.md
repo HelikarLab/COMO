@@ -1,6 +1,5 @@
 # COMO: Constraint-based Optimizations of Metabolic Objectives 
 
-[![Continuous Delivery](https://github.com/HelikarLab/COMO/actions/workflows/continuous_delivery.yml/badge.svg)](https://github.com/HelikarLab/COMO/actions/workflows/continuous_delivery.yml)
 [![Unit Tests](https://github.com/HelikarLab/COMO/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/HelikarLab/COMO/actions/workflows/unit_tests.yml)
 [![pages-build-deployment](https://github.com/HelikarLab/COMO/actions/workflows/pages/pages-build-deployment/badge.svg?branch=master)](https://github.com/HelikarLab/COMO/actions/workflows/pages/pages-build-deployment)
 
