@@ -17,17 +17,15 @@ jobs:
 
       # Install dependencies in conda environment
       - name: Install Micromamba
-        # Execute '"${SHELL}" <(curl -L micro.mamba.pm/install.sh)'
-        run: |
-          http --download "https://micro.mamba.pm/install.sh" output=micromamba
-          chmod +x micromamba
-          ./micromamba shell init -s bash -p ~/micromamba
-          source ~/.bashrc
-          micromamba create --name como
-          micromamba activate como-env
-          micromamba env update --file environment.yaml
-        env:
-          PATH: ${{ runner.workspace }}/micromamba:$PATH
+        uses: mamba-org/setup-micromamba@v1
+        with:
+          micromamba-version: '*'
+          environment-file: environment.yml
+          cache-environment: true
+          cache-downloads: true
+          post-cleanup: 'none'
+          environment-name: como
+          init-shell: bash
 
       - name: List conda packages
         run: mamba list
