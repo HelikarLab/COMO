@@ -1,5 +1,7 @@
 # This action will publish the COMO notebook to github pages
 
+name: Publish COMO
+
 on:
   push:
     branches:
