@@ -16,18 +16,18 @@ jobs:
         uses: actions/checkout@v2
 
       # Install dependencies in conda environment
-      - name: Set up Miniconda
-        uses: conda-incubator/setup-miniconda@v2
-        with:
-          python-version: "3.10"
-          mamba-version: "*"
-          channels: bioconda,conda-forge,r,gurobi,defaults
-          channel-priority: true
-          auto-update-conda: true
-          activate-environment: base
-          auto-activate-base: true
-          environment-file: environment.yaml
-
+      - name: Install Micromamba
+        # Execute '"${SHELL}" <(curl -L micro.mamba.pm/install.sh)'
+        run: |
+          curl -L "https://micro.mamba.pm/install.sh" > micromamba.sh
+          chmod +x micromamba.sh
+          ./micromamba.sh shell init -s bash -p ~/micromamba
+          source ~/.bashrc
+          micromamba create --name como
+          micromamba activate como-env
+          micromamba env update --file environment.yaml
+        env:
+          PATH: ${{ runner.workspace }}/micromamba:$PATH
 
       - name: List conda packages
         run: mamba list
