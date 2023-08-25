@@ -24,7 +24,6 @@ jobs:
           cache-environment: true
           cache-downloads: true
           post-cleanup: "none"
-          environment-name: como
           init-shell: bash
 
       - name: List installed packages
