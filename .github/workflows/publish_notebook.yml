@@ -19,7 +19,7 @@ jobs:
       - name: Install Micromamba
         # Execute '"${SHELL}" <(curl -L micro.mamba.pm/install.sh)'
         run: |
-          wget -O micromamba "https://micro.mamba.pm/install.sh"
+          http --download "https://micro.mamba.pm/install.sh" output=micromamba
           chmod +x micromamba
           ./micromamba shell init -s bash -p ~/micromamba
           source ~/.bashrc
