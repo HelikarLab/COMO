@@ -8,7 +8,7 @@ on:
       - feature/jupyter-pages
 
 jobs:
-  deploy-book:
+  deploy-como:
     runs-on: ubuntu-latest
     steps:
       # Check out the repository
@@ -21,13 +21,13 @@ jobs:
         with:
           python-version: "3.10"
           mamba-version: "*"
-          channels: conda-forge,defaults
+          channels: bioconda,conda-forge,r,gurobi,defaults
           channel-priority: true
           auto-update-conda: true
           activate-environment: base
-
-          environment-file: environment.yaml
           auto-activate-base: true
+          environment-file: environment.yaml
+
 
       - name: List conda packages
         run: mamba list
