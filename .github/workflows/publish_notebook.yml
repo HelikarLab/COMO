@@ -20,7 +20,7 @@ jobs:
         uses: mamba-org/setup-micromamba@v1
         with:
           micromamba-version: "latest"
-          environment-file: ${{ github.workspace }}/environment.yml
+          environment-file: ${{ github.workspace }}/environment.yaml
           cache-environment: true
           cache-downloads: true
           post-cleanup: "none"
