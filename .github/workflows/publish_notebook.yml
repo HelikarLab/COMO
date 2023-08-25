@@ -19,9 +19,9 @@ jobs:
       - name: Install Micromamba
         # Execute '"${SHELL}" <(curl -L micro.mamba.pm/install.sh)'
         run: |
-          curl -L "https://micro.mamba.pm/install.sh" > micromamba.sh
-          chmod +x micromamba.sh
-          ./micromamba.sh shell init -s bash -p ~/micromamba
+          wget -O micromamba "https://micro.mamba.pm/install.sh"
+          chmod +x micromamba
+          ./micromamba shell init -s bash -p ~/micromamba
           source ~/.bashrc
           micromamba create --name como
           micromamba activate como-env
