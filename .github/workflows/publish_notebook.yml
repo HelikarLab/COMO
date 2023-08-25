@@ -13,14 +13,14 @@ jobs:
     steps:
       # Check out the repository
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # Install dependencies in conda environment
       - name: Install Micromamba
         uses: mamba-org/setup-micromamba@v1
         with:
           micromamba-version: "latest"
-          environment-file: "${{ runner.GITHUB_WORKSPACE }}/environment.yml"
+          environment-file: $GITHUB_WORKSPACE/environment.yml
           cache-environment: true
           cache-downloads: true
           post-cleanup: "none"
