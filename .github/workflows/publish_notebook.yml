@@ -28,7 +28,7 @@ jobs:
           generate-run-shell: true
 
       - name: List installed packages
-        run: list
+        run: mamba list
         shell: micromamba-shell {0}
 
       - name: Install Jupyter Book
