@@ -19,15 +19,15 @@ jobs:
       - name: Install Micromamba
         uses: mamba-org/setup-micromamba@v1
         with:
-          micromamba-version: '*'
+          micromamba-version: "latest"
           environment-file: environment.yml
           cache-environment: true
           cache-downloads: true
-          post-cleanup: 'none'
+          post-cleanup: "none"
           environment-name: como
           init-shell: bash
 
-      - name: List conda packages
+      - name: List installed packages
         run: mamba list
           
 
