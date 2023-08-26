@@ -3,7 +3,7 @@ title: Knockout Simulation
 sidebar: como_sidebar
 permalink: como_args_knockout_simulation.html
 folder: como
-summary: "The arguments used in the `/main/py/knock_out_simulation.py` file"
+summary: "The arguments used in the `/main/src/knock_out_simulation.py` file"
 last_updated: September 21, 2022
 ---
 

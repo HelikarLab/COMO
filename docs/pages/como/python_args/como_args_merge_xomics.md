@@ -3,7 +3,7 @@ title: Merge Omics Gen
 sidebar: como_sidebar
 permalink: como_args_merge_xomics.html
 folder: como
-summary: "The arguments used in the `/main/py/merge_xomics.py` file"
+summary: "The arguments used in the `/main/src/merge_xomics.py` file"
 last_updated: September 21, 2022
 ---
 
