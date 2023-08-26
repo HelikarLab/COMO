@@ -30,15 +30,12 @@ jobs:
 
       - name: Build Jupyterlite
         run: |
-          jupyter lite build --contents ${{ github.workspace }}/main --output-dir ${{ github.workspace }}/distribution
-
-      - name: List build items
-        run: ls -l ${{ github.workspace }}
+          jupyter lite build --contents main --output-dir distribution
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:
-          path: ${{ github.workspace }}/distribution
+          path: ./distribution
 
   deploy-como:
     needs: build-como
