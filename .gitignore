@@ -8,8 +8,6 @@
 /**/__pycache__
 /docs/_site
 /docs/Gemfile.lock
-/main/output
-/main/py/rlogs/
-docker_old/*
+/main/src/rlogs/
 ~$*
-/**/cache/
+/results
