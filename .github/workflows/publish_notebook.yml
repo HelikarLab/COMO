@@ -26,7 +26,7 @@ jobs:
           generate-run-shell: true
 
       - name: Install jupyterlite
-        run: pip install jupyterlite
+        run: micromamba install --yes --channel conda-forge jupyterlite-core python-libarchive-c
 
       - name: Build Jupyterlite
         run: |
