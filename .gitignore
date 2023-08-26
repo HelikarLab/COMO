@@ -12,3 +12,4 @@
 
 /main/logs/
 /main/data/results
+/main/data/config_sheets/*_data_inputs_auto.xlsx
