@@ -31,9 +31,7 @@ jobs:
         run: pip install jupyter-book
 
       - name: Build Jupyter Book
-        run: |
-          jupyter-book toc from-project ${{ github.workspace }}
-          jupyter-book build ${{ github.workspace }}
+        run: jupyter-book build ${{ github.workspace }}
 
       - name: Push to Github Pages
         uses: peaceiris/actions-gh-pages@v3
