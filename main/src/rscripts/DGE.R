@@ -1,17 +1,12 @@
-library(DESeq2)
-library(edgeR)
-library(readxl)
-library(stringr)
+suppressPackageStartupMessages(library("DESeq2"))
+suppressPackageStartupMessages(library("edgeR"))
+suppressPackageStartupMessages(library("readxl"))
+suppressPackageStartupMessages(library("stringr"))
 
-# Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
-username <- Sys.info()["user"]
-work_dir <- stringr::str_interp("/home/${username}/main")
-
-if (!dir.exists(stringr::str_interp("${work_dir}/py/rlogs"))) {
-    dir.create(stringr::str_interp("${work_dir}/py/rlogs"))
-}
-
-zz <- file(file.path("/home", username, "main", "py", "rlogs", "DGE.Rout"), open="wt")
+work_dir <- getwd()
+r_log_directory <- str_interp("${work_dir}/logs")
+if (!dir.exists(r_log_directory)) { dir.create(r_log_directory) }
+zz <- file(file.path(r_log_directory, "DGE.Rout"), open="wt")
 sink(zz, type="message")
 
 readCountMatrix <- function(cmat_file, config_file, disease_name) {

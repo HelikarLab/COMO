@@ -1,19 +1,14 @@
-username <- Sys.info()["user"]
-work_dir <- str_interp("/home/${username}/main")
+suppressPackageStartupMessages(library("ggplot2"))
+suppressPackageStartupMessages(library("tidyverse"))
+suppressPackageStartupMessages(library("zoo"))
 
-if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
-    dir.create(str_interp("${work_dir}/py/rlogs"))
-}
-
-# prevent messy messages from repeatedly writing to juypter
-zz <- file(file.path("/home", username, "main", "py", "rlogs", "protein_transform.Rout"), open="wt")
+# Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
+# Then prevent messy messages from repeatedly writing to juypter
+work_dir <- getwd()
+r_log_directory <- str_interp("${work_dir}/logs")
+if (!dir.exists(r_log_directory)) { dir.create(r_log_directory) }
+zz <- file(file.path(r_log_directory, "protein_transform.Rout"), open="wt")
 sink(zz, type="message")
-
-
-library(ggplot2)
-library(tidyverse)
-library(zoo)
-
 
 z_result <- function(z_vector, density, mu, stdev, max_y) {
     z_res <- list(

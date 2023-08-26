@@ -1,4 +1,4 @@
-*.Rhistory
+/**/*.Rhistory
 /**/.DS_Store
 /**/.idea
 /**/.ipynb_checkpoints/
@@ -6,8 +6,9 @@
 /**/.mypy_cache
 /**/.pytest_cache
 /**/__pycache__
+
 /docs/_site
 /docs/Gemfile.lock
-/main/src/rlogs/
-~$*
-/results
+
+/main/logs/
+/main/results

@@ -1,27 +1,21 @@
+suppressPackageStartupMessages(library("tidyverse"))
+suppressPackageStartupMessages(library("limma"))
+suppressPackageStartupMessages(library("edgeR"))
+suppressPackageStartupMessages(library("genefilter"))
+suppressPackageStartupMessages(library("biomaRt"))
+suppressPackageStartupMessages(library("sjmisc"))
+suppressPackageStartupMessages(library("zFPKM"))
+suppressPackageStartupMessages(library("stringr"))
+suppressPackageStartupMessages(library("readxl"))
+suppressPackageStartupMessages(library("dplyr"))
+
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
-library("stringr")
-username <- Sys.info()["user"]
-work_dir <- str_interp("/home/${username}/main")
-
-if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
-    dir.create(str_interp("${work_dir}/py/rlogs"))
-}
-
-# prevent messy messages from repeatedly writing to juypter
-zz <- file(file.path("/home", username, "main", "py", "rlogs", "rnaseq.Rout"), open="wt")
+# Then prevent messy messages from repeatedly writing to juypter
+work_dir <- getwd()
+r_log_directory <- str_interp("${work_dir}/logs")
+if (!dir.exists(r_log_directory)) { dir.create(r_log_directory) }
+zz <- file(file.path(r_log_directory, "rnaseq.Rout"), open="wt")
 sink(zz, type="message")
-
-library(tidyverse)
-library(limma)
-library(edgeR)
-library(genefilter)
-library(biomaRt)
-library(sjmisc)
-library(zFPKM)
-library(stringr)
-library(readxl)
-library(dplyr)
-
 
 read_counts_matrix <- function(counts_matrix_filepath, config_filepath, info_filepath, context_name) {
     config_object <- read_excel(config_filepath, sheet=context_name)# read configuration sheet
