@@ -12,11 +12,11 @@ from pathlib import Path
 import rpy2_api
 
 # read and translate R functions
-# f = open(os.path.join(configs.rootdir, "py", "rscripts", "protein_transform.R"), "r")
+# f = open(os.path.join(configs.rootdir, "src", "rscripts", "protein_transform.R"), "r")
 # string = f.read()
 # f.close()
 # protein_transform_io = SignatureTranslatedAnonymousPackage(string, "protein_transform_io")
-r_file_path = Path(configs.rootdir, "py", "rscripts", "protein_transform.R")
+r_file_path = Path(configs.rootdir, "src", "rscripts", "protein_transform.R")
 
 
 # Load Proteomics

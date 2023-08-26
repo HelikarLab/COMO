@@ -2,7 +2,7 @@ import os
 import sys
 import pandas as pd
 
-# Allow us to import anything we need from the /main/py directory
+# Allow us to import anything we need from the /main/src directory
 # From: https://stackoverflow.com/a/30536516/13885200
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

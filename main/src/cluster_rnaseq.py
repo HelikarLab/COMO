@@ -22,8 +22,8 @@ from utilities import stringlist_to_list
 # uwot = importr("uwot")
 
 # read and translate R functions
-r_file_path = Path(configs.rootdir, "py", "rscripts", "cluster_samples.R")
-# f = open(os.path.join(configs.rootdir, "py", "rscripts", "cluster_samples.R"), "r")
+r_file_path = Path(configs.rootdir, "src", "rscripts", "cluster_samples.R")
+# f = open(os.path.join(configs.rootdir, "src", "rscripts", "cluster_samples.R"), "r")
 # string = f.read()
 # f.close()
 # cluster_io = SignatureTranslatedAnonymousPackage(string, "cluster_io")

@@ -14,7 +14,7 @@ import rpy2_api
 # enable r to py conversion
 pandas2ri.activate()
 
-r_file_path = Path(configs.rootdir, "py", "rscripts", "rnaseq.R")
+r_file_path = Path(configs.rootdir, "src", "rscripts", "rnaseq.R")
 
 
 def load_rnaseq_tests(filename, context_name, lib_type):

@@ -8,7 +8,7 @@ class Configs:
         self.datadir = os.path.join(projectdir, "data")
         self.configdir = os.path.join(projectdir, "data", "config_sheets")
         self.outputdir = os.path.join(projectdir, "output")
-        self.pydir = os.path.join(projectdir, "py")
+        self.pydir = os.path.join(projectdir, "src")
 
 
 current_dir = os.getcwd()

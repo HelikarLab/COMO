@@ -25,23 +25,23 @@ edgeR = importr("edgeR")
 readxl = importr("readxl")
 
 # read and translate R functions
-# f = open(os.path.join(configs.rootdir, "py", "rscripts", "DGE.R"), "r")
+# f = open(os.path.join(configs.rootdir, "src", "rscripts", "DGE.R"), "r")
 # string = f.read()
 # f.close()
 # DGEio = SignatureTranslatedAnonymousPackage(string, "DGEio")
-DGEio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "py", "rscripts", "DGE.R"))
+DGEio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "src", "rscripts", "DGE.R"))
 
-# f = open(os.path.join(configs.rootdir, "py", "rscripts", "fitAffy.R"), "r")
+# f = open(os.path.join(configs.rootdir, "src", "rscripts", "fitAffy.R"), "r")
 # string = f.read()
 # f.close()
 # affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
-affyio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "py", "rscripts", "fitAffy.R"))
+affyio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "src", "rscripts", "fitAffy.R"))
 
-# f = open(os.path.join(configs.rootdir, "py", "rscripts", "fitAgilent.R"), "r")
+# f = open(os.path.join(configs.rootdir, "src", "rscripts", "fitAgilent.R"), "r")
 # string = f.read()
 # f.close()
 # agilentio = SignatureTranslatedAnonymousPackage(string, "agilentio")
-agilentio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "py", "rscripts", "fitAgilent.R"))
+agilentio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "src", "rscripts", "fitAgilent.R"))
 
 
 def breakDownEntrezs(disease):

@@ -19,7 +19,7 @@ from async_bioservices.taxon_ids import TaxonIDs
 import rpy2_api
 import utilities
 
-r_file_path: Path = Path(configs.rootdir, "py", "rscripts", "generate_counts_matrix.R")
+r_file_path: Path = Path(configs.rootdir, "src", "rscripts", "generate_counts_matrix.R")
 
 def create_counts_matrix(context_name):
     """

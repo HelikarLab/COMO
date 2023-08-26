@@ -26,11 +26,11 @@ from async_bioservices import async_bioservices
 # tidyverse = importr("tidyverse")
 
 # read and translate R functions
-# f = open(os.path.join(configs.rootdir, "py", "rscripts", "combine_distributions.R"), "r")
+# f = open(os.path.join(configs.rootdir, "src", "rscripts", "combine_distributions.R"), "r")
 # string = f.read()
 # f.close()
 # combine_dist_io = SignatureTranslatedAnonymousPackage(string, "combine_dist_io")
-r_file_path = Path(configs.rootdir, "py", "rscripts", "combine_distributions.R")
+r_file_path = Path(configs.rootdir, "src", "rscripts", "combine_distributions.R")
 
 
 class _MergedHeaderNames(Enum):

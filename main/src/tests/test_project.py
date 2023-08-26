@@ -15,4 +15,4 @@ def test_config():
     assert configs.datadir == os.path.join(madrid_work_dir, "data")
     assert configs.configdir == os.path.join(madrid_work_dir, "data", "config_sheets")
     assert configs.outputdir == os.path.join(madrid_work_dir, "output")
-    assert configs.pydir == os.path.join(madrid_work_dir, "py")
+    assert configs.pydir == os.path.join(madrid_work_dir, "src")
