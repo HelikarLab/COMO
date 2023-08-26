@@ -28,18 +28,12 @@ jobs:
           cache-environment: true
           cache-downloads: true
           post-cleanup: "none"
-          generate-run-shell: true
 
       - name: Install jupyterlite
-        run: |
-          eval "$(micromamba shell hook --shell bash)" 
-          /home/runner/micromamba-bin/micromamba activate como
-          /home/runner/micromamba-bin/micromamba install --yes --channel conda-forge jupyterlite-core python-libarchive-c
-          pip install jupyterlite-pyodide-kernel
+        run: pip install jupyterlite-core jupyterlite-pyodide-kernel
 
       - name: Build Jupyterlite
-        run: |
-          jupyter lite build --contents main --output-dir distribution
+        run: jupyter lite build --contents main --output-dir distribution
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
