@@ -3,7 +3,7 @@ title: Create Context Specific Model
 sidebar: como_sidebar
 permalink: como_args_create_context_specific_model.html
 folder: como
-summary: "The arguments used in the `/main/py/create_context_specific_model.py` file"
+summary: "The arguments used in the `/main/src/create_context_specific_model.py` file"
 last_updated: September 21, 2022
 ---
 

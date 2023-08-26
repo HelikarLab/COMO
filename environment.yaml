@@ -62,6 +62,7 @@ dependencies:
       - memote==0.13.*
       - framed==0.5.*
       - jupyterlab-spreadsheet-editor==0.6.*
-      - pexpect==4.8.*
+      - git+https://github.com/babessell1/cobamp.git
+      - git+https://github.com/babessell1/troppo.git
 #    - pytest==4.6.11
 

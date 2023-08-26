@@ -1,7 +1,0 @@
-{
-    "LiteBuildConfig": {
-        "extra_ignore_contents": [
-            ".*\\.ipynb_checkpoints", ".*test.*", ".*cache.*"
-        ]
-    }
-}
