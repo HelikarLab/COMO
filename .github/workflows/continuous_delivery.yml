@@ -23,7 +23,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.GITHUB_REF }}
+          ref: ${{ github.ref }}
 
       # Get tag/release information for docker tags
       - name: Docker Metadata

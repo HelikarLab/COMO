@@ -13,7 +13,7 @@ COPY --chown=1000:100 main "${HOME}"/main
 
 # Install cobamp, bioservices, and troppo manually, as problems arose when installing using pip
 RUN git clone https://github.com/babessell1/cobamp.git \
-    && git clone https://github.com/babessell1/troppo.git \
+    && git clone git+https://github.com/babessell1/troppo.git \
     && pip install ./cobamp \
     && echo "COBAMP DONE" \
     && pip install ./troppo \
