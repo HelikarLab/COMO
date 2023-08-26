@@ -32,6 +32,9 @@ jobs:
         run: |
           jupyter lite build --contents ${{ github.workspace }}/main --output-dir ${{ github.workspace }}/distribution
 
+      - name: List build items
+        run: ls -l ${{ github.workspace }}
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:
