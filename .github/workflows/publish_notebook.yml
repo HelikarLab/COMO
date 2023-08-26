@@ -25,9 +25,17 @@ jobs:
           init-shell: bash
           generate-run-shell: true
 
+      - name: Determine micromamba installation path
+        run: which micromamba
+        continue-on-error: true
+
+      - name: Determine micromamba installation path (#2)
+        run: which mamba
+        continue-on-error: true
+
       - name: Install jupyterlite
         run: |
-          /home/runner/micromamba-bin/micromamba activate como
+          eval "$(micromamba shell hook --shell bash)" && /home/runner/micromamba-bin/micromamba activate como
           /home/runner/micromamba-bin/micromamba install --yes --channel conda-forge jupyterlite-core python-libarchive-c
 
       - name: Build Jupyterlite
