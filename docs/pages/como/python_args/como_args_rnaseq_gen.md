@@ -3,7 +3,7 @@ title: RNASeq Gen Arguments
 sidebar: como_sidebar
 permalink: como_args_rnaseq_gen.html
 folder: como
-summary: "The arguments used in the `/main/py/rnaseq_gen.py` file"
+summary: "The arguments used in the `/main/src/rnaseq_gen.py` file"
 last_updated: September 21, 2022
 ---
 

@@ -3,7 +3,7 @@ title: Disease Analysis
 sidebar: como_sidebar
 permalink: como_args_disease_analysis.html
 folder: como
-summary: "The arguments used in the `/main/py/disease_analysis.py` file"
+summary: "The arguments used in the `/main/src/disease_analysis.py` file"
 last_updated: September 21, 2022
 ---
 
