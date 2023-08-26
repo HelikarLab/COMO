@@ -28,24 +28,14 @@ jobs:
           cache-environment: true
           cache-downloads: true
           post-cleanup: "none"
-          # generate-run-shell: true
-
-      - name: Determine micromamba installation path
-        run: which micromamba
-        continue-on-error: true
-
-      - name: Determine micromamba installation path (#2)
-        run: which mamba
-        continue-on-error: true
-
-      - name: Determine micromamba installation path (#3)
-        run: which conda
-        continue-on-error: true
+          generate-run-shell: true
 
       - name: Install jupyterlite
         run: |
-          eval "$(micromamba shell hook --shell bash)" && /home/runner/micromamba-bin/micromamba activate como
+          eval "$(micromamba shell hook --shell bash)" 
+          /home/runner/micromamba-bin/micromamba activate como
           /home/runner/micromamba-bin/micromamba install --yes --channel conda-forge jupyterlite-core python-libarchive-c
+          pip install jupyterlite-pyodide-kernel
 
       - name: Build Jupyterlite
         run: |
