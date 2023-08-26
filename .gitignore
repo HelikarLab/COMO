@@ -11,4 +11,4 @@
 /docs/Gemfile.lock
 
 /main/logs/
-/main/results
+/main/data/results
