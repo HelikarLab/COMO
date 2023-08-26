@@ -22,15 +22,16 @@ jobs:
           cache-environment: true
           cache-downloads: true
           post-cleanup: "none"
-          init-shell: bash
           generate-run-shell: true
 
       - name: Determine micromamba installation path
         run: which micromamba
+        shell: micromamba-shell {0}
         continue-on-error: true
 
       - name: Determine micromamba installation path (#2)
         run: which mamba
+        shell: micromamba-shell {0}
         continue-on-error: true
 
       - name: Install jupyterlite
