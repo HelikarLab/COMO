@@ -8,14 +8,12 @@ on:
       - feature/jupyter-pages
 
 jobs:
-  deploy-como:
+  build-como:
     runs-on: ubuntu-latest
     steps:
-      # Check out the repository
       - name: Checkout
         uses: actions/checkout@v3
 
-      # Install dependencies in conda environment
       - name: Install Micromamba
         uses: mamba-org/setup-micromamba@v1
         with:
@@ -27,16 +25,31 @@ jobs:
           init-shell: bash
           generate-run-shell: true
 
-      - name: Install Jupyter Book
-        run: pip install jupyter-book
+      - name: Install jupyterlite
+        run: pip install jupyterlite
 
-      - name: Build Jupyter Book
-        run: jupyter-book build ${{ github.workspace }}
+      - name: Build Jupyterlite
+        run: |
+          jupyter lite build --contents ${{ github.workspace }}/main --output-dir ${{ github.workspace }}/distribution
 
-      - name: Push to Github Pages
-        uses: peaceiris/actions-gh-pages@v3
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ${{ github.workspace }}/_build/html
-          
+          path: ${{ github.workspace }}/distribution
 
+  deploy-como:
+    needs: build-como
+    # if: github.ref == 'ref/heads/main'
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Github Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
