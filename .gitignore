@@ -13,3 +13,4 @@
 docker_old/*
 ~$*
 /**/cache/
+/distribution/

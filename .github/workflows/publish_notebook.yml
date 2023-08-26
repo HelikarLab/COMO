@@ -29,10 +29,14 @@ jobs:
           cache-downloads: true
           post-cleanup: "none"
 
+      # Build Jupyterlite
       - name: Install jupyterlite
-        run: pip install jupyterlite-core jupyterlite-pyodide-kernel
-
+        run: pip install jupyterlite-core
       - name: Build Jupyterlite
+        run: jupyter lite build --contents main --output-dir distribution
+      - name: Install python kernel
+        run: pip install jupyterlite-pyodide-kernel
+      - name: Rebuild Jupyterlite
         run: jupyter lite build --contents main --output-dir distribution
 
       - name: Upload artifact
