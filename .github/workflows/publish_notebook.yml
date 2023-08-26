@@ -7,6 +7,12 @@ on:
     branches:
       - feature/jupyter-pages
 
+
+defaults:
+  run:
+    shell: bash -l {0}
+
+
 jobs:
   build-como:
     runs-on: ubuntu-latest
@@ -22,16 +28,18 @@ jobs:
           cache-environment: true
           cache-downloads: true
           post-cleanup: "none"
-          generate-run-shell: true
+          # generate-run-shell: true
 
       - name: Determine micromamba installation path
         run: which micromamba
-        shell: micromamba-shell {0}
         continue-on-error: true
 
       - name: Determine micromamba installation path (#2)
         run: which mamba
-        shell: micromamba-shell {0}
+        continue-on-error: true
+
+      - name: Determine micromamba installation path (#3)
+        run: which conda
         continue-on-error: true
 
       - name: Install jupyterlite
