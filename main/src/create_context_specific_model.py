@@ -1,23 +1,24 @@
 #!/usr/bin/python3
+
 import os
 import re
 import sys
 import cobra
-import collections
 import argparse
+import collections
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from warnings import warn
 from cobra.flux_analysis import pfba
 from cobamp.wrappers import COBRAModelObjectReader
-from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
-from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
 from troppo.methods.reconstruction.imat import IMAT, IMATProperties
 from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
-from project import configs
+from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
+from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
 
-from utilities import stringlist_to_list
+from project import configs
+from utilities import stringlist_to_list, split_gene_expression_data
 
 sys.setrecursionlimit(1500)  # for re.search
 
@@ -128,7 +129,7 @@ def set_boundaries(model_cobra: cobra.Model, bound_rxns: list, bound_lb, bound_u
     
     # close sinks and demands not in boundary reactions unless no boundary reactions were given
     if not allow_all_boundary_rxns:
-
+        
         for i, rxn in enumerate(sink_rxns):  # set sinks to 0
             if rxn not in bound_rxns:  # only allow sink accumulation
                 getattr(model_cobra.reactions, rxn).lower_bound = 0
@@ -136,7 +137,7 @@ def set_boundaries(model_cobra: cobra.Model, bound_rxns: list, bound_lb, bound_u
             else:  # set from file
                 getattr(model_cobra.reactions, rxn).lower_bound = bound_lb[i]
                 getattr(model_cobra.reactions, rxn).upper_bound = bound_ub[i]
-                
+        
         for i, rxn in enumerate(demand_rxns):
             if rxn not in bound_rxns:  # demand is one way - outside the system
                 getattr(model_cobra.reactions, rxn).lower_bound = 0
@@ -144,7 +145,7 @@ def set_boundaries(model_cobra: cobra.Model, bound_rxns: list, bound_lb, bound_u
             else:
                 getattr(model_cobra.reactions, rxn).lower_bound = 0
                 getattr(model_cobra.reactions, rxn).upper_bound = bound_ub[i]
-        
+    
     # Reaction media
     medium = model_cobra.medium  # get reaction media to modify
     for rxn in exchange_rxns:  # open exchanges from exchange file, close unspecified exchanges
@@ -153,7 +154,7 @@ def set_boundaries(model_cobra: cobra.Model, bound_rxns: list, bound_lb, bound_u
         else:
             medium[rxn] = -float(bound_lb[bound_rxns.index(rxn)])
     model_cobra.medium = medium  # set new media
-        
+    
     return model_cobra, bound_rm_rxns
 
 
@@ -246,7 +247,7 @@ def seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
 
 
 def seed_imat(
-        cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force, context_name
+    cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force, context_name
 ):
     expr_vector = np.array(expr_vector)
     properties = IMATProperties(
@@ -311,40 +312,6 @@ def seed_unsupported(recon_algorithm):
     sys.exit()
 
 
-def split_gene_expression_data(expression_data, recon_algorithm="GIMME"):
-    """
-    Splits genes that have mapped to multiple Entrez IDs are formated as "gene12//gene2//gene3"
-    """
-    if recon_algorithm in ["IMAT", "TINIT"]:
-        expression_data.rename(columns={"ENTREZ_GENE_ID": "Gene", "combine_z": "Data"}, inplace=True)
-    else:
-        expression_data.rename(columns={"ENTREZ_GENE_ID": "Gene", "Active": "Data"}, inplace=True)
-    
-    expression_data = expression_data.loc[:, ["Gene", "Data"]]
-    expression_data["Gene"] = expression_data["Gene"].astype(str)
-    single_gene_names = expression_data[~expression_data.Gene.str.contains("//")].reset_index(drop=True)
-    multiple_gene_names = expression_data[expression_data.Gene.str.contains("//")].reset_index(drop=True)
-    breaks_gene_names = pd.DataFrame(columns=["Gene", "Data"])
-    
-    for index, row in multiple_gene_names.iterrows():
-        for genename in row["Gene"].split("///"):
-            breaks_gene_names = pd.concat(
-                [
-                    breaks_gene_names,
-                    pd.DataFrame([{"Gene": genename, "Data": row["Data"]}]),
-                ],
-                axis=0,
-                ignore_index=True,
-            )
-    
-    gene_expressions = pd.concat(
-        [single_gene_names, breaks_gene_names], axis=0, ignore_index=True
-    )
-    gene_expressions.set_index("Gene", inplace=True)
-    
-    return gene_expressions
-
-
 def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm, low_thresh=None, high_thresh=None):
     """
     Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules
@@ -384,7 +351,7 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm, lo
             else:
                 rep_val = f" {str(unknown_val)} "
             gene_reaction_rule = (
-                    " " + gene_reaction_rule + " "
+                " " + gene_reaction_rule + " "
             )  # pad white space to prevent gene matches inside floats
             gene_reaction_rule = gene_reaction_rule.replace(
                 " {} ".format(gid), rep_val, 1
@@ -404,19 +371,19 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm, lo
 
 
 def create_context_specific_model(
-        general_model_file,
-        gene_expression_file,
-        recon_algorithm,
-        objective,
-        exclude_rxns,
-        force_rxns,
-        bound_rxns,
-        bound_lb,
-        bound_ub,
-        solver,
-        context_name,
-        low_thresh,
-        high_thresh
+    general_model_file,
+    gene_expression_file,
+    recon_algorithm,
+    objective,
+    exclude_rxns,
+    force_rxns,
+    bound_rxns,
+    bound_lb,
+    bound_ub,
+    solver,
+    context_name,
+    low_thresh,
+    high_thresh
 ):
     """
     Seed a context specific model. Core reactions are determined from GPR associations with gene expression logicals.
@@ -735,7 +702,7 @@ def main(argv):
         raise FileNotFoundError(f"Active genes file not found at {genefile}")
     
     print(f"Active genes file found at {genefile}")
-
+    
     bound_rxns = []
     bound_ub = []
     bound_lb = []
@@ -749,13 +716,16 @@ def main(argv):
         elif boundary_rxns_filepath.suffix == ".xlsx" or boundary_rxns_filepath.suffix == ".xls":
             df: pd.DataFrame = pd.read_excel(boundary_rxns_filepath, header=0)
         else:
-            raise FileNotFoundError(f"Boundary reactions file not found! Must be a csv or xlsx file. Searching for: {boundary_rxns_filepath}")
+            raise FileNotFoundError(
+                f"Boundary reactions file not found! Must be a csv or xlsx file. Searching for: {boundary_rxns_filepath}")
         
         # Make sure the columns are named correctly. They should be "Reaction", "Abbreviation", "Compartment", "Minimum Reaction Rate", and "Maximum Reaction Rate"
         for column in df.columns:
-            if column.lower() not in ["reaction", "abbreviation", "compartment", "minimum reaction rate", "maximum reaction rate"]:
-                raise ValueError(f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', 'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}")
-            
+            if column.lower() not in ["reaction", "abbreviation", "compartment", "minimum reaction rate",
+                                      "maximum reaction rate"]:
+                raise ValueError(
+                    f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', 'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}")
+        
         # convert all columns to lowercase
         df.columns = [column.lower() for column in df.columns]
         
@@ -780,9 +750,9 @@ def main(argv):
             
             temp_reaction += f"{reaction_abbreviation[i]}_{reaction_compartment[i]}"
             reaction_formula.append(temp_reaction)
-
+        
         del df
-
+    
     exclude_rxns = []
     if exclude_rxns_filepath:
         exclude_rxns_filepath: Path = Path(exclude_rxns_filepath)
@@ -820,7 +790,7 @@ def main(argv):
                 + "included in the context specific model, regardless of omics expression"
             )
             sys.exit()
-
+    
     force_rxns = []
     if force_rxns_filepath:
         force_rxns_filepath: Path = Path(force_rxns_filepath)
@@ -841,7 +811,7 @@ def main(argv):
                 sys.exit()
             
             force_rxns = df["Abbreviation"].tolist()
-
+        
         except FileNotFoundError:
             print(
                 "--force-reactions-file must be a path to a csv or xlsx file with one column."
@@ -860,14 +830,14 @@ def main(argv):
                 + "causes the model to be infeasible)."
             )
             sys.exit()
-
+    
     # Assert output types are valid
     for output_type in output_filetypes:
         if output_type not in ["xml", "mat", "json"]:
             print(f"Output file type {output_type} not recognized.")
             print("Output file types must be one of the following: xml, mat, json")
             sys.exit(1)
-
+    
     if recon_alg not in ["FASTCORE", "GIMME", "IMAT"]:
         print(
             f"Algorithm {recon_alg} not supported. Please use one of: GIMME, FASTCORE, or IMAT"
