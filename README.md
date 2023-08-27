@@ -1,11 +1,7 @@
-# COMO: Constraint-based Optimizations of Metabolic Objectives
+# COMO: Constraint-based Optimization of Metabolic Objectives
 
 [![Unit Tests](https://github.com/HelikarLab/COMO/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/HelikarLab/COMO/actions/workflows/unit_tests.yml)
 [![Documentation](https://github.com/HelikarLab/COMO/actions/workflows/pages/pages-build-deployment/badge.svg?branch=master)](https://github.com/HelikarLab/COMO/actions/workflows/pages/pages-build-deployment)
-
-This is the home page for the COMO pipeline.
-
-[Create and view Issues](https://github.com/HelikarLab/COMO/issues)
 
 ## Quick Start
 
