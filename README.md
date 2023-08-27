@@ -1,56 +1,46 @@
-# COMO: Constraint-based Optimizations of Metabolic Objectives 
+# COMO: Constraint-based Optimizations of Metabolic Objectives
 
 [![Unit Tests](https://github.com/HelikarLab/COMO/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/HelikarLab/COMO/actions/workflows/unit_tests.yml)
-[![pages-build-deployment](https://github.com/HelikarLab/COMO/actions/workflows/pages/pages-build-deployment/badge.svg?branch=master)](https://github.com/HelikarLab/COMO/actions/workflows/pages/pages-build-deployment)
+[![Documentation](https://github.com/HelikarLab/COMO/actions/workflows/pages/pages-build-deployment/badge.svg?branch=master)](https://github.com/HelikarLab/COMO/actions/workflows/pages/pages-build-deployment)
 
 This is the home page for the COMO pipeline.
-
-For more detailed information, please [view the documentation here](https://helikarlab.github.io/COMO)
 
 [Create and view Issues](https://github.com/HelikarLab/COMO/issues)
 
 ## Quick Start
-- [Install Docker](https://docs.docker.com/install/)
-- `sudo docker login`
-- `sudo docker pull ghcr.io/helikarlab/como:latest`
-- [Obtain a gurobi license](https://www.gurobi.com/academia/academic-program-and-licenses/)
 
+- [Install Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html)
+    - Preferably, [install mamba](https://mamba.readthedocs.io/en/latest/mamba-installation.html#mamba-install) instead.
+      Mamba is much faster than Conda and offers the same features
+- [Clone this repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository)
+    - `git clone https://github.com/HelikarLab/COMO.git`
+- Change directories into the newly cloned repository
+    - `cd COMO`
+- Create a new conda environment
+    - `conda env create -f environment.yaml`, <ins>**OR**</ins>
+    - `mamba env create -f environment.yaml`
+- Activate the new environment
+    - `conda activate como`, <ins>**OR**</ins>
+    - `mamba activate como`
+- **IMPORTANT**: Install our modified version of zFPKM to allow for filtering insignificant local maxima during RNA-seq
+  processing
+    - `R -e "devtools::install_github('babessell1/zFPKM')"`
+- Start the notebook server
+    - `cd main && jupyter notebook` (for "retro" jupyter notebook look and feel), <ins>**OR**</ins>
+    - `cd main && jupyter lab` (for the newer jupyter lab look and feel)
 
-### Using `docker run`
-```bash
-# We are going to export the license file location to an environment variable for use when running the docker container
-GRB_LICENSE_FILE=/your/gurobi/license/file/location/gurobi.lic
-LOCAL_FILES=/path/to/your/local/files
+This will open a web browser with the Jupyter Notebook/Lab interface. From here, you can open the `COMO.ipynb` notebook
+to get started
 
-sudo docker run \
-  --cpus=6 \
-  -p 8888:8888 \
-  --mount type=bind,source="${GRB_LICENSE_FILE}",target=/home/jovyan/gurobi.lic,readonly \
-  --volume="${LOCAL_FILES}":/home/jovyan/main/data/local_files \
-  --name como \
-  -it \
-  "ghcr.io/helikarlab/como:latest"
-```
+## Detailed Start
 
-
-### Using `docker compose`
-- Install the [docker compose](https://docs.docker.com/compose/install/) plugin
-- Create a `docker-compose.yml` file with the following contents:
-```yaml
-
-```
-
-- Run the docker image
-  - `sudo docker run -p 8888:8888 --volume=$HOME/gurobi.lic:/opt/gurobi/gurobi.lic:ro  -v /$HOME/LocalComo:/home/jovyan/work/data/local_files --rm --name como --rm -it ghcr.io/helikarlab/como:latest`
-- Open [http://127.0.0.1:8888](http://127.0.0.1:8888) from your browser  
-- In your jupyter notebook, open `COMO.ipynb`
-- Upload your configuration files to `data/config_files` and data files to `data/data_matrices` according to the instructions in the notebook and provided templates
-  - Update the file names in the jupyter notebook accordingly.
-- Run the notebook step by step, or run the step(s) by your needs
-
+For more detailed information, please [view our documentation](https://helikarlab.github.io/COMO)
 
 ## Flow Charts
+
 Please [follow this link](https://helikarlab.github.io/COMO/como_flowcharts.html) for flow charts
 
 ## Resources
-Resources for packages used in COMO and other useful links, please see [here](https://helikarlab.github.io/COMO/como_resources.html)
+
+Resources for packages used in COMO and other useful links, please
+see [here](https://helikarlab.github.io/COMO/como_resources.html)
