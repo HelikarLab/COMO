@@ -11,7 +11,7 @@
 /docs/Gemfile.lock
 
 /main/logs/
-/main/data/results
+/main/data/results/
 /main/data/config_sheets/*_data_inputs_auto.xlsx
 /main/data/gene_info.csv
 /main/data/Repurposing_Hub_Preproc.tsv
