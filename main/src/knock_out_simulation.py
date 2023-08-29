@@ -545,7 +545,7 @@ def main(argv):
     drug_score.to_csv(drug_score_file, index=False)
     print("Gene D score mapped to repurposing drugs saved to\n{}".format(drug_score_file))
     
-    print("\nDone!")
+    print(f"\nFinished {disease}!")
 
 
 if __name__ == "__main__":
