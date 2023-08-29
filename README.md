@@ -3,7 +3,9 @@
 [![Unit Tests](https://github.com/HelikarLab/COMO/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/HelikarLab/COMO/actions/workflows/unit_tests.yml)
 [![Documentation](https://github.com/HelikarLab/COMO/actions/workflows/pages/pages-build-deployment/badge.svg?branch=master)](https://github.com/HelikarLab/COMO/actions/workflows/pages/pages-build-deployment)
 
-## Quick Start
+## Non-Docker Quick Start
+
+This installation method does **not** require docker
 
 - [Install Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html)
     - Preferably, [install mamba](https://mamba.readthedocs.io/en/latest/mamba-installation.html#mamba-install) instead.
@@ -28,9 +30,23 @@
 This will open a web browser with the Jupyter Notebook/Lab interface. From here, you can open the `COMO.ipynb` notebook
 to get started
 
-## Detailed Start
+> **NOTE**: This installation method allows for saving your work and utilizing
+> the [Gurobi solver](https://www.gurobi.com/). If you would still like more details about this installation method,
+> please [visit our documentation](https://helikarlab.github.io/COMO)
 
-For more detailed information, please [view our documentation](https://helikarlab.github.io/COMO)
+## Docker Quick Start
+
+This installation method **does** require docker
+
+- [Install Docker](https://docs.docker.com/get-docker/)
+- Pull our latest container
+    - `docker pull ghcr.io/helikarlab/como:latest`
+- Run the container
+    - `docker run -p 8888:8888 ghcr.io/helikarlab/como:latest`
+
+> **NOTE**: The defualt installation method here does not allow for saving your work or utilizing
+> the [Gurobi solver](https://www.gurobi.com/). If you would like either (or both) of these features,
+> please [visit our documentation](https://helikarlab.github.io/COMO) for more details
 
 ## Flow Charts
 
