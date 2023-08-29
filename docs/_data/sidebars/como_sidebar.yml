@@ -40,11 +40,34 @@ entries:
             url: /como_resources.html
             output: web, pdf
 
+      - title: Docker Installation Method
+        output: web, pdf
+        folderitems:
+          - title: Overview
+            url: /como_docker_overview.html
+            output: web, pdf
+
+          - title: Installing Docker
+            url: /como_docker_installation.html
+            output: web, pdf
+
+          - title: Pulling the Container
+            url: /como_docker_pull_container.html
+            output: web, pdf
+
+          - title: Obtaining a Gurobi License
+            url: /como_docker_gurobi_license.html
+            output: web, pdf
+
+          - title: Starting the Container
+            url: /como_docker_start_container.html
+            output: web, pdf
+
       - title: Conda Installation Method
         output: web, pdf
         folderitems:
           - title: Overview
-            url: /como_virtual_environment.html
+            url: /como_conda_overview.html
             output: web, pdf
 
           - title: Conda/Mamba Installation
@@ -59,15 +82,12 @@ entries:
             url: /como_install_dependencies.html
             output: web, pdf
 
-          - title: Start COMO
-            url: /como_start_notebook.html
+          - title: Obtaining a Gurobi License
+            url: /como_conda_gurobi_license.html
             output: web, pdf
 
-      - title: Docker Installation Method
-        output: web, pdf
-        folderitems:
-          - title: Installation
-            url: /como_docker_installation.html
+          - title: Start COMO
+            url: /como_start_notebook.html
             output: web, pdf
 
       - title: API Arguments
