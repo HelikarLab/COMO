@@ -6,7 +6,6 @@ import sys
 import json
 import argparse
 import pandas as pd
-from enum import Enum
 from pathlib import Path
 from collections import Counter
 
@@ -33,7 +32,7 @@ from async_bioservices import async_bioservices
 r_file_path = Path(configs.rootdir, "src", "rscripts", "combine_distributions.R")
 
 
-class _MergedHeaderNames(Enum):
+class _MergedHeaderNames:
     PROTEOMICS = "prote"
     MICROARRAY = "trans"
     TRNASEQ = "trnaseq"
@@ -41,20 +40,20 @@ class _MergedHeaderNames(Enum):
     SCRNASEQ = "scrnaseq"
 
 
-class _ExpressedHeaderNames(Enum):
-    PROTEOMICS = f"{_MergedHeaderNames.PROTEOMICS.value}_exp"
-    MICROARRAY = f"{_MergedHeaderNames.MICROARRAY.value}_exp"
-    TRNASEQ = f"{_MergedHeaderNames.TRNASEQ.value}_exp"
-    MRNASEQ = f"{_MergedHeaderNames.MRNASEQ.value}_exp"
-    SCRNASEQ = f"{_MergedHeaderNames.SCRNASEQ.value}_exp"
+class _ExpressedHeaderNames:
+    PROTEOMICS = f"{_MergedHeaderNames.PROTEOMICS}_exp"
+    MICROARRAY = f"{_MergedHeaderNames.MICROARRAY}_exp"
+    TRNASEQ = f"{_MergedHeaderNames.TRNASEQ}_exp"
+    MRNASEQ = f"{_MergedHeaderNames.MRNASEQ}_exp"
+    SCRNASEQ = f"{_MergedHeaderNames.SCRNASEQ}_exp"
 
 
-class _HighExpressionHeaderNames(Enum):
-    PROTEOMICS = f"{_MergedHeaderNames.PROTEOMICS.value}_high"
-    MICROARRAY = f"{_MergedHeaderNames.MICROARRAY.value}_high"
-    TRNASEQ = f"{_MergedHeaderNames.TRNASEQ.value}_high"
-    MRNASEQ = f"{_MergedHeaderNames.MRNASEQ.value}_high"
-    SCRNASEQ = f"{_MergedHeaderNames.SCRNASEQ.value}_high"
+class _HighExpressionHeaderNames:
+    PROTEOMICS = f"{_MergedHeaderNames.PROTEOMICS}_high"
+    MICROARRAY = f"{_MergedHeaderNames.MICROARRAY}_high"
+    TRNASEQ = f"{_MergedHeaderNames.TRNASEQ}_high"
+    MRNASEQ = f"{_MergedHeaderNames.MRNASEQ}_high"
+    SCRNASEQ = f"{_MergedHeaderNames.SCRNASEQ}_high"
 
 
 def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
@@ -81,7 +80,7 @@ def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
     
     # If _ExpressedHeaderNames.PROTEOMICS.value is in the dataframe, lower the required expression by 1
     # We are only trying to get details for transcriptomic data
-    if _ExpressedHeaderNames.PROTEOMICS.value in merged_df.columns:
+    if _ExpressedHeaderNames.PROTEOMICS in merged_df.columns:
         # Get the number of sources required for a gene to be marked "expressed"
         required_expression = merged_df["Required"].iloc[0]
         
@@ -95,7 +94,7 @@ def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
         
         # Create a new dataframe without [_ExpressedHeaderNames.PROTEOMICS.value, _HighExpressionHeaderNames.PROTEOMICS.value] columns
         transcriptomic_df: pd.DataFrame = merged_df.drop(
-            columns=[_ExpressedHeaderNames.PROTEOMICS.value, _HighExpressionHeaderNames.PROTEOMICS.value],
+            columns=[_ExpressedHeaderNames.PROTEOMICS, _HighExpressionHeaderNames.PROTEOMICS],
             inplace=False
         )
         
@@ -202,26 +201,26 @@ def merge_xomics(
     high_list = []
     
     if proteomics[0] != "dummy":
-        exp_list.append(_ExpressedHeaderNames.PROTEOMICS.value)
-        high_list.append(_HighExpressionHeaderNames.PROTEOMICS.value)
+        exp_list.append(_ExpressedHeaderNames.PROTEOMICS)
+        high_list.append(_HighExpressionHeaderNames.PROTEOMICS)
         prote_data = proteomics[1].loc[:, ["expressed", "high"]]
         prote_data.rename(
             columns={
-                "expressed": _ExpressedHeaderNames.PROTEOMICS.value,
-                "high": _HighExpressionHeaderNames.PROTEOMICS.value
+                "expressed": _ExpressedHeaderNames.PROTEOMICS,
+                "high": _HighExpressionHeaderNames.PROTEOMICS
             },
             inplace=True
         )
         merge_data = prote_data
     
     if microarray[0] != "dummy":
-        exp_list.append(_ExpressedHeaderNames.MICROARRAY.value)
-        high_list.append(_HighExpressionHeaderNames.MICROARRAY.value)
+        exp_list.append(_ExpressedHeaderNames.MICROARRAY)
+        high_list.append(_HighExpressionHeaderNames.MICROARRAY)
         micro_data = microarray[1].loc[:, ["expressed", "high"]]
         micro_data.rename(
             columns={
-                "expressed": _ExpressedHeaderNames.MICROARRAY.value,
-                "high": _HighExpressionHeaderNames.MICROARRAY.value
+                "expressed": _ExpressedHeaderNames.MICROARRAY,
+                "high": _HighExpressionHeaderNames.MICROARRAY
             },
             inplace=True
         )
@@ -232,13 +231,13 @@ def merge_xomics(
             merge_data = merge_data.join(micro_data, how="outer")
     
     if trnaseq[0] != "dummy":
-        exp_list.append(_ExpressedHeaderNames.TRNASEQ.value)
-        high_list.append(_HighExpressionHeaderNames.TRNASEQ.value)
+        exp_list.append(_ExpressedHeaderNames.TRNASEQ)
+        high_list.append(_HighExpressionHeaderNames.TRNASEQ)
         trnaseq_data = trnaseq[1].loc[:, ["expressed", "high"]]
         trnaseq_data.rename(
             columns={
-                "expressed": _ExpressedHeaderNames.TRNASEQ.value,
-                "high": _HighExpressionHeaderNames.TRNASEQ.value
+                "expressed": _ExpressedHeaderNames.TRNASEQ,
+                "high": _HighExpressionHeaderNames.TRNASEQ
             },
             inplace=True
         )
@@ -248,13 +247,13 @@ def merge_xomics(
             merge_data = merge_data.join(trnaseq_data, how="outer")
     
     if mrnaseq[0] != "dummy":
-        exp_list.append(_ExpressedHeaderNames.MRNASEQ.value)
-        high_list.append(_HighExpressionHeaderNames.MRNASEQ.value)
+        exp_list.append(_ExpressedHeaderNames.MRNASEQ)
+        high_list.append(_HighExpressionHeaderNames.MRNASEQ)
         mrnaseq_data = mrnaseq[1].loc[:, ["expressed", "high"]]
         mrnaseq_data.rename(
             columns={
-                "expressed": _ExpressedHeaderNames.MRNASEQ.value,
-                "high": _HighExpressionHeaderNames.MRNASEQ.value
+                "expressed": _ExpressedHeaderNames.MRNASEQ,
+                "high": _HighExpressionHeaderNames.MRNASEQ
             },
             inplace=True
         )
@@ -264,13 +263,13 @@ def merge_xomics(
             merge_data = merge_data.join(mrnaseq_data, how="outer")
     
     if scrnaseq[0] != "dummy":
-        exp_list.append(_ExpressedHeaderNames.SCRNASEQ.value)
-        high_list.append(_HighExpressionHeaderNames.SCRNASEQ.value)
+        exp_list.append(_ExpressedHeaderNames.SCRNASEQ)
+        high_list.append(_HighExpressionHeaderNames.SCRNASEQ)
         scrnaseq_data = scrnaseq[1].loc[:, ["expressed", "high"]]
         scrnaseq_data.rename(
             columns={
-                "expressed": _ExpressedHeaderNames.SCRNASEQ.value,
-                "high": _HighExpressionHeaderNames.SCRNASEQ.value
+                "expressed": _ExpressedHeaderNames.SCRNASEQ,
+                "high": _HighExpressionHeaderNames.SCRNASEQ
             },
             inplace=True
         )

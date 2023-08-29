@@ -64,16 +64,16 @@ def load_rnaseq_tests(filename, context_name, lib_type):
 
 
 def handle_context_batch(
-        config_filename,
-        replicate_ratio,
-        batch_ratio,
-        replicate_ratio_high,
-        batch_ratio_high,
-        technique,
-        quantile,
-        min_count,
-        min_zfpkm,
-        prep,
+    config_filename,
+    replicate_ratio,
+    batch_ratio,
+    replicate_ratio_high,
+    batch_ratio_high,
+    technique,
+    quantile,
+    min_count,
+    min_zfpkm,
+    prep,
 ):
     """
     Handle iteration through each context type and create rnaseq expression file by calling rnaseq.R
@@ -87,26 +87,21 @@ def handle_context_batch(
     
     for context_name in sheet_names:
         print(f"\nStarting '{context_name}'")
-        rnaseq_output_file = "".join(["rnaseq_", prep, "_", context_name, ".csv"])
-        rnaseq_output_filepath = os.path.join(
-            configs.datadir, "results", context_name, prep, rnaseq_output_file
-        )
-        rnaseq_input_file = "".join(
-            ["gene_counts_matrix_", prep, "_", context_name, ".csv"]
-        )
-        rnaseq_input_filepath = os.path.join(
-            configs.datadir, "data_matrices", context_name, rnaseq_input_file
-        )
+        rnaseq_output_file = f"rnaseq_{prep}_{context_name}.csv"
+        rnaseq_output_filepath = os.path.join(configs.datadir, "results", context_name, prep, rnaseq_output_file)
+        
+        rnaseq_input_file = f"gene_counts_matrix_{prep}_{context_name}.csv"
+        rnaseq_input_filepath = os.path.join(configs.datadir, "data_matrices", context_name, rnaseq_input_file)
+        
         if not os.path.exists(rnaseq_input_filepath):
-            print(f"Gene counts matrix not found at {rnaseq_input_filepath}\n"
-                  f"Skipping... ")
+            print(f"Gene counts matrix not found at {rnaseq_input_filepath}, skipping...")
             continue
         
         gene_info_filepath = os.path.join(configs.datadir, "gene_info.csv")
-        
         os.makedirs(os.path.dirname(rnaseq_output_filepath), exist_ok=True)
-        print(f"Gene info:          {gene_info_filepath}")
-        print(f"Count matrix:       {rnaseq_input_filepath}")
+        
+        print(f"Gene info:\t\t{gene_info_filepath}")
+        print(f"Count matrix:\t\t{rnaseq_input_filepath}")
         
         rpy2_api.Rpy2(
             r_file_path=r_file_path,
@@ -126,7 +121,7 @@ def handle_context_batch(
             min_zfpkm=min_zfpkm
         ).call_function("save_rnaseq_tests")
         
-        print(f"Results saved at:   {rnaseq_output_filepath}")
+        print(f"Results saved at:\t{rnaseq_output_filepath}")
 
 
 def main(argv):

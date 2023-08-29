@@ -4,6 +4,7 @@ import os
 import re
 import sys
 import cobra
+from cobra import Model
 import argparse
 import collections
 import numpy as np
@@ -290,7 +291,7 @@ def seed_tinit(
     expr_vector,
     solver,
     idx_force
-) -> None:
+) -> Model:
     expr_vector = np.array(expr_vector)
     properties = tINITProperties(
         reactions_scores=expr_vector,
@@ -303,13 +304,7 @@ def seed_tinit(
     algorithm = tINIT(s_matrix, lb, ub, properties)
     algorithm.preprocessing()
     algorithm.build_problem()
-
-
-def seed_unsupported(recon_algorithm):
-    print(
-        f"Unsupported reconstruction algorithm: {recon_algorithm}. Must be either 'IMAT', 'GIMME', 'FASTCORE'"
-    )
-    sys.exit()
+    return Model()
 
 
 def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm, low_thresh=None, high_thresh=None):
@@ -325,7 +320,6 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm, lo
     
     cnt = 0
     if recon_algorithm in ["IMAT", "TINIT"]:
-        print(gene_expressions["Data"].tolist()[0:20])
         # unknown_val = min(gene_expressions["Data"].tolist())
         unknown_val = np.mean([low_thresh, high_thresh])  # put unknowns in mid bin
     elif recon_algorithm == "GIMME":
@@ -483,6 +477,8 @@ def create_context_specific_model(
             cobra_model, s_matrix, lb, ub, exp_idx_list, solver
         )
     elif recon_algorithm == "IMAT":
+        flux_df: pd.DataFrame
+        context_model_cobra: cobra.Model
         context_model_cobra, flux_df = seed_imat(
             cobra_model,
             s_matrix,
@@ -493,25 +489,32 @@ def create_context_specific_model(
             idx_force,
             context_name,
         )
+        imat_reactions = flux_df.rxn
+        model_reactions = [reaction.id for reaction in context_model_cobra.reactions]
+        reaction_intersections = set(imat_reactions).intersection(model_reactions)
+        flux_df = flux_df[~flux_df["rxn"].isin(reaction_intersections)]
+        flux_df.to_csv(os.path.join(configs.datadir, "results", context_name, f"{recon_algorithm}_flux.csv"))
+    
     elif recon_algorithm == "TINIT":
         context_model_cobra = seed_tinit(
             cobra_model, s_matrix, lb, ub, expr_vector, solver, idx_force
         )
     else:
-        context_model_cobra = seed_unsupported(recon_algorithm)
+        raise ValueError(
+            f"Unsupported reconstruction algorithm: {recon_algorithm}. Must be 'IMAT', 'GIMME', or 'FASTCORE'")
     
     # check number of unsolvable reactions for seeded model under media assumptions
     # incon_rxns_cs, context_model_cobra = feasibility_test(context_model_cobra, "after_seeding")
     incon_rxns_cs = []
     
-    if recon_algorithm in ["IMAT"]:
-        final_rxns = [rxn.id for rxn in context_model_cobra.reactions]
-        imat_rxns = flux_df.rxn
-        for rxn in imat_rxns:
-            if rxn not in final_rxns:
-                flux_df = flux_df[flux_df.rxn != rxn]
-        
-        flux_df.to_csv(os.path.join(configs.datadir, "results", context_name, f"{recon_algorithm}_flux.csv"))
+    # if recon_algorithm in ["IMAT"]:
+    #     final_rxns = [rxn.id for rxn in context_model_cobra.reactions]
+    #     imat_rxns = flux_df.rxn
+    #     for rxn in imat_rxns:
+    #         if rxn not in final_rxns:
+    #             flux_df = flux_df[flux_df.rxn != rxn]
+    #
+    #     flux_df.to_csv(os.path.join(configs.datadir, "results", context_name, f"{recon_algorithm}_flux.csv"))
     
     incon_df = pd.DataFrame({"general_infeasible_rxns": list(incon_rxns)})
     infeas_exp_df = pd.DataFrame({"expressed_infeasible_rxns": infeas_exp_rxns})
