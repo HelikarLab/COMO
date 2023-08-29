@@ -1,87 +1,113 @@
 # This is your sidebar TOC. The sidebar code loops through sections here and provides the appropriate formatting.
 
 entries:
-- title: sidebar
-  product:
-  version:
+  - title: sidebar
+    product:
+    version:
 
-  folders:
-  - title:
-    output: pdf
-    type: frontmatter
-    folderitems:
-    - title:
-      url: /titlepage.html
-      output: pdf
-      type: frontmatter
-    - title:
-      url: /tocpage.html
-      output: pdf
-      type: frontmatter
+    folders:
+      - title:
+        output: pdf
+        type: frontmatter
+        folderitems:
+          - title:
+            url: /titlepage.html
+            output: pdf
+            type: frontmatter
+          - title:
+            url: /tocpage.html
+            output: pdf
+            type: frontmatter
 
-  - title: Overview
-    output: web, pdf
-    folderitems:
-
-      - title: Getting Started
-        url: /index.html
+      - title: Overview
         output: web, pdf
-        type: homepage
+        folderitems:
 
-      - title: Example Workflow
-        url: /como_example_workflow.html
-        output: web, pdf
-
-      - title: Flow Charts
-        url: /como_flowcharts.html
-        output: web, pdf
-
-      - title: Resources
-        url: /como_resources.html
-        output: web, pdf
-
-      - title: Repository Structure
-        url: /como_repository_structure.html
-        output: web, pdf
-
-  - title: Arguments
-    output: web
-    folderitems:
-
-      - title: Arguments Overview
-        url: /como_arguments_overview.html
-        output: web, pdf
-
-        subfolders:
-          - title: Python Arguments
-            url: /como_python_arguments.html
+          - title: Getting Started
+            url: /index.html
             output: web, pdf
-            subfolderitems:
+            type: homepage
 
-              - title: Create Context Specific Model
-                url: /como_args_create_context_specific_model.html
-                output: web, pdf
+          - title: Example Workflow
+            url: /como_example_workflow.html
+            output: web, pdf
 
-              - title: Disease Analysis
-                url: /como_args_disease_analysis.html
-                output: web, pdf
+          - title: Flow Charts
+            url: /como_flowcharts.html
+            output: web, pdf
 
-              - title: Knockout Simulation
-                url: /como_args_knockout_simulation.html
-                output: web, pdf
+          - title: Resources
+            url: /como_resources.html
+            output: web, pdf
 
-              - title: Merge Omics
-                url: /como_args_merge_xomics.html
-                output: web, pdf
+      - title: Conda Installation Method
+        output: web, pdf
+        folderitems:
+          - title: Overview
+            url: /como_virtual_environment.html
+            output: web, pdf
 
-              - title: Proteomics Gen
-                url: /como_args_proteomics_gen.html
-                output: web, pdf
+          - title: Conda/Mamba Installation
+            url: /como_conda_installation.html
+            output: web, pdf
 
-              - title: RNA Seq Gen
-                url: /como_args_rnaseq_gen.html
-                output: web, pdf
+          - title: Clone COMO Repository
+            url: /como_clone_repository.html
+            output: web, pdf
 
-              - title: RNA Seq Preprocess
-                url: /como_args_rnaseq_preprocess.html
+          - title: Install Dependencies
+            url: /como_install_dependencies.html
+            output: web, pdf
+
+          - title: Start COMO
+            url: /como_start_notebook.html
+            output: web, pdf
+
+      - title: Docker Installation Method
+        output: web, pdf
+        folderitems:
+          - title: Installation
+            url: /como_docker_installation.html
+            output: web, pdf
+
+      - title: API Arguments
+        output: web
+        folderitems:
+
+          - title: Arguments Overview
+            url: /como_arguments_overview.html
+            output: web, pdf
+
+            subfolders:
+              - title: Python Arguments
+                url: /como_python_arguments.html
                 output: web, pdf
+                subfolderitems:
+
+                  - title: Create Context Specific Model
+                    url: /como_args_create_context_specific_model.html
+                    output: web, pdf
+
+                  - title: Disease Analysis
+                    url: /como_args_disease_analysis.html
+                    output: web, pdf
+
+                  - title: Knockout Simulation
+                    url: /como_args_knockout_simulation.html
+                    output: web, pdf
+
+                  - title: Merge Omics
+                    url: /como_args_merge_xomics.html
+                    output: web, pdf
+
+                  - title: Proteomics Gen
+                    url: /como_args_proteomics_gen.html
+                    output: web, pdf
+
+                  - title: RNA Seq Gen
+                    url: /como_args_rnaseq_gen.html
+                    output: web, pdf
+
+                  - title: RNA Seq Preprocess
+                    url: /como_args_rnaseq_preprocess.html
+                    output: web, pdf

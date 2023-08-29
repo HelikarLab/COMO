@@ -1,6 +1,6 @@
 ---
 title: Flow Charts
-sidebar: COMO_sidebar
+sidebar: como_sidebar
 permalink: como_flowcharts.html
 folder: como
 last_updated: September 14, 2022

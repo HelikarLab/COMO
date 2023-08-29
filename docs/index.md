@@ -1,7 +1,6 @@
 ---
 title: Getting Started
 sidebar: como_sidebar
-tags: [ getting_started ]
 permalink: index.html
 summary: This is an overview of how to get started with the COMO container
 last_updated: Sept 15, 2022
