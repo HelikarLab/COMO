@@ -48,7 +48,7 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Clearn Jupyter Notebook Outputs
+      - name: Clean Jupyter Notebook Outputs
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
