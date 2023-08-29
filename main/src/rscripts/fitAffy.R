@@ -1,14 +1,13 @@
+suppressPackageStartupMessages(library("stringr"))
+
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
-library("stringr")
-username <- Sys.info()["user"]
-work_dir <- str_interp("/home/${username}/main")
-
-if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
-    dir.create(str_interp("${work_dir}/py/rlogs"))
-}
-
-zz <- file(file.path("/home", username, "main", "py", "rlogs", "fitAffy.Rout"), open="wt")
+# Then prevent messy messages from repeatedly writing to juypter
+work_dir <- getwd()
+r_log_directory <- str_interp("${work_dir}/logs")
+if (!dir.exists(r_log_directory)) { dir.create(r_log_directory) }
+zz <- file(file.path(r_log_directory, "fitAffy.Rout"), open="wt")
 sink(zz, type="message")
+
 
 readaffydir <- function(addr){
 crd <- getwd()

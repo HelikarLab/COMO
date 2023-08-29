@@ -15,7 +15,7 @@ import rnaseq_gen
 import microarray_gen
 import proteomics_gen
 from project import configs
-from create_context_specific_model import split_gene_expression_data
+from utilities import split_gene_expression_data
 from async_bioservices import async_bioservices
 
 # enable r to py conversion
@@ -160,15 +160,15 @@ def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def merge_xomics(
-        context_name: str,
-        expression_requirement,
-        microarray_file=None,
-        proteomics_file=None,
-        trnaseq_file=None,
-        mrnaseq_file=None,
-        scrnaseq_file=None,
-        no_hc=False,
-        no_na=False,
+    context_name: str,
+    expression_requirement,
+    microarray_file=None,
+    proteomics_file=None,
+    trnaseq_file=None,
+    mrnaseq_file=None,
+    scrnaseq_file=None,
+    no_hc=False,
+    no_na=False,
 ):
     """
     Merges microarray, rnaseq, and/or proteomics active gene logicals from outputs of their respective "_gen.py"
@@ -189,9 +189,12 @@ def merge_xomics(
     # load data for each source if it exists. IF not load an empty dummy dataset
     microarray = microarray_gen.load_microarray_tests(filename=microarray_file, context_name=context_name)
     proteomics = proteomics_gen.load_proteomics_tests(filename=proteomics_file, context_name=context_name)
-    trnaseq = rnaseq_gen.load_rnaseq_tests(filename=trnaseq_file, context_name=context_name, lib_type="total")  # total RNA-seq
-    mrnaseq = rnaseq_gen.load_rnaseq_tests(filename=mrnaseq_file, context_name=context_name, lib_type="mrna")  # mRNA-seq
-    scrnaseq = rnaseq_gen.load_rnaseq_tests(filename=scrnaseq_file, context_name=context_name, lib_type="scrna")  # Single-cell RNA-seq
+    trnaseq = rnaseq_gen.load_rnaseq_tests(filename=trnaseq_file, context_name=context_name,
+                                           lib_type="total")  # total RNA-seq
+    mrnaseq = rnaseq_gen.load_rnaseq_tests(filename=mrnaseq_file, context_name=context_name,
+                                           lib_type="mrna")  # mRNA-seq
+    scrnaseq = rnaseq_gen.load_rnaseq_tests(filename=scrnaseq_file, context_name=context_name,
+                                            lib_type="scrna")  # Single-cell RNA-seq
     
     files_dict = dict()
     
@@ -320,7 +323,8 @@ def merge_xomics(
     
     transcriptomic_details = get_transcriptmoic_details(merge_data)
     transcriptomic_details_directory_path = os.path.dirname(filepath)
-    transcriptomic_details_filepath = os.path.join(transcriptomic_details_directory_path, f"TranscriptomicDetails_{context_name}.csv")
+    transcriptomic_details_filepath = os.path.join(transcriptomic_details_directory_path,
+                                                   f"TranscriptomicDetails_{context_name}.csv")
     transcriptomic_details.to_csv(transcriptomic_details_filepath, index=False)
     
     print(f"{context_name}: Save to {os.path.basename(filepath)}\n")
@@ -329,22 +333,22 @@ def merge_xomics(
 
 
 def handle_context_batch(
-        microarray_file,
-        trnaseq_file,
-        mrnaseq_file,
-        scrnaseq_file,
-        proteomics_file,
-        tweight,
-        mweight,
-        sweight,
-        pweight,
-        expression_requirement,
-        adjust_method,
-        no_hc,
-        no_na,
-        custom_df,
-        merge_distro,
-        keep_gene_score
+    microarray_file,
+    trnaseq_file,
+    mrnaseq_file,
+    scrnaseq_file,
+    proteomics_file,
+    tweight,
+    mweight,
+    sweight,
+    pweight,
+    expression_requirement,
+    adjust_method,
+    no_hc,
+    no_na,
+    custom_df,
+    merge_distro,
+    keep_gene_score
 ):
     """
     Handle merging of different data sources for each context type
