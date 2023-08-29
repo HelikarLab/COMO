@@ -33,7 +33,6 @@ dependencies:
   - r-zoo~=1.8_10
   - aioftp~=0.21.2
   - bioservices~=1.11.2
-  - cobra~=0.25.0
   - crux-toolkit~=4.1
   - escher~=1.7.3
   - geoparse~=2.0.3
@@ -60,6 +59,7 @@ dependencies:
   - wget~=1.20.3
   - xlrd~=2.0.1
   - pip:
+      - cobra==0.26.*
       - memote==0.13.*
       - framed==0.5.*
       - jupyterlab-spreadsheet-editor==0.6.*
