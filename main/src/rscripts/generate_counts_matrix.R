@@ -1,17 +1,12 @@
+suppressPackageStartupMessages(library("tidyverse"))
+
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
-library("stringr")
-username <- Sys.info()["user"]
-work_dir <- str_interp("/home/${username}/main")
-
-if (!dir.exists(str_interp("${work_dir}/py/rlogs"))) {
-    dir.create(str_interp("${work_dir}/py/rlogs"))
-}
-
-# prevent messy messages from repeatedly writing to juypter
-zz <- file(file.path("/home", username, "main", "py", "rlogs", "generate_counts_matrix.Rout"), open="wt")
+# Then prevent messy messages from repeatedly writing to juypter
+work_dir <- getwd()
+r_log_directory <- str_interp("${work_dir}/logs")
+if (!dir.exists(r_log_directory)) { dir.create(r_log_directory) }
+zz <- file(file.path(r_log_directory, "generate_counts_matrix.Rout"), open="wt")
 sink(zz, type="message")
-
-library(tidyverse)
 
 # fetch and organize COMO_input
 organize_gene_counts_files <- function(data_dir) {

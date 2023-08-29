@@ -1,15 +1,17 @@
-# prevent messy messages from repeatedly writing to juypter
-# zz <- file(file.path("home", "jovyan", "main", "rlogs", "rnaseq.Rout"), open="wt")
-# sink(zz, type="message")
+suppressPackageStartupMessages(library("ggplot2"))
+suppressPackageStartupMessages(library("ggrepel"))
+suppressPackageStartupMessages(library("tidyverse"))
+suppressPackageStartupMessages(library("FactoMineR"))
+suppressPackageStartupMessages(library("dplyr"))
+suppressPackageStartupMessages(library("uwot"))
 
-# Quiety load packages
-suppressPackageStartupMessages(library(ggplot2))
-suppressPackageStartupMessages(library(ggrepel))
-suppressPackageStartupMessages(library(tidyverse))
-suppressPackageStartupMessages(library(FactoMineR))
-suppressPackageStartupMessages(library(dplyr))
-suppressPackageStartupMessages(library(uwot))
-
+# Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
+# Then prevent messy messages from repeatedly writing to juypter
+work_dir <- getwd()
+r_log_directory <- str_interp("${work_dir}/logs")
+if (!dir.exists(r_log_directory)) { dir.create(r_log_directory) }
+zz <- file(file.path(r_log_directory, "cluster_samples.Rout"), open = "wt")
+sink(zz, type = "message")
 
 make_logical_matrix <- function(wd, technique, context_names) {
     ### organize logical matrix
@@ -50,7 +52,7 @@ make_logical_matrix <- function(wd, technique, context_names) {
               )
         }
     }
-
+    
     if (technique == "zfpkm") {
         cutoff <- -3
         logical_matrix <- do.call(
@@ -368,9 +370,12 @@ plot_UMAP_contexts <- function(log_mat_context, contexts, wd, label, n_neigh, mi
     contexts <- unique(contexts)
     n_neigh <- ifelse(n_neigh == "default", as.integer(length(contexts)), n_neigh)
     if (n_neigh < 2) {
-        print("Cannot cluster contexts if n nearest neighbors is < 1!")
-        stop()
+        print("Cannot cluster contexts if n nearest neighbors is < 1! Exiting now.")
+        # Exit cleanly
+        
+        q(save = "no")
     }
+    
     binary_matrix <- do.call(
       cbind,
       lapply(
