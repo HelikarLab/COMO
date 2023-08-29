@@ -7,8 +7,8 @@
 #   4. clusters all batches/studies across all contexts/cell types within one data source at a time
 #   5. clusters all batches/studies across all data sources within one cell type at a time (edited)
 
-library(stringr)
-library(tools)
+suppressPackageStartupMessages(library("stringr"))
+suppressPackageStartupMessages(library("tools"))
 
 get_study_value <- function(file_path) {
     # This function will get the S## value from the file path
