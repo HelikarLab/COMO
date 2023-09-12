@@ -21,10 +21,25 @@ jobs:
       # Only execute this workflow if python files have changed
       - name: Check for python changes
         id: python-changes
-        run: echo ::set-output name=python-changed::$(git dif --name-only ${{github.event.before }} ${{ github.sha }} | grep '\.py$' | wc -l)
+        run: |
+          python_changes=$(git diff --name-only ${{ github.event.before}} ${github.sha }} | grep '\.py$' | wc -l)
+          if [ "$python_changes" -eq "0" ]; then
+            echo "::set-output name=python-changed::false"
+          else
+            echo "::set-output name=python-changed::true"
+
+      - name: Set Status Check Outcome
+        if: steps.python-changes.outputs.python-changed == 'true'
+        run: "echo 'Status check outcome: failure'"
+        continue-on-error: true
+
+      - name: Mark Status Check as Success
+        if: steps.python-changes.outputs.python-changed == 'false'
+        run: "echo 'Status check outcome: success'"
 
       - name: Install Conda environment
         uses: mamba-org/provision-with-micromamba@main
+        if: steps.python-changes.outputs.python-changed == 'true'
         with:
           environment-file: main/src/tests/environment.yaml
           environment-name: como_tests
@@ -32,6 +47,7 @@ jobs:
             python=${{ matrix.python-version }}
 
       - name: Lint with flake8
+        if: steps.python-changes.outputs.python-changed == 'true'
         run: |
           # Initialize micromamba and activate como_tests environment
           eval "$(micromamba shell hook --shell=bash)" && micromamba activate como_tests
@@ -41,9 +57,8 @@ jobs:
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
       - name: Run tests
+        if: steps.python-changes.outputs.python-changed == 'true'
         run: |
           # Initialize micromamba and activate como_tests environment
           eval "$(micromamba shell hook --shell=bash)" && micromamba activate como_tests
           python -m pytest
-
-    if: steps.python-changes.outputs.python-changed > 0
