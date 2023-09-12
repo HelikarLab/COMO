@@ -27,6 +27,7 @@ jobs:
             echo "::set-output name=python-changed::false"
           else
             echo "::set-output name=python-changed::true"
+          fi
 
       - name: Set Status Check Outcome
         if: steps.python-changes.outputs.python-changed == 'true'
