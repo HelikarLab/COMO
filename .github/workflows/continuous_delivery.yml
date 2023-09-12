@@ -59,7 +59,7 @@ jobs:
 
       # Log into the GitHub Container Registry so we can push the image
       - name: Log in to Container Registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
