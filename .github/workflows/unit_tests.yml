@@ -22,7 +22,7 @@ jobs:
       - name: Check for python changes
         id: python-changes
         run: |
-          python_changes=$(git diff --name-only ${{ github.event.before}} ${github.sha }} | grep '\.py$' | wc -l)
+          python_changes=$(git diff --name-only ${{ github.event.before}} ${{ github.sha }} | grep '\.py$' | wc -l)
           if [ "$python_changes" -eq "0" ]; then
             echo "::set-output name=python-changed::false"
           else
