@@ -28,7 +28,7 @@ jobs:
       # Get tag/release information for docker tags
       - name: Docker Metadata
         id: metadata
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           flavor: |
             latest=false
