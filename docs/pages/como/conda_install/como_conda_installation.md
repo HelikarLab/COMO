@@ -6,17 +6,7 @@ sidebar: como_sidebar
 last_updated: August 29, 2023
 ---
 
-## Conda vs Mamba
-
-Conda and Mamba are effectively interchangeable. Mamba is a drop-in replacement for Conda that is much faster. We
-recommend using Mamba over Conda if possible. If it is not possible to install Mamba, Conda will work just fine.
-
-{% include important.html content="You should only choose Conda **or** Mamba, not both!" %}
-
 ## Install Conda
-
-{% include warning.html content="If you would like to use mamba, skip ahead to the [Install Mamba](#install-mamba)
-section" %}
 
 The following instructions are taken directly from the Conda documentation. Please visit
 the [conda documentation](https://conda.io/projects/conda/en/latest/user-guide/install/index.html#regular-installation)
@@ -82,51 +72,13 @@ After installing, initialize your newly-installed Miniconda. The following comma
 ~/miniconda3/bin/conda init zsh
 ```
 
-## Install Mamba
+## Initializing Conda
 
-{% include warning.html content="If you would like to use conda instead, go back to the [Install Conda](#install-conda)
-section" %}
-
-The following instructions are taken directly from the Mamba documentation. PLease visit
-the [mamba documentation](https://mamba.readthedocs.io/en/latest/mamba-installation.html#mamba-install) for
-more details
-
-### Windows
-
-Download the following file, and open it in your file browser:
-
-- [Mambaforge-Windows-x86_64](https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-Windows-x86_64.exe)
-
-### MacOS & Linux
-
-Download the installer using `cURL` **or** `wget` and run the script.
-
-```bash
-# cURL
-curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh"
-bash Mambaforge-$(uname)-$(uname -m).sh
-
-# wget
-wget "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh"
-bash Mambaforge-$(uname)-$(uname -m).sh
-```
-
-## Initializing Conda/Mamba
-
-Once Conda/Mamba is installed, you will need to initialize it. This is done by running the following command:
-
-{% include important.html content="Choose conda **OR** mamba, depending on the installation you chose above" %}
-
-### Conda
+Once Conda is installed, you will need to initialize it. Initialization is important because it allows you to use the
+`conda` command in your terminal. Initialization is done by running the following command:
 
 ```bash
 conda init $SHELL
-```
-
-### Mamba
-
-```bash
-mamba init $SHELL
 ```
 
 ## Summary
