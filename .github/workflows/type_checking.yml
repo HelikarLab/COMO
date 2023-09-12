@@ -8,17 +8,28 @@ jobs:
   type-check:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        python-version: [ "3.10" ]
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: 3.x
+      # Only execute this workflow if python files have changed
+      - name: Check for python changes
+        id: python-changes
+        run: echo ::set-output name=python-changed::$(git dif --name-only ${{github.event.before }} ${{ github.sha }} | grep '\.py$' | wc -l)
 
-    - run: pip install --upgrade pip
-    - run: pip install mypy
-    - run: |
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - run: pip install --upgrade pip
+      - run: pip install mypy
+      - run: |
           cd $GITHUB_WORKSPACE/main
           mypy --strict --ignore-missing-imports .
+
+    if: steps.python-changes.outputs.python-changed > 0
