@@ -34,7 +34,6 @@ dependencies:
   - aioftp~=0.21.2
   - bioservices~=1.11.2
   - crux-toolkit~=4.1
-  - escher~=1.7.3
   - geoparse~=2.0.3
   - git~=2.37.0
   - gurobi~=10.0
@@ -47,10 +46,9 @@ dependencies:
   - pandas~=1.4.3
   - pip~=22.1.2
   - python-libsbml~=5.19.2
-  - python~=3.10.10
+  - python
   - requests~=2.28.1
   - rpy2~=3.5.1
-  - scanpy~=1.9.1
   - scipy~=1.8.1
   - sqlalchemy~=1.4.39
   - thermorawfileparser~=1.4.0
@@ -60,10 +58,10 @@ dependencies:
   - xlrd~=2.0.1
   - pip:
       - cobra==0.26.*
-      - memote==0.13.*
+      - Escher==1.7.*
       - framed==0.5.*
+      - memote==0.13.*
       - jupyterlab-spreadsheet-editor==0.6.*
-      - git+https://github.com/babessell1/cobamp.git
-      - git+https://github.com/babessell1/troppo.git
-#    - pytest==4.6.11
-
+      - git+https://github.com/JoshLoecker/cobamp.git
+      - git+https://github.com/JoshLoecker/troppo.git
+      - redis[hiredis]>=5.*
