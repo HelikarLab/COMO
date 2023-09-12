@@ -40,11 +40,11 @@ disease analysis so that multiple diseaes can be analyzed using the same constra
 ## Choosing an installation method
 
 We provide two methods of installation: Conda/Mamba and Docker. Both methods are equally valid, but Docker can be more
-difficult to set up due to the nature of mapping paths from the docker container to the host. If you are new to Docker,
-we recommend using Conda/Mamba.
+difficult to set up due to the nature of mapping ports and paths from the docker container to the host computer.
+If you are new to Docker, we recommend using Conda/Mamba instead.
 
-- [Install using Conda/Mamba](/como_conda_overview.html)
-- [Install using Docker](/como_docker_overview.html)
+- [Install using Conda/Mamba](/COMO/como_conda_overview.html)
+- [Install using Docker](/COMO/como_docker_overview.html)
 
 ## Accessing COMO
 

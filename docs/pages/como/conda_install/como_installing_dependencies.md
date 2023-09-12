@@ -21,10 +21,6 @@ environment is, here is a brief explanation:
 > projects with specific version requirements or when collaborating with others, as it ensures consistent and controlled
 > development environments.
 
-{% include important.html content="This section of the guide will be using '`conda`' to create and install items in the
-virtual environment. If you have installed '`mamba`' instead, simply replace any instance of '`conda`'
-with '`mamba`'" %}
-
 ## Creating a virtual environment
 
 The first step is to create the actual virtual environment. This command should done on the command line
@@ -35,7 +31,20 @@ conda create -n como
 
 ## Activating the Environment
 
-The environment has been created, but it hasn't been activated yet.
+The environment has been created, but it hasn't been activated yet. Activate the environment by executing the below line
+
+```bash
+conda activate como
+```
+
+## Install Mamba
+
+Mamba is much faster than Conda, due to it being written in C++. It is a drop-in replacement for Conda, so you can use
+it in place of Conda without any issues. To install Mamba, execute the following command:
+
+```bash
+conda install --channel conda-forge mamba
+```
 
 ## Installing Dependencies
 
@@ -47,12 +56,15 @@ the previous step" %}
 ```bash
 # Change directories into the COMO folder
 cd COMO/
-conda env update --file environment.yml
+mamba env update --file environment.yml
 ```
 
 Once this is done, the final step is installing our customized version of zFPKM that allows for filtering insignificant
 local maxima during RNA-seq processing. During the "Installing Dependencies" step, R was installed. We can use that now
 to install zFPKM from our source
+
+{% include important.html content="Installing zFPKM from our source is an important step in the installation process.
+Failing to do so will result in errors when running COMO." %}
 
 ```bash
 R -e "devtools::install_github('babessell1/zFPKM')"
