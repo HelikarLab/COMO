@@ -16,7 +16,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    name: Build Docker Image
+    name: Build and Push Docker Image
 
     steps:
       # Checkout the repository
