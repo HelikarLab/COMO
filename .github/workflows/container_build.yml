@@ -48,6 +48,7 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v3
 
+
       - name: Clean Jupyter Notebook Outputs
         uses: actions/setup-python@v4
         with:
@@ -65,6 +66,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Cache Docker Layers
+        id: cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            /root/.cache/pip
+            /opt/conda/pkgs
+            /opt/conda/conda-meta
+          key: ${{ runner.os }}-${{ hashFiles('**/environment.yml') }}
+          restore-keys: ${{ runner.os }}-
+
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
@@ -74,3 +86,13 @@ jobs:
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
+
+      - name: Save Docker layer cache
+        id: save-cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            /root/.cache/pip
+            /opt/conda/pkgs
+            /opt/conda/conda-meta
+          key: ${{ runner.os }}-${{ hashFiles('**/environment.yml') }}
