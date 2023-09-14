@@ -66,33 +66,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Cache Docker Layers
-        id: cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            /root/.cache/pip
-            /opt/conda/pkgs
-            /opt/conda/conda-meta
-          key: ${{ runner.os }}-${{ hashFiles('**/environment.yml') }}
-          restore-keys: ${{ runner.os }}-
-
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
-          builder: ${{ steps.buildx.outputs.name }}
-          platforms: linux/amd64
-          file: ./Dockerfile
+          context: .
           push: true
+          file: ./Dockerfile
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          builder: ${{ steps.buildx.outputs.name }}
+          platforms: linux/amd64
 
-      - name: Save Docker layer cache
-        id: save-cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            /root/.cache/pip
-            /opt/conda/pkgs
-            /opt/conda/conda-meta
-          key: ${{ runner.os }}-${{ hashFiles('**/environment.yml') }}
