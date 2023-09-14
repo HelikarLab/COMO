@@ -1,0 +1,7 @@
+main/src/tests
+/docs
+/.github
+*~
+**/.ipynb_checkpoints/
+README.md
+LICENSE
