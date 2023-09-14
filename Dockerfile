@@ -6,10 +6,11 @@ COPY --chown=1000:100 main "${HOME}"/main
 # Install python-related items
 # Remove "python" from the pinned file so we can install our own version
 RUN sed -i '/^python/d' /opt/conda/conda-meta/pinned && \
+    echo "auto_activate_base: true" >> "${HOME}/.condarc" && \
     conda config --quiet --add channels conda-forge && \
     conda config --quiet --add channels bioconda && \
     conda config --quiet --add channels r && \
-    # Update conda
+    # Update base environment
     mamba env update --name=base --file="${HOME}/environment.yaml" && \
     R -e "devtools::install_github('babessell1/zFPKM')" && \
     # Trust the jupyter notebook
