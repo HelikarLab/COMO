@@ -15,7 +15,7 @@ This installation method **does** require docker
 - Run the container
     - `docker run -p 8888:8888 ghcr.io/helikarlab/como:latest`
 
-> **NOTE**: The defualt installation method here does not allow for saving your work or utilizing
+> **NOTE**: The defualt installation method here <ins>**does not**</ins> allow for saving your work or utilizing
 > the [Gurobi solver](https://www.gurobi.com/). If you would like either (or both) of these features,
 > please [visit our documentation](https://helikarlab.github.io/COMO) for more details
 
@@ -46,7 +46,7 @@ This installation method does **not** require docker
 This will open a web browser with the Jupyter Notebook/Lab interface. From here, you can open the `COMO.ipynb` notebook
 to get started
 
-> **NOTE**: This installation method allows for saving your work and utilizing
+> **NOTE**: This installation method <ins>**will**</ins> allow for saving your work and utilizing
 > the [Gurobi solver](https://www.gurobi.com/). If you would still like more details about this installation method,
 > please [visit our documentation](https://helikarlab.github.io/COMO)
 

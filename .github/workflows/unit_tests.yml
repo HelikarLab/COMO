@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Only execute this workflow if python files have changed
       - name: Check for python changes
