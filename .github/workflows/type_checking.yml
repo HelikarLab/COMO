@@ -2,7 +2,12 @@ name: Python Type Checking
 
 on:
   pull_request:
-    types: [ opened, reopened, synchronize ]
+    types:
+      - opened
+      - reopened
+      - synchronize
+    paths:
+      - '**.py'
 
 jobs:
   type-check:
@@ -16,40 +21,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Only execute this workflow if python files have changed
-      - name: Check for python changes
-        id: python-changes
-        run: |
-          python_changes=$(git diff --name-only ${{ github.event.before}} ${{ github.sha }} | grep '\.py$' | wc -l)
-          if [ "$python_changes" -eq "0" ]; then
-            echo "python-changed=false" >> $GITHUB_ENV
-          else
-            echo "python-changed=true" >> $GITHUB_ENV
-          fi
-
-      - name: Set Status Check Outcome
-        if: env.python-changed == 'true'
-        run: "echo 'Status check outcome: failure'"
-        continue-on-error: true
-
-      - name: Mark Status Check as Success
-        if: env.python-changed == 'true'
-        run: "echo 'Status check outcome: success'"
-
       - name: Set up Python
         uses: actions/setup-python@v4
-        if: env.python-changed == 'true'
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install mypy
-        if: env.python-changed == 'true'
         run: |
           python -m pip install --upgrade pip
           python -m pip install mypy
 
       - name: Type check with mypy
-        if: env.python-changed == 'true'
         working-directory: $GITHUB_WORKSPACE/main
         run: |
           mypy --strict --ignore-missing-imports .
