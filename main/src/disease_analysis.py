@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import asyncio
 import argparse
 import sys
 import json
@@ -9,9 +10,7 @@ import GSEpipelineFast
 from rpy2.robjects import pandas2ri
 import rpy2.robjects as ro
 
-from async_bioservices import async_bioservices
-from async_bioservices.input_database import InputDatabase
-from async_bioservices.output_database import OutputDatabase
+from async_bioservices import db2db, InputDatabase, OutputDatabase
 from rpy2.robjects.packages import importr
 from pathlib import Path
 import os
@@ -129,7 +128,7 @@ def pharse_configs(config_filepath, sheet):
     return df, df_target
 
 
-def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, taxon_id):
+async def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, taxon_id):
     """
     Get differential gene expression for microarray data
 
@@ -177,7 +176,7 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
         elif inst_name == "agilent":
             input_db: InputDatabase = InputDatabase.AGILENT_ID
         
-        bdnet = async_bioservices.fetch_gene_info(
+        bdnet = await db2db(
             input_values=list(map(str, diff_exp_df["Affy ID"].tolist())),
             input_db=input_db,
             output_db=[OutputDatabase.ENSEMBL_GENE_ID, OutputDatabase.GENE_ID, OutputDatabase.GENE_SYMBOL],
@@ -192,7 +191,7 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
     return diff_exp_df, gse_id
 
 
-def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_id):
+async def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_id):
     """
     Get differential gene expression for RNA-seq data
 
@@ -221,7 +220,7 @@ def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_
     diff_exp_df = ro.conversion.rpy2py(diff_exp_df)
     gse_id = "rnaseq"
     
-    bdnet = async_bioservices.fetch_gene_info(
+    bdnet = await db2db(
         input_values=list(map(str, diff_exp_df["Ensembl"].tolist())),
         input_db=InputDatabase.ENSEMBL_GENE_ID,
         output_db=[OutputDatabase.GENE_ID, OutputDatabase.AFFY_ID, OutputDatabase.GENE_SYMBOL],
@@ -314,7 +313,7 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
         os.remove(target_path)
 
 
-def main(argv):
+async def main(argv):
     targetfile = "targets.txt"
     count_matrix = None
     
@@ -401,9 +400,10 @@ def main(argv):
     for disease_name in sheet_names:
         target_path = os.path.join(configs.rootdir, "data", targetfile)
         if data_source == "MICROARRAY":
-            diff_exp_df, gse_id = get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, taxon_id)
+            diff_exp_df, gse_id = await get_microarray_diff_gene_exp(config_filepath, disease_name, target_path,
+                                                                     taxon_id)
         elif data_source == "RNASEQ":
-            diff_exp_df, gse_id = get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_id)
+            diff_exp_df, gse_id = await get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_id)
         else:
             print("data_source should be either 'microarray' or 'rnaseq'")
             print("Refer to example config file for either type for formatting")
@@ -413,4 +413,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    asyncio.run(main(sys.argv[1:]))

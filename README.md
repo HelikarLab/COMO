@@ -5,7 +5,15 @@
 ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/HelikarLab/COMO/container_build.yml?style=for-the-badge&logo=docker&logoColor=white&label=Docker%20Build)
 ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/HelikarLab/COMO/type_checking.yml?style=for-the-badge&logo=docker&logoColor=white&label=Type%20Checking)
 
-## Docker Quick Start
+# Setting up COMO
+
+Go to COMO's documentation page for full installation and operation instructions or use one of the Quick Start options
+
+## [COMO Documentation Page](https://helikarlab.github.io/COMO)
+
+## Quick Start Options
+
+### Docker Quick Start
 
 This installation method **does** require docker
 
@@ -19,7 +27,7 @@ This installation method **does** require docker
 > the [Gurobi solver](https://www.gurobi.com/). If you would like either (or both) of these features,
 > please [visit our documentation](https://helikarlab.github.io/COMO) for more details
 
-## Conda Quick Start
+### Conda Quick Start
 
 This installation method does **not** require docker
 
