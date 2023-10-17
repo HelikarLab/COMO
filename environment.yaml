@@ -58,6 +58,7 @@ dependencies:
   - conda-forge::wget~=1.20.3
   - conda-forge::xlrd~=2.0.1
   - pip:
+      - async_bioservices
       - cobra==0.26.*
       - Escher==1.7.*
       - framed==0.5.*
