@@ -113,7 +113,8 @@ async def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
             OutputDatabase.GENE_SYMBOL,
             OutputDatabase.ENSEMBL_GENE_INFO,
             OutputDatabase.GENE_INFO,
-        ]
+        ],
+        cache=False
     )
     gene_details["entrez_gene_id"] = gene_details.index
     gene_details.reset_index(drop=True, inplace=True)
