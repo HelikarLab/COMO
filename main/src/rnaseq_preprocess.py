@@ -209,24 +209,26 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
 async def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase, taxon_id):
     """
     Create gene info file for specified context by reading first column in its count matrix file at
-     /work/data/results/<context name>/gene_info_<context name>.csv
+     results/<context name>/gene_info_<context name>.csv
     """
     
     print(f"Fetching gene info")
     gene_info_file = os.path.join(configs.datadir, "gene_info.csv")
+    genes: list[str]
     if os.path.exists(gene_info_file):
         current_df = pd.read_csv(gene_info_file)
         genes = current_df["ensembl_gene_id"].tolist()
     else:
         genes = []
     
-    for mfile in matrix_file_list:
-        add_genes = pd.read_csv(mfile)["genes"].tolist()
-        genes = list(set(genes + add_genes))
+    for file in matrix_file_list:
+        add_genes = pd.read_csv(file)["genes"].tolist()
+        genes += add_genes
+    genes = list(set(genes))
     
     # Create our output database format
     # Do not include values equal to "form"
-    # Note: This is a refactor; I'm not sure why we are removing values not equal to "form"
+    # Remove items not equal to `form` because the input database cannot exist as an output database
     output_db: list[OutputDatabase] = [
         i for i in [
             OutputDatabase.ENSEMBL_GENE_ID,
@@ -241,15 +243,16 @@ async def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase
         input_values=genes,
         input_db=form,
         output_db=output_db,
-        taxon_id=taxon_id
+        taxon_id=taxon_id,
+        cache=False
     )
     
+    gene_info.rename(columns={OutputDatabase.ENSEMBL_GENE_ID.value: "ensembl_gene_id"}, inplace=True)
     gene_info['start_position'] = gene_info['Chromosomal Location'].str.extract("chr_start: (\d+)")
     gene_info['end_position'] = gene_info['Chromosomal Location'].str.extract("chr_end: (\d+)")
-    gene_info.index.rename("ensembl_gene_id", inplace=True)
     gene_info.rename(columns={"Gene Symbol": "hgnc_symbol", "Gene ID": "entrezgene_id"}, inplace=True)
     gene_info.drop(['Chromosomal Location'], axis=1, inplace=True)
-    gene_info.to_csv(gene_info_file)
+    gene_info.to_csv(gene_info_file, index=False)
     print(f"Gene Info file written at '{gene_info_file}'")
 
 
