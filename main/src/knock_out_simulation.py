@@ -101,7 +101,7 @@ def knock_out_simulation(
     DT_model = list(set(DT_genes["Gene ID"].tolist()).intersection(gene_ind2genes))
     print(f"{len(DT_model)} genes can be targeted by drugs")
     
-    model_opt = cobra.flux_analysis.moma(model, solution=reference_solution, linear=False).to_frame()
+    model_opt = cobra.flux_analysis.moma(model, solution=reference_solution).to_frame()
     model_opt[abs(model_opt) < 1e-8] = 0.0
     
     genes_with_metabolic_effects = []
@@ -322,7 +322,8 @@ async def repurposing_hub_preproc(drug_file):
     entrez_ids = await db2db(
         input_values=drug_db_new["Target"].tolist(),
         input_db=InputDatabase.GENE_SYMBOL,
-        output_db=OutputDatabase.GENE_ID
+        output_db=OutputDatabase.GENE_ID,
+        cache=False
     )
     
     # entrez_ids = fetch_entrez_gene_id(drug_db_new["Target"].tolist(), input_db="Gene Symbol")
@@ -338,7 +339,8 @@ async def drug_repurposing(drug_db, d_score):
     d_score_gene_sym = await db2db(
         input_values=d_score["Gene"].tolist(),
         input_db=InputDatabase.GENE_ID,
-        output_db=[OutputDatabase.GENE_SYMBOL]
+        output_db=[OutputDatabase.GENE_SYMBOL],
+        cache=False
     )
     
     d_score.set_index("Gene", inplace=True)

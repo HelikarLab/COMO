@@ -180,7 +180,8 @@ async def get_microarray_diff_gene_exp(config_filepath, disease_name, target_pat
             input_values=list(map(str, diff_exp_df["Affy ID"].tolist())),
             input_db=input_db,
             output_db=[OutputDatabase.ENSEMBL_GENE_ID, OutputDatabase.GENE_ID, OutputDatabase.GENE_SYMBOL],
-            taxon_id=taxon_id
+            taxon_id=taxon_id,
+            cache=False
         )
         
         diff_exp_df["Entrez"] = bdnet["Gene ID"].tolist()
@@ -224,7 +225,8 @@ async def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, 
         input_values=list(map(str, diff_exp_df["Ensembl"].tolist())),
         input_db=InputDatabase.ENSEMBL_GENE_ID,
         output_db=[OutputDatabase.GENE_ID, OutputDatabase.AFFY_ID, OutputDatabase.GENE_SYMBOL],
-        taxon_id=taxon_id
+        taxon_id=taxon_id,
+        cache=False
     )
     
     diff_exp_df["Affy"] = bdnet["Affy ID"].tolist()
