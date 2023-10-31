@@ -432,7 +432,7 @@ async def main(argv):
         sys.exit()
     
     # handle species alternative ids
-    if type(args.taxon_id) == str:
+    if isinstance(args.taxon_id, str):
         if args.taxon_id.upper() == "HUMAN" or args.taxon_id.upper() == "HOMO SAPIENS":
             taxon_id = TaxonID.HOMO_SAPIENS
         elif args.taxon_id.upper() == "MOUSE" or args.taxon_id.upper() == "MUS MUSCULUS":
@@ -440,7 +440,8 @@ async def main(argv):
         else:
             print("--taxon-id must be either an integer, or accepted string ('mouse', 'human')")
             sys.exit(1)
-    elif type(args.taxon_id) == int:
+    
+    elif isinstance(args.taxon_id, int):
         taxon_id = args.taxon_id
     else:
         print("--taxon-id must be either an integer, or accepted string ('mouse', 'human')")
