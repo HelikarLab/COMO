@@ -775,7 +775,7 @@ def main(argv):
                 )
                 sys.exit()
             
-            exclude_rxns = df.iloc[:, 0].tolist()
+            exclude_rxns = df["Abbreviation"].tolist()
         
         except FileNotFoundError:
             print(
