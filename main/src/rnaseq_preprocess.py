@@ -1,7 +1,3 @@
-#!/usr/bin/python3
-
-import pandas as pd
-
 import re
 import os
 import sys
@@ -9,6 +5,7 @@ import glob
 import asyncio
 import argparse
 import numpy as np
+import pandas as pd
 from pathlib import Path
 
 import rpy2_api
@@ -307,9 +304,9 @@ async def handle_context_batch(context_names, mode, form: InputDatabase, taxon_i
                 df_m.to_excel(mwriter, sheet_name=context_name, header=True, index=False)
             
             tmatrix, mmatrix = split_counts_matrices(matrix_path_all, df_t, df_m)
-            if len(tmatrix.columns) > 1:
+            if len(tmatrix.columns) >= 1:
                 tmatrix.to_csv(matrix_path_total, header=True, index=False)
-            if len(mmatrix.columns) > 1:
+            if len(mmatrix.columns) >= 1:
                 mmatrix.to_csv(matrix_path_mrna, header=True, index=False)
     
     if mode == "make":
