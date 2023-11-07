@@ -17,6 +17,8 @@ dependencies:
   - bioconda::bioconductor-genefilter~=1.76.0
   - bioconda::bioconductor-hgu133acdf~=2.18.0
   - bioconda::bioconductor-limma~=3.50.1
+  - bioconda::crux-toolkit~=4.1
+  - bioconda::escher==1.7.*
   - conda-forge::r-factominer~=2.8
   - conda-forge::r-biocmanager~=1.30.18
   - conda-forge::r-devtools~=2.4.3
@@ -34,17 +36,18 @@ dependencies:
   - conda-forge::r-zoo~=1.8_10
   - conda-forge::aioftp~=0.21.2
   - conda-forge::bioservices~=1.11.2
-  - bioconda::crux-toolkit~=4.1
+  - conda-forge::cobra<=1.0.0
   - conda-forge::geoparse~=2.0.3
   - conda-forge::git~=2.37.0
   - gurobi::gurobi~=10.0
   - conda-forge::jupyterlab~=4.0.0
+  - conda-forge::jupyterlab-spreadsheet-editor==0.6.*
   - anaconda::lxml~=4.9.1
   - conda-forge::markupsafe~=2.0.1
   - conda-forge::numpy~=1.23.0
   - conda-forge::openpyxl~=3.0.10
   - conda-forge::optlang~=1.5.2
-  - conda-forge::pandas~=1.4.3
+  - conda-forge::pandas<=3.0.0
   - conda-forge::pip~=22.1.2
   - conda-forge::python-libsbml~=5.19.2
   - conda-forge::python~=3.10
@@ -59,10 +62,7 @@ dependencies:
   - conda-forge::xlrd~=2.0.1
   - pip:
       - async_bioservices
-      - cobra==0.26.*
-      - Escher==1.7.*
       - framed==0.5.*
       - memote==0.13.*
-      - jupyterlab-spreadsheet-editor==0.6.*
       - git+https://github.com/JoshLoecker/cobamp.git
       - git+https://github.com/JoshLoecker/troppo.git
