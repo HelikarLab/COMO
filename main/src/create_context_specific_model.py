@@ -893,36 +893,30 @@ def main(argv):
             ),
             index=False,
         )
+    
+    output_directory = os.path.join(configs.datadir, "results", context_name)
     if "mat" in output_filetypes:
-        outputfile = f"{context_name}_SpecificModel_{recon_alg}.mat"
-        print(f"Output file is '{outputfile}'")
-        # cobra.io.mat.save_matlab_model(context_model, os.path.join(configs.rootdir, 'data', outputfile))
         cobra.io.save_matlab_model(
             context_model,
-            os.path.join(configs.datadir, "results", context_name, outputfile),
+            os.path.join(output_directory, f"{context_name}_SpecificModel_{recon_alg}.mat"),
         )
     if "xml" in output_filetypes:
-        outputfile = f"{context_name}_SpecificModel_{recon_alg}.xml"
-        print(f"Output file is '{outputfile}'")
         cobra.io.write_sbml_model(
             context_model,
-            os.path.join(configs.datadir, "results", context_name, outputfile),
+            os.path.join(output_directory, f"{context_name}_SpecificModel_{recon_alg}.xml"),
         )
     if "json" in output_filetypes:
-        outputfile = f"{context_name}_SpecificModel_{recon_alg}.json"
-        print(f"Output file is '{outputfile}'")
         cobra.io.save_json_model(
             context_model,
-            os.path.join(configs.datadir, "results", context_name, outputfile),
+            os.path.join(output_directory, f"{context_name}_SpecificModel_{recon_alg}.json"),
         )
     
+    # os.path.join(configs.datadir, "results", context_name, outputfile)
+    print("")
+    print(f"Saved output file to {output_directory}")
     print("Number of Genes: " + str(len(context_model.genes)))
     print("Number of Metabolites: " + str(len(context_model.metabolites)))
     print("Number of Reactions: " + str(len(context_model.reactions)))
-    print(context_model.objective._get_expression())
-    print(pfba(context_model))
-    print("len rxns: ", len(context_model.reactions))
-    
     print("\nModel successfully created!")
 
 
