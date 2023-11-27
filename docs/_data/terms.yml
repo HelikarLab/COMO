@@ -1,5 +1,0 @@
-data_dir: data
-config_dir: data/config_sheets
-data_matrices_dir: data/data_matrices
-py_dir: src
-results_dir: data/results
