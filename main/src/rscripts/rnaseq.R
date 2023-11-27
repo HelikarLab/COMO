@@ -51,7 +51,7 @@ read_counts_matrix <- function(counts_matrix_filepath, config_filepath, info_fil
     }
     
     # add to group count matrices and insert lists
-    for (i in 1:length(config_object$SampleName)) {
+    for (i in seq_along(config_object$SampleName)) {
         entry <- config_object$SampleName[i]  # CELL-TYPE_S##R##
         group <- config_object$Group[i]
         
