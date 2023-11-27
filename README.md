@@ -66,3 +66,8 @@ Please [follow this link](https://helikarlab.github.io/COMO/como_flowcharts.html
 
 Resources for packages used in COMO and other useful links, please
 see [here](https://helikarlab.github.io/COMO/como_resources.html)
+
+## Citation
+If you use this work, please cite it with the following
+
+Brandt Bessell, Josh Loecker, Zhongyuan Zhao, Sara Sadat Aghamiri, Sabyasachi Mohanty, Rada Amin, Tomáš Helikar, Bhanwar Lal Puniya, COMO: a pipeline for multi-omics data integration in metabolic modeling and drug discovery, Briefings in Bioinformatics, Volume 24, Issue 6, November 2023, bbad387, https://doi.org/10.1093/bib/bbad387
