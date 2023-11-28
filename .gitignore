@@ -16,4 +16,4 @@
 /main/data/gene_info.csv
 /main/data/Repurposing_Hub_Preproc.tsv
 /main/microarray.db
-/main/data/config_sheets
+/main/data/config_sheets/*
