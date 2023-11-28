@@ -19,7 +19,7 @@ from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
 
 from project import configs
-from utilities import stringlist_to_list, split_gene_expression_data
+from utilities import stringlist_to_list, split_gene_expression_data, Compartments
 
 sys.setrecursionlimit(1500)  # for re.search
 
@@ -706,9 +706,9 @@ def main(argv):
     
     print(f"Active genes file found at {genefile}")
     
-    bound_rxns = []
-    bound_ub = []
-    bound_lb = []
+    boundary_rxns = []
+    boundary_rxns_upper: list[float] = []
+    boundary_rxns_lower: list[float] = []
     
     if boundary_rxns_filepath:
         boundary_rxns_filepath: Path = Path(boundary_rxns_filepath)
@@ -716,27 +716,27 @@ def main(argv):
         print(f"Reading {str(boundary_rxns_filepath)} for boundary reactions")
         if boundary_rxns_filepath.suffix == ".csv":
             df: pd.DataFrame = pd.read_csv(boundary_rxns_filepath, header=0, sep=",")
-        elif boundary_rxns_filepath.suffix == ".xlsx" or boundary_rxns_filepath.suffix == ".xls":
+        elif boundary_rxns_filepath.suffix in [".xlsx", ".xls"]:
             df: pd.DataFrame = pd.read_excel(boundary_rxns_filepath, header=0)
         else:
             raise FileNotFoundError(
-                f"Boundary reactions file not found! Must be a csv or xlsx file. Searching for: {boundary_rxns_filepath}")
-        
-        # Make sure the columns are named correctly. They should be "Reaction", "Abbreviation", "Compartment", "Minimum Reaction Rate", and "Maximum Reaction Rate"
-        for column in df.columns:
-            if column.lower() not in ["reaction", "abbreviation", "compartment", "minimum reaction rate",
-                                      "maximum reaction rate"]:
-                raise ValueError(
-                    f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', 'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}")
+                f"Boundary reactions file not found! Must be a csv or Excel file. Searching for: {boundary_rxns_filepath}")
         
         # convert all columns to lowercase
         df.columns = [column.lower() for column in df.columns]
         
+        # Make sure the columns are named correctly. They should be "Reaction", "Abbreviation", "Compartment", "Minimum Reaction Rate", and "Maximum Reaction Rate"
+        for column in df.columns:
+            if column not in ["reaction", "abbreviation", "compartment", "minimum reaction rate",
+                              "maximum reaction rate"]:
+                raise ValueError(
+                    f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', 'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}")
+        
         reaction_type: list[str] = df["reaction"].tolist()
         reaction_abbreviation: list[str] = df["abbreviation"].tolist()
         reaction_compartment: list[str] = df["compartment"].tolist()
-        lower_bound: list[float] = df["minimum reaction rate"].tolist()
-        upper_bound: list[float] = df["maximum reaction rate"].tolist()
+        boundary_rxns_lower = df["minimum reaction rate"].tolist()
+        boundary_rxns_upper = df["maximum reaction rate"].tolist()
         
         reaction_formula: list[str] = []
         for i in range(len(reaction_type)):
@@ -751,8 +751,10 @@ def main(argv):
                 case "sink":
                     temp_reaction += "SK_"
             
-            temp_reaction += f"{reaction_abbreviation[i]}_{reaction_compartment[i]}"
-            reaction_formula.append(temp_reaction)
+            shorthand_compartment = Compartments.get(reaction_compartment[i])
+            temp_reaction += f"{reaction_abbreviation[i]}[{shorthand_compartment}]"
+            boundary_rxns.append(temp_reaction)
+            # reaction_formula.append(temp_reaction)
         
         del df
     
@@ -862,9 +864,9 @@ def main(argv):
         objective,
         exclude_rxns,
         force_rxns,
-        bound_rxns,
-        lower_bound,
-        upper_bound,
+        boundary_rxns,
+        boundary_rxns_lower,
+        boundary_rxns_upper,
         solver,
         context_name,
         low_threshold,
