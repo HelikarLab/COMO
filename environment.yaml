@@ -60,7 +60,7 @@ dependencies:
   - gurobi::gurobi>=11.0.0
   - pip:
       - async_bioservices
-      - escher==1.7.3
+#      - escher==1.7.3
       - framed==0.5.*
       - memote==0.13.*
       - git+https://github.com/JoshLoecker/cobamp.git
