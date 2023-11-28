@@ -913,9 +913,9 @@ def main(argv):
     # os.path.join(configs.datadir, "results", context_name, outputfile)
     print("")
     print(f"Saved output file to {output_directory}")
-    print("Number of Genes: " + str(len(context_model.genes)))
-    print("Number of Metabolites: " + str(len(context_model.metabolites)))
-    print("Number of Reactions: " + str(len(context_model.reactions)))
+    print(f"Number of Genes: {len(context_model.genes):,}")
+    print(f"Number of Metabolites: {len(context_model.metabolites):,}")
+    print(f"Number of Reactions: {len(context_model.reactions):,}")
     print("\nModel successfully created!")
 
 
