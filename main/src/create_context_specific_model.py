@@ -704,7 +704,7 @@ def main(argv):
     if not os.path.exists(genefile):
         raise FileNotFoundError(f"Active genes file not found at {genefile}")
     
-    print(f"Active genes file found at {genefile}")
+    print(f"Active Genes: {genefile}")
     
     boundary_rxns = []
     boundary_rxns_upper: list[float] = []
@@ -713,7 +713,7 @@ def main(argv):
     if boundary_rxns_filepath:
         boundary_rxns_filepath: Path = Path(boundary_rxns_filepath)
         
-        print(f"Reading {str(boundary_rxns_filepath)} for boundary reactions")
+        print(f"Boundary Reactions: {str(boundary_rxns_filepath)}")
         if boundary_rxns_filepath.suffix == ".csv":
             df: pd.DataFrame = pd.read_csv(boundary_rxns_filepath, header=0, sep=",")
         elif boundary_rxns_filepath.suffix in [".xlsx", ".xls"]:
@@ -800,7 +800,7 @@ def main(argv):
     if force_rxns_filepath:
         force_rxns_filepath: Path = Path(force_rxns_filepath)
         try:
-            print(f"Reading {force_rxns_filepath} for force reactions")
+            print(f"Force Reactions: {force_rxns_filepath}")
             if force_rxns_filepath.suffix == ".csv":
                 df = pd.read_csv(force_rxns_filepath, header=0)
             elif force_rxns_filepath.suffix == ".xlsx" or force_rxns_filepath.suffix == ".xls":
@@ -853,10 +853,7 @@ def main(argv):
         print(f"Solver {solver} not supported. Please use 'GLPK' or 'GUROBI'")
         sys.exit(2)
     
-    print(
-        f"Constructing model of {context_name} with {recon_alg} reconstruction algorithm using {solver} solver"
-    )
-    
+    print(f"Creating '{context_name}' model using '{recon_alg}' reconstruction and '{solver}' solver")
     context_model, core_list, infeas_df = create_context_specific_model(
         reference_model,
         genefile,
