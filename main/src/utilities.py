@@ -5,6 +5,66 @@ import pandas as pd
 from typing import Iterator
 
 
+class Compartments:
+    """
+    This enum will be used to convert from compartment "long-hand" to "short-hand"
+    
+    Shorthand from: https://cobrapy.readthedocs.io/en/latest/_modules/cobra/medium/annotations.html
+    
+    "Extracellular" -> "e"
+    "golgi" -> "g"
+    """
+    
+    SHORTHAND = {
+        "ce": ["cell envelope"],
+        "c": [
+            "cytoplasm",
+            "cytosol",
+            "default",
+            "in",
+            "intra cellular",
+            "intracellular",
+            "intracellular region",
+            "intracellular space",
+        ],
+        "er": ["endoplasmic reticulum"],
+        "erm": ["endoplasmic reticulum membrane"],
+        "e": [
+            "extracellular",
+            "extraorganism",
+            "out",
+            "extracellular space",
+            "extra organism",
+            "extra cellular",
+            "extra-organism",
+            "external",
+            "external medium",
+        ],
+        "f": ["flagellum", "bacterial-type flagellum"],
+        "g": ["golgi", "golgi apparatus"],
+        "gm": ["golgi membrane"],
+        "h": ["chloroplast"],
+        "l": ["lysosome"],
+        "im": ["mitochondrial intermembrane space"],
+        "mm": ["mitochondrial membrane"],
+        "m": ["mitochondrion", "mitochondria"],
+        "n": ["nucleus"],
+        "p": ["periplasm", "periplasmic space"],
+        "x": ["peroxisome", "glyoxysome"],
+        "u": ["thylakoid"],
+        "vm": ["vacuolar membrane"],
+        "v": ["vacuole"],
+        "w": ["cell wall"],
+        "s": ["eyespot", "eyespot apparatus", "stigma"],
+    }
+    
+    _REVERSE_LOOKUP = {value.lower(): key for key, values in SHORTHAND.items() for value in values}
+    
+    @classmethod
+    def get(cls, longhand: str) -> str:
+        return cls._REVERSE_LOOKUP.get(longhand.lower(), None)
+
+
 def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
     """
     We are attempting to move to a new method of gathering a list of items from the command line
