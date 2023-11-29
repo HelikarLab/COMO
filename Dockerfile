@@ -1,6 +1,6 @@
 FROM jupyter/r-notebook:latest as builder
 
-COPY /environment.yaml "${HOME}/"
+COPY environment.yaml "${HOME}/environment.yaml"
 COPY --chown=1000:100 main "${HOME}/main"
 
 # Install python-related items
@@ -18,15 +18,18 @@ RUN sed -i '/^python/d' /opt/conda/conda-meta/pinned && \
     rm -rf "${HOME}/main/tests"  # Remove tests, they are not required for running COMO
 
 # Update base environment
-RUN mamba env update --name=base --file="${HOME}/environment.yaml" && \
-    R -e "devtools::install_github('babessell1/zFPKM')"
+RUN ls "${HOME}" && \
+    mamba env update --name=base --file="${HOME}/environment.yaml" && \
+    R -e "devtools::install_github('babessell1/zFPKM')" && \
+    pip cache purge && \
+    mamba clean --all --yes
 
-FROM jupyter/r-notebook:latest
+FROM jupyter/r-notebook:latestm
 
 COPY --from=builder ${HOME} ${HOME}
 
 RUN pip cache purge && \
-    conda clean --all --yes --force-pkgs-dirs
+    conda clean --all --yes
 
 EXPOSE 8888
 VOLUME /home/joyvan/main/data/local_files
