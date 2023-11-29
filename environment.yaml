@@ -33,7 +33,7 @@ dependencies:
   - conda-forge::pip~=22.1.2
   - conda-forge::python-libsbml~=5.19.2
   - conda-forge::python~=3.10
-  # - conda-forge::r-base
+  - conda-forge::r-base
   - conda-forge::r-biocmanager~=1.30.18
   - conda-forge::r-devtools~=2.4.3
   - conda-forge::r-factominer~=2.8
