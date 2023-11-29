@@ -17,6 +17,8 @@ jobs:
       contents: read
       packages: write
 
+    # A matrix platform is used here to expand functionality for building for additional architectures
+    # For example, intel/amd (linux/amd64) or Apple Silicon (arm64)
     strategy:
       matrix:
         platform: [ linux/amd64 ]
