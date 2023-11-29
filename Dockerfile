@@ -24,7 +24,7 @@ RUN ls "${HOME}" && \
     pip cache purge && \
     mamba clean --all --yes
 
-FROM jupyter/r-notebook:latestm
+FROM jupyter/r-notebook:latest
 
 COPY --from=builder ${HOME} ${HOME}
 
