@@ -30,7 +30,7 @@ dependencies:
   - conda-forge::openpyxl~=3.0.10
   # - conda-forge::optlang~=1.5.2
   - conda-forge::pandas<=3.0.0
-  - conda-forge::pip~=22.1.2
+  - conda-forge::pip
   - conda-forge::python-libsbml~=5.19.2
   - conda-forge::python~=3.10
   - conda-forge::r-base
@@ -60,8 +60,9 @@ dependencies:
   - gurobi::gurobi
   - pip:
       - async_bioservices
-      #      - escher==1.7.3
+      # - escher==1.7.3
+      - git+https://github.com/JoshLoecker/escher.git@python38#subdirectory=py
       - framed==0.5.*
-      - memote==0.13.*
+      - memote<=1.0
       - git+https://github.com/JoshLoecker/cobamp.git
       - git+https://github.com/JoshLoecker/troppo.git
