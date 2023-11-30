@@ -241,7 +241,7 @@ async def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase
         input_db=form,
         output_db=output_db,
         taxon_id=taxon_id,
-        cache=False
+        async_cache=False
     )
     
     gene_info.rename(columns={OutputDatabase.ENSEMBL_GENE_ID.value: "ensembl_gene_id"}, inplace=True)
