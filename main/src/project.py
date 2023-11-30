@@ -21,7 +21,7 @@ for directory in directory_list:
         break  # Exit the loop when we find the "main" directory
     split_index += 1  # Otherwise increment the index
 
-# Unpack items in dirlist
+# Unpack items in directory_list
 # From: https://stackoverflow.com/questions/14826888
 work_dir = os.path.join(*directory_list[0:split_index])
 

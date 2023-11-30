@@ -11,11 +11,17 @@ env:
 
 jobs:
   build-and-push-image:
+    name: Build and Push Docker Image
     runs-on: ubuntu-20.04
     permissions:
       contents: read
       packages: write
-    name: Build and Push Docker Image
+
+    # A matrix platform is used here to expand functionality for building for additional architectures
+    # For example, intel/amd (linux/amd64) or Apple Silicon (arm64)
+    strategy:
+      matrix:
+        platform: [ linux/amd64 ]
 
     steps:
       # Checkout the repository
@@ -38,21 +44,21 @@ jobs:
             type=semver,pattern={{version}}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && endsWith(github.ref, 'master') }}
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: linux/amd64
-
       - name: Set up Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: ${{ matrix.platform }}
 
-      - name: Clean Jupyter Notebook Outputs
+      - name: Set up Jupyter Notebook Cleaner
         uses: actions/setup-python@v4
         with:
           python-version: "3.10"
-      - name: Clean Notebook Output
+
+      - name: Clean Jupyter Notebook Outputs
         run: |
           python -m pip install --upgrade nbstripout --no-cache-dir
           find $GITHUB_WORKSPACE -name "*.ipynb" -exec nbstripout "{}" \;
@@ -74,5 +80,5 @@ jobs:
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
           builder: ${{ steps.buildx.outputs.name }}
-          platforms: linux/amd64
+          platforms: ${{ matrix.platform }}
 
