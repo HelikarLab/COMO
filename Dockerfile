@@ -24,12 +24,5 @@ RUN ls "${HOME}" && \
     pip cache purge && \
     mamba clean --all --yes
 
-FROM jupyter/r-notebook:latest
-
-COPY --from=builder ${HOME} ${HOME}
-
-RUN pip cache purge && \
-    conda clean --all --yes
-
 EXPOSE 8888
 VOLUME /home/joyvan/main/data/local_files
