@@ -30,7 +30,7 @@ from async_bioservices import db2db, InputDatabase, OutputDatabase
 # string = f.read()
 # f.close()
 # combine_dist_io = SignatureTranslatedAnonymousPackage(string, "combine_dist_io")
-r_file_path = Path(configs.rootdir, "src", "rscripts", "combine_distributions.R")
+r_file_path = Path(configs.root_dir, "src", "rscripts", "combine_distributions.R")
 
 
 class _MergedHeaderNames:
@@ -311,10 +311,10 @@ async def merge_xomics(
     # merge_data = merge_data.astype(int)
     merge_data = merge_data
     
-    filepath = os.path.join(configs.rootdir, "data", "results", context_name, f"merged_{context_name}.csv")
+    filepath = os.path.join(configs.root_dir, "data", "results", context_name, f"merged_{context_name}.csv")
     merge_data.to_csv(filepath, index_label="ENTREZ_GENE_ID")
     
-    filepath = os.path.join(configs.rootdir, "data", "results", context_name, f"ActiveGenes_{context_name}_Merged.csv")
+    filepath = os.path.join(configs.root_dir, "data", "results", context_name, f"ActiveGenes_{context_name}_Merged.csv")
     merge_data.reset_index(drop=False, inplace=True)
     
     split_entrez = split_gene_expression_data(merge_data)
@@ -357,7 +357,7 @@ async def handle_context_batch(
     sheet_names = []
     for file in [microarray_file, trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file]:
         if file is not None:
-            config_filepath = os.path.join(configs.rootdir, "data", "config_sheets", file)
+            config_filepath = os.path.join(configs.root_dir, "data", "config_sheets", file)
             xl = pd.ExcelFile(config_filepath, engine="openpyxl")
             sheet_names += xl.sheet_names
     
@@ -388,7 +388,7 @@ async def handle_context_batch(
         print(f"Using {merge_distro} distribution for merging")
         rpy2_api.Rpy2(
             r_file_path,
-            os.path.join(configs.datadir, "results"),
+            os.path.join(configs.data_dir, "results"),
             sheet_names,
             use_mrna,
             use_trna,
@@ -401,7 +401,7 @@ async def handle_context_batch(
             pweight,
         ).call_function("combine_zscores_main")
     
-    files_json = os.path.join(configs.rootdir, "data", "results", "step1_results_files.json")
+    files_json = os.path.join(configs.root_dir, "data", "results", "step1_results_files.json")
     for context_name in sheet_names:
         num_sources = counts[context_name]
         if adjust_method == "progressive":
@@ -652,7 +652,7 @@ async def main(argv):
     
     # read custom expression requirment file if used
     if custom_file != "SKIP":
-        custom_filepath = os.path.join(configs.datadir, custom_file)
+        custom_filepath = os.path.join(configs.data_dir, custom_file)
         custom_df = pd.read_excel(custom_filepath, sheet_name=0)
         custom_df.columns = ["context", "req"]
     else:

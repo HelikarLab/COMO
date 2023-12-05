@@ -136,7 +136,7 @@ def queryTest(df, expression_proportion, top_proportion):
     # fetch data of each gse if it is not in the database, update database
     for gse_id in gse_ids:
         querytable = df[df["GSE ID"] == gse_id]
-        gseXXX = GSEproject(gse_id, querytable, configs.rootdir)
+        gseXXX = GSEproject(gse_id, querytable, configs.root_dir)
         if lookupMicroarrayDB(gseXXX):
             print("{} already in database, skip over.".format(gseXXX.gsename))
             continue
@@ -298,7 +298,7 @@ def mergeLogicalTable(df_results):
 def load_microarray_tests(filename, context_name):
     def load_empty_dict():
         savepath = os.path.join(
-            configs.rootdir,
+            configs.root_dir,
             "data",
             "data_matrices",
             "placeholder",
@@ -312,14 +312,14 @@ def load_microarray_tests(filename, context_name):
         
         return load_empty_dict()
     
-    inquiry_full_path = os.path.join(configs.rootdir, "data", "config_sheets", filename)
+    inquiry_full_path = os.path.join(configs.root_dir, "data", "config_sheets", filename)
     if not os.path.isfile(inquiry_full_path):
         print("Error: file not found {}".format(inquiry_full_path))
         sys.exit()
     
     filename = "Microarray_{}.csv".format(context_name)
     fullsavepath = os.path.join(
-        configs.rootdir, "data", "results", context_name, "microarray", filename
+        configs.root_dir, "data", "results", context_name, "microarray", filename
     )
     if os.path.isfile(fullsavepath):
         data = pd.read_csv(fullsavepath, index_col="ENTREZ_GENE_ID")
@@ -380,7 +380,7 @@ def main(argv):
     print("Expression Proportion for Gene Expression is ", expression_proportion)
     print("Top proportion for high-confidence genes is ", top_proportion)
     
-    inqueryFullPath = os.path.join(configs.rootdir, "data", "config_sheets", inputfile)
+    inqueryFullPath = os.path.join(configs.root_dir, "data", "config_sheets", inputfile)
     xl = pd.ExcelFile(inqueryFullPath)
     sheet_names = xl.sheet_names
     inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_names, header=0)
@@ -391,7 +391,7 @@ def main(argv):
         df_output = queryTest(df, expression_proportion, top_proportion)
         filename = "Microarray_{}.csv".format(context_name)
         fullsavepath = os.path.join(
-            configs.rootdir, "data", "results", context_name, filename
+            configs.root_dir, "data", "results", context_name, filename
         )
         os.makedirs(os.path.dirname(fullsavepath), exist_ok=True)
         df_output.to_csv(fullsavepath)
