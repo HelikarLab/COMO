@@ -21,11 +21,12 @@ class Configs:
         configuration = toml.load(self._configuration_file)
         
         como_version = configuration["general"]["COMO_version"]
-        configuration["general"]["COMO_version"] = self._get_como_version(como_version)
-        
+        new_version = self._get_como_version()
+        if como_version != new_version:
+            configuration["general"]["COMO_version"] = new_version
         return configuration
     
-    def update_configuration(
+    def write_configuration(
         self,
         write_directory: str | Path,
         config_filename: str = "configuration.toml"
@@ -33,15 +34,9 @@ class Configs:
         with open(os.path.join(write_directory, config_filename), "w") as f:
             toml.dump(self.configuration, f)
     
-    def _get_como_version(self, current_version: str):
-        if current_version == "":
-            try:
-                git_tag_command = "git describe --tags --abbrev=0"
-                current_version = subprocess.check_output(git_tag_command, shell=True).decode("utf-8").strip()
-            
-            except subprocess.CalledProcessError as e:
-                raise ValueError("Could not find latest tag") from e
-        
+    def _get_como_version(self):
+        git_tag_command = "git describe --tags --abbrev=0"
+        current_version = subprocess.check_output(git_tag_command, shell=True).decode("utf-8").strip()
         return current_version
 
 
@@ -66,3 +61,4 @@ configs: Configs = Configs(work_dir)
 if __name__ == '__main__':
     config = Configs("/Users/joshl/PycharmProjects/COMO/main")
     print(config.configuration)
+    config.write_configuration(config.root_dir)
