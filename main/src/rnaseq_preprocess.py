@@ -245,8 +245,8 @@ async def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase
     )
     
     gene_info.rename(columns={OutputDatabase.ENSEMBL_GENE_ID.value: "ensembl_gene_id"}, inplace=True)
-    gene_info['start_position'] = gene_info['Chromosomal Location'].str.extract("chr_start: (\d+)")
-    gene_info['end_position'] = gene_info['Chromosomal Location'].str.extract("chr_end: (\d+)")
+    gene_info['start_position'] = gene_info['Chromosomal Location'].str.extract(r"chr_start: (\d+)")
+    gene_info['end_position'] = gene_info['Chromosomal Location'].str.extract(r"chr_end: (\d+)")
     gene_info.rename(columns={"Gene Symbol": "hgnc_symbol", "Gene ID": "entrezgene_id"}, inplace=True)
     gene_info.drop(['Chromosomal Location'], axis=1, inplace=True)
     gene_info.to_csv(gene_info_file, index=False)
@@ -272,9 +272,7 @@ async def handle_context_batch(context_names, mode, form: InputDatabase, taxon_i
         configs.configuration["rnaseq_preprocess"]["gene_format_database"] = form.value
         configs.configuration["rnaseq_preprocess"]["taxon_id"] = taxon_id
         configs.configuration["rnaseq_preprocess"]["provided_matrix_filename"] = provided_matrix_file
-        configs.update_configuration(os.path.join(configs.results_dir, context_name))
-        
-        exit(1)
+        configs.write_configuration(os.path.join(configs.results_dir, context_name))
         
         context_name = context_name.strip(" ")
         print(f"Preprocessing {context_name}")
