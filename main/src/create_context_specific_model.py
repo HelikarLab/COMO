@@ -269,7 +269,7 @@ def seed_imat(
     print("Obtained flux values")
     context_cobra_model = cobra_model.copy()
     r_ids = [r.id for r in context_cobra_model.reactions]
-    pd.DataFrame({"rxns": r_ids}).to_csv(os.path.join(configs.datadir, "rxns_test.csv"))
+    pd.DataFrame({"rxns": r_ids}).to_csv(os.path.join(configs.data_dir, "rxns_test.csv"))
     remove_rxns = [r_ids[int(i)] for i in range(s_matrix.shape[1]) if not np.isin(i, context_rxns)]
     flux_df = pd.DataFrame(columns=["rxn", "flux"])
     for idx, (_, val) in enumerate(fluxes.items()):
@@ -493,7 +493,7 @@ def create_context_specific_model(
         model_reactions = [reaction.id for reaction in context_model_cobra.reactions]
         reaction_intersections = set(imat_reactions).intersection(model_reactions)
         flux_df = flux_df[~flux_df["rxn"].isin(reaction_intersections)]
-        flux_df.to_csv(os.path.join(configs.datadir, "results", context_name, f"{recon_algorithm}_flux.csv"))
+        flux_df.to_csv(os.path.join(configs.data_dir, "results", context_name, f"{recon_algorithm}_flux.csv"))
     
     elif recon_algorithm == "TINIT":
         context_model_cobra = seed_tinit(
@@ -872,7 +872,7 @@ def main(argv):
     
     infeas_df.to_csv(
         os.path.join(
-            configs.rootdir,
+            configs.root_dir,
             "data",
             "results",
             context_name,
@@ -884,7 +884,7 @@ def main(argv):
     if recon_alg == "FASTCORE":
         pd.DataFrame(core_list).to_csv(
             os.path.join(
-                configs.rootdir,
+                configs.root_dir,
                 "data",
                 "results",
                 context_name,
@@ -893,7 +893,7 @@ def main(argv):
             index=False,
         )
     
-    output_directory = os.path.join(configs.datadir, "results", context_name)
+    output_directory = os.path.join(configs.data_dir, "results", context_name)
     if "mat" in output_filetypes:
         cobra.io.save_matlab_model(
             context_model,

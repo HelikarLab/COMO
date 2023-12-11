@@ -14,7 +14,7 @@ import rpy2_api
 # enable r to py conversion
 pandas2ri.activate()
 
-r_file_path = Path(configs.rootdir, "src", "rscripts", "rnaseq.R")
+r_file_path = Path(configs.root_dir, "src", "rscripts", "rnaseq.R")
 
 
 def load_rnaseq_tests(filename, context_name, lib_type):
@@ -24,7 +24,7 @@ def load_rnaseq_tests(filename, context_name, lib_type):
     
     def load_dummy_dict():
         savepath = os.path.join(
-            configs.rootdir, "data", "data_matrices", "placeholder", "placeholder_empty_data.csv"
+            configs.root_dir, "data", "data_matrices", "placeholder", "placeholder_empty_data.csv"
         )
         dat = pd.read_csv(savepath, index_col="ENTREZ_GENE_ID")
         return "dummy", dat
@@ -32,7 +32,7 @@ def load_rnaseq_tests(filename, context_name, lib_type):
     if not filename or filename == "None":  # not using this data type, use empty dummy data matrix
         return load_dummy_dict()
     
-    inquiry_full_path = os.path.join(configs.rootdir, "data", "config_sheets", filename)
+    inquiry_full_path = os.path.join(configs.root_dir, "data", "config_sheets", filename)
     if not os.path.isfile(inquiry_full_path):  # check that config file exist (isn't needed to load, but helps user)
         print(f"Error: Config file not found at {inquiry_full_path}")
         sys.exit()
@@ -47,7 +47,7 @@ def load_rnaseq_tests(filename, context_name, lib_type):
         print(f"Unsupported RNA-seq library type: {lib_type}. Must be one of 'total', 'mrna', 'sc'.")
         sys.exit()
     
-    fullsavepath = os.path.join(configs.rootdir, "data", "results", context_name, lib_type, filename)
+    fullsavepath = os.path.join(configs.root_dir, "data", "results", context_name, lib_type, filename)
     
     if os.path.isfile(fullsavepath):
         data = pd.read_csv(fullsavepath, index_col="ENTREZ_GENE_ID")
@@ -79,7 +79,7 @@ def handle_context_batch(
     Handle iteration through each context type and create rnaseq expression file by calling rnaseq.R
     """
     
-    rnaseq_config_filepath = os.path.join(configs.rootdir, "data", "config_sheets", config_filename)
+    rnaseq_config_filepath = os.path.join(configs.root_dir, "data", "config_sheets", config_filename)
     xl = pd.ExcelFile(rnaseq_config_filepath)
     sheet_names = xl.sheet_names
     
@@ -88,16 +88,16 @@ def handle_context_batch(
     for context_name in sheet_names:
         print(f"\nStarting '{context_name}'")
         rnaseq_output_file = f"rnaseq_{prep}_{context_name}.csv"
-        rnaseq_output_filepath = os.path.join(configs.datadir, "results", context_name, prep, rnaseq_output_file)
+        rnaseq_output_filepath = os.path.join(configs.data_dir, "results", context_name, prep, rnaseq_output_file)
         
         rnaseq_input_file = f"gene_counts_matrix_{prep}_{context_name}.csv"
-        rnaseq_input_filepath = os.path.join(configs.datadir, "data_matrices", context_name, rnaseq_input_file)
+        rnaseq_input_filepath = os.path.join(configs.data_dir, "data_matrices", context_name, rnaseq_input_file)
         
         if not os.path.exists(rnaseq_input_filepath):
             print(f"Gene counts matrix not found at {rnaseq_input_filepath}, skipping...")
             continue
         
-        gene_info_filepath = os.path.join(configs.datadir, "gene_info.csv")
+        gene_info_filepath = os.path.join(configs.data_dir, "gene_info.csv")
         os.makedirs(os.path.dirname(rnaseq_output_filepath), exist_ok=True)
         
         print(f"Gene info:\t\t{gene_info_filepath}")

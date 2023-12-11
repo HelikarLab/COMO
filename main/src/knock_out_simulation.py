@@ -81,7 +81,7 @@ def knock_out_simulation(
     
     if os.path.isfile(inhibitors_filepath):
         print(f"Inhibitors file found at:\n{inhibitors_filepath}")
-        DT_genes = pd.read_csv(os.path.join(configs.datadir, inhibitors_filepath), header=None, sep="\t")
+        DT_genes = pd.read_csv(os.path.join(configs.data_dir, inhibitors_filepath), header=None, sep="\t")
         DT_genes.rename(columns={0: "Gene ID"}, inplace=True)
         DT_genes["Gene ID"] = DT_genes["Gene ID"].astype(str)
     else:
@@ -261,7 +261,7 @@ def score_gene_pairs(gene_pairs, filename, input_reg):
         d_score.at[p_gene, "score"] = d_s
     
     d_score.index.name = "Gene"
-    d_score.to_csv(os.path.join(configs.datadir, filename))
+    d_score.to_csv(os.path.join(configs.data_dir, filename))
     return d_score
 
 
@@ -466,7 +466,7 @@ async def main(argv):
     pars_flag = args.pars_flag
     solver = args.solver
     
-    output_dir = os.path.join(configs.datadir, "results", context, disease)
+    output_dir = os.path.join(configs.data_dir, "results", context, disease)
     inhibitors_file = os.path.join(output_dir, f"{context}_{disease}_inhibitors.tsv")
     
     print(f"Output directory: '{output_dir}'")
@@ -485,8 +485,8 @@ async def main(argv):
     cobra_model.solver = solver
     
     # preprocess repurposing hub data
-    raw_drug_filepath = os.path.join(configs.datadir, raw_drug_filename)
-    reformatted_drug_file = os.path.join(configs.datadir, "Repurposing_Hub_Preproc.tsv")
+    raw_drug_filepath = os.path.join(configs.data_dir, raw_drug_filename)
+    reformatted_drug_file = os.path.join(configs.data_dir, "Repurposing_Hub_Preproc.tsv")
     if not os.path.isfile(reformatted_drug_file):
         print("Preprocessing raw Repurposing Hub DB file...")
         drug_db = await repurposing_hub_preproc(raw_drug_filepath)
@@ -510,7 +510,7 @@ async def main(argv):
     flux_solution_ratios.to_csv(os.path.join(output_dir, "flux_ratios_KO.csv"))
     
     gene_pairs_down = create_gene_pairs(
-        configs.datadir,
+        configs.data_dir,
         model,
         gene_ind2genes,
         fluxsolution,
@@ -523,7 +523,7 @@ async def main(argv):
     gene_pairs_down.to_csv(os.path.join(output_dir, f"{context}_Gene_Pairs_Inhi_Fratio_DOWN.txt"), index=False)
     
     gene_pairs_up = create_gene_pairs(
-        configs.datadir,
+        configs.data_dir,
         model,
         gene_ind2genes,
         fluxsolution,

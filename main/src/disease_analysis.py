@@ -28,19 +28,19 @@ readxl = importr("readxl")
 # string = f.read()
 # f.close()
 # DGEio = SignatureTranslatedAnonymousPackage(string, "DGEio")
-DGEio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "src", "rscripts", "DGE.R"))
+DGEio = rpy2_api.Rpy2(r_file_path=Path(configs.root_dir, "src", "rscripts", "DGE.R"))
 
 # f = open(os.path.join(configs.rootdir, "src", "rscripts", "fitAffy.R"), "r")
 # string = f.read()
 # f.close()
 # affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
-affyio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "src", "rscripts", "fitAffy.R"))
+affyio = rpy2_api.Rpy2(r_file_path=Path(configs.root_dir, "src", "rscripts", "fitAffy.R"))
 
 # f = open(os.path.join(configs.rootdir, "src", "rscripts", "fitAgilent.R"), "r")
 # string = f.read()
 # f.close()
 # agilentio = SignatureTranslatedAnonymousPackage(string, "agilentio")
-agilentio = rpy2_api.Rpy2(r_file_path=Path(configs.rootdir, "src", "rscripts", "fitAgilent.R"))
+agilentio = rpy2_api.Rpy2(r_file_path=Path(configs.root_dir, "src", "rscripts", "fitAgilent.R"))
 
 
 def breakDownEntrezs(disease):
@@ -150,7 +150,7 @@ async def get_microarray_diff_gene_exp(config_filepath, disease_name, target_pat
     inst_name = inst_name[0]
     print(inst_name)
     
-    gseXXX = GSEpipelineFast.GSEproject(gse_id, query_table, configs.rootdir)
+    gseXXX = GSEpipelineFast.GSEproject(gse_id, query_table, configs.root_dir)
     for key, val in gseXXX.platforms.items():
         raw_dir = os.path.join(gseXXX.gene_dir, key)
         print(f"{key}:{val}, {raw_dir}")
@@ -203,7 +203,7 @@ async def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, 
     return: dataframe with fold changes, FDR adjusted p-values,
     """
     count_matrix_filename = "".join(["gene_counts_matrix_", disease_name, "_", context_name, ".csv"])
-    count_matrix_path = os.path.join(configs.datadir,
+    count_matrix_path = os.path.join(configs.data_dir,
                                      "data_matrices",
                                      context_name,
                                      "disease",
@@ -252,7 +252,7 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
         for gene in diff_exp_df[search_col].tolist()
     ]
     up_file = os.path.join(
-        configs.rootdir,
+        configs.root_dir,
         "data",
         "results",
         context_name,
@@ -262,7 +262,7 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
     os.makedirs(os.path.dirname(up_file), exist_ok=True)
     
     down_file = os.path.join(
-        configs.rootdir,
+        configs.root_dir,
         "data",
         "results",
         context_name,
@@ -280,7 +280,7 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
     print(f"Downregulated genes saved to '{down_file}'")
     
     raw_file = os.path.join(
-        configs.rootdir,
+        configs.root_dir,
         "data",
         "results",
         context_name,
@@ -299,7 +299,7 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
     }
     
     files_json = os.path.join(
-        configs.rootdir,
+        configs.root_dir,
         "data",
         "results",
         context_name,
@@ -367,9 +367,9 @@ async def main(argv):
     taxon_id = args.taxon_id
     
     if data_source == "RNASEQ":
-        config_filepath = os.path.join(configs.datadir, "config_sheets", "disease", config_file)
+        config_filepath = os.path.join(configs.data_dir, "config_sheets", "disease", config_file)
     elif data_source == "MICROARRAY":
-        config_filepath = os.path.join(configs.datadir, "config_sheets", "disease", config_file)
+        config_filepath = os.path.join(configs.data_dir, "config_sheets", "disease", config_file)
     else:
         print(f"{data_source} is not a valid data source, must be either MICROARRAY or RNASEQ.")
         sys.exit()
@@ -400,7 +400,7 @@ async def main(argv):
     
     sheet_names = xl.sheet_names
     for disease_name in sheet_names:
-        target_path = os.path.join(configs.rootdir, "data", targetfile)
+        target_path = os.path.join(configs.root_dir, "data", targetfile)
         if data_source == "MICROARRAY":
             diff_exp_df, gse_id = await get_microarray_diff_gene_exp(config_filepath, disease_name, target_path,
                                                                      taxon_id)
