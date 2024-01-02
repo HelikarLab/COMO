@@ -14,6 +14,7 @@ dependencies:
   - bioconda::bioconductor-deseq2~=1.34.0
   - bioconda::bioconductor-edger~=3.36.0
   - bioconda::bioconductor-genefilter~=1.76.0
+  - bioconda::bioconductor-genomeinfodbdata~=1.2.11  # Required or else hgu133acdf fails to install
   - bioconda::bioconductor-hgu133acdf~=2.18.0
   - bioconda::bioconductor-limma~=3.50.1
   - bioconda::crux-toolkit~=4.1
