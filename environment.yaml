@@ -22,7 +22,7 @@ dependencies:
   # - conda-forge::bioservices~=1.11.2
   - conda-forge::cobra~=0.29.0
   - conda-forge::geoparse~=2.0.3
-  # - conda-forge::git~=2.37.0
+  - conda-forge::git~=2.37.0  # Required for pip-related dependencies
   - conda-forge::jupyterlab~=4.0.0
   - conda-forge::lxml~=4.9.1
   - conda-forge::numpy~=1.23.0
