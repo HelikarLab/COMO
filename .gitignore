@@ -1,3 +1,4 @@
+# General cache files
 /**/*.Rhistory
 /**/.DS_Store
 /**/.idea
@@ -7,9 +8,11 @@
 /**/.pytest_cache
 /**/__pycache__
 
+# Documentation
 docs/_site
 docs/Gemfile.lock
 
+# COMO-specific files
 main/logs/
 main/data/results/
 main/data/config_sheets/*_data_inputs_auto.xlsx
