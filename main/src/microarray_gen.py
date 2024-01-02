@@ -1,7 +1,6 @@
-#!/usr/bin/python3
-
 # Silence sqlalchemy warning about version 2.0, we are still on 1.x
 import os
+
 os.environ["SQLALCHEMY_SILENCE_UBER_WARNING"] = "1"
 
 import sys
@@ -14,6 +13,7 @@ from sqlalchemy import create_engine
 
 from project import configs
 from GSEpipelineFast import *
+from como_utilities import is_float
 
 # create declarative_base instance
 Base = declarative_base()
@@ -156,6 +156,7 @@ async def queryTest(df, expression_proportion, top_proportion):
     
     df_output["Pos"] = posratio
     df_output["expressed"] = np.where(posratio >= expression_proportion, 1, 0)
+    
     df_output["top"] = np.where(posratio >= top_proportion, 1, 0)
     
     return df_output
@@ -380,7 +381,7 @@ async def main(argv):
     args = parser.parse_args()
     inputfile = args.config_file
     expression_proportion = args.expression_proportion
-    top_proportion = args.top_proportion
+    top_proportion = float(args.top_proportion)
     
     print("Input file is ", inputfile)
     print("Expression Proportion for Gene Expression is ", expression_proportion)
