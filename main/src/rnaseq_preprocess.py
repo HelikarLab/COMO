@@ -9,7 +9,7 @@ import pandas as pd
 from pathlib import Path
 
 import rpy2_api
-import utilities
+import como_utilities
 from project import configs
 from async_bioservices import db2db, InputDatabase, OutputDatabase, TaxonID
 
@@ -318,7 +318,7 @@ async def handle_context_batch(context_names, mode, form: InputDatabase, taxon_i
         await create_gene_info_file(tmatrix_files + mmatrix_files, form, taxon_id)
     
     else:
-        matrix_files: list[str] = utilities.stringlist_to_list(matrix_path_prov)
+        matrix_files: list[str] = como_utilities.stringlist_to_list(matrix_path_prov)
         await create_gene_info_file(matrix_files, form, taxon_id)
 
 
@@ -405,7 +405,7 @@ def parse_args(argv):
                         )
     
     args = parser.parse_args(argv)
-    args.context_names = utilities.stringlist_to_list(args.context_names)
+    args.context_names = como_utilities.stringlist_to_list(args.context_names)
     
     return args
 

@@ -12,7 +12,7 @@ import multiprocessing.pool
 import multiprocessing as mp
 
 from project import configs
-from utilities import suppress_stdout
+from como_utilities import suppress_stdout
 from async_bioservices import db2db, InputDatabase, OutputDatabase
 
 
