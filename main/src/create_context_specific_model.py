@@ -1,5 +1,3 @@
-#!/usr/bin/python3
-
 import os
 import re
 import sys
@@ -19,7 +17,7 @@ from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
 
 from project import configs
-from utilities import stringlist_to_list, split_gene_expression_data, Compartments
+from como_utilities import stringlist_to_list, split_gene_expression_data, Compartments
 
 sys.setrecursionlimit(1500)  # for re.search
 

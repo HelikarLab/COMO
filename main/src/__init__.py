@@ -1,1 +1,1 @@
-from .utilities import stringlist_to_list
+from como_utilities import *
