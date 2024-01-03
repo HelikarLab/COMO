@@ -18,6 +18,9 @@ class Configs:
     
     def _find_project_dir(self) -> Path:
         current_dir: Path = Path.cwd()
+        
+        print(f"{current_dir=}")
+        
         directory_list: tuple[str, ...] = current_dir.parts
         
         split_index: int = 0
