@@ -12,9 +12,11 @@ import rpy2_api
 import rnaseq_gen
 import microarray_gen
 import proteomics_gen
-from project import configs
+import project
 from como_utilities import split_gene_expression_data
 from async_bioservices import db2db, InputDatabase, OutputDatabase
+
+configs = project.Configs()
 
 # enable r to py conversion
 # pandas2ri.activate()

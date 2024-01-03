@@ -10,8 +10,9 @@ from rpy2.robjects.packages import importr
 from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage
 
 import rpy2_api
-from project import configs
+import project
 
+configs = project.Configs()
 affy_r_filepath = Path(os.path.join(configs.pydir, "rscripts", "fitAffy.R"))
 agilent_r_filepath = Path(os.path.join(configs.pydir, "rscripts", "fitAgilent.R"))
 

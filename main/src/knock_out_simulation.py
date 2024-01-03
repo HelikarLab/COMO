@@ -11,9 +11,11 @@ from pathlib import Path
 import multiprocessing.pool
 import multiprocessing as mp
 
-from project import configs
+import project
 from como_utilities import suppress_stdout
 from async_bioservices import db2db, InputDatabase, OutputDatabase
+
+configs = project.Configs()
 
 
 def _perform_knockout(

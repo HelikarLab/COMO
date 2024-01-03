@@ -11,9 +11,11 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, load_only
 from sqlalchemy import create_engine
 
-from project import configs
+import project
 from GSEpipelineFast import *
 from como_utilities import is_float
+
+configs = project.Configs()
 
 # create declarative_base instance
 Base = declarative_base()

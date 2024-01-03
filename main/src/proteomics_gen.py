@@ -4,10 +4,12 @@ import os
 import pandas as pd
 import numpy as np
 import instruments
-from project import configs
 from pathlib import Path
 
+import project
 import rpy2_api
+
+configs = project.Configs()
 
 # read and translate R functions
 # f = open(os.path.join(configs.rootdir, "src", "rscripts", "protein_transform.R"), "r")
