@@ -17,20 +17,22 @@ class Configs:
         self.pydir = os.path.join(self.rootdir, "src")
     
     def _find_project_dir(self) -> Path:
-        current_dir: Path = Path.cwd()
+        # Determine if "main" is in the current directory (i.e., `ls .`)
+        if "main" in os.listdir(os.getcwd()):
+            return Path(os.getcwd(), "main")
         
-        print(f"{current_dir=}")
-        
-        directory_list: tuple[str, ...] = current_dir.parts
-        
-        split_index: int = 0
-        for directory in directory_list:
+        # If "main" is not in the current directory, see if we are in a sub-directory of "main" (i.e., `ls ..`)
+        current_directory = Path.cwd()
+        directory_parts = current_directory.parts
+        for i, directory in enumerate(directory_parts):
             if directory == "main":
-                split_index += 1
-                break
-            split_index += 1
-        work_dir: Path = Path(*directory_list[0:split_index])
-        return work_dir
+                return Path(*directory_parts[0:i + 1])
+        
+        # If we are not in a sub-directory of "main", then we are not in the project directory
+        raise FileNotFoundError(
+            "Could not find project directory. "
+            "Please ensure you are in the project directory, such as 'COMO' or 'main'."
+        )
 
 
 # _current_dir = os.getcwd()
