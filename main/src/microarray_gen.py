@@ -1,13 +1,21 @@
-#!/usr/bin/python3
+# Silence sqlalchemy warning about version 2.0, we are still on 1.x
+import os
 
-import argparse
+os.environ["SQLALCHEMY_SILENCE_UBER_WARNING"] = "1"
+
 import sys
+import asyncio
+import argparse
 from sqlalchemy import Column, Integer, String, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, load_only
 from sqlalchemy import create_engine
-from project import configs
+
+import project
 from GSEpipelineFast import *
+from como_utilities import is_float
+
+configs = project.Configs()
 
 # create declarative_base instance
 Base = declarative_base()
@@ -74,13 +82,13 @@ def lookupMicroarrayDB(gseXXX):
         return False
 
 
-def updateMicroarrayDB(gseXXX):
+async def updateMicroarrayDB(gseXXX):
     """
     Update GSE info to microarray.db
     :param gseXXX: gse object
     :return:
     """
-    df_clean = gseXXX.get_entrez_table_pipeline()
+    df_clean = await gseXXX.get_entrez_table_pipeline()
     if df_clean.empty:
         return None
     
@@ -124,7 +132,7 @@ def updateMicroarrayDB(gseXXX):
 
 
 # function to complete the inquery of a sheet
-def queryTest(df, expression_proportion, top_proportion):
+async def queryTest(df, expression_proportion, top_proportion):
     sr = df["GSE ID"]
     gse_ids = sr[sr.str.match("GSE")].unique()
     sr = df["Samples"].dropna()
@@ -140,7 +148,7 @@ def queryTest(df, expression_proportion, top_proportion):
         if lookupMicroarrayDB(gseXXX):
             print("{} already in database, skip over.".format(gseXXX.gsename))
             continue
-        updateMicroarrayDB(gseXXX)
+        await updateMicroarrayDB(gseXXX)
     
     df_results = fetchLogicalTable(gsm_ids)
     df_output = mergeLogicalTable(df_results)
@@ -150,6 +158,7 @@ def queryTest(df, expression_proportion, top_proportion):
     
     df_output["Pos"] = posratio
     df_output["expressed"] = np.where(posratio >= expression_proportion, 1, 0)
+    
     df_output["top"] = np.where(posratio >= top_proportion, 1, 0)
     
     return df_output
@@ -337,7 +346,7 @@ def load_microarray_tests(filename, context_name):
         return load_empty_dict()
 
 
-def main(argv):
+async def main(argv):
     inputfile = "microarray_data_inputs.xlsx"
     
     parser = argparse.ArgumentParser(
@@ -374,7 +383,7 @@ def main(argv):
     args = parser.parse_args()
     inputfile = args.config_file
     expression_proportion = args.expression_proportion
-    top_proportion = args.top_proportion
+    top_proportion = float(args.top_proportion)
     
     print("Input file is ", inputfile)
     print("Expression Proportion for Gene Expression is ", expression_proportion)
@@ -388,7 +397,7 @@ def main(argv):
     for context_name in sheet_names:
         inqueries[context_name].fillna(method="ffill", inplace=True)
         df = inqueries[context_name].loc[:, ["GSE ID", "Samples", "GPL ID", "Instrument"]]
-        df_output = queryTest(df, expression_proportion, top_proportion)
+        df_output = await queryTest(df, expression_proportion, top_proportion)
         filename = "Microarray_{}.csv".format(context_name)
         fullsavepath = os.path.join(
             configs.rootdir, "data", "results", context_name, filename
@@ -399,4 +408,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    asyncio.run(main(sys.argv[1:]))

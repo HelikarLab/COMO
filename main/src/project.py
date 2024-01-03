@@ -1,30 +1,37 @@
 import os
+from pathlib import Path
 
 
-# find project root dir
 class Configs:
-    def __init__(self, projectdir: str) -> None:
-        self.rootdir = projectdir
-        self.datadir = os.path.join(projectdir, "data")
-        self.configdir = os.path.join(projectdir, "data", "config_sheets")
-        self.outputdir = os.path.join(projectdir, "output")
-        self.pydir = os.path.join(projectdir, "src")
-
-
-current_dir = os.getcwd()
-directory_list = current_dir.split("/")
-
-# Find the "main" directory
-split_index = 1
-for directory in directory_list:
-    if directory == "main":
-        break  # Exit the loop when we find the "main" directory
-    split_index += 1  # Otherwise increment the index
-
-# Unpack items in directory_list
-# From: https://stackoverflow.com/questions/14826888
-work_dir = os.path.join(*directory_list[0:split_index])
-
-# Add leading "/", as it will not exist right now
-work_dir = os.path.join("/", work_dir)
-configs: Configs = Configs(work_dir)
+    project_dir: str = None
+    
+    def __init__(self) -> None:
+        """
+        This class will hold all of the project configurations.
+        """
+        if Configs.project_dir is None:
+            Configs.project_dir = self._find_project_dir()
+        self.rootdir: str = str(Configs.project_dir)
+        
+        self.datadir = os.path.join(self.rootdir, "data")
+        self.configdir = os.path.join(self.rootdir, "data", "config_sheets")
+        self.outputdir = os.path.join(self.rootdir, "output")
+        self.pydir = os.path.join(self.rootdir, "src")
+    
+    def _find_project_dir(self) -> Path:
+        # Determine if "main" is in the current directory (i.e., `ls .`)
+        if "main" in os.listdir(os.getcwd()):
+            return Path(os.getcwd(), "main")
+        
+        # If "main" is not in the current directory, see if we are in a sub-directory of "main" (i.e., `ls ..`)
+        current_directory = Path.cwd()
+        directory_parts = current_directory.parts
+        for i, directory in enumerate(directory_parts):
+            if directory == "main":
+                return Path(*directory_parts[0:i + 1])
+        
+        # If we are not in a sub-directory of "main", then we are not in the project directory
+        raise FileNotFoundError(
+            "Could not find project directory. "
+            "Please ensure you are in the project directory, such as 'COMO' or 'main'."
+        )
