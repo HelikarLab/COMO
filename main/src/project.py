@@ -12,7 +12,7 @@ class Configs:
 
 
 current_dir = os.getcwd()
-directory_list = current_dir.split("/")
+directory_list: list[str] = current_dir.split("/")
 
 # Find the "main" directory
 split_index = 1
@@ -23,7 +23,7 @@ for directory in directory_list:
 
 # Unpack items in directory_list
 # From: https://stackoverflow.com/questions/14826888
-work_dir = os.path.join(*directory_list[0:split_index])
+work_dir: str = os.path.join(*directory_list[0:split_index])
 
 # Add leading "/", as it will not exist right now
 work_dir = os.path.join("/", work_dir)

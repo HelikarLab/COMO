@@ -9,7 +9,7 @@ from src import project
 
 def test_config():
     configs = project.configs
-    work_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    work_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
     assert configs.rootdir == work_dir
     assert configs.datadir == os.path.join(work_dir, "data")
