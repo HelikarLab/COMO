@@ -1,15 +1,15 @@
-#!/usr/bin/python3
-
 import os
 import sys
 import pandas as pd
 from rpy2.robjects import pandas2ri
-from project import configs
 import argparse
 import re
 from pathlib import Path
 
+import project
 import rpy2_api
+
+configs = project.Configs()
 
 # enable r to py conversion
 pandas2ri.activate()

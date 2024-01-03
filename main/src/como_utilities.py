@@ -139,3 +139,11 @@ def suppress_stdout() -> Iterator[None]:
             yield
         finally:
             sys.stdout = sys.__stdout__
+
+
+def is_float(value) -> bool:
+    try:
+        float(value)
+        return True
+    except ValueError:
+        return False
