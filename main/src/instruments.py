@@ -13,6 +13,14 @@ import rpy2_api
 import project
 
 configs = project.Configs()
+
+print("CONFIGS")
+print(f"{configs.rootdir=}")
+print(f"{configs.datadir=}")
+print(f"{configs.configdir=}")
+print(f"{configs.outputdir=}")
+print(f"{configs.pydir=}")
+
 affy_r_filepath = Path(os.path.join(configs.pydir, "rscripts", "fitAffy.R"))
 agilent_r_filepath = Path(os.path.join(configs.pydir, "rscripts", "fitAgilent.R"))
 
