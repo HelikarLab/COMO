@@ -24,7 +24,7 @@ for directory in directory_list:
 # Unpack items in directory_list
 # From: https://stackoverflow.com/questions/14826888
 work_dir: str = os.path.join(*directory_list[0:split_index])
-
+print(f"Providing `project.py` with work_dir: {work_dir}")
 # Add leading "/", as it will not exist right now
 work_dir = os.path.join("/", work_dir)
 configs: Configs = Configs(work_dir)
