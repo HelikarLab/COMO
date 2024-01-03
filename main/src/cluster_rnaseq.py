@@ -1,5 +1,3 @@
-# !/usr/bin/python3
-
 import os
 import sys
 # from rpy2.robjects.packages import importr
@@ -8,10 +6,10 @@ import argparse
 import numpy as np
 from pathlib import Path
 
-
 import rpy2_api
 from project import configs
-from utilities import stringlist_to_list
+from como_utilities import stringlist_to_list
+
 # enable r to py conversion
 # pandas2ri.activate()
 
@@ -23,6 +21,8 @@ from utilities import stringlist_to_list
 
 # read and translate R functions
 r_file_path = Path(configs.rootdir, "src", "rscripts", "cluster_samples.R")
+
+
 # f = open(os.path.join(configs.rootdir, "src", "rscripts", "cluster_samples.R"), "r")
 # string = f.read()
 # f.close()
@@ -33,13 +33,13 @@ def main(argv: list[str]) -> None:
     """
     Cluster RNA-seq Data
     """
-
+    
     parser = argparse.ArgumentParser(
         prog="cluster_rnaseq.py",
         description="Cluster RNA-seq Data using Multiple Correspondence Analysis or UMAP. Clusters at the replicate, "
-        "batch/study, and context levels.",
+                    "batch/study, and context levels.",
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
-        "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
+               "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
     )
     parser.add_argument(
         "-n",
@@ -159,7 +159,7 @@ def main(argv: list[str]) -> None:
         help="""Random seed for clustering algorithm initialization""",
     )
     args = parser.parse_args()
-
+    
     wd = os.path.join(configs.datadir, "results")
     context_names = stringlist_to_list(args.context_names)
     technique = args.technique.lower()
@@ -179,7 +179,7 @@ def main(argv: list[str]) -> None:
         seed = np.random.randint(0, 100000)
     else:
         seed = args.seed
-
+    
     if type(min_count) == str and not min_count.lower() == "default":
         try:
             min_count = int(min_count)
@@ -187,7 +187,7 @@ def main(argv: list[str]) -> None:
             raise ValueError("--min-count must be either 'default' or an integer > 0")
     if type(min_count) != str and min_count < 0:
         raise ValueError("--min-count must be either 'default' or an integer > 0")
-
+    
     if type(quantile) == str and not quantile.lower() == "default":
         try:
             quantile = int(quantile)
@@ -195,7 +195,7 @@ def main(argv: list[str]) -> None:
             raise ValueError("--quantile must be either 'default' or an integer between 0 and 100")
     if type(quantile) != str and 0 > quantile > 100:
         raise ValueError("--quantile must be either 'default' or an integer between 0 and 100")
-
+    
     if type(rep_ratio) == str and not rep_ratio.lower() == "default":
         try:
             rep_ratio = float(rep_ratio)
@@ -203,7 +203,7 @@ def main(argv: list[str]) -> None:
             raise ValueError("--rep-ratio must be 'default' or a float between 0 and 1")
     if type(rep_ratio) != str and 0 > rep_ratio > 1.0:
         raise ValueError("--rep-ratio must be 'default' or a float between 0 and 1")
-
+    
     if type(batch_ratio) == str and not batch_ratio.lower() == "default":
         try:
             batch_ratio = float(batch_ratio)
@@ -211,19 +211,19 @@ def main(argv: list[str]) -> None:
             raise ValueError("--batch-ratio must be 'default' or a float between 0 and 1")
     if type(batch_ratio) != str and 0 > batch_ratio > 1.0:
         raise ValueError("--batch-ratio must be 'default' or a float between 0 and 1")
-
+    
     if technique.lower() not in ["quantile", "tpm", "cpm", "zfpkm"]:
         raise ValueError("--technique must be either 'quantile', 'tpm', 'cpm', 'zfpkm'")
-
+    
     if technique.lower() == "tpm":
         technique = "quantile"
-
+    
     if clust_algo.lower() not in ["mca", "umap"]:
         raise ValueError("--clust_algo must be either 'mca', 'umap'")
-
+    
     if type(min_dist) != str and 0 > min_dist > 1.0:
         raise ValueError("--min_dist must be a float between 0 and 1")
-
+    
     if type(n_neigh_rep) == str and not n_neigh_rep.lower() == "default":
         try:
             n_neigh_rep = int(n_neigh_rep)
@@ -237,7 +237,7 @@ def main(argv: list[str]) -> None:
             f"--n_neigh_rep must be either 'default' or an integer greater than 1 and less than or equal to "
             f"the total number of replicates being clustered across all contexts."
         )
-
+    
     if type(n_neigh_batch) == str and not n_neigh_batch.lower() == "default":
         try:
             n_neigh_batch = int(n_neigh_batch)
@@ -251,7 +251,7 @@ def main(argv: list[str]) -> None:
             f"--n_neigh_batch must be either 'default' or an integer greater than 1 and less than or equal to "
             f"the total number of batches being clustered across all contexts."
         )
-
+    
     if type(n_neigh_cont) == str and not n_neigh_cont.lower() == "default":
         try:
             n_neigh_cont = int(n_neigh_cont)
@@ -265,7 +265,7 @@ def main(argv: list[str]) -> None:
             f"--n_neigh_context must be either 'default' or an integer greater than 1 and less than or equal to "
             f"the total number of contexts being clustered."
         )
-
+    
     cluster_samples = rpy2_api.Rpy2(
         r_file_path=r_file_path,
         wd=wd,
