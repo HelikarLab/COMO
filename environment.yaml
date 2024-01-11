@@ -3,12 +3,10 @@ channels:
   - conda-forge
   - bioconda
   - gurobi
-  - anaconda
 
 # Use the ~= specifier to allow any minor updates
 # For example, "~=4.0" requires version 4.0, but does not allow version 5.0
 dependencies:
-  - anaconda::lxml~=4.9.1
   - bioconda::bioconductor-affyio~=1.64.0
   - bioconda::bioconductor-affy~=1.72.0
   - bioconda::bioconductor-agilp~=3.26.0
@@ -16,6 +14,7 @@ dependencies:
   - bioconda::bioconductor-deseq2~=1.34.0
   - bioconda::bioconductor-edger~=3.36.0
   - bioconda::bioconductor-genefilter~=1.76.0
+  - bioconda::bioconductor-genomeinfodbdata~=1.2.11  # Required or else hgu133acdf fails to install
   - bioconda::bioconductor-hgu133acdf~=2.18.0
   - bioconda::bioconductor-limma~=3.50.1
   - bioconda::crux-toolkit~=4.1
@@ -24,8 +23,9 @@ dependencies:
   # - conda-forge::bioservices~=1.11.2
   - conda-forge::cobra~=0.29.0
   - conda-forge::geoparse~=2.0.3
-  # - conda-forge::git~=2.37.0
+  - conda-forge::git~=2.37.0  # Required for pip-related dependencies
   - conda-forge::jupyterlab~=4.0.0
+  - conda-forge::lxml~=4.9.1
   - conda-forge::numpy~=1.23.0
   - conda-forge::openpyxl~=3.0.10
   # - conda-forge::optlang~=1.5.2

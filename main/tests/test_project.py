@@ -7,9 +7,12 @@ import sys
 from src import project
 
 
+# from src import project
+
+
 def test_config():
-    configs = project.configs
-    work_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    configs = project.Configs()
+    work_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
     assert configs.root_dir == work_dir
     assert configs.data_dir == os.path.join(work_dir, "data")
