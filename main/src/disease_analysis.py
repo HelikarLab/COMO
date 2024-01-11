@@ -2,7 +2,7 @@
 import argparse
 import sys
 import json
-from project import configs
+from project import Configs
 import rpy2_api
 import GSEpipelineFast
 
@@ -14,6 +14,8 @@ from rpy2.robjects.packages import importr
 from pathlib import Path
 import os
 import pandas as pd
+
+configs = Configs()
 
 pandas2ri.activate()
 
@@ -385,7 +387,7 @@ def main(argv):
     print("Config file is at ", config_filepath)
     
     # handle species alternative ids
-    if type(taxon_id) == str:
+    if isinstance(taxon_id, str):
         if taxon_id.upper() == "HUMAN" or taxon_id.upper() == "HOMO SAPIENS":
             taxon_id = 9606
         elif taxon_id.upper() == "MOUSE" or taxon_id.upper() == "MUS MUSCULUS":
@@ -393,7 +395,7 @@ def main(argv):
         else:
             print('--taxon-id must be either an integer, or accepted string ("mouse", "human")')
             sys.exit()
-    elif type(taxon_id) != int:
+    elif not isinstance(taxon_id, int):
         print('--taxon-id must be either an integer, or accepted string ("mouse", "human")')
         sys.exit()
     

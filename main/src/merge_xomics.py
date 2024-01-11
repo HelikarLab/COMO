@@ -13,9 +13,11 @@ import rpy2_api
 import rnaseq_gen
 import microarray_gen
 import proteomics_gen
-from project import configs
+from project import Configs
 from como_utilities import split_gene_expression_data
 from multi_bioservices import db2db, InputDatabase, OutputDatabase
+
+configs = Configs()
 
 # enable r to py conversion
 # pandas2ri.activate()
@@ -121,20 +123,20 @@ def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
     # It excludes the square brackets and "Description: ", and only returns the description
     # descriptions: list[str] = [
     gene_details["description"] = [
-        i.group(1) if type(i) == re.Match else "No Description Available"
+        i.group(1) if isinstance(i, re.Match) else "No Description Available"
         for i in gene_details["Ensembl Gene Info"].apply(
             lambda x: re.search("\[Description: (.*)\]", x)
         )
     ]
     
     gene_details["gene_info_type"] = [
-        i.group(1) if type(i) == re.Match else "None"
+        i.group(1) if isinstance(i, re.Match) else "None"
         for i in gene_details["Gene Info"].apply(
             lambda x: re.search("\[Gene Type: (.*)\]", x)
         )
     ]
     gene_details["ensembl_info_type"] = [
-        i.group(1) if type(i) == re.Match else "None"
+        i.group(1) if isinstance(i, re.Match) else "None"
         for i in gene_details["Ensembl Gene Info"].apply(
             lambda x: re.search("\[Gene Type: (.*)\]", x)
         )

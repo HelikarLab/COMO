@@ -6,10 +6,12 @@ import os
 import pandas as pd
 import numpy as np
 import instruments
-from project import configs
+from project import Configs
 from pathlib import Path
 
 import rpy2_api
+
+configs = Configs()
 
 # read and translate R functions
 # f = open(os.path.join(configs.rootdir, "src", "rscripts", "protein_transform.R"), "r")
@@ -166,7 +168,7 @@ def load_proteomics_tests(filename, context_name):
         dat = pd.read_csv(savepath, index_col="ENTREZ_GENE_ID")
         return "dummy", dat
     
-    if (not filename or filename == "None"):  # if not using proteomics load empty dummy data matrix
+    if not filename or filename == "None":  # if not using proteomics load empty dummy data matrix
         return load_empty_dict()
     
     inquiry_full_path = os.path.join(configs.root_dir, "data", "config_sheets", filename)

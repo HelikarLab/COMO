@@ -9,9 +9,10 @@ from pathlib import Path
 
 import rpy2_api
 import como_utilities
-from project import configs
+from project import Configs
 from multi_bioservices import db2db, InputDatabase, OutputDatabase, TaxonID
 
+configs = Configs()
 r_file_path: Path = Path(configs.root_dir, "src", "rscripts", "generate_counts_matrix.R")
 
 
@@ -266,12 +267,6 @@ def handle_context_batch(context_names, mode, form: InputDatabase, taxon_id, pro
     tmatrix_files = []
     mmatrix_files = []
     for context_name in context_names:
-        configs.configuration["rnaseq_preprocess"]["mode"] = mode
-        configs.configuration["rnaseq_preprocess"]["gene_format_database"] = form.value
-        configs.configuration["rnaseq_preprocess"]["taxon_id"] = taxon_id
-        configs.configuration["rnaseq_preprocess"]["provided_matrix_filename"] = provided_matrix_file
-        configs.write_configuration(os.path.join(configs.results_dir, context_name))
-        
         context_name = context_name.strip(" ")
         print(f"Preprocessing {context_name}")
         gene_output_dir = os.path.join(configs.root_dir, "data", "results", context_name)
@@ -341,7 +336,7 @@ def parse_args(argv):
         prog="rnaseq_preprocess.py",
         description="""
             Fetches additional gene information from a provided matrix or gene counts, or optionally creates this
-            matrix using gene count files obtained using STAR aligner. Creation of counts matrix from STAR aligner 
+            matrix using gene count files obtained using STAR aligner. Creation of counts matrix from STAR aligner
             output requires that the 'COMO_input' folder exists and is correctly structured according to the
             normalization technique being used. A correctly structured folder can be made using our Snakemake-based
             alignment pipeline at:

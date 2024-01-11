@@ -11,8 +11,10 @@ from pathlib import Path
 import multiprocessing.pool
 import multiprocessing as mp
 
-from project import configs
+from project import Configs
 from multi_bioservices import db2db, InputDatabase, OutputDatabase
+
+configs = Configs()
 
 
 def _perform_knockout(
@@ -193,7 +195,7 @@ def create_gene_pairs(
     has_effects_gene,
     disease_genes,
 ):
-    disease_genes = pd.read_csv(os.path.join(datadir, disease_genes))
+    disease_genes = pd.read_csv(str(os.path.join(datadir, disease_genes)))
     DAG_dis_genes = pd.DataFrame()  # data analysis genes
     DAG_dis_genes["Gene ID"] = disease_genes.iloc[:, 0].astype(str)
     # DAG_dis_genes

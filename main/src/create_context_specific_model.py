@@ -18,10 +18,12 @@ from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
 from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
 
-from project import configs
+from project import Configs
 from como_utilities import stringlist_to_list, split_gene_expression_data, Compartments
 
 sys.setrecursionlimit(1500)  # for re.search
+
+configs = Configs()
 
 
 def correct_bracket(rule: str, name: str) -> str:
@@ -493,7 +495,7 @@ def create_context_specific_model(
         model_reactions = [reaction.id for reaction in context_model_cobra.reactions]
         reaction_intersections = set(imat_reactions).intersection(model_reactions)
         flux_df = flux_df[~flux_df["rxn"].isin(reaction_intersections)]
-        flux_df.to_csv(os.path.join(configs.data_dir, "results", context_name, f"{recon_algorithm}_flux.csv"))
+        flux_df.to_csv(str(os.path.join(configs.data_dir, "results", context_name, f"{recon_algorithm}_flux.csv")))
     
     elif recon_algorithm == "TINIT":
         context_model_cobra = seed_tinit(
