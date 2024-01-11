@@ -2,20 +2,18 @@ import re
 import os
 import sys
 import glob
-import asyncio
 import argparse
 import numpy as np
 import pandas as pd
 from pathlib import Path
 
-import project
 import rpy2_api
 import como_utilities
-from async_bioservices import db2db, InputDatabase, OutputDatabase, TaxonID
+from project import Configs
+from multi_bioservices import db2db, InputDatabase, OutputDatabase, TaxonID
 
-configs = project.Configs()
-
-r_file_path: Path = Path(configs.rootdir, "src", "rscripts", "generate_counts_matrix.R")
+configs = Configs()
+r_file_path: Path = Path(configs.root_dir, "src", "rscripts", "generate_counts_matrix.R")
 
 
 def create_counts_matrix(context_name):
@@ -23,9 +21,9 @@ def create_counts_matrix(context_name):
     Create a counts matrix by reading gene counts tables in COMO_input/<context name>/<study number>/geneCounts/
     Uses R in backend (generate_counts_matrix.R)
     """
-    input_dir = os.path.join(configs.rootdir, 'data', 'COMO_input', context_name)
+    input_dir = os.path.join(configs.root_dir, 'data', 'COMO_input', context_name)
     print(f"Looking for STAR gene count tables in '{input_dir}'")
-    matrix_output_dir = os.path.join(configs.rootdir, 'data', 'data_matrices', context_name)
+    matrix_output_dir = os.path.join(configs.root_dir, 'data', 'data_matrices', context_name)
     print(f"Creating Counts Matrix for '{context_name}'")
     
     # call generate_counts_matrix.R to create count matrix from COMO_input folder
@@ -39,7 +37,7 @@ def create_config_df(context_name):
     based on the gene counts matrix. If using zFPKM normalization technique, fetch mean fragment lengths from
     /work/data/COMO_input/<context name>/<study number>/fragmentSizes/
     """
-    gene_counts_glob = os.path.join(configs.rootdir, "data", "COMO_input", context_name, "geneCounts", "*", "*.tab")
+    gene_counts_glob = os.path.join(configs.root_dir, "data", "COMO_input", context_name, "geneCounts", "*", "*.tab")
     gene_counts_files = glob.glob(gene_counts_glob, recursive=True)
     
     out_df = pd.DataFrame(columns=['SampleName', 'FragmentLength', 'Layout', 'Strand', 'Group'])
@@ -75,7 +73,7 @@ def create_config_df(context_name):
                     r_label = re.findall(r"r\d{1,3}", r)[0]
                     R_label = re.findall(r"R\d{1,3}", r)[0]
                     frag_filename = "".join([context_name, "_", study_number, R_label, r_label, "_fragment_size.txt"])
-                    frag_files.append(os.path.join(configs.rootdir, "data", "COMO_input", context_name,
+                    frag_files.append(os.path.join(configs.root_dir, "data", "COMO_input", context_name,
                                                    "fragmentSizes", study_number, frag_filename))
         
         layout_file = context_name + "_" + label + "_layout.txt"
@@ -83,7 +81,7 @@ def create_config_df(context_name):
         frag_file = context_name + "_" + label + "_fragment_size.txt"
         prep_file = context_name + "_" + label + "_prep_method.txt"
         
-        context_path = os.path.join(configs.rootdir, "data", "COMO_input", context_name)
+        context_path = os.path.join(configs.root_dir, "data", "COMO_input", context_name)
         layout_path = os.path.join(context_path, "layouts", "*", layout_file)
         strand_path = os.path.join(context_path, "strandedness", "*", strand_file)
         frag_path = os.path.join(context_path, "fragmentSizes", "*", frag_file)
@@ -205,14 +203,14 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     return matrix_total, matrix_mrna
 
 
-async def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase, taxon_id):
+def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase, taxon_id):
     """
     Create gene info file for specified context by reading first column in its count matrix file at
      results/<context name>/gene_info_<context name>.csv
     """
     
     print(f"Fetching gene info")
-    gene_info_file = os.path.join(configs.datadir, "gene_info.csv")
+    gene_info_file = os.path.join(configs.data_dir, "gene_info.csv")
     genes: list[str]
     if os.path.exists(gene_info_file):
         current_df = pd.read_csv(gene_info_file)
@@ -238,29 +236,28 @@ async def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase
         if i.value != form.value
     ]
     
-    gene_info = await db2db(
+    gene_info = db2db(
         input_values=genes,
         input_db=form,
         output_db=output_db,
         taxon_id=taxon_id,
-        async_cache=False
     )
     
     gene_info.rename(columns={OutputDatabase.ENSEMBL_GENE_ID.value: "ensembl_gene_id"}, inplace=True)
-    gene_info['start_position'] = gene_info['Chromosomal Location'].str.extract("chr_start: (\d+)")
-    gene_info['end_position'] = gene_info['Chromosomal Location'].str.extract("chr_end: (\d+)")
+    gene_info['start_position'] = gene_info['Chromosomal Location'].str.extract(r"chr_start: (\d+)")
+    gene_info['end_position'] = gene_info['Chromosomal Location'].str.extract(r"chr_end: (\d+)")
     gene_info.rename(columns={"Gene Symbol": "hgnc_symbol", "Gene ID": "entrezgene_id"}, inplace=True)
     gene_info.drop(['Chromosomal Location'], axis=1, inplace=True)
     gene_info.to_csv(gene_info_file, index=False)
     print(f"Gene Info file written at '{gene_info_file}'")
 
 
-async def handle_context_batch(context_names, mode, form: InputDatabase, taxon_id, provided_matrix_file):
+def handle_context_batch(context_names, mode, form: InputDatabase, taxon_id, provided_matrix_file):
     """
     Handle iteration through each context type and create files according to flag used (config, matrix, info)
     """
-    trnaseq_config_filename = os.path.join(configs.rootdir, "data", "config_sheets", "trnaseq_data_inputs_auto.xlsx")
-    mrnaseq_config_filename = os.path.join(configs.rootdir, "data", "config_sheets", "mrnaseq_data_inputs_auto.xlsx")
+    trnaseq_config_filename = os.path.join(configs.root_dir, "data", "config_sheets", "trnaseq_data_inputs_auto.xlsx")
+    mrnaseq_config_filename = os.path.join(configs.root_dir, "data", "config_sheets", "mrnaseq_data_inputs_auto.xlsx")
     
     tflag = False  # turn on when any total set is found to prevent writer from being init multiple times or empty
     mflag = False  # turn on when any mrna set is found to prevent writer from being init multiple times or empty
@@ -272,8 +269,8 @@ async def handle_context_batch(context_names, mode, form: InputDatabase, taxon_i
     for context_name in context_names:
         context_name = context_name.strip(" ")
         print(f"Preprocessing {context_name}")
-        gene_output_dir = os.path.join(configs.rootdir, "data", "results", context_name)
-        matrix_output_dir = os.path.join(configs.rootdir, "data", "data_matrices", context_name)
+        gene_output_dir = os.path.join(configs.root_dir, "data", "results", context_name)
+        matrix_output_dir = os.path.join(configs.root_dir, "data", "data_matrices", context_name)
         os.makedirs(gene_output_dir, exist_ok=True)
         os.makedirs(matrix_output_dir, exist_ok=True)
         print('Gene info output directory is "{}"'.format(gene_output_dir))
@@ -317,11 +314,11 @@ async def handle_context_batch(context_names, mode, form: InputDatabase, taxon_i
         if mflag:
             mwriter.close()
         
-        await create_gene_info_file(tmatrix_files + mmatrix_files, form, taxon_id)
+        create_gene_info_file(tmatrix_files + mmatrix_files, form, taxon_id)
     
     else:
         matrix_files: list[str] = como_utilities.stringlist_to_list(matrix_path_prov)
-        await create_gene_info_file(matrix_files, form, taxon_id)
+        create_gene_info_file(matrix_files, form, taxon_id)
 
 
 def parse_args(argv):
@@ -339,7 +336,7 @@ def parse_args(argv):
         prog="rnaseq_preprocess.py",
         description="""
             Fetches additional gene information from a provided matrix or gene counts, or optionally creates this
-            matrix using gene count files obtained using STAR aligner. Creation of counts matrix from STAR aligner 
+            matrix using gene count files obtained using STAR aligner. Creation of counts matrix from STAR aligner
             output requires that the 'COMO_input' folder exists and is correctly structured according to the
             normalization technique being used. A correctly structured folder can be made using our Snakemake-based
             alignment pipeline at:
@@ -412,7 +409,7 @@ def parse_args(argv):
     return args
 
 
-async def main(argv):
+def main(argv):
     args = parse_args(argv)
     
     if args.gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
@@ -455,8 +452,8 @@ async def main(argv):
         print("--provide-matrix or --create-matrix must be set")
         sys.exit(1)
     
-    await handle_context_batch(args.context_names, mode, gene_format_database, taxon_id, args.provided_matrix_fname)
+    handle_context_batch(args.context_names, mode, gene_format_database, taxon_id, args.provided_matrix_fname)
 
 
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1:]))
+    main(sys.argv[1:])

@@ -82,8 +82,6 @@ prepare_sample_counts <- function(counts_file, counts_files, strand_file) {
             
             strand_read <- gsub("[\r\n]", "", readChar(strand_file, file.info(strand_file)$size))
             
-            
-            print(paste0("HERE: ", strand_read))
             stopifnot((strand_read == "NONE") ||
                         (strand_read == "SECOND_READ_TRANSCRIPTION_STRAND") ||
                         (strand_read == "FIRST_READ_TRANSCRIPTION_STRAND")
