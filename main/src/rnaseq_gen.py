@@ -11,6 +11,8 @@ import rpy2_api
 from project import configs
 from rpy2.robjects import pandas2ri
 
+configs = project.Configs()
+
 # enable r to py conversion
 pandas2ri.activate()
 

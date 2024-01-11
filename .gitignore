@@ -1,3 +1,4 @@
+# General cache files
 /**/*.Rhistory
 /**/.DS_Store
 /**/.idea
@@ -7,13 +8,17 @@
 /**/.pytest_cache
 /**/__pycache__
 
-/docs/_site
-/docs/Gemfile.lock
+# Documentation
+docs/_site
+docs/Gemfile.lock
 
-/main/logs/
-/main/data/results/
-/main/data/config_sheets/*_data_inputs_auto.xlsx
-/main/data/gene_info.csv
-/main/data/Repurposing_Hub_Preproc.tsv
-/main/microarray.db
-/main/data/config_sheets/*
+# COMO-specific files
+main/logs/
+main/data/results/
+main/data/config_sheets/*_data_inputs_auto.xlsx
+main/data/gene_info.csv
+main/data/Repurposing_Hub_Preproc.tsv
+main/microarray.db
+main/data/config_sheets/*
+main/data/GSE*_RAW
+main/data/gpl*entrez.csv

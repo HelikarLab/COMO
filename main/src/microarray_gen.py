@@ -1,4 +1,7 @@
-#!/usr/bin/python3
+# Silence sqlalchemy warning about version 2.0, we are still on 1.x
+import os
+
+os.environ["SQLALCHEMY_SILENCE_UBER_WARNING"] = "1"
 
 import argparse
 import os
@@ -12,6 +15,8 @@ from project import configs
 from sqlalchemy import Column, Float, Integer, String, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import load_only, sessionmaker
+
+configs = project.Configs()
 
 # create declarative_base instance
 Base = declarative_base()
@@ -78,13 +83,13 @@ def lookupMicroarrayDB(gseXXX):
         return False
 
 
-def updateMicroarrayDB(gseXXX):
+async def updateMicroarrayDB(gseXXX):
     """
     Update GSE info to microarray.db
     :param gseXXX: gse object
     :return:
     """
-    df_clean = gseXXX.get_entrez_table_pipeline()
+    df_clean = await gseXXX.get_entrez_table_pipeline()
     if df_clean.empty:
         return None
 
@@ -128,7 +133,7 @@ def updateMicroarrayDB(gseXXX):
 
 
 # function to complete the inquery of a sheet
-def queryTest(df, expression_proportion, top_proportion):
+async def queryTest(df, expression_proportion, top_proportion):
     sr = df["GSE ID"]
     gse_ids = sr[sr.str.match("GSE")].unique()
     sr = df["Samples"].dropna()
@@ -154,6 +159,7 @@ def queryTest(df, expression_proportion, top_proportion):
 
     df_output["Pos"] = posratio
     df_output["expressed"] = np.where(posratio >= expression_proportion, 1, 0)
+    
     df_output["top"] = np.where(posratio >= top_proportion, 1, 0)
 
     return df_output
@@ -346,7 +352,7 @@ def load_microarray_tests(filename, context_name):
         return load_empty_dict()
 
 
-def main(argv):
+async def main(argv):
     inputfile = "microarray_data_inputs.xlsx"
 
     parser = argparse.ArgumentParser(
@@ -410,4 +416,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    asyncio.run(main(sys.argv[1:]))

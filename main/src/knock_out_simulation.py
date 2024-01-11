@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 import os
 import re
 import sys
@@ -13,6 +12,8 @@ import multiprocessing as mp
 
 from project import configs
 from multi_bioservices import db2db, InputDatabase, OutputDatabase
+
+configs = project.Configs()
 
 
 def _perform_knockout(

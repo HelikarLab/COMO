@@ -1,5 +1,3 @@
-# !/usr/bin/python3
-
 import os
 import sys
 # from rpy2.robjects.packages import importr

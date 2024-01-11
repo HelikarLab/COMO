@@ -7,11 +7,13 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 
+import project
 import rpy2_api
 import como_utilities
 from project import configs
 from multi_bioservices import db2db, InputDatabase, OutputDatabase, TaxonID
 
+configs = project.Configs()
 r_file_path: Path = Path(configs.root_dir, "src", "rscripts", "generate_counts_matrix.R")
 
 

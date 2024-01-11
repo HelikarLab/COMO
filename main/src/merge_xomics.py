@@ -1,5 +1,3 @@
-#!/usr/bin/python3
-
 import os
 import re
 import sys
@@ -16,6 +14,8 @@ import proteomics_gen
 from project import configs
 from como_utilities import split_gene_expression_data
 from multi_bioservices import db2db, InputDatabase, OutputDatabase
+
+configs = project.Configs()
 
 # enable r to py conversion
 # pandas2ri.activate()
