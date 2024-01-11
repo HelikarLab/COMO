@@ -4,7 +4,6 @@ import os
 import re
 import sys
 import json
-import asyncio
 import argparse
 import pandas as pd
 from pathlib import Path
@@ -16,7 +15,7 @@ import microarray_gen
 import proteomics_gen
 from project import configs
 from utilities import split_gene_expression_data
-from async_bioservices import db2db, InputDatabase, OutputDatabase
+from multi_bioservices import db2db, InputDatabase, OutputDatabase
 
 # enable r to py conversion
 # pandas2ri.activate()
@@ -57,7 +56,7 @@ class _HighExpressionHeaderNames:
     SCRNASEQ = f"{_MergedHeaderNames.SCRNASEQ}_high"
 
 
-async def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
+def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
     """
     This function will get the following details of transcriptomic data:
     - Gene Symbol
@@ -106,15 +105,14 @@ async def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
     else:
         transcriptomic_df: pd.DataFrame = merged_df.copy()
     
-    gene_details: pd.DataFrame = await db2db(
+    gene_details: pd.DataFrame = db2db(
         input_values=transcriptomic_df.index.astype(str).values.tolist(),
         input_db=InputDatabase.GENE_ID,
         output_db=[
             OutputDatabase.GENE_SYMBOL,
             OutputDatabase.ENSEMBL_GENE_INFO,
             OutputDatabase.GENE_INFO,
-        ],
-        async_cache=False
+        ]
     )
     gene_details["entrez_gene_id"] = gene_details.index
     gene_details.reset_index(drop=True, inplace=True)
@@ -160,7 +158,7 @@ async def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
     return gene_details
 
 
-async def merge_xomics(
+def merge_xomics(
     context_name: str,
     expression_requirement,
     microarray_file=None,
@@ -322,7 +320,7 @@ async def merge_xomics(
     split_entrez.to_csv(filepath, index_label="ENTREZ_GENE_ID")
     files_dict[context_name] = filepath
     
-    transcriptomic_details = await get_transcriptmoic_details(merge_data)
+    transcriptomic_details = get_transcriptmoic_details(merge_data)
     transcriptomic_details_directory_path = os.path.dirname(filepath)
     transcriptomic_details_filepath = os.path.join(transcriptomic_details_directory_path,
                                                    f"TranscriptomicDetails_{context_name}.csv")
@@ -333,7 +331,7 @@ async def merge_xomics(
     return files_dict
 
 
-async def handle_context_batch(
+def handle_context_batch(
     microarray_file,
     trnaseq_file,
     mrnaseq_file,
@@ -428,7 +426,7 @@ async def handle_context_batch(
                   "Will be force changed to 1 to prevent output from having 0 active genes. ")
             exp_req = 1
         
-        files_dict = await merge_xomics(
+        files_dict = merge_xomics(
             context_name,
             expression_requirement=exp_req,
             microarray_file=microarray_file,
@@ -448,7 +446,7 @@ async def handle_context_batch(
     return
 
 
-async def main(argv):
+def main(argv):
     """
     Merge expression tables of multiple sources, microarray, RNA-seq, and/or proteomics into one list
     User can specify the number of sources with an active gene in order for it to be considered active in the model.
@@ -691,7 +689,7 @@ async def main(argv):
         )
         sys.exit(1)
     
-    await handle_context_batch(
+    handle_context_batch(
         microarray_file,
         trnaseq_file,
         mrnaseq_file,
@@ -714,7 +712,7 @@ async def main(argv):
 
 
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1:]))
+    main(sys.argv[1:])
     # df = pd.read_csv("/Users/joshl/PycharmProjects/MADRID/main/data/results/naiveB/merged_naiveB.csv")
     # x = get_transcriptmoic_details(df)
     # print("DONE")

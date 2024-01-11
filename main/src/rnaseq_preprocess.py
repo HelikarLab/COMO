@@ -2,7 +2,6 @@ import re
 import os
 import sys
 import glob
-import asyncio
 import argparse
 import numpy as np
 import pandas as pd
@@ -11,7 +10,7 @@ from pathlib import Path
 import rpy2_api
 import utilities
 from project import configs
-from async_bioservices import db2db, InputDatabase, OutputDatabase, TaxonID
+from multi_bioservices import db2db, InputDatabase, OutputDatabase, TaxonID
 
 r_file_path: Path = Path(configs.root_dir, "src", "rscripts", "generate_counts_matrix.R")
 
@@ -203,7 +202,7 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     return matrix_total, matrix_mrna
 
 
-async def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase, taxon_id):
+def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase, taxon_id):
     """
     Create gene info file for specified context by reading first column in its count matrix file at
      results/<context name>/gene_info_<context name>.csv
@@ -236,12 +235,11 @@ async def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase
         if i.value != form.value
     ]
     
-    gene_info = await db2db(
+    gene_info = db2db(
         input_values=genes,
         input_db=form,
         output_db=output_db,
         taxon_id=taxon_id,
-        async_cache=False
     )
     
     gene_info.rename(columns={OutputDatabase.ENSEMBL_GENE_ID.value: "ensembl_gene_id"}, inplace=True)
@@ -253,7 +251,7 @@ async def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase
     print(f"Gene Info file written at '{gene_info_file}'")
 
 
-async def handle_context_batch(context_names, mode, form: InputDatabase, taxon_id, provided_matrix_file):
+def handle_context_batch(context_names, mode, form: InputDatabase, taxon_id, provided_matrix_file):
     """
     Handle iteration through each context type and create files according to flag used (config, matrix, info)
     """
@@ -321,11 +319,11 @@ async def handle_context_batch(context_names, mode, form: InputDatabase, taxon_i
         if mflag:
             mwriter.close()
         
-        await create_gene_info_file(tmatrix_files + mmatrix_files, form, taxon_id)
+        create_gene_info_file(tmatrix_files + mmatrix_files, form, taxon_id)
     
     else:
         matrix_files: list[str] = utilities.stringlist_to_list(matrix_path_prov)
-        await create_gene_info_file(matrix_files, form, taxon_id)
+        create_gene_info_file(matrix_files, form, taxon_id)
 
 
 def parse_args(argv):
@@ -416,7 +414,7 @@ def parse_args(argv):
     return args
 
 
-async def main(argv):
+def main(argv):
     args = parse_args(argv)
     
     if args.gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
@@ -459,8 +457,8 @@ async def main(argv):
         print("--provide-matrix or --create-matrix must be set")
         sys.exit(1)
     
-    await handle_context_batch(args.context_names, mode, gene_format_database, taxon_id, args.provided_matrix_fname)
+    handle_context_batch(args.context_names, mode, gene_format_database, taxon_id, args.provided_matrix_fname)
 
 
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1:]))
+    main(sys.argv[1:])

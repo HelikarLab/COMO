@@ -17,10 +17,10 @@ pandas2ri.activate()
 
 # gse = load_gse_soft(gsename)
 
-from async_bioservices import db2db, InputDatabase, OutputDatabase
+from multi_bioservices import db2db, InputDatabase, OutputDatabase
 
 
-async def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
+def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
     """
     download ID to ENTREZ_GENE_ID maps, create a csv file for each platform, and return dictionary
     :param gpls:
@@ -44,7 +44,7 @@ async def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="aff
                 table["CONTROL_TYPE"] == "FALSE", "SPOT_ID"
             ].tolist()
             
-            temp = await db2db(
+            temp = db2db(
                 input_values=input_values,
                 input_db=InputDatabase.AGILENT_ID,
                 output_db=[
@@ -172,7 +172,7 @@ class GSEproject:
         
         return True
     
-    async def get_entrez_table_pipeline(self, fromcsv=True):
+    def get_entrez_table_pipeline(self, fromcsv=True):
         """
         create ENTREZ ID based table from gse
         :return: pandas dataframe for table of GSE
@@ -218,7 +218,7 @@ class GSEproject:
                     
                     outputdf = instruments.readagilent(platformdir, list(self.gsm_platform.keys()))
                     
-                    gsm_maps[key] = await db2db(
+                    gsm_maps[key] = db2db(
                         input_values=list(map(str, list(outputdf["ProbeName"]))),
                         input_db=InputDatabase.AGILENT_ID,
                         output_db=[OutputDatabase.GENE_ID]

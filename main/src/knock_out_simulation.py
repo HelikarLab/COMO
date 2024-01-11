@@ -3,7 +3,6 @@ import os
 import re
 import sys
 import cobra
-import asyncio
 import argparse
 import numpy as np
 import pandas as pd
@@ -14,7 +13,7 @@ import multiprocessing as mp
 
 from project import configs
 from utilities import suppress_stdout
-from async_bioservices import db2db, InputDatabase, OutputDatabase
+from multi_bioservices import db2db, InputDatabase, OutputDatabase
 
 
 def _perform_knockout(
@@ -298,7 +297,7 @@ def load_Inhi_Fratio(filepath):
     return temp2
 
 
-async def repurposing_hub_preproc(drug_file):
+def repurposing_hub_preproc(drug_file):
     drug_db = pd.read_csv(drug_file, sep="\t")
     drug_db_new = pd.DataFrame()
     for index, row in drug_db.iterrows():
@@ -319,7 +318,7 @@ async def repurposing_hub_preproc(drug_file):
             )
     drug_db_new.reset_index(inplace=True)
     
-    entrez_ids = await db2db(
+    entrez_ids = db2db(
         input_values=drug_db_new["Target"].tolist(),
         input_db=InputDatabase.GENE_SYMBOL,
         output_db=OutputDatabase.GENE_ID,
@@ -333,10 +332,10 @@ async def repurposing_hub_preproc(drug_file):
     return drug_db_new
 
 
-async def drug_repurposing(drug_db, d_score):
+def drug_repurposing(drug_db, d_score):
     d_score["Gene"] = d_score["Gene"].astype(str)
     
-    d_score_gene_sym = await db2db(
+    d_score_gene_sym = db2db(
         input_values=d_score["Gene"].tolist(),
         input_db=InputDatabase.GENE_ID,
         output_db=[OutputDatabase.GENE_SYMBOL],
@@ -362,7 +361,7 @@ async def drug_repurposing(drug_db, d_score):
     return d_score_trim
 
 
-async def main(argv):
+def main(argv):
     parser = argparse.ArgumentParser(
         prog="knock_out_simulation.py",
         description="This script is responsible for mapping drug targets in metabolic models, performing knock out simulations, and comparing simulation results with disease genes. It also identified drug targets and repurposable drugs.",
@@ -489,7 +488,7 @@ async def main(argv):
     reformatted_drug_file = os.path.join(configs.data_dir, "Repurposing_Hub_Preproc.tsv")
     if not os.path.isfile(reformatted_drug_file):
         print("Preprocessing raw Repurposing Hub DB file...")
-        drug_db = await repurposing_hub_preproc(raw_drug_filepath)
+        drug_db = repurposing_hub_preproc(raw_drug_filepath)
         drug_db.to_csv(reformatted_drug_file, index=False, sep="\t")
         print(f"Preprocessed Repurposing Hub tsv file written to:\n{reformatted_drug_file}")
     else:
@@ -541,7 +540,7 @@ async def main(argv):
     pertubation_effect_score.reset_index(drop=False, inplace=True)
     
     # last step: output drugs based on d score
-    drug_score = await drug_repurposing(drug_db, pertubation_effect_score)
+    drug_score = drug_repurposing(drug_db, pertubation_effect_score)
     drug_score_file = os.path.join(output_dir, f"{context}_drug_score.csv")
     drug_score.to_csv(drug_score_file, index=False)
     print("Gene D score mapped to repurposing drugs saved to\n{}".format(drug_score_file))
@@ -550,4 +549,4 @@ async def main(argv):
 
 
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1:]))
+    main(sys.argv[1:])

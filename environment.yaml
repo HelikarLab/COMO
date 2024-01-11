@@ -60,7 +60,7 @@ dependencies:
   # - conda-forge::xlrd~=2.0.1
   - gurobi::gurobi
   - pip:
-      - async_bioservices
+      - multi_bioservices
       # - escher==1.7.3
       - git+https://github.com/JoshLoecker/escher.git@python38#subdirectory=py
       - framed==0.5.*
