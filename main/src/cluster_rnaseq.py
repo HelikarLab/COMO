@@ -10,7 +10,7 @@ from pathlib import Path
 
 import rpy2_api
 from project import configs
-from utilities import stringlist_to_list
+from como_utilities import stringlist_to_list
 
 # enable r to py conversion
 # pandas2ri.activate()
