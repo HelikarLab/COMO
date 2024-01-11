@@ -49,8 +49,6 @@ def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
                     OutputDatabase.GENE_ID,
                     OutputDatabase.ENSEMBL_GENE_ID
                 ],
-                async_cache=False,
-                biodbnet_cache=False
             )
             
             temp.drop(columns=["Ensembl Gene ID"], inplace=True)
@@ -125,7 +123,7 @@ class GSEproject:
                 cnt += 1
         print("{} raw data files moved.".format(cnt))
     
-    async def get_gsm_tables(self):
+    def get_gsm_tables(self):
         """
         get gsm maps in table
         :return:
@@ -137,7 +135,7 @@ class GSEproject:
             if not os.path.isfile(filepath):
                 # Could improve to automatic download new tables based on platform
                 gse = load_gse_soft(self.gsename)
-                await download_gsm_id_maps(self.datadir, gse, gpls=[gpl], vendor=vendor)
+                download_gsm_id_maps(self.datadir, gse, gpls=[gpl], vendor=vendor)
                 print("Skip Unsupported Platform: {}, {}".format(gpl, vendor))
                 # continue
             temp = pd.read_csv(filepath)
@@ -197,7 +195,7 @@ class GSEproject:
                 print("Unable to read {}")
         
         print("Create new table: {}".format(filefullpath))
-        gsm_maps = await self.get_gsm_tables()
+        gsm_maps = self.get_gsm_tables()
         
         if not any(gsm_maps):
             print("Not available, return empty dataframe")
@@ -222,8 +220,6 @@ class GSEproject:
                         input_values=list(map(str, list(outputdf["ProbeName"]))),
                         input_db=InputDatabase.AGILENT_ID,
                         output_db=[OutputDatabase.GENE_ID],
-                        async_cache=False,
-                        biodbnet_cache=False
                     )
                     
                     gsm_maps[key].rename(columns={"Gene ID": "ENTREZ_GENE_ID"}, inplace=True)
