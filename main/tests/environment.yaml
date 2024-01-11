@@ -19,5 +19,5 @@ dependencies:
   - tqdm==4.64.1
   - pip==22.1.2
   - pip:
-      - async_bioservices
+      - multi_bioservices
       - GEOparse==2.0.3
