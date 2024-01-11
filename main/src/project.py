@@ -14,9 +14,9 @@ class Configs:
         self.root_dir: str = str(Configs.project_dir)
         
         self.data_dir: str = os.path.join(self.root_dir, "data")
-        self.config_dir: str = os.path.join(self.root_dir, "data", "config_sheets")
-        self.output_dir: str = os.path.join(self.root_dir, "output")
-        self.py_dir: str = os.path.join(self.root_dir, "src")
+        self.config_dir: str = os.path.join(self.data_dir, "config_sheets")
+        self.results_dir: str = os.path.join(self.data_dir, "results")
+        self.src_dir: str = os.path.join(self.root_dir, "src")
     
     def _find_project_dir(self) -> Path:
         # Determine if "main" is in the current directory (i.e., `ls .`)
