@@ -14,8 +14,8 @@ import project
 
 configs = project.Configs()
 
-affy_r_filepath = Path(os.path.join(configs.pydir, "rscripts", "fitAffy.R"))
-agilent_r_filepath = Path(os.path.join(configs.pydir, "rscripts", "fitAgilent.R"))
+affy_r_filepath = Path(os.path.join(configs.src_dir, "rscripts", "fitAffy.R"))
+agilent_r_filepath = Path(os.path.join(configs.src_dir, "rscripts", "fitAgilent.R"))
 
 affy_r = open(affy_r_filepath, "r").read()
 agilent_r = open(agilent_r_filepath, "r").read()
