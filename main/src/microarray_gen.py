@@ -1,21 +1,19 @@
-# Silence sqlalchemy warning about version 2.0, we are still on 1.x
-import os
+#!/usr/bin/python3
 
-os.environ["SQLALCHEMY_SILENCE_UBER_WARNING"] = "1"
-
-import sys
-import asyncio
 import argparse
-from sqlalchemy import Column, Integer, String, Float
+import os
+import sys
+
+# from GSEpipelineFast import *
+import GSEpipelineFast
+import numpy as np
+import pandas as pd
+from project import Configs
+from sqlalchemy import Column, Float, Integer, String, create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, load_only
-from sqlalchemy import create_engine
+from sqlalchemy.orm import load_only, sessionmaker
 
-import project
-from GSEpipelineFast import *
-from como_utilities import is_float
-
-configs = project.Configs()
+configs = Configs()
 
 # create declarative_base instance
 Base = declarative_base()
@@ -82,13 +80,13 @@ def lookupMicroarrayDB(gseXXX):
         return False
 
 
-async def updateMicroarrayDB(gseXXX):
+def updateMicroarrayDB(gseXXX):
     """
     Update GSE info to microarray.db
     :param gseXXX: gse object
     :return:
     """
-    df_clean = await gseXXX.get_entrez_table_pipeline()
+    df_clean = gseXXX.get_entrez_table_pipeline()
     if df_clean.empty:
         return None
     
@@ -132,7 +130,7 @@ async def updateMicroarrayDB(gseXXX):
 
 
 # function to complete the inquery of a sheet
-async def queryTest(df, expression_proportion, top_proportion):
+def queryTest(df, expression_proportion, top_proportion):
     sr = df["GSE ID"]
     gse_ids = sr[sr.str.match("GSE")].unique()
     sr = df["Samples"].dropna()
@@ -144,11 +142,11 @@ async def queryTest(df, expression_proportion, top_proportion):
     # fetch data of each gse if it is not in the database, update database
     for gse_id in gse_ids:
         querytable = df[df["GSE ID"] == gse_id]
-        gseXXX = GSEproject(gse_id, querytable, configs.rootdir)
+        gseXXX = GSEpipelineFast.GSEproject(gse_id, querytable, configs.root_dir)
         if lookupMicroarrayDB(gseXXX):
             print("{} already in database, skip over.".format(gseXXX.gsename))
             continue
-        await updateMicroarrayDB(gseXXX)
+        updateMicroarrayDB(gseXXX)
     
     df_results = fetchLogicalTable(gsm_ids)
     df_output = mergeLogicalTable(df_results)
@@ -158,7 +156,6 @@ async def queryTest(df, expression_proportion, top_proportion):
     
     df_output["Pos"] = posratio
     df_output["expressed"] = np.where(posratio >= expression_proportion, 1, 0)
-    
     df_output["top"] = np.where(posratio >= top_proportion, 1, 0)
     
     return df_output
@@ -283,7 +280,9 @@ def mergeLogicalTable(df_results):
     entrez_dups_dict = dict(zip(full_entre_id_sets, entrez_dups_list))
     
     for merged_entrez_id, entrez_dups_list in entrez_dups_dict.items():
-        df_results["ENTREZ_GENE_ID"].replace(to_replace=entrez_dups_list, value=merged_entrez_id, inplace=True)
+        df_results["ENTREZ_GENE_ID"].replace(
+            to_replace=entrez_dups_list, value=merged_entrez_id, inplace=True
+        )
     
     df_results.set_index("ENTREZ_GENE_ID", inplace=True)
     df_output = df_results.fillna(-1).groupby(level=0).max()
@@ -307,7 +306,7 @@ def mergeLogicalTable(df_results):
 def load_microarray_tests(filename, context_name):
     def load_empty_dict():
         savepath = os.path.join(
-            configs.rootdir,
+            configs.root_dir,
             "data",
             "data_matrices",
             "placeholder",
@@ -317,18 +316,21 @@ def load_microarray_tests(filename, context_name):
         
         return "dummy", dat
     
-    if (not filename or filename == "None"):  # if not using microarray use empty dummy matrix
-        
+    if (
+        not filename or filename == "None"
+    ):  # if not using microarray use empty dummy matrix
         return load_empty_dict()
     
-    inquiry_full_path = os.path.join(configs.rootdir, "data", "config_sheets", filename)
+    inquiry_full_path = os.path.join(
+        configs.root_dir, "data", "config_sheets", filename
+    )
     if not os.path.isfile(inquiry_full_path):
         print("Error: file not found {}".format(inquiry_full_path))
         sys.exit()
     
     filename = "Microarray_{}.csv".format(context_name)
     fullsavepath = os.path.join(
-        configs.rootdir, "data", "results", context_name, "microarray", filename
+        configs.root_dir, "data", "results", context_name, "microarray", filename
     )
     if os.path.isfile(fullsavepath):
         data = pd.read_csv(fullsavepath, index_col="ENTREZ_GENE_ID")
@@ -346,7 +348,7 @@ def load_microarray_tests(filename, context_name):
         return load_empty_dict()
 
 
-async def main(argv):
+def main(argv):
     inputfile = "microarray_data_inputs.xlsx"
     
     parser = argparse.ArgumentParser(
@@ -383,24 +385,26 @@ async def main(argv):
     args = parser.parse_args()
     inputfile = args.config_file
     expression_proportion = args.expression_proportion
-    top_proportion = float(args.top_proportion)
+    top_proportion = args.top_proportion
     
     print("Input file is ", inputfile)
     print("Expression Proportion for Gene Expression is ", expression_proportion)
     print("Top proportion for high-confidence genes is ", top_proportion)
     
-    inqueryFullPath = os.path.join(configs.rootdir, "data", "config_sheets", inputfile)
+    inqueryFullPath = os.path.join(configs.root_dir, "data", "config_sheets", inputfile)
     xl = pd.ExcelFile(inqueryFullPath)
     sheet_names = xl.sheet_names
     inqueries = pd.read_excel(inqueryFullPath, sheet_name=sheet_names, header=0)
     
     for context_name in sheet_names:
         inqueries[context_name].fillna(method="ffill", inplace=True)
-        df = inqueries[context_name].loc[:, ["GSE ID", "Samples", "GPL ID", "Instrument"]]
-        df_output = await queryTest(df, expression_proportion, top_proportion)
+        df = inqueries[context_name].loc[
+             :, ["GSE ID", "Samples", "GPL ID", "Instrument"]
+             ]
+        df_output = queryTest(df, expression_proportion, top_proportion)
         filename = "Microarray_{}.csv".format(context_name)
         fullsavepath = os.path.join(
-            configs.rootdir, "data", "results", context_name, filename
+            configs.root_dir, "data", "results", context_name, filename
         )
         os.makedirs(os.path.dirname(fullsavepath), exist_ok=True)
         df_output.to_csv(fullsavepath)
@@ -408,4 +412,4 @@ async def main(argv):
 
 
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1:]))
+    main(sys.argv[1:])
