@@ -1,8 +1,8 @@
+#!/usr/bin/python3
 import os
 import re
 import sys
 import cobra
-import asyncio
 import argparse
 import numpy as np
 import pandas as pd
@@ -11,11 +11,10 @@ from pathlib import Path
 import multiprocessing.pool
 import multiprocessing as mp
 
-import project
-from como_utilities import suppress_stdout
-from async_bioservices import db2db, InputDatabase, OutputDatabase
+from project import Configs
+from multi_bioservices import db2db, InputDatabase, OutputDatabase
 
-configs = project.Configs()
+configs = Configs()
 
 
 def _perform_knockout(
@@ -82,7 +81,7 @@ def knock_out_simulation(
     
     if os.path.isfile(inhibitors_filepath):
         print(f"Inhibitors file found at:\n{inhibitors_filepath}")
-        DT_genes = pd.read_csv(os.path.join(configs.datadir, inhibitors_filepath), header=None, sep="\t")
+        DT_genes = pd.read_csv(os.path.join(configs.data_dir, inhibitors_filepath), header=None, sep="\t")
         DT_genes.rename(columns={0: "Gene ID"}, inplace=True)
         DT_genes["Gene ID"] = DT_genes["Gene ID"].astype(str)
     else:
@@ -196,7 +195,7 @@ def create_gene_pairs(
     has_effects_gene,
     disease_genes,
 ):
-    disease_genes = pd.read_csv(os.path.join(datadir, disease_genes))
+    disease_genes = pd.read_csv(str(os.path.join(datadir, disease_genes)))
     DAG_dis_genes = pd.DataFrame()  # data analysis genes
     DAG_dis_genes["Gene ID"] = disease_genes.iloc[:, 0].astype(str)
     # DAG_dis_genes
@@ -262,7 +261,7 @@ def score_gene_pairs(gene_pairs, filename, input_reg):
         d_score.at[p_gene, "score"] = d_s
     
     d_score.index.name = "Gene"
-    d_score.to_csv(os.path.join(configs.datadir, filename))
+    d_score.to_csv(os.path.join(configs.data_dir, filename))
     return d_score
 
 
@@ -299,7 +298,7 @@ def load_Inhi_Fratio(filepath):
     return temp2
 
 
-async def repurposing_hub_preproc(drug_file):
+def repurposing_hub_preproc(drug_file):
     drug_db = pd.read_csv(drug_file, sep="\t")
     drug_db_new = pd.DataFrame()
     for index, row in drug_db.iterrows():
@@ -320,7 +319,7 @@ async def repurposing_hub_preproc(drug_file):
             )
     drug_db_new.reset_index(inplace=True)
     
-    entrez_ids = await db2db(
+    entrez_ids = db2db(
         input_values=drug_db_new["Target"].tolist(),
         input_db=InputDatabase.GENE_SYMBOL,
         output_db=OutputDatabase.GENE_ID,
@@ -334,10 +333,10 @@ async def repurposing_hub_preproc(drug_file):
     return drug_db_new
 
 
-async def drug_repurposing(drug_db, d_score):
+def drug_repurposing(drug_db, d_score):
     d_score["Gene"] = d_score["Gene"].astype(str)
     
-    d_score_gene_sym = await db2db(
+    d_score_gene_sym = db2db(
         input_values=d_score["Gene"].tolist(),
         input_db=InputDatabase.GENE_ID,
         output_db=[OutputDatabase.GENE_SYMBOL],
@@ -363,7 +362,7 @@ async def drug_repurposing(drug_db, d_score):
     return d_score_trim
 
 
-async def main(argv):
+def main(argv):
     parser = argparse.ArgumentParser(
         prog="knock_out_simulation.py",
         description="This script is responsible for mapping drug targets in metabolic models, performing knock out simulations, and comparing simulation results with disease genes. It also identified drug targets and repurposable drugs.",
@@ -467,7 +466,7 @@ async def main(argv):
     pars_flag = args.pars_flag
     solver = args.solver
     
-    output_dir = os.path.join(configs.datadir, "results", context, disease)
+    output_dir = os.path.join(configs.data_dir, "results", context, disease)
     inhibitors_file = os.path.join(output_dir, f"{context}_{disease}_inhibitors.tsv")
     
     print(f"Output directory: '{output_dir}'")
@@ -486,11 +485,11 @@ async def main(argv):
     cobra_model.solver = solver
     
     # preprocess repurposing hub data
-    raw_drug_filepath = os.path.join(configs.datadir, raw_drug_filename)
-    reformatted_drug_file = os.path.join(configs.datadir, "Repurposing_Hub_Preproc.tsv")
+    raw_drug_filepath = os.path.join(configs.data_dir, raw_drug_filename)
+    reformatted_drug_file = os.path.join(configs.data_dir, "Repurposing_Hub_Preproc.tsv")
     if not os.path.isfile(reformatted_drug_file):
         print("Preprocessing raw Repurposing Hub DB file...")
-        drug_db = await repurposing_hub_preproc(raw_drug_filepath)
+        drug_db = repurposing_hub_preproc(raw_drug_filepath)
         drug_db.to_csv(reformatted_drug_file, index=False, sep="\t")
         print(f"Preprocessed Repurposing Hub tsv file written to:\n{reformatted_drug_file}")
     else:
@@ -511,7 +510,7 @@ async def main(argv):
     flux_solution_ratios.to_csv(os.path.join(output_dir, "flux_ratios_KO.csv"))
     
     gene_pairs_down = create_gene_pairs(
-        configs.datadir,
+        configs.data_dir,
         model,
         gene_ind2genes,
         fluxsolution,
@@ -524,7 +523,7 @@ async def main(argv):
     gene_pairs_down.to_csv(os.path.join(output_dir, f"{context}_Gene_Pairs_Inhi_Fratio_DOWN.txt"), index=False)
     
     gene_pairs_up = create_gene_pairs(
-        configs.datadir,
+        configs.data_dir,
         model,
         gene_ind2genes,
         fluxsolution,
@@ -542,7 +541,7 @@ async def main(argv):
     pertubation_effect_score.reset_index(drop=False, inplace=True)
     
     # last step: output drugs based on d score
-    drug_score = await drug_repurposing(drug_db, pertubation_effect_score)
+    drug_score = drug_repurposing(drug_db, pertubation_effect_score)
     drug_score_file = os.path.join(output_dir, f"{context}_drug_score.csv")
     drug_score.to_csv(drug_score_file, index=False)
     print("Gene D score mapped to repurposing drugs saved to\n{}".format(drug_score_file))
@@ -551,4 +550,4 @@ async def main(argv):
 
 
 if __name__ == "__main__":
-    asyncio.run(main(sys.argv[1:]))
+    main(sys.argv[1:])

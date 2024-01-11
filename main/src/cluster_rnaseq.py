@@ -1,3 +1,5 @@
+# !/usr/bin/python3
+
 import os
 import sys
 # from rpy2.robjects.packages import importr
@@ -7,7 +9,7 @@ import numpy as np
 from pathlib import Path
 
 import rpy2_api
-from project import configs
+from project import Configs
 from como_utilities import stringlist_to_list
 
 # enable r to py conversion
@@ -20,7 +22,8 @@ from como_utilities import stringlist_to_list
 # uwot = importr("uwot")
 
 # read and translate R functions
-r_file_path = Path(configs.rootdir, "src", "rscripts", "cluster_samples.R")
+configs = Configs()
+r_file_path = Path(configs.root_dir, "src", "rscripts", "cluster_samples.R")
 
 
 # f = open(os.path.join(configs.rootdir, "src", "rscripts", "cluster_samples.R"), "r")
@@ -29,7 +32,7 @@ r_file_path = Path(configs.rootdir, "src", "rscripts", "cluster_samples.R")
 # cluster_io = SignatureTranslatedAnonymousPackage(string, "cluster_io")
 
 
-def main(argv: list[str]) -> None:
+def main() -> None:
     """
     Cluster RNA-seq Data
     """
@@ -160,7 +163,7 @@ def main(argv: list[str]) -> None:
     )
     args = parser.parse_args()
     
-    wd = os.path.join(configs.datadir, "results")
+    wd = os.path.join(configs.data_dir, "results")
     context_names = stringlist_to_list(args.context_names)
     technique = args.technique.lower()
     clust_algo = args.clust_algo.lower()
@@ -180,36 +183,36 @@ def main(argv: list[str]) -> None:
     else:
         seed = args.seed
     
-    if type(min_count) == str and not min_count.lower() == "default":
+    if isinstance(min_count, str) and min_count.lower() == "default":
         try:
             min_count = int(min_count)
         except ValueError:
             raise ValueError("--min-count must be either 'default' or an integer > 0")
-    if type(min_count) != str and min_count < 0:
+    if not isinstance(min_count, str) and min_count < 0:
         raise ValueError("--min-count must be either 'default' or an integer > 0")
     
-    if type(quantile) == str and not quantile.lower() == "default":
+    if isinstance(quantile, str) and not quantile.lower() == "default":
         try:
             quantile = int(quantile)
         except ValueError:
             raise ValueError("--quantile must be either 'default' or an integer between 0 and 100")
-    if type(quantile) != str and 0 > quantile > 100:
+    if not isinstance(quantile, str) and 0 > quantile > 100:
         raise ValueError("--quantile must be either 'default' or an integer between 0 and 100")
     
-    if type(rep_ratio) == str and not rep_ratio.lower() == "default":
+    if isinstance(rep_ratio, str) and not rep_ratio.lower() == "default":
         try:
             rep_ratio = float(rep_ratio)
         except ValueError:
             raise ValueError("--rep-ratio must be 'default' or a float between 0 and 1")
-    if type(rep_ratio) != str and 0 > rep_ratio > 1.0:
+    if not isinstance(rep_ratio, str) and 0 > rep_ratio > 1.0:
         raise ValueError("--rep-ratio must be 'default' or a float between 0 and 1")
     
-    if type(batch_ratio) == str and not batch_ratio.lower() == "default":
+    if isinstance(batch_ratio, str) and not batch_ratio.lower() == "default":
         try:
             batch_ratio = float(batch_ratio)
         except ValueError:
             raise ValueError("--batch-ratio must be 'default' or a float between 0 and 1")
-    if type(batch_ratio) != str and 0 > batch_ratio > 1.0:
+    if not isinstance(batch_ratio, str) and 0 > batch_ratio > 1.0:
         raise ValueError("--batch-ratio must be 'default' or a float between 0 and 1")
     
     if technique.lower() not in ["quantile", "tpm", "cpm", "zfpkm"]:
@@ -221,10 +224,10 @@ def main(argv: list[str]) -> None:
     if clust_algo.lower() not in ["mca", "umap"]:
         raise ValueError("--clust_algo must be either 'mca', 'umap'")
     
-    if type(min_dist) != str and 0 > min_dist > 1.0:
+    if not isinstance(min_dist, str) and 0 > min_dist > 1.0:
         raise ValueError("--min_dist must be a float between 0 and 1")
     
-    if type(n_neigh_rep) == str and not n_neigh_rep.lower() == "default":
+    if isinstance(n_neigh_rep, str) and not n_neigh_rep.lower() == "default":
         try:
             n_neigh_rep = int(n_neigh_rep)
         except ValueError:
@@ -232,13 +235,13 @@ def main(argv: list[str]) -> None:
                 f"--n_neigh_rep must be either 'default' or an integer greater than 1 and less than or equal to "
                 f"the total number of replicates being clustered across all contexts."
             )
-    if type(n_neigh_rep) != str and n_neigh_rep < 2:
+    if not isinstance(n_neigh_rep, str) and n_neigh_rep < 2:
         raise ValueError(
             f"--n_neigh_rep must be either 'default' or an integer greater than 1 and less than or equal to "
             f"the total number of replicates being clustered across all contexts."
         )
     
-    if type(n_neigh_batch) == str and not n_neigh_batch.lower() == "default":
+    if isinstance(n_neigh_batch, str) and not n_neigh_batch.lower() == "default":
         try:
             n_neigh_batch = int(n_neigh_batch)
         except ValueError:
@@ -246,13 +249,13 @@ def main(argv: list[str]) -> None:
                 f"--n_neigh_batch must be either 'default' or an integer greater than 1 and less than or equal to "
                 f"the total number of batches being clustered across all contexts."
             )
-    if type(n_neigh_batch) != str and n_neigh_batch < 2:
+    if not isinstance(n_neigh_batch, str) and n_neigh_batch < 2:
         raise ValueError(
             f"--n_neigh_batch must be either 'default' or an integer greater than 1 and less than or equal to "
             f"the total number of batches being clustered across all contexts."
         )
     
-    if type(n_neigh_cont) == str and not n_neigh_cont.lower() == "default":
+    if isinstance(n_neigh_cont, str) and not n_neigh_cont.lower() == "default":
         try:
             n_neigh_cont = int(n_neigh_cont)
         except ValueError:
@@ -260,7 +263,7 @@ def main(argv: list[str]) -> None:
                 f"--n_neigh_batch must be either 'default' or an integer greater than 1 and less than or equal to "
                 f"the total number of batches being clustered across all contexts."
             )
-    if type(n_neigh_batch) != str and n_neigh_cont < 2:
+    if not isinstance(n_neigh_cont, str) and n_neigh_cont < 2:
         raise ValueError(
             f"--n_neigh_context must be either 'default' or an integer greater than 1 and less than or equal to "
             f"the total number of contexts being clustered."
