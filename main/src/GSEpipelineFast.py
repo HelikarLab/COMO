@@ -15,10 +15,10 @@ pandas2ri.activate()
 
 # gse = load_gse_soft(gsename)
 
-from async_bioservices import db2db, InputDatabase, OutputDatabase
+from multi_bioservices import db2db, InputDatabase, OutputDatabase
 
 
-async def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
+def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
     """
     download ID to ENTREZ_GENE_ID maps, create a csv file for each platform, and return dictionary
     :param gpls:
@@ -42,15 +42,13 @@ async def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="aff
                 table["CONTROL_TYPE"] == "FALSE", "SPOT_ID"
             ].tolist()
             
-            temp = await db2db(
+            temp = db2db(
                 input_values=input_values,
                 input_db=InputDatabase.AGILENT_ID,
                 output_db=[
                     OutputDatabase.GENE_ID,
                     OutputDatabase.ENSEMBL_GENE_ID
                 ],
-                async_cache=False,
-                biodbnet_cache=False
             )
             
             temp.drop(columns=["Ensembl Gene ID"], inplace=True)
@@ -125,7 +123,7 @@ class GSEproject:
                 cnt += 1
         print("{} raw data files moved.".format(cnt))
     
-    async def get_gsm_tables(self):
+    def get_gsm_tables(self):
         """
         get gsm maps in table
         :return:
@@ -137,7 +135,7 @@ class GSEproject:
             if not os.path.isfile(filepath):
                 # Could improve to automatic download new tables based on platform
                 gse = load_gse_soft(self.gsename)
-                await download_gsm_id_maps(self.datadir, gse, gpls=[gpl], vendor=vendor)
+                download_gsm_id_maps(self.datadir, gse, gpls=[gpl], vendor=vendor)
                 print("Skip Unsupported Platform: {}, {}".format(gpl, vendor))
                 # continue
             temp = pd.read_csv(filepath)
@@ -172,7 +170,7 @@ class GSEproject:
         
         return True
     
-    async def get_entrez_table_pipeline(self, fromcsv=True):
+    def get_entrez_table_pipeline(self, fromcsv=True):
         """
         create ENTREZ ID based table from gse
         :return: pandas dataframe for table of GSE
@@ -197,7 +195,7 @@ class GSEproject:
                 print("Unable to read {}")
         
         print("Create new table: {}".format(filefullpath))
-        gsm_maps = await self.get_gsm_tables()
+        gsm_maps = self.get_gsm_tables()
         
         if not any(gsm_maps):
             print("Not available, return empty dataframe")
@@ -218,12 +216,10 @@ class GSEproject:
                     
                     outputdf = instruments.readagilent(platformdir, list(self.gsm_platform.keys()))
                     
-                    gsm_maps[key] = await db2db(
+                    gsm_maps[key] = db2db(
                         input_values=list(map(str, list(outputdf["ProbeName"]))),
                         input_db=InputDatabase.AGILENT_ID,
                         output_db=[OutputDatabase.GENE_ID],
-                        async_cache=False,
-                        biodbnet_cache=False
                     )
                     
                     gsm_maps[key].rename(columns={"Gene ID": "ENTREZ_GENE_ID"}, inplace=True)
