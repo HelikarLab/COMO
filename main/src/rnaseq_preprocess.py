@@ -10,7 +10,7 @@ from pathlib import Path
 import rpy2_api
 import como_utilities
 from project import Configs
-from multi_bioservices import db2db, InputDatabase, OutputDatabase, TaxonID
+from multi_bioservices.biodbnet import db2db, InputDatabase, OutputDatabase, TaxonID
 
 configs = Configs()
 r_file_path: Path = Path(configs.root_dir, "src", "rscripts", "generate_counts_matrix.R")
@@ -33,7 +33,7 @@ def create_counts_matrix(context_name):
 
 def create_config_df(context_name):
     """
-    Create configuration sheet at /work/data/config_sheets/rnaseq_data_inputs_auto.xlsx
+    Create configuration sheet at /main/data/config_sheets/rnaseq_data_inputs_auto.xlsx
     based on the gene counts matrix. If using zFPKM normalization technique, fetch mean fragment lengths from
     /work/data/COMO_input/<context name>/<study number>/fragmentSizes/
     """
@@ -50,10 +50,11 @@ def create_config_df(context_name):
             label = re.findall(r"S\d{1,3}R\d{1,3}(?:r\d{1,3})?", gcfilename)[0]
         
         except IndexError:
-            print(f"\nfilename of {gcfilename} is not valid. Should be 'contextName_SXRYrZ.tab', where X is the "
-                  "study/batch number, Y is the replicate number, and Z is the run number. If not a multi-run sample, "
-                  "exclude 'rZ' from the filename.")
-            sys.exit()
+            raise IndexError(
+                f"\n\nFilename of '{gcfilename}' is not valid. Should be 'contextName_SXRYrZ.tab', where X is the "
+                "study/batch number, Y is the replicate number, and Z is the run number."
+                "\n\nIf not a multi-run sample, exclude 'rZ' from the filename."
+            )
         
         study_number = re.findall(r"S\d{1,3}", label)[0]
         rep_number = re.findall(r"R\d{1,3}", label)[0]
@@ -203,7 +204,7 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     return matrix_total, matrix_mrna
 
 
-def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase, taxon_id):
+def create_gene_info_file(matrix_file_list: list[str], input_format: InputDatabase, taxon_id):
     """
     Create gene info file for specified context by reading first column in its count matrix file at
      results/<context name>/gene_info_<context name>.csv
@@ -211,16 +212,9 @@ def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase, taxo
     
     print(f"Fetching gene info")
     gene_info_file = os.path.join(configs.data_dir, "gene_info.csv")
-    genes: list[str]
-    if os.path.exists(gene_info_file):
-        current_df = pd.read_csv(gene_info_file)
-        genes = current_df["ensembl_gene_id"].tolist()
-    else:
-        genes = []
-    
+    genes: list[str] = []
     for file in matrix_file_list:
-        add_genes = pd.read_csv(file)["genes"].tolist()
-        genes += add_genes
+        genes += pd.read_csv(file)["genes"].tolist()
     genes = list(set(genes))
     
     # Create our output database format
@@ -233,14 +227,16 @@ def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase, taxo
             OutputDatabase.GENE_ID,
             OutputDatabase.CHROMOSOMAL_LOCATION
         ]
-        if i.value != form.value
+        if i.value != input_format.value
     ]
     
     gene_info = db2db(
         input_values=genes,
-        input_db=form,
+        input_db=input_format,
         output_db=output_db,
         taxon_id=taxon_id,
+        use_progress_bar=True,
+        cache=True
     )
     
     gene_info.rename(columns={OutputDatabase.ENSEMBL_GENE_ID.value: "ensembl_gene_id"}, inplace=True)
@@ -252,7 +248,7 @@ def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase, taxo
     print(f"Gene Info file written at '{gene_info_file}'")
 
 
-def handle_context_batch(context_names, mode, form: InputDatabase, taxon_id, provided_matrix_file):
+def handle_context_batch(context_names, mode, input_format: InputDatabase, taxon_id, provided_matrix_file):
     """
     Handle iteration through each context type and create files according to flag used (config, matrix, info)
     """
@@ -314,11 +310,11 @@ def handle_context_batch(context_names, mode, form: InputDatabase, taxon_id, pro
         if mflag:
             mwriter.close()
         
-        create_gene_info_file(tmatrix_files + mmatrix_files, form, taxon_id)
+        create_gene_info_file(tmatrix_files + mmatrix_files, input_format, taxon_id)
     
     else:
         matrix_files: list[str] = como_utilities.stringlist_to_list(matrix_path_prov)
-        create_gene_info_file(matrix_files, form, taxon_id)
+        create_gene_info_file(matrix_files, input_format, taxon_id)
 
 
 def parse_args(argv):
@@ -452,7 +448,13 @@ def main(argv):
         print("--provide-matrix or --create-matrix must be set")
         sys.exit(1)
     
-    handle_context_batch(args.context_names, mode, gene_format_database, taxon_id, args.provided_matrix_fname)
+    handle_context_batch(
+        context_names=args.context_names,
+        mode=mode,
+        input_format=gene_format_database,
+        taxon_id=taxon_id,
+        provided_matrix_file=args.provided_matrix_fname
+    )
 
 
 if __name__ == "__main__":
