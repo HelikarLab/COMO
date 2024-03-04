@@ -19,5 +19,5 @@ dependencies:
   - tqdm==4.64.1
   - pip==22.1.2
   - pip:
-      - fast_bioservices
+      - git+https://github.com/JoshLoecker/fast_bioservices
       - GEOparse==2.0.3
