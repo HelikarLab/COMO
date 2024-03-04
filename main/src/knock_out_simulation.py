@@ -1,18 +1,19 @@
 #!/usr/bin/python3
+import argparse
+import multiprocessing as mp
+import multiprocessing.pool
 import os
 import re
 import sys
+from pathlib import Path
+from typing import Union
+
 import cobra
-import argparse
 import numpy as np
 import pandas as pd
-from typing import Union
-from pathlib import Path
-import multiprocessing.pool
-import multiprocessing as mp
+from fast_bioservices import BioDBNet, Input, Output
 
 from project import Configs
-from multi_bioservices import db2db, InputDatabase, OutputDatabase
 
 configs = Configs()
 
@@ -319,11 +320,11 @@ def repurposing_hub_preproc(drug_file):
             )
     drug_db_new.reset_index(inplace=True)
     
-    entrez_ids = db2db(
+    biodbnet = BioDBNet()
+    entrez_ids = biodbnet.db2db(
         input_values=drug_db_new["Target"].tolist(),
-        input_db=InputDatabase.GENE_SYMBOL,
-        output_db=OutputDatabase.GENE_ID,
-        cache=False
+        input_db=Input.GENE_SYMBOL,
+        output_db=Output.GENE_ID,
     )
     
     # entrez_ids = fetch_entrez_gene_id(drug_db_new["Target"].tolist(), input_db="Gene Symbol")
@@ -335,12 +336,11 @@ def repurposing_hub_preproc(drug_file):
 
 def drug_repurposing(drug_db, d_score):
     d_score["Gene"] = d_score["Gene"].astype(str)
-    
-    d_score_gene_sym = db2db(
+    biodbnet = BioDBNet()
+    d_score_gene_sym = biodbnet.db2db(
         input_values=d_score["Gene"].tolist(),
-        input_db=InputDatabase.GENE_ID,
-        output_db=[OutputDatabase.GENE_SYMBOL],
-        cache=False
+        input_db=Input.GENE_ID,
+        output_db=[Output.GENE_SYMBOL],
     )
     
     d_score.set_index("Gene", inplace=True)

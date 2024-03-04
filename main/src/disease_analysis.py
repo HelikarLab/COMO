@@ -1,19 +1,19 @@
 #!/usr/bin/python3
 import argparse
-import sys
 import json
-from project import Configs
-import rpy2_api
-import GSEpipelineFast
-
-from rpy2.robjects import pandas2ri
-import rpy2.robjects as ro
-
-from multi_bioservices import db2db, InputDatabase, OutputDatabase
-from rpy2.robjects.packages import importr
-from pathlib import Path
 import os
+import sys
+from pathlib import Path
+
 import pandas as pd
+import rpy2.robjects as ro
+from fast_bioservices import BioDBNet, Input, Output
+from rpy2.robjects import pandas2ri
+from rpy2.robjects.packages import importr
+
+import GSEpipelineFast
+import rpy2_api
+from project import Configs
 
 configs = Configs()
 
@@ -173,16 +173,16 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
         print(diff_exp_df)
         
         if inst_name == "affy":
-            input_db: InputDatabase = InputDatabase.AFFY_ID
+            input_db: Input = Input.AFFY_ID
         elif inst_name == "agilent":
-            input_db: InputDatabase = InputDatabase.AGILENT_ID
+            input_db: Input = Input.AGILENT_ID
         
-        bdnet = db2db(
+        biodbnet = BioDBNet()
+        bdnet = biodbnet.db2db(
             input_values=list(map(str, diff_exp_df["Affy ID"].tolist())),
             input_db=input_db,
-            output_db=[OutputDatabase.ENSEMBL_GENE_ID, OutputDatabase.GENE_ID, OutputDatabase.GENE_SYMBOL],
-            taxon_id=taxon_id,
-            cache=False
+            output_db=[Output.ENSEMBL_GENE_ID, Output.GENE_ID, Output.GENE_SYMBOL],
+            taxon=taxon_id,
         )
         
         diff_exp_df["Entrez"] = bdnet["Gene ID"].tolist()
@@ -222,12 +222,12 @@ def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_
     diff_exp_df = ro.conversion.rpy2py(diff_exp_df)
     gse_id = "rnaseq"
     
-    bdnet = db2db(
+    biodbnet = BioDBNet()
+    bdnet = biodbnet.db2db(
         input_values=list(map(str, diff_exp_df["Ensembl"].tolist())),
-        input_db=InputDatabase.ENSEMBL_GENE_ID,
-        output_db=[OutputDatabase.GENE_ID, OutputDatabase.AFFY_ID, OutputDatabase.GENE_SYMBOL],
-        taxon_id=taxon_id,
-        cache=False
+        input_db=Input.ENSEMBL_GENE_ID,
+        output_db=[Output.GENE_ID, Output.AFFY_ID, Output.GENE_SYMBOL],
+        taxon=taxon_id,
     )
     
     diff_exp_df["Affy"] = bdnet["Affy ID"].tolist()
