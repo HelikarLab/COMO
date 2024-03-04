@@ -1,25 +1,26 @@
 #!/usr/bin/python3
 
+import argparse
+import collections
 import os
 import re
 import sys
-import cobra
-from cobra import Model
-import argparse
-import collections
-import numpy as np
-import pandas as pd
 from pathlib import Path
 from warnings import warn
-from cobra.flux_analysis import pfba
+
+import cobra
+import numpy as np
+import pandas as pd
 from cobamp.wrappers import COBRAModelObjectReader
+from cobra import Model
+from cobra.flux_analysis import pfba
+from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
+from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.imat import IMAT, IMATProperties
 from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
-from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
-from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
 
+from como_utilities import Compartments, split_gene_expression_data, stringlist_to_list
 from project import Configs
-from como_utilities import stringlist_to_list, split_gene_expression_data, Compartments
 
 sys.setrecursionlimit(1500)  # for re.search
 
@@ -208,7 +209,7 @@ def seed_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
         obj_frac=0.9,
         objectives=[{idx_objective: 1}],
         preprocess=True,
-        flux_threshold=0.9,
+        # flux_threshold=0.9,  # This was removed on 2/7/24 because this value is ~5 orders of magnitude higher than troppo's default flux_threshold
     )
     algorithm = GIMME(s_matrix, lb, ub, properties)
     gene_activity = algorithm.run()
@@ -727,18 +728,16 @@ def main(argv):
         # convert all columns to lowercase
         df.columns = [column.lower() for column in df.columns]
         
-        # Make sure the columns are named correctly. They should be "Reaction", "Abbreviation", "Compartment", "Minimum Reaction Rate", and "Maximum Reaction Rate"
         for column in df.columns:
-            if column not in ["reaction", "abbreviation", "compartment", "minimum reaction rate",
-                              "maximum reaction rate"]:
+            if column not in ["reaction id", "boundary", "compartment", "lower bound", "upper bound"]:
                 raise ValueError(
-                    f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', 'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}")
+                    f"Boundary reactions file must have columns named 'Reaction ID', 'Boundary', 'Compartment', 'Lower Bound', and 'Upper Bound'. Found: {column}")
         
-        reaction_type: list[str] = df["reaction"].tolist()
-        reaction_abbreviation: list[str] = df["abbreviation"].tolist()
+        reaction_type: list[str] = df["boundary"].tolist()
+        reaction_abbreviation: list[str] = df["reaction id"].tolist()
         reaction_compartment: list[str] = df["compartment"].tolist()
-        boundary_rxns_lower = df["minimum reaction rate"].tolist()
-        boundary_rxns_upper = df["maximum reaction rate"].tolist()
+        boundary_rxns_lower = df["lower bound"].tolist()
+        boundary_rxns_upper = df["upper bound"].tolist()
         
         reaction_formula: list[str] = []
         for i in range(len(reaction_type)):
@@ -779,7 +778,7 @@ def main(argv):
                 )
                 sys.exit()
             
-            exclude_rxns = df["Abbreviation"].tolist()
+            exclude_rxns = df["Reaction ID"].tolist()
         
         except FileNotFoundError:
             print(
@@ -817,7 +816,7 @@ def main(argv):
                 )
                 sys.exit()
             
-            force_rxns = df["Abbreviation"].tolist()
+            force_rxns = df["Reaction ID"].tolist()
         
         except FileNotFoundError:
             print(

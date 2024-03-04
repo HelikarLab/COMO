@@ -1,21 +1,22 @@
 #!/usr/bin/python3
 
+import argparse
+import json
 import os
 import re
 import sys
-import json
-import argparse
-import pandas as pd
-from pathlib import Path
 from collections import Counter
+from pathlib import Path
 
-import rpy2_api
-import rnaseq_gen
+import pandas as pd
+from fast_bioservices import BioDBNet, Input, Output
+
 import microarray_gen
 import proteomics_gen
-from project import Configs
+import rnaseq_gen
+import rpy2_api
 from como_utilities import split_gene_expression_data
-from multi_bioservices import db2db, InputDatabase, OutputDatabase
+from project import Configs
 
 configs = Configs()
 
@@ -107,13 +108,14 @@ def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
     else:
         transcriptomic_df: pd.DataFrame = merged_df.copy()
     
-    gene_details: pd.DataFrame = db2db(
+    biodbnet = BioDBNet()
+    gene_details: pd.DataFrame = biodbnet.db2db(
         input_values=transcriptomic_df.index.astype(str).values.tolist(),
-        input_db=InputDatabase.GENE_ID,
+        input_db=Input.GENE_ID,
         output_db=[
-            OutputDatabase.GENE_SYMBOL,
-            OutputDatabase.ENSEMBL_GENE_INFO,
-            OutputDatabase.GENE_INFO,
+            Output.GENE_SYMBOL,
+            Output.ENSEMBL_GENE_INFO,
+            Output.GENE_INFO,
         ]
     )
     gene_details["entrez_gene_id"] = gene_details.index
