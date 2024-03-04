@@ -7,9 +7,10 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+from rpy2.robjects import pandas2ri
+
 import rpy2_api
 from project import Configs
-from rpy2.robjects import pandas2ri
 
 # enable r to py conversion
 pandas2ri.activate()
@@ -179,7 +180,7 @@ def main(argv):
         type=str,
         required=True,
         dest="config_filename",
-        help="Name of config .xlsx file in the /work/data/config_files/. Can be generated using "
+        help="Name of config .xlsx file in the /main/data/config_files/. Can be generated using "
              "rnaseq_preprocess.py or manually created and imported into the Juypterlab",
     )
     parser.add_argument(

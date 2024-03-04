@@ -14,9 +14,9 @@ dependencies:
   - bioconda::bioconductor-deseq2~=1.34.0
   - bioconda::bioconductor-edger~=3.36.0
   - bioconda::bioconductor-genefilter~=1.76.0
-  - bioconda::bioconductor-genomeinfodbdata~=1.2.11  # Required or else hgu133acdf fails to install
+  # - bioconda::bioconductor-genomeinfodbdata~=1.2.11  # Required or else hgu133acdf fails to install
   - bioconda::bioconductor-hgu133acdf~=2.18.0
-  - bioconda::bioconductor-limma~=3.50.1
+  # - bioconda::bioconductor-limma~=3.50.1
   - bioconda::crux-toolkit~=4.1
   - bioconda::thermorawfileparser~=1.4.0
   - conda-forge::aioftp~=0.21.2
@@ -60,7 +60,7 @@ dependencies:
   # - conda-forge::xlrd~=2.0.1
   - gurobi::gurobi
   - pip:
-      - multi_bioservices
+      - git+https://github.com/JoshLoecker/fast_bioservices
       # - escher==1.7.3
       - git+https://github.com/JoshLoecker/escher.git@python38#subdirectory=py
       - framed==0.5.*
