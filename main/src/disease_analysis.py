@@ -1,19 +1,18 @@
 #!/usr/bin/python3
 import argparse
-import sys
 import json
-from project import Configs
-import rpy2_api
-import GSEpipelineFast
-
-from rpy2.robjects import pandas2ri
-import rpy2.robjects as ro
-
-from multi_bioservices import db2db, InputDatabase, OutputDatabase
-from rpy2.robjects.packages import importr
-from pathlib import Path
 import os
+import sys
+from pathlib import Path
+
+import GSEpipelineFast
 import pandas as pd
+import rpy2.robjects as ro
+import rpy2_api
+from multi_bioservices.biodbnet import InputDatabase, OutputDatabase, db2db
+from project import Configs
+from rpy2.robjects import pandas2ri
+from rpy2.robjects.packages import importr
 
 configs = Configs()
 
@@ -35,13 +34,17 @@ DGEio = rpy2_api.Rpy2(r_file_path=Path(configs.root_dir, "src", "rscripts", "DGE
 # string = f.read()
 # f.close()
 # affyio = SignatureTranslatedAnonymousPackage(string, "affyio")
-affyio = rpy2_api.Rpy2(r_file_path=Path(configs.root_dir, "src", "rscripts", "fitAffy.R"))
+affyio = rpy2_api.Rpy2(
+    r_file_path=Path(configs.root_dir, "src", "rscripts", "fitAffy.R")
+)
 
 # f = open(os.path.join(configs.rootdir, "src", "rscripts", "fitAgilent.R"), "r")
 # string = f.read()
 # f.close()
 # agilentio = SignatureTranslatedAnonymousPackage(string, "agilentio")
-agilentio = rpy2_api.Rpy2(r_file_path=Path(configs.root_dir, "src", "rscripts", "fitAgilent.R"))
+agilentio = rpy2_api.Rpy2(
+    r_file_path=Path(configs.root_dir, "src", "rscripts", "fitAgilent.R")
+)
 
 
 def breakDownEntrezs(disease):
@@ -54,18 +57,18 @@ def breakDownEntrezs(disease):
     single_gene_names = disease[~disease["Gene ID"].str.contains("//")].reset_index(
         drop=True
     )
-    multiple_gene_names = disease[
-        disease["Gene ID"].str.contains("//")
-    ].reset_index(drop=True)
+    multiple_gene_names = disease[disease["Gene ID"].str.contains("//")].reset_index(
+        drop=True
+    )
     breaks_gene_names = pd.DataFrame(columns=["Gene ID"])
-    
+
     for index, row in multiple_gene_names.iterrows():
         for genename in row["Gene ID"].split("//"):
-            breaks_gene_names = breaks_gene_names.append(
+            breaks_gene_names = breaks_gene_names.append(  # type: ignore
                 {"Gene ID": genename}, ignore_index=True
             )
     gene_expressions = single_gene_names.append(breaks_gene_names, ignore_index=True)
-    
+
     return gene_expressions
 
 
@@ -116,7 +119,7 @@ def pharse_configs(config_filepath, sheet):
     xl = pd.ExcelFile(config_filepath)
     sheet_name = xl.sheet_names
     inqueries = pd.read_excel(config_filepath, sheet_name=sheet_name, header=0)
-    inqueries[sheet].fillna(method="ffill", inplace=True)
+    inqueries[sheet].fillna(method="ffill", inplace=True)  # type: ignore
     df = inqueries[sheet].loc[:, ["GSE ID", "Samples", "GPL ID", "Instrument"]]
     df_target = inqueries[sheet].loc[:, ["Samples", "Experiment"]]
     df_target.rename(
@@ -145,12 +148,12 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
     sr = query_table["GSE ID"]
     gse_ids = sr[sr.str.match("GSE")].unique()
     gse_id = gse_ids[0]
-    
+
     inst = query_table["Instrument"]
     inst_name = inst.unique()
     inst_name = inst_name[0]
     print(inst_name)
-    
+
     gseXXX = GSEpipelineFast.GSEproject(gse_id, query_table, configs.root_dir)
     for key, val in gseXXX.platforms.items():
         raw_dir = os.path.join(gseXXX.gene_dir, key)
@@ -162,35 +165,39 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
         elif inst_name == "agilent":
             diff_exp_df = agilentio.call_function("fitagilent", raw_dir, target_path)
             # diff_exp_df = agilentio.fitagilent(raw_dir, target_path)
-        diff_exp_df = ro.conversion.rpy2py(diff_exp_df)
+        diff_exp_df = ro.conversion.rpy2py(diff_exp_df)  # type: ignore
         diff_exp_df.reset_index(inplace=True)
-        diff_exp_df = diff_exp_df.rename(columns={'index': 'Affy ID'})
+        diff_exp_df = diff_exp_df.rename(columns={"index": "Affy ID"})
         print(diff_exp_df)
         print(type(diff_exp_df))
         data_top = diff_exp_df.head()
         print(data_top)
         diff_exp_df.rename(columns={"adj.P.Val": "FDR"}, inplace=True)
         print(diff_exp_df)
-        
+
         if inst_name == "affy":
             input_db: InputDatabase = InputDatabase.AFFY_ID
         elif inst_name == "agilent":
             input_db: InputDatabase = InputDatabase.AGILENT_ID
-        
+
         bdnet = db2db(
             input_values=list(map(str, diff_exp_df["Affy ID"].tolist())),
-            input_db=input_db,
-            output_db=[OutputDatabase.ENSEMBL_GENE_ID, OutputDatabase.GENE_ID, OutputDatabase.GENE_SYMBOL],
+            input_db=input_db,  # type: ignore
+            output_db=[
+                OutputDatabase.ENSEMBL_GENE_ID,
+                OutputDatabase.GENE_ID,
+                OutputDatabase.GENE_SYMBOL,
+            ],
             taxon_id=taxon_id,
-            cache=False
+            cache=False,
         )
-        
+
         diff_exp_df["Entrez"] = bdnet["Gene ID"].tolist()
         diff_exp_df["Ensembl"] = bdnet["Ensembl Gene ID"].tolist()
         diff_exp_df["Symbol"] = bdnet["Gene Symbol"].tolist()
         print(diff_exp_df)
         diff_exp_df.rename(columns={"Affy ID": "Affy"}, inplace=True)
-    return diff_exp_df, gse_id
+    return diff_exp_df, gse_id  # type: ignore
 
 
 def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_id):
@@ -203,41 +210,54 @@ def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_
 
     return: dataframe with fold changes, FDR adjusted p-values,
     """
-    count_matrix_filename = "".join(["gene_counts_matrix_", disease_name, "_", context_name, ".csv"])
-    count_matrix_path = os.path.join(configs.data_dir,
-                                     "data_matrices",
-                                     context_name,
-                                     "disease",
-                                     count_matrix_filename
-                                     )
-    
+    count_matrix_filename = "".join(
+        ["gene_counts_matrix_", disease_name, "_", context_name, ".csv"]
+    )
+    count_matrix_path = os.path.join(
+        configs.data_dir,
+        "data_matrices",
+        context_name,
+        "disease",
+        count_matrix_filename,
+    )
+
     if os.path.exists(count_matrix_path):
         print("Count Matrix File is at ", count_matrix_path)
     else:
-        print(f"No count matrix found at {count_matrix_path}. Please make sure file is in the correct location "
-              f"with the correct name.")
+        print(
+            f"No count matrix found at {count_matrix_path}. Please make sure file is in the correct location "
+            f"with the correct name."
+        )
         sys.exit()
-    
-    diff_exp_df = DGEio.call_function("DGE_main", count_matrix_path, config_filepath, context_name, disease_name)
+
+    diff_exp_df = DGEio.call_function(
+        "DGE_main", count_matrix_path, config_filepath, context_name, disease_name
+    )
     diff_exp_df = ro.conversion.rpy2py(diff_exp_df)
     gse_id = "rnaseq"
-    
+
     bdnet = db2db(
         input_values=list(map(str, diff_exp_df["Ensembl"].tolist())),
         input_db=InputDatabase.ENSEMBL_GENE_ID,
-        output_db=[OutputDatabase.GENE_ID, OutputDatabase.AFFY_ID, OutputDatabase.GENE_SYMBOL],
+        output_db=[
+            OutputDatabase.GENE_ID,
+            OutputDatabase.AFFY_ID,
+            OutputDatabase.GENE_SYMBOL,
+        ],
         taxon_id=taxon_id,
-        cache=False
+        cache=False,
     )
-    
+
     diff_exp_df["Affy"] = bdnet["Affy ID"].tolist()
     diff_exp_df["Entrez"] = bdnet["Gene ID"].tolist()
     diff_exp_df["Symbol"] = bdnet["Gene Symbol"].tolist()
-    
+
     return diff_exp_df, gse_id
 
 
-def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, target_path):
+def write_outputs(
+    diff_exp_df, gse_id, context_name, disease_name, data_source, target_path
+):
     search_col = "Ensembl" if data_source == "RNASEQ" else "Affy"
     diff_exp_df["logFC"].astype(float)
     diff_exp_df["abs_logFC"] = diff_exp_df["logFC"].abs()
@@ -247,9 +267,13 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
     down_regulated = regulated[regulated["logFC"] < 0]
     up_regulated = regulated[regulated["logFC"] > 0]
     diff_exp_df["regulated"] = [
-        "unchanged" if gene not in regulated[search_col].tolist()
-        else ("upregulated" if gene in up_regulated[search_col].tolist()
-              else "downregulated")
+        "unchanged"
+        if gene not in regulated[search_col].tolist()
+        else (
+            "upregulated"
+            if gene in up_regulated[search_col].tolist()
+            else "downregulated"
+        )
         for gene in diff_exp_df[search_col].tolist()
     ]
     up_file = os.path.join(
@@ -258,28 +282,28 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
         "results",
         context_name,
         disease_name,
-        f"Disease_UP_{gse_id}.txt"
+        f"Disease_UP_{gse_id}.txt",
     )
     os.makedirs(os.path.dirname(up_file), exist_ok=True)
-    
+
     down_file = os.path.join(
         configs.root_dir,
         "data",
         "results",
         context_name,
         disease_name,
-        f"Disease_DOWN_{gse_id}.txt"
+        f"Disease_DOWN_{gse_id}.txt",
     )
     os.makedirs(os.path.dirname(down_file), exist_ok=True)
-    
+
     up_regulated = up_regulated[up_regulated["Entrez"] != "-"]
     down_regulated = down_regulated[down_regulated["Entrez"] != "-"]
-    
+
     up_regulated["Entrez"].to_csv(up_file, index=False)
     down_regulated["Entrez"].to_csv(down_file, index=False)
     print(f"Upregulated genes saved to '{up_file}'")
     print(f"Downregulated genes saved to '{down_file}'")
-    
+
     raw_file = os.path.join(
         configs.root_dir,
         "data",
@@ -288,17 +312,19 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
         disease_name,
         f"Raw_Fit_{gse_id}.csv",
     )
-    diff_exp_df.drop(columns=["Affy"], inplace=True)  # drop for now bc commas mess up csv parsing, maybe fix later
+    diff_exp_df.drop(
+        columns=["Affy"], inplace=True
+    )  # drop for now bc commas mess up csv parsing, maybe fix later
     diff_exp_df.to_csv(raw_file, index=False)
     print(f"Raw Data saved to '{raw_file}'")
-    
+
     files_dict = {
         "gse": gse_id,
         "up_regulated": up_file,
         "down_regulated": down_file,
         "raw_data": raw_file,
     }
-    
+
     files_json = os.path.join(
         configs.root_dir,
         "data",
@@ -308,10 +334,10 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
         "step2_results_files.json",
     )
     os.makedirs(os.path.dirname(files_json), exist_ok=True)
-    
+
     with open(files_json, "w") as fp:
         json.dump(files_dict, fp)
-    
+
     if data_source == "MICROARRAY":
         os.remove(target_path)
 
@@ -319,14 +345,14 @@ def write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, 
 def main(argv):
     targetfile = "targets.txt"
     count_matrix = None
-    
+
     parser = argparse.ArgumentParser(
         prog="disease_analysis.py",
         description="Performs differential gene expression analysis to find up and downregulated genes associated "
-                    "with a disease. Significant genes are ones that have an FDR adjusted P-value < 0.05 and an "
-                    "absolute fold-change greater than the threshold specified, default is 2",
+        "with a disease. Significant genes are ones that have an FDR adjusted P-value < 0.05 and an "
+        "absolute fold-change greater than the threshold specified, default is 2",
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at: "
-               "https://github.com/HelikarLab/MADRID or email babessell@gmail.com"
+        "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
     )
     parser.add_argument(
         "-c",
@@ -350,7 +376,7 @@ def main(argv):
         type=str,
         required=True,
         dest="data_source",
-        help="Source of data being used, either rnaseq or microarray"
+        help="Source of data being used, either rnaseq or microarray",
     )
     parser.add_argument(
         "-i",
@@ -360,21 +386,27 @@ def main(argv):
         dest="taxon_id",
         help="BioDbNet taxon ID number, also accepts 'human', or 'mouse'",
     )
-    
+
     args = parser.parse_args()
     context_name = args.context_name
     config_file = args.config_file
     data_source = args.data_source.upper()
     taxon_id = args.taxon_id
-    
+
     if data_source == "RNASEQ":
-        config_filepath = os.path.join(configs.data_dir, "config_sheets", "disease", config_file)
+        config_filepath = os.path.join(
+            configs.data_dir, "config_sheets", "disease", config_file
+        )
     elif data_source == "MICROARRAY":
-        config_filepath = os.path.join(configs.data_dir, "config_sheets", "disease", config_file)
+        config_filepath = os.path.join(
+            configs.data_dir, "config_sheets", "disease", config_file
+        )
     else:
-        print(f"{data_source} is not a valid data source, must be either MICROARRAY or RNASEQ.")
+        print(
+            f"{data_source} is not a valid data source, must be either MICROARRAY or RNASEQ."
+        )
         sys.exit()
-    
+
     print(config_filepath)
     try:
         xl = pd.ExcelFile(config_filepath)
@@ -385,7 +417,7 @@ def main(argv):
         print("Config file must be in xlsx format!")
         sys.exit()
     print("Config file is at ", config_filepath)
-    
+
     # handle species alternative ids
     if isinstance(taxon_id, str):
         if taxon_id.upper() == "HUMAN" or taxon_id.upper() == "HOMO SAPIENS":
@@ -393,26 +425,35 @@ def main(argv):
         elif taxon_id.upper() == "MOUSE" or taxon_id.upper() == "MUS MUSCULUS":
             taxon_id = 10090
         else:
-            print('--taxon-id must be either an integer, or accepted string ("mouse", "human")')
+            print(
+                '--taxon-id must be either an integer, or accepted string ("mouse", "human")'
+            )
             sys.exit()
     elif not isinstance(taxon_id, int):
-        print('--taxon-id must be either an integer, or accepted string ("mouse", "human")')
+        print(
+            '--taxon-id must be either an integer, or accepted string ("mouse", "human")'
+        )
         sys.exit()
-    
+
     sheet_names = xl.sheet_names
     for disease_name in sheet_names:
         target_path = os.path.join(configs.root_dir, "data", targetfile)
         if data_source == "MICROARRAY":
-            diff_exp_df, gse_id = get_microarray_diff_gene_exp(config_filepath, disease_name, target_path,
-                                                               taxon_id)
+            diff_exp_df, gse_id = get_microarray_diff_gene_exp(
+                config_filepath, disease_name, target_path, taxon_id
+            )
         elif data_source == "RNASEQ":
-            diff_exp_df, gse_id = get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_id)
+            diff_exp_df, gse_id = get_rnaseq_diff_gene_exp(
+                config_filepath, disease_name, context_name, taxon_id
+            )
         else:
             print("data_source should be either 'microarray' or 'rnaseq'")
             print("Refer to example config file for either type for formatting")
             sys.exit(2)
-        
-        write_outputs(diff_exp_df, gse_id, context_name, disease_name, data_source, target_path)
+
+        write_outputs(
+            diff_exp_df, gse_id, context_name, disease_name, data_source, target_path
+        )
 
 
 if __name__ == "__main__":
