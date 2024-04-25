@@ -1,12 +1,11 @@
 #!/usr/bin/python3
 import argparse
 import multiprocessing as mp
-import multiprocessing.pool
 import os
 import re
 import sys
 from pathlib import Path
-from typing import Union
+from typing import Literal, Union
 
 import cobra
 import numpy as np
@@ -23,6 +22,7 @@ def _perform_knockout(
     model: cobra.Model,
     gene_id: str,
     reference_solution,
+    knockout_method: Literal["moma"],
 ) -> tuple[str, pd.DataFrame]:
     """
     This function will perform a single gene knockout. It will be used in multiprocessing
@@ -31,9 +31,10 @@ def _perform_knockout(
     gene: cobra.Gene = model_copy.genes.get_by_id(gene_id)  # type: ignore
     gene.knock_out()
 
-    optimized_model: pd.DataFrame = cobra.flux_analysis.moma(
-        model_copy, solution=reference_solution, linear=False
-    ).to_frame()
+    if knockout_method == "moma":
+        optimized_model: pd.DataFrame = cobra.flux_analysis.moma(
+            model_copy, solution=reference_solution, linear=False
+        ).to_frame()
 
     count_progress.acquire()
     count_progress.value += 1
@@ -57,6 +58,7 @@ def knock_out_simulation(
     reference_flux_filepath: Union[str, Path, None],
     test_all: bool,
     pars_flag: bool,
+    knockout_method: Literal["moma"],
 ):
     reference_solution: cobra.Solution
     if reference_flux_filepath is not None:
@@ -135,18 +137,18 @@ def knock_out_simulation(
         "2" for len(has_effects_gene) = 10 to 99
         "3" for len(has_effects_gene) = 100 to 999
     """
+    spacer: int = len(str(len(genes_with_metabolic_effects)))
+
     # Initialize the processing pool with a counter
     # From: https://stackoverflow.com/questions/69907453Up
     synchronizer = mp.Value("i", 0)
+    flux_solution: pd.DataFrame = pd.DataFrame()
 
     # Require at least one core
     num_cores: int = max(1, mp.cpu_count() - 2)
     pool: mp.Pool = mp.Pool(  # type: ignore
         num_cores, initializer=initialize_pool, initargs=(synchronizer,)
     )
-
-    spacer: int = len(str(len(genes_with_metabolic_effects)))
-    flux_solution: pd.DataFrame = pd.DataFrame()
 
     print(
         f"Found {len(genes_with_metabolic_effects)} genes with potentially-significant metabolic impacts\n"
@@ -166,6 +168,7 @@ def knock_out_simulation(
                     "model": model,
                     "gene_id": id_,
                     "reference_solution": reference_solution,
+                    "knockout_method": knockout_method,
                 },
             )
         )
@@ -260,17 +263,27 @@ def create_gene_pairs(
     return gene_pairs
 
 
-def score_gene_pairs(gene_pairs, filename, input_reg):
+def score_gene_pairs(
+    gene_pairs,
+    filename,
+    input_reg,
+    downreg_flux_cutoff: float,
+    upreg_flux_cutoff: float,
+):
     p_model_genes = gene_pairs.Gene.unique()
     d_score = pd.DataFrame([], columns=["score"])
     for p_gene in p_model_genes:
         data_p = gene_pairs.loc[gene_pairs["Gene"] == p_gene].copy()
         total_aff = data_p["Gene IDs"].unique().size
         n_aff_down = (
-            data_p.loc[abs(data_p["rxn_fluxRatio"]) < 0.9, "Gene IDs"].unique().size
+            data_p.loc[abs(data_p["rxn_fluxRatio"]) < downreg_flux_cutoff, "Gene IDs"]
+            .unique()
+            .size
         )
         n_aff_up = (
-            data_p.loc[abs(data_p["rxn_fluxRatio"]) > 1.1, "Gene IDs"].unique().size
+            data_p.loc[abs(data_p["rxn_fluxRatio"]) > upreg_flux_cutoff, "Gene IDs"]
+            .unique()
+            .size
         )
         if input_reg == "up":
             d_s = (n_aff_down - n_aff_up) / total_aff
@@ -317,7 +330,7 @@ def load_Inhi_Fratio(filepath):
     return temp2
 
 
-def repurposing_hub_preproc(drug_file):
+def repurposing_hub_preproc(drug_file, taxon_id: int):
     drug_db = pd.read_csv(drug_file, sep="\t")
     drug_db_new = pd.DataFrame()
     for index, row in drug_db.iterrows():
@@ -347,6 +360,7 @@ def repurposing_hub_preproc(drug_file):
         input_db=InputDatabase.GENE_SYMBOL,
         output_db=OutputDatabase.GENE_ID,
         cache=False,
+        taxon_id=taxon_id,
     )
 
     # entrez_ids = fetch_entrez_gene_id(drug_db_new["Target"].tolist(), input_db="Gene Symbol")
@@ -356,7 +370,7 @@ def repurposing_hub_preproc(drug_file):
     return drug_db_new
 
 
-def drug_repurposing(drug_db, d_score):
+def drug_repurposing(drug_db, d_score, taxon_id: int):
     d_score["Gene"] = d_score["Gene"].astype(str)
 
     d_score_gene_sym = db2db(
@@ -364,6 +378,7 @@ def drug_repurposing(drug_db, d_score):
         input_db=InputDatabase.GENE_ID,
         output_db=[OutputDatabase.GENE_SYMBOL],
         cache=False,
+        taxon_id=taxon_id,
     )
 
     d_score.set_index("Gene", inplace=True)
@@ -391,6 +406,14 @@ def main(argv):
         description="This script is responsible for mapping drug targets in metabolic models, performing knock out simulations, and comparing simulation results with disease genes. It also identified drug targets and repurposable drugs.",
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
         "https://github.com/HelikarLab/COMO",
+    )
+    parser.add_argument(
+        "-t",
+        "--taxon-id",
+        type=int,
+        required=True,
+        dest="taxon_id",
+        help="The taxon ID of the organism, such as 9096 for Homo Sapiens",
     )
     parser.add_argument(
         "-m",
@@ -459,6 +482,34 @@ def main(argv):
         help="Test all genes, even ones predicted to have little no effect.",
     )
     parser.add_argument(
+        "-pv",
+        "--p-value",
+        type=float,
+        required=False,
+        default=0.05,
+        dest="p_value",
+        help="The p-value threshold for significance determination",
+    )
+    parser.add_argument(
+        "-dge",
+        "--log2-differential-expression-cutuff",
+        type=float,
+        required=False,
+        default=0.58,
+        dest="log2_dge_cutoff",
+        help="The log2 differential expression cutoff for significance determination. A log2 of 0.58 is equivalent to a 1.5 fold change.",
+    )
+    parser.add_argument(
+        "-k",
+        "--knockout-method",
+        type=str,
+        required=False,
+        choices=["moma"],
+        default="moma",
+        dest="knockout_method",
+        help="The method to use for knockout simulations. Options are: moma",
+    )
+    parser.add_argument(
         "-p",
         "--parsimonious",
         action="store_true",
@@ -476,8 +527,27 @@ def main(argv):
         dest="solver",
         help="The solver to use for FBA. Options are: gurobi or glpk",
     )
+    parser.add_argument(
+        "-lf",
+        "--downreg-flux-cutoff",
+        type=float,
+        required=False,
+        default=0.9,
+        dest="downreg_flux_cutoff",
+        help="The flux cutoff to mark a reaction as down-regulated",
+    )
+    parser.add_argument(
+        "-hf",
+        "--upreg-flux-cutoff",
+        type=float,
+        required=False,
+        default=1.1,
+        dest="upreg_flux_cutoff",
+        help="The flux cutoff to mark a reaction as up-regulated",
+    )
 
     args = parser.parse_args()
+    taxon_id: int = args.taxon_id
     tissue_spec_model_file = args.model
     context = args.context
     disease = args.disease
@@ -488,6 +558,11 @@ def main(argv):
     test_all = args.test_all
     pars_flag = args.pars_flag
     solver = args.solver
+    p_value: float = args.p_value
+    log2_dge_cutoff: float = args.log2_dge_cutoff
+    knockout_method = args.knockout_method
+    downreg_flux_cutoff: float = args.downreg_flux_cutoff
+    upreg_flux_cutoff: float = args.upreg_flux_cutoff
 
     output_dir = os.path.join(configs.data_dir, "results", context, disease)
     inhibitors_file = os.path.join(output_dir, f"{context}_{disease}_inhibitors.tsv")
@@ -514,7 +589,7 @@ def main(argv):
     )
     if not os.path.isfile(reformatted_drug_file):
         print("Preprocessing raw Repurposing Hub DB file...")
-        drug_db = repurposing_hub_preproc(raw_drug_filepath)
+        drug_db = repurposing_hub_preproc(raw_drug_filepath, taxon_id=taxon_id)
         drug_db.to_csv(reformatted_drug_file, index=False, sep="\t")
         print(
             f"Preprocessed Repurposing Hub tsv file written to:\n{reformatted_drug_file}"
@@ -540,6 +615,7 @@ def main(argv):
         reference_flux_filepath=ref_flux_file,
         test_all=test_all,
         pars_flag=pars_flag,
+        knockout_method=knockout_method,
     )
 
     flux_solution_diffs.to_csv(os.path.join(output_dir, "flux_diffs_KO.csv"))
@@ -579,11 +655,15 @@ def main(argv):
         gene_pairs_down,
         os.path.join(output_dir, f"{context}_d_score_DOWN.csv"),
         input_reg="down",
+        downreg_flux_cutoff=downreg_flux_cutoff,
+        upreg_flux_cutoff=upreg_flux_cutoff,
     )
     d_score_up = score_gene_pairs(
         gene_pairs_up,
         os.path.join(output_dir, f"{context}_d_score_UP.csv"),
         input_reg="up",
+        downreg_flux_cutoff=downreg_flux_cutoff,
+        upreg_flux_cutoff=upreg_flux_cutoff,
     )
     pertubation_effect_score = (d_score_up + d_score_down).sort_values(
         by="score", ascending=False
@@ -592,7 +672,7 @@ def main(argv):
     pertubation_effect_score.reset_index(drop=False, inplace=True)
 
     # last step: output drugs based on d score
-    drug_score = drug_repurposing(drug_db, pertubation_effect_score)
+    drug_score = drug_repurposing(drug_db, pertubation_effect_score, taxon_id=taxon_id)
     drug_score_file = os.path.join(output_dir, f"{context}_drug_score.csv")
     drug_score.to_csv(drug_score_file, index=False)
     print(
