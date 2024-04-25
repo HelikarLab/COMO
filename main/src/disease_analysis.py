@@ -176,7 +176,7 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
         print(diff_exp_df)
 
         if inst_name == "affy":
-            input_db: InputDatabase = InputDatabase.AFFY_ID
+            input_db: Input = Input.AFFY_ID
         elif inst_name == "agilent":
             input_db: InputDatabase = InputDatabase.AGILENT_ID
 
