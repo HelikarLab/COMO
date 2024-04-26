@@ -135,7 +135,7 @@ def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
 
     gene_details: pd.DataFrame = db2db(
         input_values=transcriptomic_df.index.astype(str).values.tolist(),
-        input_db=InputDatabase.GENE_ID,
+        input_db=Input.GENE_ID,
         output_db=[
             OutputDatabase.GENE_SYMBOL,
             OutputDatabase.ENSEMBL_GENE_INFO,

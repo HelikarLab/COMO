@@ -65,7 +65,7 @@ def breakDownEntrezs(disease):
 
     for index, row in multiple_gene_names.iterrows():
         for genename in row["Gene ID"].split("//"):
-            breaks_gene_names = breaks_gene_names.append(
+            breaks_gene_names = breaks_gene_names.append(  # type: ignore
                 {"Gene ID": genename}, ignore_index=True
             )
     gene_expressions = single_gene_names.append(breaks_gene_names, ignore_index=True)
@@ -120,7 +120,7 @@ def pharse_configs(config_filepath, sheet):
     xl = pd.ExcelFile(config_filepath)
     sheet_name = xl.sheet_names
     inqueries = pd.read_excel(config_filepath, sheet_name=sheet_name, header=0)
-    inqueries[sheet].fillna(method="ffill", inplace=True)
+    inqueries[sheet].fillna(method="ffill", inplace=True)  # type: ignore
     df = inqueries[sheet].loc[:, ["GSE ID", "Samples", "GPL ID", "Instrument"]]
     df_target = inqueries[sheet].loc[:, ["Samples", "Experiment"]]
     df_target.rename(
@@ -166,7 +166,7 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
         elif inst_name == "agilent":
             diff_exp_df = agilentio.call_function("fitagilent", raw_dir, target_path)
             # diff_exp_df = agilentio.fitagilent(raw_dir, target_path)
-        diff_exp_df = ro.conversion.rpy2py(diff_exp_df)
+        diff_exp_df = ro.conversion.rpy2py(diff_exp_df)  # type: ignore
         diff_exp_df.reset_index(inplace=True)
         diff_exp_df = diff_exp_df.rename(columns={"index": "Affy ID"})
         print(diff_exp_df)
@@ -177,7 +177,7 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
         print(diff_exp_df)
 
         if inst_name == "affy":
-            input_db: InputDatabase = InputDatabase.AFFY_ID
+            input_db: Input = Input.AFFY_ID
         elif inst_name == "agilent":
             input_db: InputDatabase = InputDatabase.AGILENT_ID
 
@@ -198,7 +198,7 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
         diff_exp_df["Symbol"] = bdnet["Gene Symbol"].tolist()
         print(diff_exp_df)
         diff_exp_df.rename(columns={"Affy ID": "Affy"}, inplace=True)
-    return diff_exp_df, gse_id
+    return diff_exp_df, gse_id  # type: ignore
 
 
 def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_id):

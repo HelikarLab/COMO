@@ -47,7 +47,7 @@ def create_counts_matrix(context_name):
 
 def create_config_df(context_name):
     """
-    Create configuration sheet at /work/data/config_sheets/rnaseq_data_inputs_auto.xlsx
+    Create configuration sheet at /main/data/config_sheets/rnaseq_data_inputs_auto.xlsx
     based on the gene counts matrix. If using zFPKM normalization technique, fetch mean fragment lengths from
     /work/data/COMO_input/<context name>/<study number>/fragmentSizes/
     """
@@ -284,7 +284,7 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     return matrix_total, matrix_mrna
 
 
-def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase, taxon_id):
+def create_gene_info_file(matrix_file_list: list[str], input_format: Input, taxon_id):
     """
     Create gene info file for specified context by reading first column in its count matrix file at
      results/<context name>/gene_info_<context name>.csv
@@ -300,8 +300,7 @@ def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase, taxo
         genes = []
 
     for file in matrix_file_list:
-        add_genes = pd.read_csv(file)["genes"].tolist()
-        genes += add_genes
+        genes += pd.read_csv(file)["genes"].tolist()
     genes = list(set(genes))
 
     # Create our output database format
@@ -315,14 +314,14 @@ def create_gene_info_file(matrix_file_list: list[str], form: InputDatabase, taxo
             OutputDatabase.GENE_ID,
             OutputDatabase.CHROMOSOMAL_LOCATION,
         ]
-        if i.value != form.value
+        if i.value != input_format.value
     ]
 
     gene_info = db2db(
         input_values=genes,
-        input_db=form,
+        input_db=input_format,
         output_db=output_db,
-        taxon_id=taxon_id,
+        taxon=taxon_id,
     )
 
     gene_info.rename(
@@ -428,7 +427,7 @@ def handle_context_batch(
 
     else:
         matrix_files: list[str] = como_utilities.stringlist_to_list(matrix_path_prov)
-        create_gene_info_file(matrix_files, form, taxon_id)
+        create_gene_info_file(matrix_files, input_format, taxon_id)
 
 
 def parse_args(argv):

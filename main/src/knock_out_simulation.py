@@ -35,12 +35,13 @@ def _perform_knockout(
     model: cobra.Model,
     gene_id: str,
     reference_solution,
+    knockout_method: Literal["moma"],
 ) -> tuple[str, pd.DataFrame]:
     """
     This function will perform a single gene knockout. It will be used in multiprocessing
     """
-    model_copy = model.copy()
-    gene: cobra.Gene = model_copy.genes.get_by_id(gene_id)
+    model_copy: cobra.Model = model.copy()
+    gene: cobra.Gene = model_copy.genes.get_by_id(gene_id)  # type: ignore
     gene.knock_out()
 
     optimized_model: pd.DataFrame = cobra.flux_analysis.moma(
@@ -125,7 +126,7 @@ def knock_out_simulation(
     genes_with_metabolic_effects = []
     for id_ in DT_model:
         gene = model.genes.get_by_id(id_)
-        for rxn in gene.reactions:
+        for rxn in gene.reactions:  # type: ignore
             gene_reaction_rule = rxn.gene_reaction_rule
             gene_ids = re.findall(r"\d+", gene_reaction_rule)
             for gene_id in gene_ids:
@@ -133,7 +134,7 @@ def knock_out_simulation(
                     boolval = "False"
                 else:
                     # boolval = "{}".format(model.genes.get_by_id(gene_id)._functional)
-                    boolval = "{}".format(model.genes.get_by_id(gene_id).functional)
+                    boolval = "{}".format(model.genes.get_by_id(gene_id).functional)  # type: ignore
                 gene_reaction_rule = gene_reaction_rule.replace(
                     "{}".format(gene_id), boolval, 1
                 )
@@ -147,6 +148,8 @@ def knock_out_simulation(
         "2" for len(has_effects_gene) = 10 to 99
         "3" for len(has_effects_gene) = 100 to 999
     """
+    spacer: int = len(str(len(genes_with_metabolic_effects)))
+
     # Initialize the processing pool with a counter
     # From: https://stackoverflow.com/questions/69907453Up
     synchronizer = mp.Value("i", 0)
@@ -272,7 +275,13 @@ def create_gene_pairs(
     return gene_pairs
 
 
-def score_gene_pairs(gene_pairs, filename, input_reg):
+def score_gene_pairs(
+    gene_pairs,
+    filename,
+    input_reg,
+    downreg_flux_cutoff: float,
+    upreg_flux_cutoff: float,
+):
     p_model_genes = gene_pairs.Gene.unique()
     d_score = pd.DataFrame([], columns=["score"])
     for p_gene in p_model_genes:
@@ -329,7 +338,7 @@ def load_Inhi_Fratio(filepath):
     return temp2
 
 
-def repurposing_hub_preproc(drug_file):
+def repurposing_hub_preproc(drug_file, taxon_id: int):
     drug_db = pd.read_csv(drug_file, sep="\t")
     drug_db_new = pd.DataFrame()
     for index, row in drug_db.iterrows():
@@ -368,7 +377,7 @@ def repurposing_hub_preproc(drug_file):
     return drug_db_new
 
 
-def drug_repurposing(drug_db, d_score):
+def drug_repurposing(drug_db, d_score, taxon_id: int):
     d_score["Gene"] = d_score["Gene"].astype(str)
 
     d_score_gene_sym = db2db(
@@ -417,6 +426,7 @@ def main(argv):
     parser.add_argument(**test_all_genes_arg)
 
     args = parser.parse_args()
+    taxon_id: int = args.taxon_id
     tissue_spec_model_file = args.model
     context = args.context
     disease = args.disease
@@ -453,7 +463,7 @@ def main(argv):
     )
     if not os.path.isfile(reformatted_drug_file):
         print("Preprocessing raw Repurposing Hub DB file...")
-        drug_db = repurposing_hub_preproc(raw_drug_filepath)
+        drug_db = repurposing_hub_preproc(raw_drug_filepath, taxon_id=taxon_id)
         drug_db.to_csv(reformatted_drug_file, index=False, sep="\t")
         print(
             f"Preprocessed Repurposing Hub tsv file written to:\n{reformatted_drug_file}"
@@ -531,7 +541,7 @@ def main(argv):
     pertubation_effect_score.reset_index(drop=False, inplace=True)
 
     # last step: output drugs based on d score
-    drug_score = drug_repurposing(drug_db, pertubation_effect_score)
+    drug_score = drug_repurposing(drug_db, pertubation_effect_score, taxon_id=taxon_id)
     drug_score_file = os.path.join(output_dir, f"{context}_drug_score.csv")
     drug_score.to_csv(drug_score_file, index=False)
     print(
