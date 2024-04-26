@@ -4,10 +4,10 @@ The purpose of this file is to create a uniform interface for the arguments that
 
 import argparse
 import math
-import typing
+from typing import Callable, Union
 
 
-def ranged_type(value_type, min_value, max_value) -> typing.Callable:
+def ranged_type(value_type, min_value, max_value) -> Callable:
     """
     Return function handle of an argument type function for ArgumentParser checking a range
 
@@ -39,23 +39,23 @@ def ranged_type(value_type, min_value, max_value) -> typing.Callable:
 
 
 taxon_id_arg = {
-    "name_or_flags": ["--taxon_id"],
-    "type": int | str,
+    "flag": "--taxon-id",
+    "type": str,
     "required": True,
     "dest": "taxon_id",
     "help": "The taxon ID of the organism, such as 9096 or 'Mus Musculus'",
 }
 
 context_names_arg = {
-    "name_or_flags": ["--context-names"],
+    "flag": "--context-names",
     "type": str,
     "required": True,
     "dest": "context_names",
-    "help": """Tissue/cell name of models to generate. If making multiple models in a batch, then use the format: "context1 context2 context3" """,
+    "help": "Tissue/cell name of models to generate. If making multiple models in a batch, then use the format: 'context1 context2 context3' ",
 }
 
 filtering_technique_arg = {
-    "name_or_flags": ["--filtering-technique"],
+    "flag": "--filtering-technique",
     "type": str,
     "choices": ["zfpkm", "quantile", "cpm"],
     "required": True,
@@ -64,7 +64,7 @@ filtering_technique_arg = {
 }
 
 cluster_algorithm_arg = {
-    "name_or_flags": ["--cluster-algorithm"],
+    "flag": "--cluster-algorithm",
     "type": str,
     "choices": ["mca", "umap"],
     "required": False,
@@ -74,7 +74,7 @@ cluster_algorithm_arg = {
 }
 
 label_arg = {
-    "name_or_flags": ["--no-label"],
+    "flag": "--no-label",
     "type": bool,
     "action": "store_false",
     "default": "True",
@@ -84,7 +84,7 @@ label_arg = {
 }
 
 min_dist_arg = {
-    "name_or_flags": ["--min-dist"],
+    "flag": "--min-dist",
     "type": ranged_type(float, 0.0, 1.0),
     "required": False,
     "default": 0.01,
@@ -93,7 +93,7 @@ min_dist_arg = {
 }
 
 replicate_ratio_arg = {
-    "name_or_flags": ["--replicate-ratio"],
+    "flag": "--replicate-ratio",
     "type": ranged_type(float, 0.0, 1.0),
     "required": False,
     "default": 0.9,
@@ -102,7 +102,7 @@ replicate_ratio_arg = {
 }
 
 batch_ratio_arg = {
-    "name_or_flags": ["--batch-ratio"],
+    "flag": "--batch-ratio",
     "type": ranged_type(float, 0.0, 1.0),
     "required": False,
     "default": 0.9,
@@ -111,7 +111,7 @@ batch_ratio_arg = {
 }
 
 num_neighbors_replicate_arg = {
-    "name_or_flags": ["--num-neighbors-replicate"],
+    "flag": "--num-neighbors-replicate",
     "type": str | int,
     "required": False,
     "default": "default",
@@ -120,7 +120,7 @@ num_neighbors_replicate_arg = {
 }
 
 num_neighbors_batch_arg = {
-    "name_or_flags": ["--num-neighbors-batch"],
+    "flag": "--num-neighbors-batch",
     "type": str | int,
     "required": False,
     "default": "default",
@@ -129,7 +129,7 @@ num_neighbors_batch_arg = {
 }
 
 num_neighbors_context_arg = {
-    "name_or_flags": ["--num-neighbors-context"],
+    "flag": "--num-neighbors-context",
     "type": str | int,
     "required": False,
     "default": "default",
@@ -138,7 +138,7 @@ num_neighbors_context_arg = {
 }
 
 min_count_arg = {
-    "name_or_flags": ["--min-count"],
+    "flag": "--min-count",
     "type": int | str,
     "required": False,
     "default": "default",
@@ -147,7 +147,7 @@ min_count_arg = {
 }
 
 quantile_arg = {
-    "name_or_flags": ["--quantile"],
+    "flag": "--quantile",
     "type": ranged_type(float, 0.0, 1.0),
     "required": False,
     "default": 0.5,
@@ -156,7 +156,7 @@ quantile_arg = {
 }
 
 random_seed_arg = {
-    "name_or_flags": ["--seed"],
+    "flag": "--seed",
     "type": int,
     "required": False,
     "default": -1,
@@ -165,7 +165,7 @@ random_seed_arg = {
 }
 
 reference_model_filepath_arg = {
-    "name_or_flags": ["--reference-model-filepath"],
+    "flag": "--reference-model-filepath",
     "type": str,
     "required": True,
     "dest": "modelfile",
@@ -173,7 +173,7 @@ reference_model_filepath_arg = {
 }
 
 active_genes_filepath_arg = {
-    "name_or_flags": ["--active-genes-filepath"],
+    "flag": "--active-genes-filepath",
     "type": str,
     "required": True,
     "dest": "genefile",
@@ -181,7 +181,7 @@ active_genes_filepath_arg = {
 }
 
 objective_function_arg = {
-    "name_or_flags": ["--objective"],
+    "flag": "--objective",
     "type": str,
     "required": False,
     "default": "biomass_reeaction",
@@ -190,7 +190,7 @@ objective_function_arg = {
 }
 
 boundary_reactions_filepath_arg = {
-    "name_or_flags": ["--boundary-reactions-filepath"],
+    "flag": "--boundary-reactions-filepath",
     "type": str,
     "required": False,
     "default": None,
@@ -199,7 +199,7 @@ boundary_reactions_filepath_arg = {
 }
 
 exclude_reactions_filepath_arg = {
-    "name_or_flags": ["--exclude-reactions-filepath"],
+    "flag": "--exclude-reactions-filepath",
     "type": str,
     "required": False,
     "default": None,
@@ -208,7 +208,7 @@ exclude_reactions_filepath_arg = {
 }
 
 force_reactions_filepath_arg = {
-    "name_or_flags": ["--force-reactions-filepath"],
+    "flag": "--force-reactions-filepath",
     "type": str,
     "required": False,
     "default": None,
@@ -217,7 +217,7 @@ force_reactions_filepath_arg = {
 }
 
 reconstruction_algorithm_arg = {
-    "name_or_flags": ["--algorithm"],
+    "flag": "--algorithm",
     "type": str,
     "required": False,
     "default": "GIMME",
@@ -227,7 +227,7 @@ reconstruction_algorithm_arg = {
 }
 
 imat_low_threshold_arg = {
-    "name_or_flags": ["--low-threshold"],
+    "flag": "--low-threshold",
     "type": ranged_type(int, -math.inf, math.inf),
     "required": False,
     "default": -5,
@@ -236,7 +236,7 @@ imat_low_threshold_arg = {
 }
 
 imat_high_threshold_arg = {
-    "name_or_flags": ["--high-threshold"],
+    "flag": "--high-threshold",
     "type": ranged_type(int, -math.inf, math.inf),
     "required": False,
     "default": -3,
@@ -245,7 +245,7 @@ imat_high_threshold_arg = {
 }
 
 reconstruction_solver_arg = {
-    "name_or_flags": ["--solver"],
+    "flag": "--solver",
     "type": str,
     "required": False,
     "default": "glpk",
@@ -254,7 +254,7 @@ reconstruction_solver_arg = {
 }
 
 output_filetypes_arg = {
-    "name_or_flags": ["--output-filetypes"],
+    "flag": "--output-filetypes",
     "type": str,
     "required": False,
     "default": "mat",
@@ -263,7 +263,7 @@ output_filetypes_arg = {
 }
 
 config_file_arg = {
-    "name_or_flags": ["--config-file"],
+    "flag": "--config-file",
     "type": str,
     "required": True,
     "dest": "config_file",
@@ -271,7 +271,7 @@ config_file_arg = {
 }
 
 data_source_arg = {
-    "name_or_flags": ["--data-source"],
+    "flag": "--data-source",
     "type": str,
     "choices": ["rnaseq", "microarray"],
     "required": True,
@@ -280,7 +280,7 @@ data_source_arg = {
 }
 
 context_model_filepath_arg = {
-    "name_or_flags": ["--context-model"],
+    "flag": "--context-model",
     "type": str,
     "required": True,
     "dest": "model",
@@ -288,7 +288,7 @@ context_model_filepath_arg = {
 }
 
 disease_names_arg = {
-    "name_or_flags": ["--disease-names"],
+    "flag": "--disease-names",
     "type": str,
     "required": True,
     "dest": "disease",
@@ -296,7 +296,7 @@ disease_names_arg = {
 }
 
 disease_up_filepath_arg = {
-    "name_or_flags": ["--disease-up"],
+    "flag": "--disease-up",
     "type": str,
     "required": True,
     "dest": "disease_up",
@@ -304,7 +304,7 @@ disease_up_filepath_arg = {
 }
 
 disease_down_filepath_arg = {
-    "name_or_flags": ["--disease-down"],
+    "flag": "--disease-down",
     "type": str,
     "required": True,
     "dest": "disease_down",
@@ -312,7 +312,7 @@ disease_down_filepath_arg = {
 }
 
 raw_drug_filepath_arg = {
-    "name_or_flags": ["--raw-drug-file"],
+    "flag": "--raw-drug-file",
     "type": str,
     "required": True,
     "dest": "raw_drug_file",
@@ -320,7 +320,7 @@ raw_drug_filepath_arg = {
 }
 
 reference_flux_filepath_arg = {
-    "name_or_flags": ["--reference-flux-file"],
+    "flag": "--reference-flux-file",
     "type": str,
     "required": False,
     "dest": "ref_flux_file",
@@ -328,8 +328,7 @@ reference_flux_filepath_arg = {
 }
 
 test_all_genes_arg = {
-    "name_or_flags": ["--test-all"],
-    "type": bool,
+    "flag": "--test-all",
     "action": "store_true",
     "required": False,
     "default": False,
@@ -338,8 +337,7 @@ test_all_genes_arg = {
 }
 
 parsimonious_fba_arg = {
-    "name_or_flags": ["--parsimonious"],
-    "type": bool,
+    "flag": "--parsimonious",
     "action": "store_true",
     "required": False,
     "default": False,
@@ -348,8 +346,7 @@ parsimonious_fba_arg = {
 }
 
 merge_distribution_arg = {
-    "name_or_flags": ["--merge-distribution"],
-    "type": bool,
+    "flag": "--merge-distribution",
     "action": "store_true",
     "required": False,
     "default": False,
@@ -358,8 +355,7 @@ merge_distribution_arg = {
 }
 
 keep_gene_score_arg = {
-    "name_or_flags": ["--keep-gene-scores"],
-    "type": bool,
+    "flag": "--keep-gene-scores",
     "action": "store_true",
     "required": False,
     "default": True,
@@ -368,7 +364,7 @@ keep_gene_score_arg = {
 }
 
 microarray_config_filename_arg = {
-    "name_or_flags": ["--microarray-config-file"],
+    "flag": "--microarray-config-file",
     "type": str,
     "required": False,
     "dest": "microarray_file",
@@ -376,7 +372,7 @@ microarray_config_filename_arg = {
 }
 
 total_rnaseq_filename_arg = {
-    "name_or_flags": ["--total-rnaseq-config-file"],
+    "flag": "--total-rnaseq-config-file",
     "type": str,
     "required": False,
     "dest": "trnaseq_file",
@@ -384,7 +380,7 @@ total_rnaseq_filename_arg = {
 }
 
 mrnaseq_filename_arg = {
-    "name_or_flags": ["--mrnaseq-config-file"],
+    "flag": "--mrnaseq-config-file",
     "type": str,
     "required": False,
     "dest": "mrnaseq_file",
@@ -392,7 +388,7 @@ mrnaseq_filename_arg = {
 }
 
 scrnaseq_filename_arg = {
-    "name_or_flags": ["--scrnaseq-config-file"],
+    "flag": "--scrnaseq-config-file",
     "type": str,
     "required": False,
     "dest": "scrnaseq_file",
@@ -400,7 +396,7 @@ scrnaseq_filename_arg = {
 }
 
 proteomics_config_filename_arg = {
-    "name_or_flags": ["--proteomics-config-file"],
+    "flag": "--proteomics-config-file",
     "type": str,
     "required": False,
     "dest": "proteomics_file",
@@ -408,7 +404,7 @@ proteomics_config_filename_arg = {
 }
 
 expression_requirement_arg = {
-    "name_or_flags": ["--expression-requirement"],
+    "flag": "--expression-requirement",
     "type": int | str,
     "required": False,
     "default": "default",
@@ -417,7 +413,7 @@ expression_requirement_arg = {
 }
 
 requirement_adjustment_arg = {
-    "name_or_flags": ["--requirement-adjust"],
+    "flag": "--requirement-adjust",
     "type": str,
     "choices": ["progressive", "regressive", "flat", "custom"],
     "required": False,
@@ -427,7 +423,7 @@ requirement_adjustment_arg = {
 }
 
 custom_requirement_file_arg = {
-    "name_or_flags": ["--custom-requirement-file"],
+    "flag": "--custom-requirement-file",
     "type": str,
     "required": False,
     "default": "SKIP",
@@ -436,8 +432,7 @@ custom_requirement_file_arg = {
 }
 
 no_high_confidence_genes_arg = {
-    "name_or_flags": ["--no-hc"],
-    "type": bool,
+    "flag": "--no-hc",
     "action": "store_true",
     "required": False,
     "default": False,
@@ -446,8 +441,7 @@ no_high_confidence_genes_arg = {
 }
 
 no_na_adjustment_arg = {
-    "name_or_flags": ["--no-na-adjust"],
-    "type": bool,
+    "flag": "--no-na-adjust",
     "action": "store_true",
     "required": False,
     "default": False,
@@ -456,7 +450,7 @@ no_na_adjustment_arg = {
 }
 
 total_rnaseq_weight_arg = {
-    "name_or_flags": ["--total-rnaseq-weight"],
+    "flag": "--total-rnaseq-weight",
     "type": ranged_type(int, 0, math.inf),
     "required": False,
     "default": 1,
@@ -465,7 +459,7 @@ total_rnaseq_weight_arg = {
 }
 
 mrnaseq_weight_arg = {
-    "name_or_flags": ["--mrnaseq-weight"],
+    "flag": "--mrnaseq-weight",
     "type": ranged_type(int, 0, math.inf),
     "required": False,
     "default": 1,
@@ -474,7 +468,7 @@ mrnaseq_weight_arg = {
 }
 
 scrnaseq_weight_arg = {
-    "name_or_flags": ["--single-cell-rnaseq-weight"],
+    "flag": "--single-cell-rnaseq-weight",
     "type": ranged_type(int, 0, math.inf),
     "required": False,
     "default": 1,
@@ -483,7 +477,7 @@ scrnaseq_weight_arg = {
 }
 
 proteomics_weight_arg = {
-    "name_or_flags": ["--protein-weight"],
+    "flag": "--protein-weight",
     "type": ranged_type(int, 0, math.inf),
     "required": False,
     "default": 2,
@@ -492,7 +486,7 @@ proteomics_weight_arg = {
 }
 
 high_replicate_ratio_arg = {
-    "name_or_flags": ["--high-replicate-ratio"],
+    "flag": "--high-replicate-ratio",
     "type": ranged_type(float, 0.0, 1.0),
     "required": False,
     "default": 0.5,
@@ -501,7 +495,7 @@ high_replicate_ratio_arg = {
 }
 
 high_batch_ratio_arg = {
-    "name_or_flags": ["--high-batch-ratio"],
+    "flag": "--high-batch-ratio",
     "type": ranged_type(float, 0.0, 1.0),
     "required": False,
     "default": 0.5,
@@ -510,7 +504,7 @@ high_batch_ratio_arg = {
 }
 
 min_zfpkm_arg = {
-    "name_or_flags": ["--min-zfpkm"],
+    "flag": "--min-zfpkm",
     "type": int,
     "required": False,
     "default": -3,
@@ -519,7 +513,7 @@ min_zfpkm_arg = {
 }
 
 library_prep_arg = {
-    "name_or_flags": ["--library-prep"],
+    "flag": "--library-prep",
     "type": str,
     "choices": ["total", "mrna", "scrna"],
     "required": True,
@@ -527,19 +521,24 @@ library_prep_arg = {
     "help": "Library preparation method used for the data.",
 }
 
+# fmt: off
 gene_format_arg = {
-    "name_or_flags": ["--gene-format"],
+    "flag": "--gene-format",
     "type": str,
     "required": False,
     "default": "Ensembl Gene ID",
-    "choices": ["ensembl", "entrez", "hgnc_symbol"],
+    # "choices": [
+    #     "ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID",
+    #     "HGNC SYMBOL", "HUGO", "HUGO SYMBOL", "SYMBOL", "HGNC",
+    #     "GENE SYMBOL", "ENTREZ", "ENTRES", "ENTREZ ID", "ENTREZ NUMBER" "GENE ID",
+    # ],
     "dest": "gene_format",
     "help": "The format of the gene IDs in the data. Must be one of 'entrez', 'symbol', or 'ensembl'.",
 }
+# fmt: on
 
 provide_count_matrix_arg = {
-    "name_or_flags": ["--provide-matrix"],
-    "type": bool,
+    "flag": "--provide-matrix",
     "action": "store_true",
     "required": False,
     "default": False,
@@ -548,8 +547,7 @@ provide_count_matrix_arg = {
 }
 
 create_matrix_arg = {
-    "name_or_flags": ["--create-matrix"],
-    "type": bool,
+    "flag": "--create-matrix",
     "action": "store_true",
     "required": False,
     "default": False,
@@ -558,7 +556,7 @@ create_matrix_arg = {
 }
 
 provided_matrix_filename_arg = {
-    "name_or_flags": ["--matrix"],
+    "flag": "--matrix",
     "type": str,
     "required": False,
     "default": "SKIP",

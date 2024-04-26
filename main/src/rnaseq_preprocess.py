@@ -17,7 +17,7 @@ from arguments import (
     provided_matrix_filename_arg,
     taxon_id_arg,
 )
-from multi_bioservices import InputDatabase, OutputDatabase, TaxonID, db2db
+from multi_bioservices.biodbnet import InputDatabase, OutputDatabase, TaxonID, db2db
 from project import Configs
 
 configs = Configs()
@@ -456,28 +456,16 @@ def parse_args(argv):
             https://github.com/HelikarLab/MADRID or email babessell@gmail.com""",
     )
 
-    parser.add_argument(
-        "-n",
-        "--context-names",
-        type=str,
-        nargs="+",
-        required=True,
-        dest="context_names",
-        help="""Tissue/cell name of models to generate. These names should correspond to the folders
-                             in 'COMO_input/' if creating count matrix files, or to
-                             'work/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv' if supplying
-                             the count matrix as an imported .csv file. If making multiple models in a batch, then
-                             use the format: "context1 context2 context3". """,
-    )
-
-    parser.add_argument(**gene_format_arg)
-    parser.add_argument(**taxon_id_arg)
-    parser.add_argument(**context_names_arg)
+    # fmt: off
+    parser.add_argument(gene_format_arg["flag"], **{k: v for k, v in gene_format_arg.items() if k != "flag"})
+    parser.add_argument(taxon_id_arg["flag"], **{k: v for k, v in taxon_id_arg.items() if k != "flag"})
+    parser.add_argument(context_names_arg["flag"], **{k: v for k, v in context_names_arg.items() if k != "flag"})
 
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument(**provide_count_matrix_arg)
-    group.add_argument(**create_matrix_arg)
-    group.add_argument(**provided_matrix_filename_arg)
+    group.add_argument(provide_count_matrix_arg["flag"], **{k: v for k, v in provide_count_matrix_arg.items() if k != "flag"})
+    group.add_argument(create_matrix_arg["flag"], **{k: v for k, v in create_matrix_arg.items() if k != "flag"})
+    parser.add_argument(provided_matrix_filename_arg["flag"], **{k: v for k, v in provided_matrix_filename_arg.items() if k != "flag"})
+    # fmt: on
 
     args = parser.parse_args(argv)
     args.context_names = como_utilities.stringlist_to_list(args.context_names)
