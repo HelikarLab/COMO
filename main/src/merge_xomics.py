@@ -32,7 +32,7 @@ from arguments import (
     total_rnaseq_weight_arg,
 )
 from como_utilities import split_gene_expression_data
-from multi_bioservices import InputDatabase, OutputDatabase, db2db
+from fast_bioservices import BioDBNet, Input, Output
 from project import Configs
 
 configs = Configs()
@@ -76,7 +76,11 @@ class _HighExpressionHeaderNames:
     SCRNASEQ = f"{_MergedHeaderNames.SCRNASEQ}_high"
 
 
-def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
+def get_transcriptmoic_details(
+    merged_df: pd.DataFrame,
+    biodbnet: BioDBNet,
+    taxon_id: int,
+) -> pd.DataFrame:
     """
     This function will get the following details of transcriptomic data:
     - Gene Symbol
@@ -133,14 +137,15 @@ def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
     else:
         transcriptomic_df: pd.DataFrame = merged_df.copy()
 
-    gene_details: pd.DataFrame = db2db(
+    gene_details: pd.DataFrame = biodbnet.db2db(
         input_values=transcriptomic_df.index.astype(str).values.tolist(),
         input_db=Input.GENE_ID,
         output_db=[
-            OutputDatabase.GENE_SYMBOL,
-            OutputDatabase.ENSEMBL_GENE_INFO,
-            OutputDatabase.GENE_INFO,
+            Output.GENE_SYMBOL,
+            Output.ENSEMBL_GENE_INFO,
+            Output.GENE_INFO,
         ],
+        taxon=taxon_id,
     )
     gene_details["entrez_gene_id"] = gene_details.index
     gene_details.reset_index(drop=True, inplace=True)
@@ -150,31 +155,31 @@ def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
     # descriptions: list[str] = [
     gene_details["description"] = [
         i.group(1) if isinstance(i, re.Match) else "No Description Available"
-        for i in gene_details["Ensembl Gene Info"].apply(
-            lambda x: re.search("\[Description: (.*)\]", x)
+        for i in gene_details["Ensembl Gene Info"].apply(  # type: ignore
+            lambda x: re.search("\[Description: (.*)\]", x)  # type: ignore
         )
     ]
 
     gene_details["gene_info_type"] = [
         i.group(1) if isinstance(i, re.Match) else "None"
-        for i in gene_details["Gene Info"].apply(
-            lambda x: re.search("\[Gene Type: (.*)\]", x)
+        for i in gene_details["Gene Info"].apply(  # type: ignore
+            lambda x: re.search("\[Gene Type: (.*)\]", x)  # type: ignore
         )
     ]
     gene_details["ensembl_info_type"] = [
         i.group(1) if isinstance(i, re.Match) else "None"
-        for i in gene_details["Ensembl Gene Info"].apply(
-            lambda x: re.search("\[Gene Type: (.*)\]", x)
+        for i in gene_details["Ensembl Gene Info"].apply(  # type: ignore
+            lambda x: re.search("\[Gene Type: (.*)\]", x)  # type: ignore
         )
     ]
 
     gene_type: list[str] = []
     row: pd.DataFrame
-    for row in gene_details.itertuples():
+    for row in gene_details.itertuples():  # type: ignore
         if row.gene_info_type != "None":
-            gene_type.append(row.gene_info_type)
+            gene_type.append(row.gene_info_type)  # type: ignore
         elif row.ensembl_info_type != "None":
-            gene_type.append(row.ensembl_info_type)
+            gene_type.append(row.ensembl_info_type)  # type: ignore
         else:
             gene_type.append("No Gene Type Available")
     gene_details["gene_type"] = gene_type
@@ -197,6 +202,8 @@ def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
 def merge_xomics(
     context_name: str,
     expression_requirement,
+    biodbnet: BioDBNet,
+    taxon_id: int,
     microarray_file=None,
     proteomics_file=None,
     trnaseq_file=None,
@@ -271,7 +278,7 @@ def merge_xomics(
         if "merge_data" not in locals():
             merge_data = micro_data
         else:
-            merge_data = merge_data.join(micro_data, how="outer")
+            merge_data = merge_data.join(micro_data, how="outer")  # type: ignore
 
     if trnaseq[0] != "dummy":
         exp_list.append(_ExpressedHeaderNames.TRNASEQ)
@@ -287,7 +294,7 @@ def merge_xomics(
         if "merge_data" not in locals():
             merge_data = trnaseq_data
         else:
-            merge_data = merge_data.join(trnaseq_data, how="outer")
+            merge_data = merge_data.join(trnaseq_data, how="outer")  # type: ignore
 
     if mrnaseq[0] != "dummy":
         exp_list.append(_ExpressedHeaderNames.MRNASEQ)
@@ -303,7 +310,7 @@ def merge_xomics(
         if "merge_data" not in locals():
             merge_data = mrnaseq_data
         else:
-            merge_data = merge_data.join(mrnaseq_data, how="outer")
+            merge_data = merge_data.join(mrnaseq_data, how="outer")  # type: ignore
 
     if scrnaseq[0] != "dummy":
         exp_list.append(_ExpressedHeaderNames.SCRNASEQ)
@@ -319,9 +326,9 @@ def merge_xomics(
         if "merge_data" not in locals():
             merge_data = scrnaseq_data
         else:
-            merge_data = merge_data.join(scrnaseq_data, how="outer")
+            merge_data = merge_data.join(scrnaseq_data, how="outer")  # type: ignore
 
-    merge_data = microarray_gen.mergeLogicalTable(merge_data)
+    merge_data = microarray_gen.mergeLogicalTable(merge_data)  # type: ignore
 
     num_sources = len(exp_list)
     merge_data["Active"] = 0
@@ -375,7 +382,11 @@ def merge_xomics(
     split_entrez.to_csv(filepath, index_label="ENTREZ_GENE_ID")
     files_dict[context_name] = filepath
 
-    transcriptomic_details = get_transcriptmoic_details(merge_data)
+    transcriptomic_details = get_transcriptmoic_details(
+        merge_data,
+        biodbnet=biodbnet,
+        taxon_id=taxon_id,
+    )
     transcriptomic_details_directory_path = os.path.dirname(filepath)
     transcriptomic_details_filepath = os.path.join(
         transcriptomic_details_directory_path,
@@ -405,6 +416,8 @@ def handle_context_batch(
     custom_df,
     merge_distro,
     keep_gene_score,
+    biodbnet: BioDBNet,
+    taxon_id: int,
 ):
     """
     Handle merging of different data sources for each context type
@@ -510,6 +523,8 @@ def handle_context_batch(
             scrnaseq_file=scrnaseq_file,
             no_hc=no_hc,
             no_na=no_na,
+            biodbnet=biodbnet,
+            taxon_id=taxon_id,
         )
 
         dict_list.update(files_dict)
@@ -536,22 +551,24 @@ def main(argv):
 
     custom_requirement_file_arg["required"] = True if "custom" in argv else False
 
-    parser.add_argument(**custom_requirement_file_arg)
-    parser.add_argument(**expression_requirement_arg)
-    parser.add_argument(**keep_gene_score_arg)
-    parser.add_argument(**merge_distribution_arg)
-    parser.add_argument(**microarray_config_filename_arg)
-    parser.add_argument(**mrnaseq_filename_arg)
-    parser.add_argument(**mrnaseq_weight_arg)
-    parser.add_argument(**no_high_confidence_genes_arg)
-    parser.add_argument(**no_na_adjustment_arg)
-    parser.add_argument(**proteomics_config_filename_arg)
-    parser.add_argument(**proteomics_weight_arg)
-    parser.add_argument(**requirement_adjustment_arg)
-    parser.add_argument(**scrnaseq_filename_arg)
-    parser.add_argument(**scrnaseq_weight_arg)
-    parser.add_argument(**total_rnaseq_filename_arg)
-    parser.add_argument(**total_rnaseq_weight_arg)
+    # fmt: off
+    parser.add_argument(custom_requirement_file_arg["flag"], **{k: v for k, v in custom_requirement_file_arg.items() if k != "flag"})
+    parser.add_argument(expression_requirement_arg["flag"], **{k: v for k, v in expression_requirement_arg.items() if k != "flag"})
+    parser.add_argument(keep_gene_score_arg["flag"], **{k: v for k, v in keep_gene_score_arg.items() if k != "flag"})
+    parser.add_argument(merge_distribution_arg["flag"], **{k: v for k, v in merge_distribution_arg.items() if k != "flag"})
+    parser.add_argument(microarray_config_filename_arg["flag"], **{k: v for k, v in microarray_config_filename_arg.items() if k != "flag"})
+    parser.add_argument(mrnaseq_filename_arg["flag"], **{k: v for k, v in mrnaseq_filename_arg.items() if k != "flag"})
+    parser.add_argument(mrnaseq_weight_arg["flag"], **{k: v for k, v in mrnaseq_weight_arg.items() if k != "flag"})
+    parser.add_argument(no_high_confidence_genes_arg["flag"], **{k: v for k, v in no_high_confidence_genes_arg.items() if k != "flag"})
+    parser.add_argument(no_na_adjustment_arg["flag"], **{k: v for k, v in no_na_adjustment_arg.items() if k != "flag"})
+    parser.add_argument(proteomics_config_filename_arg["flag"], **{k: v for k, v in proteomics_config_filename_arg.items() if k != "flag"})
+    parser.add_argument(proteomics_weight_arg["flag"], **{k: v for k, v in proteomics_weight_arg.items() if k != "flag"})
+    parser.add_argument(requirement_adjustment_arg["flag"], **{k: v for k, v in requirement_adjustment_arg.items() if k != "flag"})
+    parser.add_argument(scrnaseq_filename_arg["flag"], **{k: v for k, v in scrnaseq_filename_arg.items() if k != "flag"})
+    parser.add_argument(scrnaseq_weight_arg["flag"], **{k: v for k, v in scrnaseq_weight_arg.items() if k != "flag"})
+    parser.add_argument(total_rnaseq_filename_arg["flag"], **{k: v for k, v in total_rnaseq_filename_arg.items() if k != "flag"})
+    parser.add_argument(total_rnaseq_weight_arg["flag"], **{k: v for k, v in total_rnaseq_weight_arg.items() if k != "flag"})
+    # fmt: on
 
     args = parser.parse_args(argv)
 
@@ -571,6 +588,14 @@ def main(argv):
     mweight = args.mweight
     sweight = args.sweight
     pweight = args.pweight
+    taxon_id: int = args.taxon_id
+    show_biodbnet_progress: bool = args.show_biodbnet_progress
+    use_biodbnet_cache: bool = args.use_biodbnet_cache
+
+    biodbnet: BioDBNet = BioDBNet(
+        show_progress=show_biodbnet_progress,
+        cache=use_biodbnet_cache,
+    )
 
     # read custom expression requirment file if used
     if custom_file != "SKIP":
@@ -630,6 +655,8 @@ def main(argv):
         custom_df,
         merge_distro,
         keep_gene_score,
+        biodbnet=biodbnet,
+        taxon_id=taxon_id,
     )
 
     print("\nDone!")
