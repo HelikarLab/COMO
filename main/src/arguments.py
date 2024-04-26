@@ -54,6 +54,24 @@ context_names_arg = {
     "help": "Tissue/cell name of models to generate. If making multiple models in a batch, then use the format: 'context1 context2 context3' ",
 }
 
+show_biodbnet_progress_arg = {
+    "flag": "--show-biodbnet-progress",
+    "action": "store_true",
+    "required": False,
+    "default": False,
+    "dest": "show_biodbnet_progress",
+    "help": "Show progress of biodbnet queries",
+}
+
+use_biodbnet_cache_arg = {
+    "flag": "--use-biodbnet-cache",
+    "action": "store_true",
+    "required": False,
+    "default": False,
+    "dest": "use_biodbnet_cache",
+    "help": "Use biodbnet cache",
+}
+
 filtering_technique_arg = {
     "flag": "--filtering-technique",
     "type": str,
@@ -139,7 +157,7 @@ num_neighbors_context_arg = {
 
 min_count_arg = {
     "flag": "--min-count",
-    "type": int | str,
+    "type": str,
     "required": False,
     "default": "default",
     "dest": "min_count",
@@ -405,7 +423,7 @@ proteomics_config_filename_arg = {
 
 expression_requirement_arg = {
     "flag": "--expression-requirement",
-    "type": int | str,
+    "type": str,
     "required": False,
     "default": "default",
     "dest": "expression_requirement",

@@ -1,12 +1,11 @@
 #!/usr/bin/python3
 import argparse
 import multiprocessing as mp
-import multiprocessing.pool
 import os
 import re
 import sys
 from pathlib import Path
-from typing import Union
+from typing import Literal, Union
 
 import cobra
 import numpy as np
@@ -23,7 +22,7 @@ from arguments import (
     reference_flux_filepath_arg,
     test_all_genes_arg,
 )
-from multi_bioservices import InputDatabase, OutputDatabase, db2db
+from fast_bioservices import BioDBNet, Input, Output
 from project import Configs
 
 configs = Configs()
@@ -44,9 +43,10 @@ def _perform_knockout(
     gene: cobra.Gene = model_copy.genes.get_by_id(gene_id)  # type: ignore
     gene.knock_out()
 
-    optimized_model: pd.DataFrame = cobra.flux_analysis.moma(
-        model_copy, solution=reference_solution, linear=False
-    ).to_frame()
+    if knockout_method == "moma":
+        optimized_model: pd.DataFrame = cobra.flux_analysis.moma(
+            model_copy, solution=reference_solution, linear=False
+        ).to_frame()
 
     count_progress.acquire()
     count_progress.value += 1
@@ -55,7 +55,7 @@ def _perform_knockout(
     )
     count_progress.release()
 
-    return gene_id, optimized_model["fluxes"]
+    return gene_id, optimized_model[["fluxes"]]
 
 
 def initialize_pool(synchronizer):
@@ -70,6 +70,7 @@ def knock_out_simulation(
     reference_flux_filepath: Union[str, Path, None],
     test_all: bool,
     pars_flag: bool,
+    knockout_method: Literal["moma"],
 ):
     reference_solution: cobra.Solution
     if reference_flux_filepath is not None:
@@ -87,7 +88,7 @@ def knock_out_simulation(
                 "the given context-specific model!"
             )
 
-        reference_solution = cobra.core.solution.Solution(
+        reference_solution = cobra.core.solution.Solution(  # type: ignore
             model.objective, "OPTIMAL", reference_flux
         )
     else:
@@ -153,15 +154,13 @@ def knock_out_simulation(
     # Initialize the processing pool with a counter
     # From: https://stackoverflow.com/questions/69907453Up
     synchronizer = mp.Value("i", 0)
+    flux_solution: pd.DataFrame = pd.DataFrame()
 
     # Require at least one core
     num_cores: int = max(1, mp.cpu_count() - 2)
-    pool: mp.Pool = mp.Pool(
+    pool: mp.Pool = mp.Pool(  # type: ignore
         num_cores, initializer=initialize_pool, initargs=(synchronizer,)
     )
-
-    spacer: int = len(str(len(genes_with_metabolic_effects)))
-    flux_solution: pd.DataFrame = pd.DataFrame()
 
     print(
         f"Found {len(genes_with_metabolic_effects)} genes with potentially-significant metabolic impacts\n"
@@ -170,7 +169,7 @@ def knock_out_simulation(
 
     start = time.time()
 
-    output: list[mp.pool.ApplyResult] = []
+    output: list[mp.pool.ApplyResult] = []  # type: ignore
     for id_ in genes_with_metabolic_effects:
         output.append(
             pool.apply_async(
@@ -181,6 +180,7 @@ def knock_out_simulation(
                     "model": model,
                     "gene_id": id_,
                     "reference_solution": reference_solution,
+                    "knockout_method": knockout_method,
                 },
             )
         )
@@ -288,10 +288,14 @@ def score_gene_pairs(
         data_p = gene_pairs.loc[gene_pairs["Gene"] == p_gene].copy()
         total_aff = data_p["Gene IDs"].unique().size
         n_aff_down = (
-            data_p.loc[abs(data_p["rxn_fluxRatio"]) < 0.9, "Gene IDs"].unique().size
+            data_p.loc[abs(data_p["rxn_fluxRatio"]) < downreg_flux_cutoff, "Gene IDs"]
+            .unique()
+            .size
         )
         n_aff_up = (
-            data_p.loc[abs(data_p["rxn_fluxRatio"]) > 1.1, "Gene IDs"].unique().size
+            data_p.loc[abs(data_p["rxn_fluxRatio"]) > upreg_flux_cutoff, "Gene IDs"]
+            .unique()
+            .size
         )
         if input_reg == "up":
             d_s = (n_aff_down - n_aff_up) / total_aff
@@ -338,7 +342,7 @@ def load_Inhi_Fratio(filepath):
     return temp2
 
 
-def repurposing_hub_preproc(drug_file, taxon_id: int):
+def repurposing_hub_preproc(drug_file, biodbnet: BioDBNet, taxon_id: int):
     drug_db = pd.read_csv(drug_file, sep="\t")
     drug_db_new = pd.DataFrame()
     for index, row in drug_db.iterrows():
@@ -363,11 +367,11 @@ def repurposing_hub_preproc(drug_file, taxon_id: int):
             )
     drug_db_new.reset_index(inplace=True)
 
-    entrez_ids = db2db(
+    entrez_ids = biodbnet.db2db(
         input_values=drug_db_new["Target"].tolist(),
-        input_db=InputDatabase.GENE_SYMBOL,
-        output_db=OutputDatabase.GENE_ID,
-        cache=False,
+        input_db=Input.GENE_SYMBOL,
+        output_db=Output.GENE_ID,
+        taxon=taxon_id,
     )
 
     # entrez_ids = fetch_entrez_gene_id(drug_db_new["Target"].tolist(), input_db="Gene Symbol")
@@ -377,14 +381,14 @@ def repurposing_hub_preproc(drug_file, taxon_id: int):
     return drug_db_new
 
 
-def drug_repurposing(drug_db, d_score, taxon_id: int):
+def drug_repurposing(drug_db, d_score, biodbnet: BioDBNet, taxon_id: int):
     d_score["Gene"] = d_score["Gene"].astype(str)
 
-    d_score_gene_sym = db2db(
+    d_score_gene_sym = biodbnet.db2db(
         input_values=d_score["Gene"].tolist(),
-        input_db=InputDatabase.GENE_ID,
-        output_db=[OutputDatabase.GENE_SYMBOL],
-        cache=False,
+        input_db=Input.GENE_ID,
+        output_db=[Output.GENE_SYMBOL],
+        taxon=taxon_id,
     )
 
     d_score.set_index("Gene", inplace=True)
@@ -414,16 +418,18 @@ def main(argv):
         "https://github.com/HelikarLab/COMO",
     )
 
-    parser.add_argument(**context_model_filepath_arg)
-    parser.add_argument(**context_names_arg)
-    parser.add_argument(**disease_down_filepath_arg)
-    parser.add_argument(**disease_names_arg)
-    parser.add_argument(**disease_up_filepath_arg)
-    parser.add_argument(**parsimonious_fba_arg)
-    parser.add_argument(**raw_drug_filepath_arg)
-    parser.add_argument(**reconstruction_solver_arg)
-    parser.add_argument(**reference_flux_filepath_arg)
-    parser.add_argument(**test_all_genes_arg)
+    # fmt: off
+    parser.add_argument(context_model_filepath_arg["flag"], **{k: v for k, v in context_model_filepath_arg.items() if k != "flag"})
+    parser.add_argument(context_names_arg["flag"], **{k: v for k, v in context_names_arg.items() if k != "flag"})
+    parser.add_argument(disease_down_filepath_arg["flag"], **{k: v for k, v in disease_down_filepath_arg.items() if k != "flag"})
+    parser.add_argument(disease_names_arg["flag"], **{k: v for k, v in disease_names_arg.items() if k != "flag"})
+    parser.add_argument(disease_up_filepath_arg["flag"], **{k: v for k, v in disease_up_filepath_arg.items() if k != "flag"})
+    parser.add_argument(parsimonious_fba_arg["flag"], **{k: v for k, v in parsimonious_fba_arg.items() if k != "flag"})
+    parser.add_argument(raw_drug_filepath_arg["flag"], **{k: v for k, v in raw_drug_filepath_arg.items() if k != "flag"})
+    parser.add_argument(reconstruction_solver_arg["flag"], **{k: v for k, v in reconstruction_solver_arg.items() if k != "flag"})
+    parser.add_argument(reference_flux_filepath_arg["flag"], **{k: v for k, v in reference_flux_filepath_arg.items() if k != "flag"})
+    parser.add_argument(test_all_genes_arg["flag"], **{k: v for k, v in test_all_genes_arg.items() if k != "flag"})
+    # fmt: on
 
     args = parser.parse_args()
     taxon_id: int = args.taxon_id
@@ -437,9 +443,21 @@ def main(argv):
     test_all = args.test_all
     pars_flag = args.pars_flag
     solver = args.solver
+    p_value: float = args.p_value
+    log2_dge_cutoff: float = args.log2_dge_cutoff
+    knockout_method = args.knockout_method
+    downreg_flux_cutoff: float = args.downreg_flux_cutoff
+    upreg_flux_cutoff: float = args.upreg_flux_cutoff
+    show_biodbnet_progress: bool = args.show_biodbnet_progress
+    use_biodbnet_cache: bool = args.use_biodbnet_cache
 
     output_dir = os.path.join(configs.data_dir, "results", context, disease)
     inhibitors_file = os.path.join(output_dir, f"{context}_{disease}_inhibitors.tsv")
+
+    biodbnet: BioDBNet = BioDBNet(
+        show_progress=show_biodbnet_progress,
+        cache=use_biodbnet_cache,
+    )
 
     print(f"Output directory: '{output_dir}'")
     print(f"Tissue Specific Model file is at: {tissue_spec_model_file}")
@@ -463,7 +481,9 @@ def main(argv):
     )
     if not os.path.isfile(reformatted_drug_file):
         print("Preprocessing raw Repurposing Hub DB file...")
-        drug_db = repurposing_hub_preproc(raw_drug_filepath, taxon_id=taxon_id)
+        drug_db = repurposing_hub_preproc(
+            raw_drug_filepath, biodbnet=biodbnet, taxon_id=taxon_id
+        )
         drug_db.to_csv(reformatted_drug_file, index=False, sep="\t")
         print(
             f"Preprocessed Repurposing Hub tsv file written to:\n{reformatted_drug_file}"
@@ -489,6 +509,7 @@ def main(argv):
         reference_flux_filepath=ref_flux_file,
         test_all=test_all,
         pars_flag=pars_flag,
+        knockout_method=knockout_method,
     )
 
     flux_solution_diffs.to_csv(os.path.join(output_dir, "flux_diffs_KO.csv"))
@@ -528,11 +549,15 @@ def main(argv):
         gene_pairs_down,
         os.path.join(output_dir, f"{context}_d_score_DOWN.csv"),
         input_reg="down",
+        downreg_flux_cutoff=downreg_flux_cutoff,
+        upreg_flux_cutoff=upreg_flux_cutoff,
     )
     d_score_up = score_gene_pairs(
         gene_pairs_up,
         os.path.join(output_dir, f"{context}_d_score_UP.csv"),
         input_reg="up",
+        downreg_flux_cutoff=downreg_flux_cutoff,
+        upreg_flux_cutoff=upreg_flux_cutoff,
     )
     pertubation_effect_score = (d_score_up + d_score_down).sort_values(
         by="score", ascending=False
@@ -541,7 +566,12 @@ def main(argv):
     pertubation_effect_score.reset_index(drop=False, inplace=True)
 
     # last step: output drugs based on d score
-    drug_score = drug_repurposing(drug_db, pertubation_effect_score, taxon_id=taxon_id)
+    drug_score = drug_repurposing(
+        drug_db,
+        pertubation_effect_score,
+        biodbnet=biodbnet,
+        taxon_id=taxon_id,
+    )
     drug_score_file = os.path.join(output_dir, f"{context}_drug_score.csv")
     drug_score.to_csv(drug_score_file, index=False)
     print(

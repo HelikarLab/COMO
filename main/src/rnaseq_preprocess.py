@@ -17,7 +17,7 @@ from arguments import (
     provided_matrix_filename_arg,
     taxon_id_arg,
 )
-from multi_bioservices.biodbnet import InputDatabase, OutputDatabase, TaxonID, db2db
+from fast_bioservices import BioDBNet, Input, Output, Taxon
 from project import Configs
 
 configs = Configs()
@@ -216,7 +216,7 @@ def create_config_df(context_name):
                 else:
                     mean_fragment_sizes = np.array([])
                     library_sizes = np.array([])
-                    for ff in frag_files:
+                    for ff in frag_files:  # type: ignore
                         frag_df = pd.read_table(
                             ff, low_memory=False, sep="\t", on_bad_lines="skip"
                         )
@@ -285,7 +285,10 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
 
 
 def create_gene_info_file(
-    matrix_file_list: list[str], input_format: InputDatabase, taxon_id
+    matrix_file_list: list[str],
+    biodbnet: BioDBNet,
+    form: Input,
+    taxon_id,
 ):
     """
     Create gene info file for specified context by reading first column in its count matrix file at
@@ -308,26 +311,26 @@ def create_gene_info_file(
     # Create our output database format
     # Do not include values equal to "form"
     # Remove items not equal to `form` because the input database cannot exist as an output database
-    output_db: list[OutputDatabase] = [
+    output_db: list[Output] = [
         i
         for i in [
-            OutputDatabase.ENSEMBL_GENE_ID,
-            OutputDatabase.GENE_SYMBOL,
-            OutputDatabase.GENE_ID,
-            OutputDatabase.CHROMOSOMAL_LOCATION,
+            Output.ENSEMBL_GENE_ID,
+            Output.GENE_SYMBOL,
+            Output.GENE_ID,
+            Output.CHROMOSOMAL_LOCATION,
         ]
-        if i.value != input_format.value
+        if i.value != form.value
     ]
 
-    gene_info = db2db(
+    gene_info = biodbnet.db2db(
         input_values=genes,
-        input_db=input_format,
+        input_db=form,
         output_db=output_db,
-        taxon_id=taxon_id,
+        taxon=taxon_id,
     )
 
     gene_info.rename(
-        columns={OutputDatabase.ENSEMBL_GENE_ID.value: "ensembl_gene_id"}, inplace=True
+        columns={Output.ENSEMBL_GENE_ID.value: "ensembl_gene_id"}, inplace=True
     )
     gene_info["start_position"] = gene_info["Chromosomal Location"].str.extract(
         r"chr_start: (\d+)"
@@ -344,7 +347,12 @@ def create_gene_info_file(
 
 
 def handle_context_batch(
-    context_names, mode, form: InputDatabase, taxon_id, provided_matrix_file
+    context_names,
+    mode,
+    biodbnet: BioDBNet,
+    form: Input,
+    taxon_id,
+    provided_matrix_file,
 ):
     """
     Handle iteration through each context type and create files according to flag used (config, matrix, info)
@@ -400,7 +408,10 @@ def handle_context_batch(
 
                 tmatrix_files.append(matrix_path_total)
                 df_t.to_excel(
-                    twriter, sheet_name=context_name, header=True, index=False
+                    twriter,  # type: ignore
+                    sheet_name=context_name,
+                    header=True,
+                    index=False,  # type: ignore
                 )
 
             if not df_m.empty:
@@ -410,7 +421,10 @@ def handle_context_batch(
 
                 mmatrix_files.append(matrix_path_mrna)
                 df_m.to_excel(
-                    mwriter, sheet_name=context_name, header=True, index=False
+                    mwriter,  # type: ignore
+                    sheet_name=context_name,
+                    header=True,
+                    index=False,
                 )
 
             tmatrix, mmatrix = split_counts_matrices(matrix_path_all, df_t, df_m)
@@ -421,15 +435,25 @@ def handle_context_batch(
 
     if mode == "make":
         if tflag:
-            twriter.close()
+            twriter.close()  # type: ignore
         if mflag:
-            mwriter.close()
+            mwriter.close()  # type: ignore
 
-        create_gene_info_file(tmatrix_files + mmatrix_files, form, taxon_id)
+        create_gene_info_file(
+            tmatrix_files + mmatrix_files,
+            biodbnet=biodbnet,
+            form=form,
+            taxon_id=taxon_id,
+        )
 
     else:
-        matrix_files: list[str] = como_utilities.stringlist_to_list(matrix_path_prov)
-        create_gene_info_file(matrix_files, form, taxon_id)
+        matrix_files: list[str] = como_utilities.stringlist_to_list(matrix_path_prov)  # type: ignore
+        create_gene_info_file(
+            matrix_files,
+            biodbnet=biodbnet,
+            form=form,
+            taxon_id=taxon_id,
+        )
 
 
 def parse_args(argv):
@@ -477,6 +501,7 @@ def parse_args(argv):
 def main(argv):
     args = parse_args(argv)
 
+    gene_format_database: Input
     if args.gene_format.upper() in [
         "ENSEMBL",
         "ENSEMBLE",
@@ -485,7 +510,7 @@ def main(argv):
         "ENSEMBL ID",
         "ENSEMBL GENE ID",
     ]:
-        gene_format_database: InputDatabase = InputDatabase.ENSEMBL_GENE_ID
+        gene_format_database = Input.ENSEMBL_GENE_ID
 
     elif args.gene_format.upper() in [
         "HGNC SYMBOL",
@@ -495,7 +520,7 @@ def main(argv):
         "HGNC",
         "GENE SYMBOL",
     ]:
-        gene_format_database: InputDatabase = InputDatabase.GENE_SYMBOL
+        gene_format_database = Input.GENE_SYMBOL
 
     elif args.gene_format.upper() in [
         "ENTREZ",
@@ -503,7 +528,7 @@ def main(argv):
         "ENTREZ ID",
         "ENTREZ NUMBER" "GENE ID",
     ]:
-        gene_format_database: InputDatabase = InputDatabase.GENE_ID
+        gene_format_database = Input.GENE_ID
 
     else:  # provided invalid gene format
         print("Gene format (--gene_format) is invalid")
@@ -514,11 +539,11 @@ def main(argv):
     # handle species alternative ids
     if isinstance(args.taxon_id, str):
         if args.taxon_id.upper() == "HUMAN" or args.taxon_id.upper() == "HOMO SAPIENS":
-            taxon_id = TaxonID.HOMO_SAPIENS
+            taxon_id = Taxon.HOMO_SAPIENS
         elif (
             args.taxon_id.upper() == "MOUSE" or args.taxon_id.upper() == "MUS MUSCULUS"
         ):
-            taxon_id = TaxonID.MUS_MUSCULUS
+            taxon_id = Taxon.MUS_MUSCULUS
         else:
             print(
                 "--taxon-id must be either an integer, or accepted string ('mouse', 'human')"
@@ -542,12 +567,17 @@ def main(argv):
         print("--provide-matrix or --create-matrix must be set")
         sys.exit(1)
 
+    biodbnet: BioDBNet = BioDBNet(
+        show_progress=args.use_biodbnet_cache, cache=args.use_biodbnet_cache
+    )
+
     handle_context_batch(
-        args.context_names,
-        mode,
-        gene_format_database,
-        taxon_id,
-        args.provided_matrix_fname,
+        context_names=args.context_names,
+        mode=mode,
+        biodbnet=biodbnet,
+        form=gene_format_database,
+        taxon_id=taxon_id,
+        provided_matrix_file=args.provided_matrix_fname,
     )
 
 

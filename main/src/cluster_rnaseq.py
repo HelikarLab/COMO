@@ -47,7 +47,7 @@ r_file_path = Path(configs.root_dir, "src", "rscripts", "cluster_samples.R")
 # cluster_io = SignatureTranslatedAnonymousPackage(string, "cluster_io")
 
 
-def main() -> None:
+def main(argv) -> None:
     """
     Cluster RNA-seq Data
     """
@@ -205,24 +205,6 @@ def main() -> None:
         seed=seed,
     )
     cluster_samples.call_function("cluster_samples_main")
-    # cluster_io = rpy2_api.Rpy2(r_file_path=r_file_path)
-    # cluster_io_function = cluster_io.call_function("cluster_samples_main")
-    # cluster_io_function(
-    #     wd,
-    #     context_names,
-    #     technique,
-    #     clust_algo,
-    #     label,
-    #     min_dist=min_dist,
-    #     n_neigh_rep=n_neigh_rep,
-    #     n_neigh_batch=n_neigh_batch,
-    #     n_neigh_cont=n_neigh_cont,
-    #     rep_ratio=rep_ratio,
-    #     batch_ratio=batch_ratio,
-    #     quantile=quantile,
-    #     min_count=min_count,
-    #     seed=seed,
-    # )
 
 
 if __name__ == "__main__":
