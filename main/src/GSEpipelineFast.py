@@ -7,9 +7,11 @@ import instruments
 import numpy as np
 import pandas as pd
 import rpy2.robjects as ro
-from fast_bioservices import BioDBNet, Input, Output
 from GSEpipeline import load_gse_soft
 from instruments import AffyIO
+
+# from fast_bioservices import BioDBNet, Input, Output
+from multi_bioservices.biodbnet import InputDatabase, OutputDatabase, TaxonID, db2db
 from rpy2.robjects import pandas2ri
 
 pandas2ri.activate()
@@ -34,8 +36,6 @@ def download_gsm_id_maps(datadir, gse, gpls: Optional[list[str]] = None, vendor=
     if gpls is None:
         gpls = ["GPL96", "GPL97", "GPL8300"]
 
-    biodbnet = BioDBNet()
-
     for gpl in gpls:
         table = gse.gpls[gpl].table.copy()
         if vendor.lower() == "affy":
@@ -46,18 +46,18 @@ def download_gsm_id_maps(datadir, gse, gpls: Optional[list[str]] = None, vendor=
                 table["CONTROL_TYPE"] == "FALSE", "SPOT_ID"
             ].tolist()
 
-            temp = biodbnet.db2db(
+            temp = db2db(
                 input_values=input_values,
-                input_db=Input.AGILENT_ID,
-                output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID],
+                input_db=InputDatabase.AGILENT_ID,
+                output_db=[OutputDatabase.GENE_ID, OutputDatabase.ENSEMBL_GENE_ID],
             )
 
             temp.drop(columns=["Ensembl Gene ID"], inplace=True)
             temp.reset_index(inplace=True)
             temp.rename(
                 columns={
-                    Input.AGILENT_ID.value: "ID",
-                    Output.GENE_ID.value: "ENTREZ_GENE_ID",
+                    InputDatabase.AGILENT_ID.value: "ID",
+                    OutputDatabase.GENE_ID.value: "ENTREZ_GENE_ID",
                 },
                 inplace=True,
             )
@@ -204,7 +204,6 @@ class GSEproject:
             return pd.DataFrame([])
 
         # Ready Affy files from folders
-        biodbnet = BioDBNet()
         gsm_tables_sc500 = {}
         for key, vendor in self.platforms.items():
             platformdir = os.path.join(self.gene_dir, key)
@@ -220,20 +219,20 @@ class GSEproject:
                         platformdir, list(self.gsm_platform.keys())
                     )
 
-                    gsm_maps[key] = biodbnet.db2db(
+                    gsm_maps[key] = db2db(
                         input_values=list(map(str, list(outputdf["ProbeName"]))),
-                        input_db=Input.AGILENT_ID,
-                        output_db=[Output.GENE_ID],
+                        input_db=InputDatabase.AGILENT_ID,
+                        output_db=[OutputDatabase.GENE_ID],
                     )
 
                     outputdf = instruments.readagilent(
                         platformdir, list(self.gsm_platform.keys())
                     )
 
-                    gsm_maps[key] = biodbnet.db2db(
+                    gsm_maps[key] = db2db(
                         input_values=list(map(str, list(outputdf["ProbeName"]))),
-                        input_db=Input.AGILENT_ID,
-                        output_db=[Output.GENE_ID],
+                        input_db=InputDatabase.AGILENT_ID,
+                        output_db=[OutputDatabase.GENE_ID],
                     )
 
                     gsm_maps[key].rename(
