@@ -261,3 +261,20 @@ output_filetypes_arg = {
     "dest": "output_filetypes",
     "help": "Filetypes to save seeded model type. Can be either a string with one filetype such as 'xml' or multiple in the format 'extension1 extension2 extension3'. If you want to output in all 3 accepted formats,  would be: 'mat xml json'.",
 }
+
+config_file_arg = {
+    "name_or_flags": ["--config-file"],
+    "type": str,
+    "required": True,
+    "dest": "config_file",
+    "help": "The path to the configuration file",
+}
+
+data_source_arg = {
+    "name_or_flags": ["--data-source"],
+    "type": str,
+    "choices": ["rnaseq", "microarray"],
+    "required": True,
+    "dest": "data_source",
+    "help": "Source of data being used, either rnaseq or microarray",
+}
