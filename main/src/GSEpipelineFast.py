@@ -1,16 +1,16 @@
 import os
 import tarfile
 import urllib.request
+from typing import Optional
 
+import instruments
 import numpy as np
 import pandas as pd
 import rpy2.robjects as ro
 from fast_bioservices import BioDBNet, Input, Output
-from rpy2.robjects import pandas2ri
-
-import instruments
 from GSEpipeline import load_gse_soft
 from instruments import AffyIO
+from rpy2.robjects import pandas2ri
 
 pandas2ri.activate()
 
@@ -20,7 +20,7 @@ pandas2ri.activate()
 # gse = load_gse_soft(gsename)
 
 
-def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
+def download_gsm_id_maps(datadir, gse, gpls: Optional[list[str]] = None, vendor="affy"):
     """
     download ID to ENTREZ_GENE_ID maps, create a csv file for each platform, and return dictionary
     :param gpls:
@@ -32,11 +32,10 @@ def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
     # Do not allow gpls to be mutable
     # From: https://florimond.dev/en/posts/2018/08/python-mutable-defaults-are-the-source-of-all-evil/
     if gpls is None:
-        gpls: list[str] = ["GPL96", "GPL97", "GPL8300"]
+        gpls = ["GPL96", "GPL97", "GPL8300"]
 
-    
     biodbnet = BioDBNet()
-    
+
     for gpl in gpls:
         table = gse.gpls[gpl].table.copy()
         if vendor.lower() == "affy":
@@ -47,30 +46,20 @@ def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
                 table["CONTROL_TYPE"] == "FALSE", "SPOT_ID"
             ].tolist()
 
-            temp = db2db(
-            
             temp = biodbnet.db2db(
                 input_values=input_values,
-                input_db=InputDatabase.AGILENT_ID,
-                output_db=[OutputDatabase.GENE_ID, OutputDatabase.ENSEMBL_GENE_ID],
                 input_db=Input.AGILENT_ID,
-                output_db=[
-                    Output.GENE_ID,
-                    Output.ENSEMBL_GENE_ID
-                ],
+                output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID],
             )
 
             temp.drop(columns=["Ensembl Gene ID"], inplace=True)
             temp.reset_index(inplace=True)
             temp.rename(
                 columns={
-                    InputDatabase.AGILENT_ID.value: "ID",
-                    OutputDatabase.GENE_ID.value: "ENTREZ_GENE_ID",
+                    Input.AGILENT_ID.value: "ID",
+                    Output.GENE_ID.value: "ENTREZ_GENE_ID",
                 },
                 inplace=True,
-                    Input.AGILENT_ID.value: "ID",
-                    Output.GENE_ID.value: "ENTREZ_GENE_ID"
-                }, inplace=True
             )
             temp.replace(to_replace="-", value=np.nan, inplace=True)
 
@@ -231,10 +220,16 @@ class GSEproject:
                         platformdir, list(self.gsm_platform.keys())
                     )
 
-                    gsm_maps[key] = db2db(
-                    
-                    outputdf = instruments.readagilent(platformdir, list(self.gsm_platform.keys()))
-                    
+                    gsm_maps[key] = biodbnet.db2db(
+                        input_values=list(map(str, list(outputdf["ProbeName"]))),
+                        input_db=Input.AGILENT_ID,
+                        output_db=[Output.GENE_ID],
+                    )
+
+                    outputdf = instruments.readagilent(
+                        platformdir, list(self.gsm_platform.keys())
+                    )
+
                     gsm_maps[key] = biodbnet.db2db(
                         input_values=list(map(str, list(outputdf["ProbeName"]))),
                         input_db=Input.AGILENT_ID,
@@ -277,45 +272,50 @@ class GSEproject:
                     how="outer",
                 )
 
-        df_outer_sc500.dropna(how="all", inplace=True)
-        print("Full: {}".format(df_outer_sc500.shape))
-        df_outer_sc500.rename(str.lower, axis="columns", inplace=True)
+        df_outer_sc500.dropna(how="all", inplace=True)  # type: ignore
+        print("Full: {}".format(df_outer_sc500.shape))  # type: ignore
+        df_outer_sc500.rename(str.lower, axis="columns", inplace=True)  # type: ignore
         keys = []
         vals = []
         gsms_loaded = []
 
-        for col in list(df_outer_sc500):
-            if ".cel.gz" in col:
-                strs = col.split(".cel.gz")
+        for col in list(df_outer_sc500):  # type: ignore
+            if ".cel.gz" in col:  # type: ignore
+                strs = col.split(".cel.gz")  # type: ignore
                 gsm = strs[0].split("_")[0]
                 newcol = "{}.cel.gz{}".format(gsm, strs[-1])
                 vals.append(newcol)
                 keys.append(col)
                 gsms_loaded.append(gsm)
 
-        df_outer_sc500.rename(columns=dict(zip(keys, vals)), inplace=True)
+        df_outer_sc500.rename(columns=dict(zip(keys, vals)), inplace=True)  # type: ignore
         gsms_loaded = list(set(gsms_loaded).union(set(self.gsm_platform.keys())))
 
         # Remove duplicated items, keep largest VALUE for each GSM
         if "df_clean_sc500" not in locals():
-            df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)
+            df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)  # type: ignore
             df_clean_sc500 = df_clean_sc500[
                 ~df_clean_sc500.index.duplicated(keep="first")
             ]
-        elif df_clean_sc500.empty:
-            df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)
+        elif df_clean_sc500.empty:  # type: ignore
+            df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)  # type: ignore
             df_clean_sc500 = df_clean_sc500[
                 ~df_clean_sc500.index.duplicated(keep="first")
             ]
         else:
-            df_clean_sc500.set_index("ENTREZ_GENE_ID", inplace=True)
+            df_clean_sc500.set_index("ENTREZ_GENE_ID", inplace=True)  # type: ignore
             placeholder = pd.DataFrame(
-                [], columns=["placeholder"], index=df_outer_sc500.index
+                [],
+                columns=["placeholder"],
+                index=df_outer_sc500.index,  # type: ignore
             )
             placeholder["placeholder"] = 0
             placeholder.index.name = "ENTREZ_GENE_ID"
             df_clean_sc500 = pd.merge(
-                df_clean_sc500, placeholder, on="ENTREZ_GENE_ID", how="outer"
+                df_clean_sc500,  # type: ignore
+                placeholder,
+                on="ENTREZ_GENE_ID",
+                how="outer",  # type: ignore
             )
             df_clean_sc500 = df_clean_sc500[
                 ~df_clean_sc500.index.duplicated(keep="last")
@@ -330,7 +330,7 @@ class GSEproject:
             )
 
             try:
-                temp = df_outer_sc500.loc[:, [col1, col2, col3]]
+                temp = df_outer_sc500.loc[:, [col1, col2, col3]]  # type: ignore
 
             except:
                 if key in list(self.gsm_platform.keys()):
