@@ -278,3 +278,71 @@ data_source_arg = {
     "dest": "data_source",
     "help": "Source of data being used, either rnaseq or microarray",
 }
+
+context_model_filepath_arg = {
+    "name_or_flags": ["--context-model"],
+    "type": str,
+    "required": True,
+    "dest": "model",
+    "help": "The context-specific model file. Must end in .mat, .xml, or .json.",
+}
+
+disease_names_arg = {
+    "name_or_flags": ["--disease-names"],
+    "type": str,
+    "required": True,
+    "dest": "disease",
+    "help": "The disease names of the organism, such as 'cancer' or 'diabetes'. Only accepts a single disease at a time.",
+}
+
+disease_up_filepath_arg = {
+    "name_or_flags": ["--disease-up"],
+    "type": str,
+    "required": True,
+    "dest": "disease_up",
+    "help": "The upregulated gene filepath for the disease.",
+}
+
+disease_down_filepath_arg = {
+    "name_or_flags": ["--disease-down"],
+    "type": str,
+    "required": True,
+    "dest": "disease_down",
+    "help": "The downregulated gene filepath for the disease.",
+}
+
+raw_drug_filepath_arg = {
+    "name_or_flags": ["--raw-drug-file"],
+    "type": str,
+    "required": True,
+    "dest": "raw_drug_file",
+    "help": "The raw drug file path.",
+}
+
+reference_flux_filepath_arg = {
+    "name_or_flags": ["--reference-flux-file"],
+    "type": str,
+    "required": False,
+    "dest": "ref_flux_file",
+    "help": "The reference flux file path.",
+}
+
+test_all_genes_arg = {
+    "name_or_flags": ["--test-all"],
+    "type": bool,
+    "action": "store_true",
+    "required": False,
+    "default": False,
+    "dest": "test_all",
+    "help": "Test all genes in the model, even ones predicted to have little-to-no effect.",
+}
+
+parsimonious_fba_arg = {
+    "name_or_flags": ["--parsimonious"],
+    "type": bool,
+    "action": "store_true",
+    "required": False,
+    "default": False,
+    "dest": "pars_flag",
+    "help": "Use parsimonious FBA to calculate the optimal reference solution. Only valid if a reference flux file is not being provided.",
+}
