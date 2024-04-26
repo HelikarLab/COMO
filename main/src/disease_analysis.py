@@ -9,7 +9,8 @@ import GSEpipelineFast
 import pandas as pd
 import rpy2.robjects as ro
 import rpy2_api
-from multi_bioservices.biodbnet import InputDatabase, OutputDatabase, db2db
+from arguments import config_file_arg, context_names_arg, data_source_arg, taxon_id_arg
+from multi_bioservices import InputDatabase, OutputDatabase, db2db
 from project import Configs
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import importr
@@ -182,7 +183,7 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
 
         bdnet = db2db(
             input_values=list(map(str, diff_exp_df["Affy ID"].tolist())),
-            input_db=input_db,  # type: ignore
+            input_db=input_db,
             output_db=[
                 OutputDatabase.ENSEMBL_GENE_ID,
                 OutputDatabase.GENE_ID,
@@ -354,38 +355,10 @@ def main(argv):
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at: "
         "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
     )
-    parser.add_argument(
-        "-c",
-        "--config-file",
-        type=str,
-        required=True,
-        dest="config_file",
-        help="The path to the configuration file",
-    )
-    parser.add_argument(
-        "-t",
-        "--context-name",
-        type=str,
-        required=True,
-        dest="context_name",
-        help="The type of context being used",
-    )
-    parser.add_argument(
-        "-s",
-        "--data-source",
-        type=str,
-        required=True,
-        dest="data_source",
-        help="Source of data being used, either rnaseq or microarray",
-    )
-    parser.add_argument(
-        "-i",
-        "--taxon-id",
-        required=False,
-        default=9606,
-        dest="taxon_id",
-        help="BioDbNet taxon ID number, also accepts 'human', or 'mouse'",
-    )
+    parser.add_argument(**config_file_arg)
+    parser.add_argument(**context_names_arg)
+    parser.add_argument(**data_source_arg)
+    parser.add_argument(**taxon_id_arg)
 
     args = parser.parse_args()
     context_name = args.context_name
