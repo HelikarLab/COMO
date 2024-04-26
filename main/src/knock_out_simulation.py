@@ -11,6 +11,18 @@ import cobra
 import numpy as np
 import pandas as pd
 from fast_bioservices import BioDBNet, Input, Output
+from arguments import (
+    context_model_filepath_arg,
+    context_names_arg,
+    disease_down_filepath_arg,
+    disease_names_arg,
+    disease_up_filepath_arg,
+    parsimonious_fba_arg,
+    raw_drug_filepath_arg,
+    reconstruction_solver_arg,
+    reference_flux_filepath_arg,
+    test_all_genes_arg,
+)
 from project import Configs
 
 configs = Configs()
@@ -405,162 +417,17 @@ def main(argv):
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
         "https://github.com/HelikarLab/COMO",
     )
-    parser.add_argument(
-        "-t",
-        "--taxon-id",
-        type=int,
-        required=True,
-        dest="taxon_id",
-        help="The taxon ID of the organism, such as 9096 for Homo Sapiens",
-    )
-    parser.add_argument(
-        "-m",
-        "--context-model",
-        type=str,
-        required=True,
-        dest="model",
-        help="The context-specific model file, (must be .mat, .xml, or .json",
-    )
-    parser.add_argument(
-        "-c",
-        "--context-name",
-        type=str,
-        required=True,
-        dest="context",
-        help="Name of context, tissue, cell-type, etc",
-    )
-    parser.add_argument(
-        "-d",
-        "--disease-name",
-        type=str,
-        required=True,
-        dest="disease",
-        help="Name of disease",
-    )
-    parser.add_argument(
-        "-up",
-        "--disease-up",
-        type=str,
-        required=True,
-        dest="disease_up",
-        help="The name of the disease up-regulated file",
-    )
-    parser.add_argument(
-        "-dn",
-        "--disease-down",
-        type=str,
-        required=True,
-        dest="disease_down",
-        help="The name of the disease down-regulated file",
-    )
-    parser.add_argument(
-        "-r",
-        "--raw-drug-file",
-        type=str,
-        required=True,
-        dest="raw_drug_file",
-        help="The name of the raw drug file",
-    )
-    parser.add_argument(
-        "-f",
-        "--reference-flux-file",
-        type=str if ("--reference-flux-file" in argv or "-f" in argv) else type(None),
-        required=False,
-        default=None,
-        dest="ref_flux_file",
-        help="The name of the reference flux file",
-    )
-    parser.add_argument(
-        "-a",
-        "--test-all",
-        action="store_true",
-        required=False,
-        default=False,
-        dest="test_all",
-        help="Test all genes, even ones predicted to have little no effect.",
-    )
-    parser.add_argument(
-        "-pv",
-        "--p-value",
-        type=float,
-        required=False,
-        default=0.05,
-        dest="p_value",
-        help="The p-value threshold for significance determination",
-    )
-    parser.add_argument(
-        "-dge",
-        "--log2-differential-expression-cutuff",
-        type=float,
-        required=False,
-        default=0.58,
-        dest="log2_dge_cutoff",
-        help="The log2 differential expression cutoff for significance determination. A log2 of 0.58 is equivalent to a 1.5 fold change.",
-    )
-    parser.add_argument(
-        "-k",
-        "--knockout-method",
-        type=str,
-        required=False,
-        choices=["moma"],
-        default="moma",
-        dest="knockout_method",
-        help="The method to use for knockout simulations. Options are: moma",
-    )
-    parser.add_argument(
-        "-p",
-        "--parsimonious",
-        action="store_true",
-        required=False,
-        default=False,
-        dest="pars_flag",
-        help="Use parsimonious FBA for optimal reference solution (only if not providing flux file)",
-    )
-    parser.add_argument(
-        "-s",
-        "--solver",
-        type=str,
-        required=False,
-        default="gurobi",
-        dest="solver",
-        help="The solver to use for FBA. Options are: gurobi or glpk",
-    )
-    parser.add_argument(
-        "-lf",
-        "--downreg-flux-cutoff",
-        type=float,
-        required=False,
-        default=0.9,
-        dest="downreg_flux_cutoff",
-        help="The flux cutoff to mark a reaction as down-regulated",
-    )
-    parser.add_argument(
-        "-hf",
-        "--upreg-flux-cutoff",
-        type=float,
-        required=False,
-        default=1.1,
-        dest="upreg_flux_cutoff",
-        help="The flux cutoff to mark a reaction as up-regulated",
-    )
-    parser.add_argument(
-        "-bp",
-        "--show-biodbnet-progress",
-        action="store_true",
-        required=False,
-        default=False,
-        dest="show_biodbnet_progress",
-        help="Show progress bar for BioDBNet API requests",
-    )
-    parser.add_argument(
-        "-bc",
-        "--use-biodbnet-cache",
-        action="store_true",
-        required=False,
-        default=False,
-        dest="use_biodbnet_cache",
-        help="Use cached BioDBNet API requests",
-    )
+
+    parser.add_argument(**context_model_filepath_arg)
+    parser.add_argument(**context_names_arg)
+    parser.add_argument(**disease_down_filepath_arg)
+    parser.add_argument(**disease_names_arg)
+    parser.add_argument(**disease_up_filepath_arg)
+    parser.add_argument(**parsimonious_fba_arg)
+    parser.add_argument(**raw_drug_filepath_arg)
+    parser.add_argument(**reconstruction_solver_arg)
+    parser.add_argument(**reference_flux_filepath_arg)
+    parser.add_argument(**test_all_genes_arg)
 
     args = parser.parse_args()
     taxon_id: int = args.taxon_id

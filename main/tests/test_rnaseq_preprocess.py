@@ -1,6 +1,7 @@
-import pytest
 import os
 import sys
+
+import pytest
 
 # Add parent directory to path, allows us to import the "project.py" file from the parent directory
 # From: https://stackoverflow.com/a/30536516/13885200
@@ -13,14 +14,33 @@ import rnaseq_preprocess
     "args",
     [
         # Test using data in COMO_input data
-        ["-n", "naiveB immNK", "--gene-format", "Ensembl", "--taxon-id", "9606", "--create-matrix"],
-        ["-n", "dimNK brightNK", "--gene-format", "SYMBOL", "--taxon-id", "human", "--provide-matrix", "--matrix", "COMO_input/counts_matrix.tsv"],
-    ]
+        [
+            "--context-names",
+            "naiveB immNK",
+            "--gene-format",
+            "Ensembl",
+            "--taxon-id",
+            "9606",
+            "--create-matrix",
+        ],
+        [
+            "--context-names",
+            "dimNK brightNK",
+            "--gene-format",
+            "SYMBOL",
+            "--taxon-id",
+            "human",
+            "--provide-matrix",
+            "--matrix",
+            "COMO_input/counts_matrix.tsv",
+        ],
+    ],
 )
 def test_arg_input(args: list[str]):
     """
     This function asserts that the arguments passed into the function are correct
     """
+    print(args)
     context_names = args[1]
     gene_format = args[3]
     taxon_id = args[5]
@@ -28,7 +48,9 @@ def test_arg_input(args: list[str]):
 
     parsed = rnaseq_preprocess.parse_args(args)
 
-    assert [context_name in parsed.context_names for context_name in context_names.split()]
+    assert [
+        context_name in parsed.context_names for context_name in context_names.split()
+    ]
     assert parsed.gene_format == gene_format
     assert parsed.taxon_id == taxon_id
 

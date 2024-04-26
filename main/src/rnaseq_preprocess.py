@@ -10,6 +10,14 @@ import numpy as np
 import pandas as pd
 import rpy2_api
 from fast_bioservices import BioDBNet, Input, Output, Taxon
+from arguments import (
+    context_names_arg,
+    create_matrix_arg,
+    gene_format_arg,
+    provide_count_matrix_arg,
+    provided_matrix_filename_arg,
+    taxon_id_arg,
+)
 from project import Configs
 
 configs = Configs()
@@ -39,7 +47,7 @@ def create_counts_matrix(context_name):
 
 def create_config_df(context_name):
     """
-    Create configuration sheet at /work/data/config_sheets/rnaseq_data_inputs_auto.xlsx
+    Create configuration sheet at /main/data/config_sheets/rnaseq_data_inputs_auto.xlsx
     based on the gene counts matrix. If using zFPKM normalization technique, fetch mean fragment lengths from
     /work/data/COMO_input/<context name>/<study number>/fragmentSizes/
     """
@@ -297,8 +305,7 @@ def create_gene_info_file(
         genes = []
 
     for file in matrix_file_list:
-        add_genes = pd.read_csv(file)["genes"].tolist()
-        genes += add_genes
+        genes += pd.read_csv(file)["genes"].tolist()
     genes = list(set(genes))
 
     # Create our output database format
@@ -312,12 +319,12 @@ def create_gene_info_file(
             Output.GENE_ID,
             Output.CHROMOSOMAL_LOCATION,
         ]
-        if i.value != form.value
+        if i.value != input_format.value
     ]
 
     gene_info = biodbnet.db2db(
         input_values=genes,
-        input_db=form,
+        input_db=input_format,
         output_db=output_db,
         taxon=taxon_id,
     )
@@ -474,89 +481,16 @@ def parse_args(argv):
             https://github.com/HelikarLab/MADRID or email babessell@gmail.com""",
     )
 
-    parser.add_argument(
-        "-n",
-        "--context-names",
-        type=str,
-        nargs="+",
-        required=True,
-        dest="context_names",
-        help="""Tissue/cell name of models to generate. These names should correspond to the folders
-                             in 'COMO_input/' if creating count matrix files, or to
-                             'work/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv' if supplying
-                             the count matrix as an imported .csv file. If making multiple models in a batch, then
-                             use the format: "context1 context2 context3". """,
-    )
-
-    parser.add_argument(
-        "-f",
-        "--gene-format",
-        type=str,
-        required=False,
-        default="Ensembl Gene ID",
-        dest="gene_format",
-        help="Format of Genes, accepts 'Ensembl', 'Entrez', or'HGNC symbol'",
-    )
-
-    parser.add_argument(
-        "-i",
-        "--taxon-id",
-        required=False,
-        default=9606,
-        dest="taxon_id",
-        help="BioDbNet taxon ID number, also accepts 'human', or 'mouse'",
-    )
-    parser.add_argument(
-        "-m",
-        "--matrix",
-        required="--provide-matrix" in argv,  # require if using --provide-matrix flag,
-        dest="provided_matrix_fname",
-        default="SKIP",
-        help="Name of provided counts matrix in "
-        "/work/data/data_matrices/<context name>/<NAME OF FILE>.csv",
-    )
-    parser.add_argument(
-        "-bp",
-        "--show-biodbnet-progress",
-        action="store_true",
-        required=False,
-        default=False,
-        dest="show_biodbnet_progress",
-        help="Show progress bar for BioDBNet API requests",
-    )
-    parser.add_argument(
-        "-bc",
-        "--use-biodbnet-cache",
-        action="store_true",
-        required=False,
-        default=False,
-        dest="use_biodbnet_cache",
-        help="Use cached BioDBNet API requests",
-    )
+    # fmt: off
+    parser.add_argument(gene_format_arg["flag"], **{k: v for k, v in gene_format_arg.items() if k != "flag"})
+    parser.add_argument(taxon_id_arg["flag"], **{k: v for k, v in taxon_id_arg.items() if k != "flag"})
+    parser.add_argument(context_names_arg["flag"], **{k: v for k, v in context_names_arg.items() if k != "flag"})
 
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument(
-        "-p",
-        "--provide-matrix",
-        action="store_true",
-        required=False,
-        default=False,
-        dest="provide_matrix",
-        help="Provide your own count matrix. Requires additional argument '--matrix' which is .csv file "
-        "where colnames are sample names (in contextName_SXRY format) and rownames are genes in "
-        "in format specified by --gene-format",
-    )  # would be nice if this was a directory full matrices in case you want to do in batches
-    group.add_argument(
-        "-y",
-        "--create-matrix",
-        action="store_true",
-        required=False,
-        default=False,
-        dest="make_matrix",
-        help="Flag for if you want to make a counts matrix, but not a config file. "
-        "Requires a correctly structured COMO_input folder in /work/data/. Can make one using: "
-        "https://github.com/HelikarLab/FastqToGeneCounts",
-    )
+    group.add_argument(provide_count_matrix_arg["flag"], **{k: v for k, v in provide_count_matrix_arg.items() if k != "flag"})
+    group.add_argument(create_matrix_arg["flag"], **{k: v for k, v in create_matrix_arg.items() if k != "flag"})
+    parser.add_argument(provided_matrix_filename_arg["flag"], **{k: v for k, v in provided_matrix_filename_arg.items() if k != "flag"})
+    # fmt: on
 
     args = parser.parse_args(argv)
     args.context_names = como_utilities.stringlist_to_list(args.context_names)

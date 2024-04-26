@@ -15,6 +15,24 @@ import rnaseq_gen
 import rpy2_api
 from como_utilities import split_gene_expression_data
 from fast_bioservices import BioDBNet, Input, Output
+from arguments import (
+    custom_requirement_file_arg,
+    expression_requirement_arg,
+    keep_gene_score_arg,
+    merge_distribution_arg,
+    microarray_config_filename_arg,
+    mrnaseq_filename_arg,
+    mrnaseq_weight_arg,
+    no_high_confidence_genes_arg,
+    no_na_adjustment_arg,
+    proteomics_config_filename_arg,
+    proteomics_weight_arg,
+    requirement_adjustment_arg,
+    scrnaseq_filename_arg,
+    scrnaseq_weight_arg,
+    total_rnaseq_filename_arg,
+    total_rnaseq_weight_arg,
+)
 from project import Configs
 
 configs = Configs()
@@ -531,199 +549,24 @@ def main(argv):
         "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
     )
 
-    parser.add_argument(
-        "-d",
-        "--merge-distribution",
-        action="store_true",
-        required=False,
-        default=False,
-        dest="merge_distro",
-        help="Flag to merge zFPKM distributions. Required if using iMAT reconstruction algorithm in "
-        "create_context_specific_model.py. Must have run rnaseq_gen.py with 'zFPKM' as "
-        "'--technique'. If --proteomics-config-file is given will merge proteomics distributions "
-        "with zFPKM distributions using a weighted scheme.",
-    )
+    custom_requirement_file_arg["required"] = True if "custom" in argv else False
 
-    parser.add_argument(
-        "-k",
-        "--keep-gene-scores",
-        action="store_true",
-        required=False,
-        default=True,
-        dest="keep_gene_score",
-        help="When merging z-score distributions of expression, if using both protein abundance and transcipt zFPKM "
-        "flag true if you wish to keep z-score of genes with no protein data, flag false if you wish to discard "
-        "and treat as no expression",
-    )
-
-    parser.add_argument(
-        "-a",
-        "--microarray-config-file",
-        type=str,
-        required=False,
-        default=None,
-        dest="microarray_file",
-        help="Name of microarray config .xlsx file in the /main/data/config_files/.",
-    )
-
-    parser.add_argument(
-        "-t",
-        "--total-rnaseq-config-file",
-        type=str,
-        required=False,
-        default=None,
-        dest="trnaseq_file",
-        help="Name of total RNA-seq config .xlsx file in the /main/data/config_files/.",
-    )
-
-    parser.add_argument(
-        "-m",
-        "--mrnaseq-config-file",
-        type=str,
-        required=False,
-        default=None,
-        dest="mrnaseq_file",
-        help="Name of mRNA-seq config .xlsx file in the /main/data/config_files/.",
-    )
-
-    parser.add_argument(
-        "-s",
-        "--scrnaseq-config-file",
-        type=str,
-        required=False,
-        default=None,
-        dest="scrnaseq_file",
-        help="Name of RNA-seq config .xlsx file in the /main/data/config_files/.",
-    )
-
-    parser.add_argument(
-        "-p",
-        "--proteomics-config-file",
-        type=str,
-        required=False,
-        default=None,
-        dest="proteomics_file",
-        help="Name of proteomics config .xlsx file in the /main/data/config_files/.",
-    )
-
-    parser.add_argument(
-        "-e",
-        "--expression-requirement",
-        type=str,
-        required=False,
-        default=None,
-        dest="expression_requirement",
-        help="Number of sources with active gene for it to be considered active even if it is not a "
-        "high confidence-gene",
-    )
-
-    parser.add_argument(
-        "-r",
-        "--requirement-adjust",
-        type=str,
-        required=False,
-        default="flat",
-        dest="adjust_method",
-        help="Technique to adjust expression requirement based on differences in number of provided "
-        "data source types.",
-    )
-
-    parser.add_argument(
-        "-c",
-        "--custom-requirement-file",
-        required="custom" in argv,  # required if --requriement-adjust is "custom",
-        dest="custom_file",
-        default="SKIP",
-        help="Name of .xlsx file where first column is context names and second column is expression "
-        "requirement for that context, in /main/data/",
-    )
-
-    parser.add_argument(
-        "-hc",
-        "--no-hc",
-        action="store_true",
-        required=False,
-        default=False,
-        dest="no_hc",
-        help="Flag to prevent high-confidence genes forcing a gene to be used in final model "
-        "irrespective of other other data sources",
-    )
-
-    parser.add_argument(
-        "-na",
-        "--no-na-adjustment",
-        action="store_true",
-        required=False,
-        default=False,
-        dest="no_na",
-        help="Flag to prevent genes missing in a data source library, but present in others from "
-        "subtracting 1 from the expression requirement per data source that gene is missing in",
-    )
-
-    parser.add_argument(
-        "-tw",
-        "--total-rnaseq-weight",
-        required=False,
-        default=1,
-        type=float,
-        dest="tweight",
-        help="Total RNA-seq weight for merging zFPKM distribution",
-    )
-
-    parser.add_argument(
-        "-mw",
-        "--mrnaseq-weight",
-        required=False,
-        default=1,
-        type=float,
-        dest="mweight",
-        help="PolyA enriched (messenger) RNA-seq weight for merging zFPKM distribution",
-    )
-
-    parser.add_argument(
-        "-sw",
-        "--single-cell-rnaseq-weight",
-        required=False,
-        default=1,
-        type=float,
-        dest="sweight",
-        help="Single-cell RNA-seq weight for merging zFPKM distribution",
-    )
-
-    parser.add_argument(
-        "-pw",
-        "--protein-weight",
-        required=False,
-        default=2,
-        type=float,
-        dest="pweight",
-        help="Proteomics weight for merging z-score distribution",
-    )
-    parser.add_argument(
-        "--taxon-id",
-        required=True,
-        type=int,
-        dest="taxon_id",
-        help="NCBI taxon id for the species of interest",
-    )
-    parser.add_argument(
-        "-bp",
-        "--show-biodbnet-progress",
-        action="store_true",
-        required=False,
-        default=False,
-        dest="show_biodbnet_progress",
-        help="Show progress bar for BioDBNet API requests",
-    )
-    parser.add_argument(
-        "-bc",
-        "--use-biodbnet-cache",
-        action="store_true",
-        required=False,
-        default=False,
-        dest="use_biodbnet_cache",
-        help="Use cached BioDBNet API requests",
-    )
+    parser.add_argument(**custom_requirement_file_arg)
+    parser.add_argument(**expression_requirement_arg)
+    parser.add_argument(**keep_gene_score_arg)
+    parser.add_argument(**merge_distribution_arg)
+    parser.add_argument(**microarray_config_filename_arg)
+    parser.add_argument(**mrnaseq_filename_arg)
+    parser.add_argument(**mrnaseq_weight_arg)
+    parser.add_argument(**no_high_confidence_genes_arg)
+    parser.add_argument(**no_na_adjustment_arg)
+    parser.add_argument(**proteomics_config_filename_arg)
+    parser.add_argument(**proteomics_weight_arg)
+    parser.add_argument(**requirement_adjustment_arg)
+    parser.add_argument(**scrnaseq_filename_arg)
+    parser.add_argument(**scrnaseq_weight_arg)
+    parser.add_argument(**total_rnaseq_filename_arg)
+    parser.add_argument(**total_rnaseq_weight_arg)
 
     args = parser.parse_args(argv)
 
@@ -770,7 +613,7 @@ def main(argv):
                 scrnaseq_file,
                 proteomics_file,
             ]
-            if test is None
+            if test is not None
         ]
     )
 

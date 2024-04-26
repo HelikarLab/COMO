@@ -9,9 +9,14 @@ import pandas as pd
 import rpy2.robjects as ro
 from GSEpipeline import load_gse_soft
 from instruments import AffyIO
+
+# from fast_bioservices import BioDBNet, Input, Output
+from multi_bioservices.biodbnet import InputDatabase, OutputDatabase, TaxonID, db2db
 from rpy2.robjects import pandas2ri
 
 pandas2ri.activate()
+
+
 # Input: Extract Gene Info from GEO DataSets
 
 # gse = load_gse_soft(gsename)
@@ -306,24 +311,29 @@ class GSEproject:
 
         # Remove duplicated items, keep largest VALUE for each GSM
         if "df_clean_sc500" not in locals():
-            df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)
+            df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)  # type: ignore
             df_clean_sc500 = df_clean_sc500[
                 ~df_clean_sc500.index.duplicated(keep="first")
             ]
-        elif df_clean_sc500.empty:
-            df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)
+        elif df_clean_sc500.empty:  # type: ignore
+            df_clean_sc500 = pd.DataFrame([], index=df_outer_sc500.index)  # type: ignore
             df_clean_sc500 = df_clean_sc500[
                 ~df_clean_sc500.index.duplicated(keep="first")
             ]
         else:
-            df_clean_sc500.set_index("ENTREZ_GENE_ID", inplace=True)
+            df_clean_sc500.set_index("ENTREZ_GENE_ID", inplace=True)  # type: ignore
             placeholder = pd.DataFrame(
-                [], columns=["placeholder"], index=df_outer_sc500.index
+                [],
+                columns=["placeholder"],
+                index=df_outer_sc500.index,  # type: ignore
             )
             placeholder["placeholder"] = 0
             placeholder.index.name = "ENTREZ_GENE_ID"
             df_clean_sc500 = pd.merge(
-                df_clean_sc500, placeholder, on="ENTREZ_GENE_ID", how="outer"
+                df_clean_sc500,  # type: ignore
+                placeholder,
+                on="ENTREZ_GENE_ID",
+                how="outer",  # type: ignore
             )
             df_clean_sc500 = df_clean_sc500[
                 ~df_clean_sc500.index.duplicated(keep="last")
