@@ -346,3 +346,147 @@ parsimonious_fba_arg = {
     "dest": "pars_flag",
     "help": "Use parsimonious FBA to calculate the optimal reference solution. Only valid if a reference flux file is not being provided.",
 }
+
+merge_distribution_arg = {
+    "name_or_flags": ["--merge-distribution"],
+    "type": bool,
+    "action": "store_true",
+    "required": False,
+    "default": False,
+    "dest": "merge_distro",
+    "help": "Flag to merge zFPKM distributions. Required if using iMAT reconstruction algorithm in create_context_specific_model.py. Must have run rnaseq_gen.py with 'zFPKM' as '--technique'. If --proteomics-config-file is given will merge proteomics distributions with zFPKM distributions using a weighted scheme.",
+}
+
+keep_gene_score_arg = {
+    "name_or_flags": ["--keep-gene-scores"],
+    "type": bool,
+    "action": "store_true",
+    "required": False,
+    "default": True,
+    "dest": "keep_gene_score",
+    "help": "When merging z-score distributions of expression, if using both protein abundance and transcipt zFPKM flag true if you wish to keep z-score of genes with no protein data, flag false if you wish to discard and treat as no expression",
+}
+
+microarray_config_filename_arg = {
+    "name_or_flags": ["--microarray-config-file"],
+    "type": str,
+    "required": False,
+    "dest": "microarray_file",
+    "help": "The name of the microarray configuration file",
+}
+
+total_rnaseq_filename_arg = {
+    "name_or_flags": ["--total-rnaseq-config-file"],
+    "type": str,
+    "required": False,
+    "dest": "trnaseq_file",
+    "help": "The name of the total RNA-seq file",
+}
+
+mrnaseq_filename_arg = {
+    "name_or_flags": ["--mrnaseq-config-file"],
+    "type": str,
+    "required": False,
+    "dest": "mrnaseq_file",
+    "help": "The name of the mRNA RNA-seq file",
+}
+
+scrnaseq_filename_arg = {
+    "name_or_flags": ["--scrnaseq-config-file"],
+    "type": str,
+    "required": False,
+    "dest": "scrnaseq_file",
+    "help": "The name of the single-cell RNA-seq file",
+}
+
+proteomics_config_filename_arg = {
+    "name_or_flags": ["--proteomics-config-file"],
+    "type": str,
+    "required": False,
+    "dest": "proteomics_file",
+    "help": "The name of the proteomics configuration file",
+}
+
+expression_requirement_arg = {
+    "name_or_flags": ["--expression-requirement"],
+    "type": int | str,
+    "required": False,
+    "default": "default",
+    "dest": "expression_requirement",
+    "help": "Number of sources with active gene for it to be considered active even if it is not a high confidence-gene. Set to 'default' to set expression requirement to the total number of data sources provided.",
+}
+
+requirement_adjustment_arg = {
+    "name_or_flags": ["--requirement-adjust"],
+    "type": str,
+    "choices": ["progressive", "regressive", "flat", "custom"],
+    "required": False,
+    "default": "flat",
+    "dest": "requirement_adjust",
+    "help": "Technique to adjust expression requirement based on differences in number of provided data source types.",
+}
+
+custom_requirement_file_arg = {
+    "name_or_flags": ["--custom-requirement-file"],
+    "type": str,
+    "required": False,
+    "default": "SKIP",
+    "dest": "custom_file",
+    "help": "Name of .xlsx file where the first column is a context name and the second column is the expression requirement for that context",
+}
+
+no_high_confidence_genes_arg = {
+    "name_or_flags": ["--no-hc"],
+    "type": bool,
+    "action": "store_true",
+    "required": False,
+    "default": False,
+    "dest": "no_hc",
+    "help": "Use this to prevent high-confidence genes forcing a gene to be used in final model irrespective of other other data sources",
+}
+
+no_na_adjustment_arg = {
+    "name_or_flags": ["--no-na-adjust"],
+    "type": bool,
+    "action": "store_true",
+    "required": False,
+    "default": False,
+    "dest": "no_na",
+    "help": "Use this to prevent genes missing in a data source library, but present in others from subtracting 1 from the expression requirement per data source that gene is missing in",
+}
+
+total_rnaseq_weight_arg = {
+    "name_or_flags": ["--total-rnaseq-weight"],
+    "type": ranged_type(int, 0, math.inf),
+    "required": False,
+    "default": 1,
+    "dest": "tweight",
+    "help": "Total RNA-seq weight for merging zFPKM distribution",
+}
+
+mrnaseq_weight_arg = {
+    "name_or_flags": ["--mrnaseq-weight"],
+    "type": ranged_type(int, 0, math.inf),
+    "required": False,
+    "default": 1,
+    "dest": "mweight",
+    "help": "mRNA RNA-seq weight for merging zFPKM distribution",
+}
+
+scrnaseq_weight_arg = {
+    "name_or_flags": ["--single-cell-rnaseq-weight"],
+    "type": ranged_type(int, 0, math.inf),
+    "required": False,
+    "default": 1,
+    "dest": "sweight",
+    "help": "Single-cell RNA-seq weight for merging zFPKM distribution",
+}
+
+proteomics_weight_arg = {
+    "name_or_flags": ["--protein-weight"],
+    "type": ranged_type(int, 0, math.inf),
+    "required": False,
+    "default": 2,
+    "dest": "pweight",
+    "help": "Proteomics weight for merging zFPKM distribution",
+}
