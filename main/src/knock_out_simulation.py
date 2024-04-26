@@ -10,7 +10,7 @@ from typing import Literal, Union
 import cobra
 import numpy as np
 import pandas as pd
-from multi_bioservices.biodbnet import InputDatabase, OutputDatabase, db2db
+from fast_bioservices import BioDBNet, Input, Output
 from project import Configs
 
 configs = Configs()
@@ -330,7 +330,7 @@ def load_Inhi_Fratio(filepath):
     return temp2
 
 
-def repurposing_hub_preproc(drug_file, taxon_id: int):
+def repurposing_hub_preproc(drug_file, biodbnet: BioDBNet, taxon_id: int):
     drug_db = pd.read_csv(drug_file, sep="\t")
     drug_db_new = pd.DataFrame()
     for index, row in drug_db.iterrows():
@@ -355,12 +355,11 @@ def repurposing_hub_preproc(drug_file, taxon_id: int):
             )
     drug_db_new.reset_index(inplace=True)
 
-    entrez_ids = db2db(
+    entrez_ids = biodbnet.db2db(
         input_values=drug_db_new["Target"].tolist(),
-        input_db=InputDatabase.GENE_SYMBOL,
-        output_db=OutputDatabase.GENE_ID,
-        cache=False,
-        taxon_id=taxon_id,
+        input_db=Input.GENE_SYMBOL,
+        output_db=Output.GENE_ID,
+        taxon=taxon_id,
     )
 
     # entrez_ids = fetch_entrez_gene_id(drug_db_new["Target"].tolist(), input_db="Gene Symbol")
@@ -370,15 +369,14 @@ def repurposing_hub_preproc(drug_file, taxon_id: int):
     return drug_db_new
 
 
-def drug_repurposing(drug_db, d_score, taxon_id: int):
+def drug_repurposing(drug_db, d_score, biodbnet: BioDBNet, taxon_id: int):
     d_score["Gene"] = d_score["Gene"].astype(str)
 
-    d_score_gene_sym = db2db(
+    d_score_gene_sym = biodbnet.db2db(
         input_values=d_score["Gene"].tolist(),
-        input_db=InputDatabase.GENE_ID,
-        output_db=[OutputDatabase.GENE_SYMBOL],
-        cache=False,
-        taxon_id=taxon_id,
+        input_db=Input.GENE_ID,
+        output_db=[Output.GENE_SYMBOL],
+        taxon=taxon_id,
     )
 
     d_score.set_index("Gene", inplace=True)
@@ -545,6 +543,24 @@ def main(argv):
         dest="upreg_flux_cutoff",
         help="The flux cutoff to mark a reaction as up-regulated",
     )
+    parser.add_argument(
+        "-bp",
+        "--show-biodbnet-progress",
+        action="store_true",
+        required=False,
+        default=False,
+        dest="show_biodbnet_progress",
+        help="Show progress bar for BioDBNet API requests",
+    )
+    parser.add_argument(
+        "-bc",
+        "--use-biodbnet-cache",
+        action="store_true",
+        required=False,
+        default=False,
+        dest="use_biodbnet_cache",
+        help="Use cached BioDBNet API requests",
+    )
 
     args = parser.parse_args()
     taxon_id: int = args.taxon_id
@@ -563,9 +579,16 @@ def main(argv):
     knockout_method = args.knockout_method
     downreg_flux_cutoff: float = args.downreg_flux_cutoff
     upreg_flux_cutoff: float = args.upreg_flux_cutoff
+    show_biodbnet_progress: bool = args.show_biodbnet_progress
+    use_biodbnet_cache: bool = args.use_biodbnet_cache
 
     output_dir = os.path.join(configs.data_dir, "results", context, disease)
     inhibitors_file = os.path.join(output_dir, f"{context}_{disease}_inhibitors.tsv")
+
+    biodbnet: BioDBNet = BioDBNet(
+        show_progress=show_biodbnet_progress,
+        cache=use_biodbnet_cache,
+    )
 
     print(f"Output directory: '{output_dir}'")
     print(f"Tissue Specific Model file is at: {tissue_spec_model_file}")
@@ -589,7 +612,9 @@ def main(argv):
     )
     if not os.path.isfile(reformatted_drug_file):
         print("Preprocessing raw Repurposing Hub DB file...")
-        drug_db = repurposing_hub_preproc(raw_drug_filepath, taxon_id=taxon_id)
+        drug_db = repurposing_hub_preproc(
+            raw_drug_filepath, biodbnet=biodbnet, taxon_id=taxon_id
+        )
         drug_db.to_csv(reformatted_drug_file, index=False, sep="\t")
         print(
             f"Preprocessed Repurposing Hub tsv file written to:\n{reformatted_drug_file}"
@@ -672,7 +697,12 @@ def main(argv):
     pertubation_effect_score.reset_index(drop=False, inplace=True)
 
     # last step: output drugs based on d score
-    drug_score = drug_repurposing(drug_db, pertubation_effect_score, taxon_id=taxon_id)
+    drug_score = drug_repurposing(
+        drug_db,
+        pertubation_effect_score,
+        biodbnet=biodbnet,
+        taxon_id=taxon_id,
+    )
     drug_score_file = os.path.join(output_dir, f"{context}_drug_score.csv")
     drug_score.to_csv(drug_score_file, index=False)
     print(

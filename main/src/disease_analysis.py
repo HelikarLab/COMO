@@ -9,7 +9,7 @@ import GSEpipelineFast
 import pandas as pd
 import rpy2.robjects as ro
 import rpy2_api
-from multi_bioservices.biodbnet import InputDatabase, OutputDatabase, db2db
+from fast_bioservices.biodbnet import BioDBNet, Input, Output
 from project import Configs
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import importr
@@ -132,7 +132,9 @@ def pharse_configs(config_filepath, sheet):
     return df, df_target
 
 
-def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, taxon_id):
+def get_microarray_diff_gene_exp(
+    config_filepath, disease_name, target_path, taxon_id, biodbnet: BioDBNet
+):
     """
     Get differential gene expression for microarray data
 
@@ -176,31 +178,36 @@ def get_microarray_diff_gene_exp(config_filepath, disease_name, target_path, tax
         print(diff_exp_df)
 
         if inst_name == "affy":
-            input_db: InputDatabase = InputDatabase.AFFY_ID
+            input_db: Input = Input.AFFY_ID
         elif inst_name == "agilent":
-            input_db: InputDatabase = InputDatabase.AGILENT_ID
+            input_db: Input = Input.AGILENT_ID
 
-        bdnet = db2db(
+        conversion = biodbnet.db2db(
             input_values=list(map(str, diff_exp_df["Affy ID"].tolist())),
             input_db=input_db,  # type: ignore
             output_db=[
-                OutputDatabase.ENSEMBL_GENE_ID,
-                OutputDatabase.GENE_ID,
-                OutputDatabase.GENE_SYMBOL,
+                Output.ENSEMBL_GENE_ID,
+                Output.GENE_ID,
+                Output.GENE_SYMBOL,
             ],
-            taxon_id=taxon_id,
-            cache=False,
+            taxon=taxon_id,
         )
 
-        diff_exp_df["Entrez"] = bdnet["Gene ID"].tolist()
-        diff_exp_df["Ensembl"] = bdnet["Ensembl Gene ID"].tolist()
-        diff_exp_df["Symbol"] = bdnet["Gene Symbol"].tolist()
+        diff_exp_df["Entrez"] = conversion["Gene ID"].tolist()
+        diff_exp_df["Ensembl"] = conversion["Ensembl Gene ID"].tolist()
+        diff_exp_df["Symbol"] = conversion["Gene Symbol"].tolist()
         print(diff_exp_df)
         diff_exp_df.rename(columns={"Affy ID": "Affy"}, inplace=True)
     return diff_exp_df, gse_id  # type: ignore
 
 
-def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_id):
+def get_rnaseq_diff_gene_exp(
+    config_filepath,
+    disease_name,
+    context_name,
+    taxon_id,
+    biodbnet: BioDBNet,
+):
     """
     Get differential gene expression for RNA-seq data
 
@@ -236,21 +243,20 @@ def get_rnaseq_diff_gene_exp(config_filepath, disease_name, context_name, taxon_
     diff_exp_df = ro.conversion.rpy2py(diff_exp_df)
     gse_id = "rnaseq"
 
-    bdnet = db2db(
+    conversion = biodbnet.db2db(
         input_values=list(map(str, diff_exp_df["Ensembl"].tolist())),
-        input_db=InputDatabase.ENSEMBL_GENE_ID,
+        input_db=Input.ENSEMBL_GENE_ID,
         output_db=[
-            OutputDatabase.GENE_ID,
-            OutputDatabase.AFFY_ID,
-            OutputDatabase.GENE_SYMBOL,
+            Output.GENE_ID,
+            Output.AFFY_ID,
+            Output.GENE_SYMBOL,
         ],
-        taxon_id=taxon_id,
-        cache=False,
+        taxon=taxon_id,
     )
 
-    diff_exp_df["Affy"] = bdnet["Affy ID"].tolist()
-    diff_exp_df["Entrez"] = bdnet["Gene ID"].tolist()
-    diff_exp_df["Symbol"] = bdnet["Gene Symbol"].tolist()
+    diff_exp_df["Affy"] = conversion["Affy ID"].tolist()
+    diff_exp_df["Entrez"] = conversion["Gene ID"].tolist()
+    diff_exp_df["Symbol"] = conversion["Gene Symbol"].tolist()
 
     return diff_exp_df, gse_id
 
@@ -386,12 +392,34 @@ def main(argv):
         dest="taxon_id",
         help="BioDbNet taxon ID number, also accepts 'human', or 'mouse'",
     )
+    parser.add_argument(
+        "-bp",
+        "--show-biodbnet-progress",
+        action="store_true",
+        required=False,
+        default=False,
+        dest="show_biodbnet_progress",
+        help="Should BioDbNet progress be shown?",
+    )
+    parser.add_argument(
+        "-bc",
+        "--use-biodbnet-cache",
+        action="store_true",
+        required=False,
+        default=False,
+        dest="use_biodbnet_cache",
+        help="Should BioDbNet cache be used?",
+    )
 
     args = parser.parse_args()
     context_name = args.context_name
     config_file = args.config_file
     data_source = args.data_source.upper()
     taxon_id = args.taxon_id
+    show_biodbnet_progress = args.show_biodbnet_progress
+    use_biodbnet_cache = args.use_biodbnet_cache
+
+    biodbnet = BioDBNet(show_progress=show_biodbnet_progress, cache=use_biodbnet_cache)
 
     if data_source == "RNASEQ":
         config_filepath = os.path.join(
@@ -407,7 +435,6 @@ def main(argv):
         )
         sys.exit()
 
-    print(config_filepath)
     try:
         xl = pd.ExcelFile(config_filepath)
     except FileNotFoundError:
@@ -440,11 +467,19 @@ def main(argv):
         target_path = os.path.join(configs.root_dir, "data", targetfile)
         if data_source == "MICROARRAY":
             diff_exp_df, gse_id = get_microarray_diff_gene_exp(
-                config_filepath, disease_name, target_path, taxon_id
+                config_filepath,
+                disease_name,
+                target_path,
+                taxon_id,
+                biodbnet=biodbnet,
             )
         elif data_source == "RNASEQ":
             diff_exp_df, gse_id = get_rnaseq_diff_gene_exp(
-                config_filepath, disease_name, context_name, taxon_id
+                config_filepath,
+                disease_name,
+                context_name,
+                taxon_id,
+                biodbnet=biodbnet,
             )
         else:
             print("data_source should be either 'microarray' or 'rnaseq'")
