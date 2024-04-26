@@ -526,3 +526,42 @@ library_prep_arg = {
     "dest": "prep",
     "help": "Library preparation method used for the data.",
 }
+
+gene_format_arg = {
+    "name_or_flags": ["--gene-format"],
+    "type": str,
+    "required": False,
+    "default": "Ensembl Gene ID",
+    "choices": ["ensembl", "entrez", "hgnc_symbol"],
+    "dest": "gene_format",
+    "help": "The format of the gene IDs in the data. Must be one of 'entrez', 'symbol', or 'ensembl'.",
+}
+
+provide_count_matrix_arg = {
+    "name_or_flags": ["--provide-matrix"],
+    "type": bool,
+    "action": "store_true",
+    "required": False,
+    "default": False,
+    "dest": "provide_matrix",
+    "help": "Provide your own count matrix. Requires additional argument '--matrix' which is .csv file where colnames are sample names (in contextName_SXRY format) and rownames are genes in in format specified by --gene-format",
+}
+
+create_matrix_arg = {
+    "name_or_flags": ["--create-matrix"],
+    "type": bool,
+    "action": "store_true",
+    "required": False,
+    "default": False,
+    "dest": "make_matrix",
+    "help": "Flag for if you want to make a counts matrix, but not a config file. Requires a correctly structured COMO_input folder in /work/data/. Can make one using: https://github.com/HelikarLab/FastqToGeneCounts",
+}
+
+provided_matrix_filename_arg = {
+    "name_or_flags": ["--matrix"],
+    "type": str,
+    "required": False,
+    "default": "SKIP",
+    "dest": "provided_matrix_fname",
+    "help": "The file name of the provided count matrix",
+}
