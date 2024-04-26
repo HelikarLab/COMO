@@ -7,10 +7,9 @@ import sys
 from pathlib import Path
 
 import pandas as pd
-from rpy2.robjects import pandas2ri
-
 import rpy2_api
 from project import Configs
+from rpy2.robjects import pandas2ri
 
 # enable r to py conversion
 pandas2ri.activate()
@@ -120,12 +119,12 @@ def handle_context_batch(
         print(f"\nStarting '{context_name}'")
         rnaseq_output_file = f"rnaseq_{prep}_{context_name}.csv"
         rnaseq_output_filepath = os.path.join(
-            configs.data_dir, "results", context_name, prep, rnaseq_output_file
+            configs.data_dir, "results", str(context_name), prep, rnaseq_output_file
         )
 
         rnaseq_input_file = f"gene_counts_matrix_{prep}_{context_name}.csv"
         rnaseq_input_filepath = os.path.join(
-            configs.data_dir, "data_matrices", context_name, rnaseq_input_file
+            configs.data_dir, "data_matrices", str(context_name), rnaseq_input_file
         )
 
         if not os.path.exists(rnaseq_input_filepath):
@@ -193,17 +192,19 @@ def main(argv):
     filtering_technique_arg["choices"] = ["quantile-tpm", "zfpkm", "flat-cpm"]
     quantile_arg["default"] = 0.25
 
-    parser.add_argument(**batch_ratio_arg)
-    parser.add_argument(**config_file_arg)
-    parser.add_argument(**filtering_technique_arg)
-    parser.add_argument(**high_batch_ratio_arg)
-    parser.add_argument(**high_replicate_ratio_arg)
-    parser.add_argument(**library_prep_arg)
-    parser.add_argument(**min_count_arg)
-    parser.add_argument(**min_zfpkm_arg)
-    parser.add_argument(**quantile_arg)
-    parser.add_argument(**replicate_ratio_arg)
+    # fmt: off
+    parser.add_argument(batch_ratio_arg["flag"], **{k: v for k, v in batch_ratio_arg.items() if k != "flag"})
+    parser.add_argument(config_file_arg["flag"], **{k: v for k, v in config_file_arg.items() if k != "flag"})
+    parser.add_argument(filtering_technique_arg["flag"], **{k: v for k, v in filtering_technique_arg.items() if k != "flag"})
+    parser.add_argument(high_batch_ratio_arg["flag"], **{k: v for k, v in high_batch_ratio_arg.items() if k != "flag"})
+    parser.add_argument(high_replicate_ratio_arg["flag"], **{k: v for k, v in high_replicate_ratio_arg.items() if k != "flag"})
+    parser.add_argument(library_prep_arg["flag"], **{k: v for k, v in library_prep_arg.items() if k != "flag"})
+    parser.add_argument(min_count_arg["flag"], **{k: v for k, v in min_count_arg.items() if k != "flag"})
+    parser.add_argument(min_zfpkm_arg["flag"], **{k: v for k, v in min_zfpkm_arg.items() if k != "flag"})
+    parser.add_argument(quantile_arg["flag"], **{k: v for k, v in quantile_arg.items() if k != "flag"})
+    parser.add_argument(replicate_ratio_arg["flag"], **{k: v for k, v in replicate_ratio_arg.items() if k != "flag"})
     args = parser.parse_args(argv)
+    # fmt: on
 
     config_filename = args.config_filename
     replicate_ratio = args.replicate_ratio

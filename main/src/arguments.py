@@ -157,7 +157,7 @@ num_neighbors_context_arg = {
 
 min_count_arg = {
     "flag": "--min-count",
-    "type": int | str,
+    "type": str,
     "required": False,
     "default": "default",
     "dest": "min_count",
@@ -423,7 +423,7 @@ proteomics_config_filename_arg = {
 
 expression_requirement_arg = {
     "flag": "--expression-requirement",
-    "type": int | str,
+    "type": str,
     "required": False,
     "default": "default",
     "dest": "expression_requirement",

@@ -13,8 +13,6 @@ import pandas as pd
 import proteomics_gen
 import rnaseq_gen
 import rpy2_api
-from como_utilities import split_gene_expression_data
-from fast_bioservices import BioDBNet, Input, Output
 from arguments import (
     custom_requirement_file_arg,
     expression_requirement_arg,
@@ -33,6 +31,8 @@ from arguments import (
     total_rnaseq_filename_arg,
     total_rnaseq_weight_arg,
 )
+from como_utilities import split_gene_expression_data
+from fast_bioservices import BioDBNet, Input, Output
 from project import Configs
 
 configs = Configs()
@@ -551,22 +551,24 @@ def main(argv):
 
     custom_requirement_file_arg["required"] = True if "custom" in argv else False
 
-    parser.add_argument(**custom_requirement_file_arg)
-    parser.add_argument(**expression_requirement_arg)
-    parser.add_argument(**keep_gene_score_arg)
-    parser.add_argument(**merge_distribution_arg)
-    parser.add_argument(**microarray_config_filename_arg)
-    parser.add_argument(**mrnaseq_filename_arg)
-    parser.add_argument(**mrnaseq_weight_arg)
-    parser.add_argument(**no_high_confidence_genes_arg)
-    parser.add_argument(**no_na_adjustment_arg)
-    parser.add_argument(**proteomics_config_filename_arg)
-    parser.add_argument(**proteomics_weight_arg)
-    parser.add_argument(**requirement_adjustment_arg)
-    parser.add_argument(**scrnaseq_filename_arg)
-    parser.add_argument(**scrnaseq_weight_arg)
-    parser.add_argument(**total_rnaseq_filename_arg)
-    parser.add_argument(**total_rnaseq_weight_arg)
+    # fmt: off
+    parser.add_argument(custom_requirement_file_arg["flag"], **{k: v for k, v in custom_requirement_file_arg.items() if k != "flag"})
+    parser.add_argument(expression_requirement_arg["flag"], **{k: v for k, v in expression_requirement_arg.items() if k != "flag"})
+    parser.add_argument(keep_gene_score_arg["flag"], **{k: v for k, v in keep_gene_score_arg.items() if k != "flag"})
+    parser.add_argument(merge_distribution_arg["flag"], **{k: v for k, v in merge_distribution_arg.items() if k != "flag"})
+    parser.add_argument(microarray_config_filename_arg["flag"], **{k: v for k, v in microarray_config_filename_arg.items() if k != "flag"})
+    parser.add_argument(mrnaseq_filename_arg["flag"], **{k: v for k, v in mrnaseq_filename_arg.items() if k != "flag"})
+    parser.add_argument(mrnaseq_weight_arg["flag"], **{k: v for k, v in mrnaseq_weight_arg.items() if k != "flag"})
+    parser.add_argument(no_high_confidence_genes_arg["flag"], **{k: v for k, v in no_high_confidence_genes_arg.items() if k != "flag"})
+    parser.add_argument(no_na_adjustment_arg["flag"], **{k: v for k, v in no_na_adjustment_arg.items() if k != "flag"})
+    parser.add_argument(proteomics_config_filename_arg["flag"], **{k: v for k, v in proteomics_config_filename_arg.items() if k != "flag"})
+    parser.add_argument(proteomics_weight_arg["flag"], **{k: v for k, v in proteomics_weight_arg.items() if k != "flag"})
+    parser.add_argument(requirement_adjustment_arg["flag"], **{k: v for k, v in requirement_adjustment_arg.items() if k != "flag"})
+    parser.add_argument(scrnaseq_filename_arg["flag"], **{k: v for k, v in scrnaseq_filename_arg.items() if k != "flag"})
+    parser.add_argument(scrnaseq_weight_arg["flag"], **{k: v for k, v in scrnaseq_weight_arg.items() if k != "flag"})
+    parser.add_argument(total_rnaseq_filename_arg["flag"], **{k: v for k, v in total_rnaseq_filename_arg.items() if k != "flag"})
+    parser.add_argument(total_rnaseq_weight_arg["flag"], **{k: v for k, v in total_rnaseq_weight_arg.items() if k != "flag"})
+    # fmt: on
 
     args = parser.parse_args(argv)
 

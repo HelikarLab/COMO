@@ -10,7 +10,6 @@ from typing import Literal, Union
 import cobra
 import numpy as np
 import pandas as pd
-from fast_bioservices import BioDBNet, Input, Output
 from arguments import (
     context_model_filepath_arg,
     context_names_arg,
@@ -23,6 +22,7 @@ from arguments import (
     reference_flux_filepath_arg,
     test_all_genes_arg,
 )
+from fast_bioservices import BioDBNet, Input, Output
 from project import Configs
 
 configs = Configs()
@@ -418,16 +418,18 @@ def main(argv):
         "https://github.com/HelikarLab/COMO",
     )
 
-    parser.add_argument(**context_model_filepath_arg)
-    parser.add_argument(**context_names_arg)
-    parser.add_argument(**disease_down_filepath_arg)
-    parser.add_argument(**disease_names_arg)
-    parser.add_argument(**disease_up_filepath_arg)
-    parser.add_argument(**parsimonious_fba_arg)
-    parser.add_argument(**raw_drug_filepath_arg)
-    parser.add_argument(**reconstruction_solver_arg)
-    parser.add_argument(**reference_flux_filepath_arg)
-    parser.add_argument(**test_all_genes_arg)
+    # fmt: off
+    parser.add_argument(context_model_filepath_arg["flag"], **{k: v for k, v in context_model_filepath_arg.items() if k != "flag"})
+    parser.add_argument(context_names_arg["flag"], **{k: v for k, v in context_names_arg.items() if k != "flag"})
+    parser.add_argument(disease_down_filepath_arg["flag"], **{k: v for k, v in disease_down_filepath_arg.items() if k != "flag"})
+    parser.add_argument(disease_names_arg["flag"], **{k: v for k, v in disease_names_arg.items() if k != "flag"})
+    parser.add_argument(disease_up_filepath_arg["flag"], **{k: v for k, v in disease_up_filepath_arg.items() if k != "flag"})
+    parser.add_argument(parsimonious_fba_arg["flag"], **{k: v for k, v in parsimonious_fba_arg.items() if k != "flag"})
+    parser.add_argument(raw_drug_filepath_arg["flag"], **{k: v for k, v in raw_drug_filepath_arg.items() if k != "flag"})
+    parser.add_argument(reconstruction_solver_arg["flag"], **{k: v for k, v in reconstruction_solver_arg.items() if k != "flag"})
+    parser.add_argument(reference_flux_filepath_arg["flag"], **{k: v for k, v in reference_flux_filepath_arg.items() if k != "flag"})
+    parser.add_argument(test_all_genes_arg["flag"], **{k: v for k, v in test_all_genes_arg.items() if k != "flag"})
+    # fmt: on
 
     args = parser.parse_args()
     taxon_id: int = args.taxon_id
