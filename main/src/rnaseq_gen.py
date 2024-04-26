@@ -7,9 +7,10 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+from rpy2.robjects import pandas2ri
+
 import rpy2_api
 from project import Configs
-from rpy2.robjects import pandas2ri
 
 # enable r to py conversion
 pandas2ri.activate()

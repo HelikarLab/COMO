@@ -2,20 +2,22 @@ import os
 import tarfile
 import urllib.request
 
-import instruments
 import numpy as np
 import pandas as pd
 import rpy2.robjects as ro
-from GSEpipeline import load_gse_soft
-from instruments import AffyIO
+from fast_bioservices import BioDBNet, Input, Output
 from rpy2.robjects import pandas2ri
 
+import instruments
+from GSEpipeline import load_gse_soft
+from instruments import AffyIO
+
 pandas2ri.activate()
+
+
 # Input: Extract Gene Info from GEO DataSets
 
 # gse = load_gse_soft(gsename)
-
-from multi_bioservices.biodbnet import InputDatabase, OutputDatabase, db2db
 
 
 def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
@@ -32,6 +34,9 @@ def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
     if gpls is None:
         gpls: list[str] = ["GPL96", "GPL97", "GPL8300"]
 
+    
+    biodbnet = BioDBNet()
+    
     for gpl in gpls:
         table = gse.gpls[gpl].table.copy()
         if vendor.lower() == "affy":
@@ -43,9 +48,16 @@ def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
             ].tolist()
 
             temp = db2db(
+            
+            temp = biodbnet.db2db(
                 input_values=input_values,
                 input_db=InputDatabase.AGILENT_ID,
                 output_db=[OutputDatabase.GENE_ID, OutputDatabase.ENSEMBL_GENE_ID],
+                input_db=Input.AGILENT_ID,
+                output_db=[
+                    Output.GENE_ID,
+                    Output.ENSEMBL_GENE_ID
+                ],
             )
 
             temp.drop(columns=["Ensembl Gene ID"], inplace=True)
@@ -56,6 +68,9 @@ def download_gsm_id_maps(datadir, gse, gpls: list[str] = None, vendor="affy"):
                     OutputDatabase.GENE_ID.value: "ENTREZ_GENE_ID",
                 },
                 inplace=True,
+                    Input.AGILENT_ID.value: "ID",
+                    Output.GENE_ID.value: "ENTREZ_GENE_ID"
+                }, inplace=True
             )
             temp.replace(to_replace="-", value=np.nan, inplace=True)
 
@@ -200,6 +215,7 @@ class GSEproject:
             return pd.DataFrame([])
 
         # Ready Affy files from folders
+        biodbnet = BioDBNet()
         gsm_tables_sc500 = {}
         for key, vendor in self.platforms.items():
             platformdir = os.path.join(self.gene_dir, key)
@@ -216,9 +232,13 @@ class GSEproject:
                     )
 
                     gsm_maps[key] = db2db(
+                    
+                    outputdf = instruments.readagilent(platformdir, list(self.gsm_platform.keys()))
+                    
+                    gsm_maps[key] = biodbnet.db2db(
                         input_values=list(map(str, list(outputdf["ProbeName"]))),
-                        input_db=InputDatabase.AGILENT_ID,
-                        output_db=[OutputDatabase.GENE_ID],
+                        input_db=Input.AGILENT_ID,
+                        output_db=[Output.GENE_ID],
                     )
 
                     gsm_maps[key].rename(

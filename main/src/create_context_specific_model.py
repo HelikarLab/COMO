@@ -228,7 +228,7 @@ def seed_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
         obj_frac=0.9,
         objectives=[{idx_objective: 1}],
         preprocess=True,
-        flux_threshold=0.9,
+        # flux_threshold=0.9,  # This was removed on 2/7/24 because this value is ~5 orders of magnitude higher than troppo's default flux_threshold
     )
     algorithm = GIMME(s_matrix, lb, ub, properties)
     gene_activity = algorithm.run()

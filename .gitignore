@@ -1,4 +1,3 @@
-# General cache files
 /**/*.Rhistory
 /**/.DS_Store
 /**/.idea
@@ -13,6 +12,7 @@ docs/_site
 docs/Gemfile.lock
 
 # COMO-specific files
+**/*.Rout
 main/logs/
 main/data/results/
 main/data/config_sheets/*_data_inputs_auto.xlsx
