@@ -284,7 +284,9 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     return matrix_total, matrix_mrna
 
 
-def create_gene_info_file(matrix_file_list: list[str], input_format: Input, taxon_id):
+def create_gene_info_file(
+    matrix_file_list: list[str], input_format: InputDatabase, taxon_id
+):
     """
     Create gene info file for specified context by reading first column in its count matrix file at
      results/<context name>/gene_info_<context name>.csv
@@ -321,7 +323,7 @@ def create_gene_info_file(matrix_file_list: list[str], input_format: Input, taxo
         input_values=genes,
         input_db=input_format,
         output_db=output_db,
-        taxon=taxon_id,
+        taxon_id=taxon_id,
     )
 
     gene_info.rename(
@@ -427,7 +429,7 @@ def handle_context_batch(
 
     else:
         matrix_files: list[str] = como_utilities.stringlist_to_list(matrix_path_prov)
-        create_gene_info_file(matrix_files, input_format, taxon_id)
+        create_gene_info_file(matrix_files, form, taxon_id)
 
 
 def parse_args(argv):
