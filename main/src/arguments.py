@@ -3,6 +3,7 @@ The purpose of this file is to create a uniform interface for the arguments that
 """
 
 import argparse
+import math
 import typing
 
 
@@ -161,4 +162,102 @@ random_seed_arg = {
     "default": -1,
     "dest": "random_seed",
     "help": "The random seed to use for clustering initialization. If -1 is used, the seed is randomly generated.",
+}
+
+reference_model_filepath_arg = {
+    "name_or_flags": ["--reference-model-filepath"],
+    "type": str,
+    "required": True,
+    "dest": "modelfile",
+    "help": "Name of Genome-scale metabolic model to seed the context model to. For example, the GeneralModelUpdatedV2.mat, is a modified Recon3D model. We also provide iMM_madrid for mouse. The file type can be in .mat, .xml, or .json format.",
+}
+
+active_genes_filepath_arg = {
+    "name_or_flags": ["--active-genes-filepath"],
+    "type": str,
+    "required": True,
+    "dest": "genefile",
+    "help": "Path to logical table of active genes output from merge_xomics.py called ActiveGenes_contextName_Merged.csv. Should be in the corresponding context/context folder inside /main/data/results/contextName/. The json file output from the function using the context of interest as the key can be used here.",
+}
+
+objective_function_arg = {
+    "name_or_flags": ["--objective"],
+    "type": str,
+    "required": False,
+    "default": "biomass_reeaction",
+    "dest": "objective",
+    "help": "The reaction ID of the objective function to use. Generally a biomass function (biomass_maintenance, biomass_maintenance_noTrTr, etc.).",
+}
+
+boundary_reactions_filepath_arg = {
+    "name_or_flags": ["--boundary-reactions-filepath"],
+    "type": str,
+    "required": False,
+    "default": None,
+    "dest": "boundary_rxns_filepath",
+    "help": "Path to file contains the exchange (media), sink, and demand reactions which the model should use to fulfill the reactions governed by transcriptomic and proteomics data inputs. It must be a csv or xlsx with three columns: Rxn, Lowerbound, Upperbound. If not specified, COMO will allow ALL BOUNDARY REACTIONS THAT ARE OPEN IN THE REFERENCE MODEL TO BE USED!",
+}
+
+exclude_reactions_filepath_arg = {
+    "name_or_flags": ["--exclude-reactions-filepath"],
+    "type": str,
+    "required": False,
+    "default": None,
+    "dest": "exclude_rxns_filepath",
+    "help": "Filepath to file that contains reactions which will be removed from active reactions the model to use when seeding, even if considered active from transcriptomic and proteomics data inputs. It must be a csv or xlsx with one column of reaction IDs consistent with the reference model",
+}
+
+force_reactions_filepath_arg = {
+    "name_or_flags": ["--force-reactions-filepath"],
+    "type": str,
+    "required": False,
+    "default": None,
+    "dest": "force_rxns_filepath",
+    "help": "Filepath to file that contains reactions which will be added to active reactions for the model to use when seeding (unless it causes the model to be unsolvable), regardless of results of transcriptomic and proteomics data inputs. It must be a csv or xlsx with one column of reaction IDs consistent with the reference model",
+}
+
+reconstruction_algorithm_arg = {
+    "name_or_flags": ["--algorithm"],
+    "type": str,
+    "required": False,
+    "default": "GIMME",
+    "choices": ["GIMME", "FASTCORE", "iMAT", "tINIT"],
+    "dest": "algorithm",
+    "help": "Algorithm used to seed context specific model to the Genome-scale model. Can be either GIMME, FASTCORE, iMAT, or tINIT.",
+}
+
+imat_low_threshold_arg = {
+    "name_or_flags": ["--low-threshold"],
+    "type": ranged_type(int, -math.inf, math.inf),
+    "required": False,
+    "default": -5,
+    "dest": "low_threshold",
+    "help": "Lower threshold for iMAT algorithm",
+}
+
+imat_high_threshold_arg = {
+    "name_or_flags": ["--high-threshold"],
+    "type": ranged_type(int, -math.inf, math.inf),
+    "required": False,
+    "default": -3,
+    "dest": "high_threshold",
+    "help": "Middle to high bin cutoff for iMAT algorithm.",
+}
+
+reconstruction_solver_arg = {
+    "name_or_flags": ["--solver"],
+    "type": str,
+    "required": False,
+    "default": "glpk",
+    "dest": "solver",
+    "help": "Solver used to seed model and attempt to solve objective. Default is GLPK, also takes GUROBI but you must mount a container license to the Docker to use. An academic license can be obtained for free. See the README on the Github or Dockerhub for information on mounting this license.",
+}
+
+output_filetypes_arg = {
+    "name_or_flags": ["--output-filetypes"],
+    "type": str,
+    "required": False,
+    "default": "mat",
+    "dest": "output_filetypes",
+    "help": "Filetypes to save seeded model type. Can be either a string with one filetype such as 'xml' or multiple in the format 'extension1 extension2 extension3'. If you want to output in all 3 accepted formats,  would be: 'mat xml json'.",
 }
