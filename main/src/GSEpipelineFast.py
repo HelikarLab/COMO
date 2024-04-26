@@ -7,11 +7,9 @@ import instruments
 import numpy as np
 import pandas as pd
 import rpy2.robjects as ro
+from fast_bioservices import BioDBNet, Input, Output
 from GSEpipeline import load_gse_soft
 from instruments import AffyIO
-
-# from fast_bioservices import BioDBNet, Input, Output
-from multi_bioservices.biodbnet import InputDatabase, OutputDatabase, TaxonID, db2db
 from rpy2.robjects import pandas2ri
 
 pandas2ri.activate()
@@ -21,8 +19,17 @@ pandas2ri.activate()
 
 # gse = load_gse_soft(gsename)
 
+from fast_bioservices import BioDBNet, Input, Output
 
-def download_gsm_id_maps(datadir, gse, gpls: Optional[list[str]] = None, vendor="affy"):
+
+def download_gsm_id_maps(
+    datadir,
+    gse,
+    biodbnet: BioDBNet,
+    taxon_id: int,
+    gpls: Optional[list[str]] = None,
+    vendor="affy",
+):
     """
     download ID to ENTREZ_GENE_ID maps, create a csv file for each platform, and return dictionary
     :param gpls:
@@ -46,18 +53,19 @@ def download_gsm_id_maps(datadir, gse, gpls: Optional[list[str]] = None, vendor=
                 table["CONTROL_TYPE"] == "FALSE", "SPOT_ID"
             ].tolist()
 
-            temp = db2db(
+            temp = biodbnet.db2db(
                 input_values=input_values,
-                input_db=InputDatabase.AGILENT_ID,
-                output_db=[OutputDatabase.GENE_ID, OutputDatabase.ENSEMBL_GENE_ID],
+                input_db=Input.AGILENT_ID,
+                output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID],
+                taxon=taxon_id,
             )
 
             temp.drop(columns=["Ensembl Gene ID"], inplace=True)
             temp.reset_index(inplace=True)
             temp.rename(
                 columns={
-                    InputDatabase.AGILENT_ID.value: "ID",
-                    OutputDatabase.GENE_ID.value: "ENTREZ_GENE_ID",
+                    Input.AGILENT_ID.value: "ID",
+                    Output.GENE_ID.value: "ENTREZ_GENE_ID",
                 },
                 inplace=True,
             )
@@ -74,7 +82,14 @@ def download_gsm_id_maps(datadir, gse, gpls: Optional[list[str]] = None, vendor=
 
 
 class GSEproject:
-    def __init__(self, gsename, querytable, rootdir="../"):
+    def __init__(
+        self,
+        gsename,
+        querytable,
+        show_biodbnet_progress: bool = False,
+        use_biodbnet_cache: bool = True,
+        rootdir="../",
+    ):
         self.gsename = gsename
         # Setup paths
         self.querytable = querytable
@@ -82,6 +97,12 @@ class GSEproject:
         self.datadir = os.path.join(self.rootdir, "data")
         self.outputdir = os.path.join(self.rootdir, "output")
         self.gene_dir = os.path.join(self.datadir, self.gsename + "_RAW")
+
+        self.biodbnet = BioDBNet(
+            show_progress=show_biodbnet_progress,
+            cache=use_biodbnet_cache,
+        )
+
         print(
             "Initialize project ({}):\nRoot: {}\nRaw data: {}".format(
                 self.gsename, self.rootdir, self.gene_dir
@@ -137,7 +158,13 @@ class GSEproject:
             if not os.path.isfile(filepath):
                 # Could improve to automatic download new tables based on platform
                 gse = load_gse_soft(self.gsename)
-                download_gsm_id_maps(self.datadir, gse, gpls=[gpl], vendor=vendor)
+                download_gsm_id_maps(
+                    self.datadir,
+                    gse,
+                    gpls=[gpl],
+                    vendor=vendor,
+                    biodbnet=self.biodbnet,
+                )
                 print("Skip Unsupported Platform: {}, {}".format(gpl, vendor))
                 # continue
             temp = pd.read_csv(filepath)
@@ -225,16 +252,6 @@ class GSEproject:
                         output_db=[OutputDatabase.GENE_ID],
                     )
 
-                    outputdf = instruments.readagilent(
-                        platformdir, list(self.gsm_platform.keys())
-                    )
-
-                    gsm_maps[key] = db2db(
-                        input_values=list(map(str, list(outputdf["ProbeName"]))),
-                        input_db=InputDatabase.AGILENT_ID,
-                        output_db=[OutputDatabase.GENE_ID],
-                    )
-
                     gsm_maps[key].rename(
                         columns={"Gene ID": "ENTREZ_GENE_ID"}, inplace=True
                     )
@@ -271,23 +288,23 @@ class GSEproject:
                     how="outer",
                 )
 
-        df_outer_sc500.dropna(how="all", inplace=True)  # type: ignore
-        print("Full: {}".format(df_outer_sc500.shape))  # type: ignore
-        df_outer_sc500.rename(str.lower, axis="columns", inplace=True)  # type: ignore
+        df_outer_sc500.dropna(how="all", inplace=True)
+        print("Full: {}".format(df_outer_sc500.shape))
+        df_outer_sc500.rename(str.lower, axis="columns", inplace=True)
         keys = []
         vals = []
         gsms_loaded = []
 
-        for col in list(df_outer_sc500):  # type: ignore
-            if ".cel.gz" in col:  # type: ignore
-                strs = col.split(".cel.gz")  # type: ignore
+        for col in list(df_outer_sc500):
+            if ".cel.gz" in col:
+                strs = col.split(".cel.gz")
                 gsm = strs[0].split("_")[0]
                 newcol = "{}.cel.gz{}".format(gsm, strs[-1])
                 vals.append(newcol)
                 keys.append(col)
                 gsms_loaded.append(gsm)
 
-        df_outer_sc500.rename(columns=dict(zip(keys, vals)), inplace=True)  # type: ignore
+        df_outer_sc500.rename(columns=dict(zip(keys, vals)), inplace=True)
         gsms_loaded = list(set(gsms_loaded).union(set(self.gsm_platform.keys())))
 
         # Remove duplicated items, keep largest VALUE for each GSM
@@ -329,7 +346,7 @@ class GSEproject:
             )
 
             try:
-                temp = df_outer_sc500.loc[:, [col1, col2, col3]]  # type: ignore
+                temp = df_outer_sc500.loc[:, [col1, col2, col3]]
 
             except:
                 if key in list(self.gsm_platform.keys()):

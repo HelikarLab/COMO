@@ -251,12 +251,15 @@ def main(argv):
         "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
     )
     quantile_arg["default"] = 0.25
-    parser.add_argument(**batch_ratio_arg)
-    parser.add_argument(**config_file_arg)
-    parser.add_argument(**high_batch_ratio_arg)
-    parser.add_argument(**high_replicate_ratio_arg)
-    parser.add_argument(**quantile_arg)
-    parser.add_argument(**replicate_ratio_arg)
+
+    # fmt: off
+    parser.add_argument(batch_ratio_arg["flag"], **{k: v for k, v in batch_ratio_arg.items() if k != "flag"})
+    parser.add_argument(config_file_arg["flag"], **{k: v for k, v in config_file_arg.items() if k != "flag"})
+    parser.add_argument(high_batch_ratio_arg["flag"], **{k: v for k, v in high_batch_ratio_arg.items() if k != "flag"})
+    parser.add_argument(high_replicate_ratio_arg["flag"], **{k: v for k, v in high_replicate_ratio_arg.items() if k != "flag"})
+    parser.add_argument(quantile_arg["flag"], **{k: v for k, v in quantile_arg.items() if k != "flag"})
+    parser.add_argument(replicate_ratio_arg["flag"], **{k: v for k, v in replicate_ratio_arg.items() if k != "flag"})
+    # fmt: on
 
     args = parser.parse_args()
 
@@ -276,7 +279,7 @@ def main(argv):
     sheet_names = xl.sheet_names
 
     for context_name in sheet_names:
-        datafilename = "".join(["protein_abundance_", context_name, ".csv"])
+        datafilename = "".join(["protein_abundance_", str(context_name), ".csv"])
         config_sheet = pd.read_excel(prot_config_filepath, sheet_name=context_name)
         groups = config_sheet["Group"].unique().tolist()
 
@@ -292,7 +295,7 @@ def main(argv):
             ).ravel().tolist() + ["Gene Symbol"]
 
             proteomics_data = load_proteomics_data(datafilename, context_name)
-            proteomics_data = proteomics_data.loc[:, cols]
+            proteomics_data = proteomics_data.loc[:, cols]  # type: ignore
 
             sym2id = load_gene_symbol_map(
                 gene_symbols=proteomics_data["Gene Symbol"].tolist(),
