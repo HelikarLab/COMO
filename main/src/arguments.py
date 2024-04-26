@@ -490,3 +490,21 @@ proteomics_weight_arg = {
     "dest": "pweight",
     "help": "Proteomics weight for merging zFPKM distribution",
 }
+
+high_replicate_ratio_arg = {
+    "name_or_flags": ["--high-replicate-ratio"],
+    "type": ranged_type(float, 0.0, 1.0),
+    "required": False,
+    "default": 0.5,
+    "dest": "hi_replicate_ratio",
+    "help": "Ratio of replicates required for a gene to be considered high-confidence in that group",
+}
+
+high_batch_ratio_arg = {
+    "name_or_flags": ["--high-batch-ratio"],
+    "type": ranged_type(float, 0.0, 1.0),
+    "required": False,
+    "default": 0.5,
+    "dest": "hi_batch_ratio",
+    "help": "Ratio of groups (batches or studies) required for a gene to be considered high-confidence in a context",
+}
