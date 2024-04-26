@@ -9,7 +9,6 @@ import como_utilities
 import numpy as np
 import pandas as pd
 import rpy2_api
-from fast_bioservices import BioDBNet, Input, Output, Taxon
 from arguments import (
     context_names_arg,
     create_matrix_arg,
@@ -18,6 +17,7 @@ from arguments import (
     provided_matrix_filename_arg,
     taxon_id_arg,
 )
+from fast_bioservices import BioDBNet, Input, Output, Taxon
 from project import Configs
 
 configs = Configs()
@@ -319,12 +319,12 @@ def create_gene_info_file(
             Output.GENE_ID,
             Output.CHROMOSOMAL_LOCATION,
         ]
-        if i.value != input_format.value
+        if i.value != form.value
     ]
 
     gene_info = biodbnet.db2db(
         input_values=genes,
-        input_db=input_format,
+        input_db=form,
         output_db=output_db,
         taxon=taxon_id,
     )
