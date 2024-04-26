@@ -7,11 +7,9 @@ import instruments
 import numpy as np
 import pandas as pd
 import rpy2.robjects as ro
+from fast_bioservices import BioDBNet, Input, Output
 from GSEpipeline import load_gse_soft
 from instruments import AffyIO
-
-# from fast_bioservices import BioDBNet, Input, Output
-from multi_bioservices.biodbnet import InputDatabase, OutputDatabase, TaxonID, db2db
 from rpy2.robjects import pandas2ri
 
 pandas2ri.activate()
