@@ -9,8 +9,15 @@ import GSEpipelineFast
 import pandas as pd
 import rpy2.robjects as ro
 import rpy2_api
+from arguments import (
+    config_file_arg,
+    context_names_arg,
+    data_source_arg,
+    show_biodbnet_progress_arg,
+    taxon_id_arg,
+    use_biodbnet_cache_arg,
+)
 from fast_bioservices.biodbnet import BioDBNet, Input, Output
-from arguments import config_file_arg, context_names_arg, data_source_arg, taxon_id_arg
 from project import Configs
 from rpy2.robjects import pandas2ri
 from rpy2.robjects.packages import importr
@@ -134,7 +141,11 @@ def pharse_configs(config_filepath, sheet):
 
 
 def get_microarray_diff_gene_exp(
-    config_filepath, disease_name, target_path, taxon_id, biodbnet: BioDBNet
+    config_filepath,
+    disease_name,
+    target_path,
+    taxon_id,
+    biodbnet: BioDBNet,
 ):
     """
     Get differential gene expression for microarray data
@@ -157,7 +168,11 @@ def get_microarray_diff_gene_exp(
     inst_name = inst_name[0]
     print(inst_name)
 
-    gseXXX = GSEpipelineFast.GSEproject(gse_id, query_table, configs.root_dir)
+    gseXXX = GSEpipelineFast.GSEproject(
+        gsename=gse_id,
+        querytable=query_table,
+        rootdir=configs.root_dir,
+    )
     for key, val in gseXXX.platforms.items():
         raw_dir = os.path.join(gseXXX.gene_dir, key)
         print(f"{key}:{val}, {raw_dir}")
@@ -361,10 +376,16 @@ def main(argv):
         epilog="For additional help, please post questions/issues in the MADRID GitHub repo at: "
         "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
     )
-    parser.add_argument(**config_file_arg)
-    parser.add_argument(**context_names_arg)
-    parser.add_argument(**data_source_arg)
-    parser.add_argument(**taxon_id_arg)
+
+    # fmt: off
+    # parser.add_argument(gene_format_arg["flag"], **{k: v for k, v in gene_format_arg.items() if k != "flag"})
+    parser.add_argument(config_file_arg["flag"], **{k: v for k, v in config_file_arg.items() if k != "flag"})
+    parser.add_argument(context_names_arg["flag"], **{k: v for k, v in context_names_arg.items() if k != "flag"})
+    parser.add_argument(data_source_arg["flag"], **{k: v for k, v in data_source_arg.items() if k != "flag"})
+    parser.add_argument(taxon_id_arg["flag"], **{k: v for k, v in taxon_id_arg.items() if k != "flag"})
+    parser.add_argument(show_biodbnet_progress_arg["flag"], **{k: v for k, v in show_biodbnet_progress_arg.items() if k != "flag"})
+    parser.add_argument(use_biodbnet_cache_arg["flag"], **{k: v for k, v in use_biodbnet_cache_arg.items() if k != "flag"})
+    # fmt: on
 
     args = parser.parse_args()
     context_name = args.context_name
