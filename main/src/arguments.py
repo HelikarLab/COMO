@@ -508,3 +508,21 @@ high_batch_ratio_arg = {
     "dest": "hi_batch_ratio",
     "help": "Ratio of groups (batches or studies) required for a gene to be considered high-confidence in a context",
 }
+
+min_zfpkm_arg = {
+    "name_or_flags": ["--min-zfpkm"],
+    "type": int,
+    "required": False,
+    "default": -3,
+    "dest": "min_zfpkm",
+    "help": "Cutoff used for zfpkm. Minimum zfpkm to be considered expressed. According to PMC3870982, should be between -3 and -2.",
+}
+
+library_prep_arg = {
+    "name_or_flags": ["--library-prep"],
+    "type": str,
+    "choices": ["total", "mrna", "scrna"],
+    "required": True,
+    "dest": "prep",
+    "help": "Library preparation method used for the data.",
+}
