@@ -589,18 +589,20 @@ def parse_args(argv):
         "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
     )
 
-    parser.add_argument(**context_names_arg)
-    parser.add_argument(**reference_model_filepath_arg)
-    parser.add_argument(**active_genes_filepath_arg)
-    parser.add_argument(**objective_function_arg)
-    parser.add_argument(**boundary_reactions_filepath_arg)
-    parser.add_argument(**exclude_reactions_filepath_arg)
-    parser.add_argument(**force_reactions_filepath_arg)
-    parser.add_argument(**reconstruction_algorithm_arg)
-    parser.add_argument(**imat_low_threshold_arg)
-    parser.add_argument(**imat_high_threshold_arg)
-    parser.add_argument(**reconstruction_solver_arg)
-    parser.add_argument(**output_filetypes_arg)
+    # fmt: off
+    parser.add_argument(context_names_arg["flag"], **{k: v for k, v in context_names_arg.items() if k != "flag"})
+    parser.add_argument(reference_model_filepath_arg["flag"], **{k: v for k, v in reference_model_filepath_arg.items() if k != "flag"})
+    parser.add_argument(active_genes_filepath_arg["flag"], **{k: v for k, v in active_genes_filepath_arg.items() if k != "flag"})
+    parser.add_argument(objective_function_arg["flag"], **{k: v for k, v in objective_function_arg.items() if k != "flag"})
+    parser.add_argument(boundary_reactions_filepath_arg["flag"], **{k: v for k, v in boundary_reactions_filepath_arg.items() if k != "flag"})
+    parser.add_argument(exclude_reactions_filepath_arg["flag"], **{k: v for k, v in exclude_reactions_filepath_arg.items() if k != "flag"})
+    parser.add_argument(force_reactions_filepath_arg["flag"], **{k: v for k, v in force_reactions_filepath_arg.items() if k != "flag"})
+    parser.add_argument(reconstruction_algorithm_arg["flag"], **{k: v for k, v in reconstruction_algorithm_arg.items() if k != "flag"})
+    parser.add_argument(imat_low_threshold_arg["flag"], **{k: v for k, v in imat_low_threshold_arg.items() if k != "flag"})
+    parser.add_argument(imat_high_threshold_arg["flag"], **{k: v for k, v in imat_high_threshold_arg.items() if k != "flag"})
+    parser.add_argument(reconstruction_solver_arg["flag"], **{k: v for k, v in reconstruction_solver_arg.items() if k != "flag"})
+    parser.add_argument(output_filetypes_arg["flag"], **{k: v for k, v in output_filetypes_arg.items() if k != "flag"})
+    # fmt: on
 
     args = parser.parse_args()
     return args
