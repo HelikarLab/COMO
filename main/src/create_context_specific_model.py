@@ -413,7 +413,7 @@ def create_context_specific_model(
     if general_model_file[-4:] == ".mat":
         cobra_model = cobra.io.load_matlab_model(general_model_file)
     elif general_model_file[-4:] == ".xml":
-        cobra_model = cobra.io.load_sbml_model(general_model_file)
+        cobra_model = cobra.io.read_sbml_model(general_model_file)
     elif general_model_file[-5:] == ".json":
         cobra_model = cobra.io.load_json_model(general_model_file)
     else:
