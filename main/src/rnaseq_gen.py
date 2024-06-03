@@ -47,17 +47,16 @@ def load_rnaseq_tests(filename, context_name, lib_type):
         dat = pd.read_csv(savepath, index_col="ENTREZ_GENE_ID")
         return "dummy", dat
 
-    if (
-        not filename or filename == "None"
-    ):  # not using this data type, use empty dummy data matrix
+    # not using this data type, use empty dummy data matrix
+    if not filename or filename == "None":
         return load_dummy_dict()
 
     inquiry_full_path = os.path.join(
         configs.root_dir, "data", "config_sheets", filename
     )
-    if not os.path.isfile(
-        inquiry_full_path
-    ):  # check that config file exist (isn't needed to load, but helps user)
+
+    # check that config file exist (isn't needed to load, but helps user)
+    if not os.path.isfile(inquiry_full_path):
         print(f"Error: Config file not found at {inquiry_full_path}")
         sys.exit()
 
@@ -206,12 +205,12 @@ def main(argv):
     args = parser.parse_args(argv)
     # fmt: on
 
-    config_filename = args.config_filename
+    config_filename = args.config_file
     replicate_ratio = args.replicate_ratio
     batch_ratio = args.batch_ratio
-    replicate_ratio_high = args.replicate_ratio_high
-    batch_ratio_high = args.batch_ratio_high
-    technique = args.technique
+    replicate_ratio_high = args.hi_replicate_ratio
+    batch_ratio_high = args.hi_batch_ratio
+    technique = args.filtering_technique
     quantile = args.quantile
     min_count = args.min_count
     prep = args.prep
