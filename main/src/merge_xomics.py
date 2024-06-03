@@ -28,8 +28,11 @@ from arguments import (
     requirement_adjustment_arg,
     scrnaseq_filename_arg,
     scrnaseq_weight_arg,
+    show_biodbnet_progress_arg,
+    taxon_id_arg,
     total_rnaseq_filename_arg,
     total_rnaseq_weight_arg,
+    use_biodbnet_cache_arg,
 )
 from como_utilities import split_gene_expression_data
 from fast_bioservices import BioDBNet, Input, Output
@@ -462,7 +465,7 @@ def handle_context_batch(
     min_inputs = min(counts.values())
 
     if merge_distro:
-        print(f"Using {merge_distro} distribution for merging")
+        print("Using true distribution for merging")
         rpy2_api.Rpy2(
             r_file_path,
             os.path.join(configs.data_dir, "results"),
@@ -566,8 +569,11 @@ def main(argv):
     parser.add_argument(requirement_adjustment_arg["flag"], **{k: v for k, v in requirement_adjustment_arg.items() if k != "flag"})
     parser.add_argument(scrnaseq_filename_arg["flag"], **{k: v for k, v in scrnaseq_filename_arg.items() if k != "flag"})
     parser.add_argument(scrnaseq_weight_arg["flag"], **{k: v for k, v in scrnaseq_weight_arg.items() if k != "flag"})
+    parser.add_argument(show_biodbnet_progress_arg["flag"], **{k: v for k, v in show_biodbnet_progress_arg.items() if k != "flag"})
+    parser.add_argument(taxon_id_arg["flag"], **{k: v for k, v in taxon_id_arg.items() if k != "flag"})
     parser.add_argument(total_rnaseq_filename_arg["flag"], **{k: v for k, v in total_rnaseq_filename_arg.items() if k != "flag"})
     parser.add_argument(total_rnaseq_weight_arg["flag"], **{k: v for k, v in total_rnaseq_weight_arg.items() if k != "flag"})
+    parser.add_argument(use_biodbnet_cache_arg["flag"], **{k: v for k, v in use_biodbnet_cache_arg.items() if k != "flag"})
     # fmt: on
 
     args = parser.parse_args(argv)
@@ -578,7 +584,7 @@ def main(argv):
     mrnaseq_file = args.mrnaseq_file
     scrnaseq_file = args.scrnaseq_file
     expression_requirement = args.expression_requirement
-    adjust_method = args.adjust_method.lower()
+    adjust_method = args.requirement_adjust.lower()
     custom_file = args.custom_file
     no_hc = args.no_hc
     no_na = args.no_na
