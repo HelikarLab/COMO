@@ -297,7 +297,7 @@ def create_gene_info_file(
      results/<context name>/gene_info_<context name>.csv
     """
 
-    print(f"Fetching gene info")
+    print("Fetching gene info")
     gene_info_file = os.path.join(configs.data_dir, "gene_info.csv")
     genes: list[str]
     if os.path.exists(gene_info_file):
