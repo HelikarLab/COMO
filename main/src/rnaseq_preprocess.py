@@ -15,7 +15,9 @@ from arguments import (
     gene_format_arg,
     provide_count_matrix_arg,
     provided_matrix_filename_arg,
+    show_biodbnet_progress_arg,
     taxon_id_arg,
+    use_biodbnet_cache_arg,
 )
 from fast_bioservices import BioDBNet, Input, Output, Taxon
 from project import Configs
@@ -485,6 +487,9 @@ def parse_args(argv):
     parser.add_argument(gene_format_arg["flag"], **{k: v for k, v in gene_format_arg.items() if k != "flag"})
     parser.add_argument(taxon_id_arg["flag"], **{k: v for k, v in taxon_id_arg.items() if k != "flag"})
     parser.add_argument(context_names_arg["flag"], **{k: v for k, v in context_names_arg.items() if k != "flag"})
+    parser.add_argument(use_biodbnet_cache_arg["flag"], **{k: v for k, v in use_biodbnet_cache_arg.items() if k != "flag"})
+    parser.add_argument(show_biodbnet_progress_arg["flag"], **{k: v for k, v in show_biodbnet_progress_arg.items() if k != "flag"})
+
 
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(provide_count_matrix_arg["flag"], **{k: v for k, v in provide_count_matrix_arg.items() if k != "flag"})
