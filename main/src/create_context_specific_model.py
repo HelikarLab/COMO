@@ -274,7 +274,10 @@ def seed_imat(
 ):
     expr_vector = np.array(expr_vector)
     properties = IMATProperties(
-        exp_vector=expr_vector, exp_thresholds=expr_thesh, core=idx_force, epsilon=0.01
+        exp_vector=expr_vector,
+        exp_thresholds=expr_thesh,
+        core=idx_force,
+        epsilon=0.01,  # type: ignore
     )
     print("Setting properties")
     algorithm = IMAT(s_matrix, lb, ub, properties)
@@ -283,7 +286,7 @@ def seed_imat(
     context_rxns = algorithm.run()
 
     print("Running")
-    fluxes = algorithm.sol.to_series()
+    fluxes = algorithm.sol.to_series()  # type: ignore
 
     print("Obtained flux values")
     context_cobra_model = cobra_model.copy()
@@ -345,8 +348,10 @@ def map_expression_to_rxn(
 
     cnt = 0
     if recon_algorithm in ["IMAT", "TINIT"]:
-        # unknown_val = min(gene_expressions["Data"].tolist())
-        unknown_val = np.mean([low_thresh, high_thresh])  # put unknowns in mid bin
+        # put unknowns in mid bin
+        assert low_thresh is not None, "low_thresh must not be `None`"
+        assert high_thresh is not None, "high_thresh must not be `None`"
+        unknown_val = (low_thresh + high_thresh) / 2
     elif recon_algorithm == "GIMME":
         unknown_val = -1
     elif recon_algorithm == "FASTCORE":
@@ -413,7 +418,7 @@ def create_context_specific_model(
     if general_model_file[-4:] == ".mat":
         cobra_model = cobra.io.load_matlab_model(general_model_file)
     elif general_model_file[-4:] == ".xml":
-        cobra_model = cobra.io.load_sbml_model(general_model_file)
+        cobra_model = cobra.io.read_sbml_model(general_model_file)
     elif general_model_file[-5:] == ".json":
         cobra_model = cobra.io.load_json_model(general_model_file)
     else:
@@ -614,7 +619,7 @@ def main(argv):
     """
     args = parse_args(argv)
 
-    context_name = args.context_name
+    context_name = args.context_names
     reference_model = args.modelfile
     genefile = args.genefile
     objective = args.objective
@@ -658,23 +663,22 @@ def main(argv):
         # Make sure the columns are named correctly. They should be "Reaction", "Abbreviation", "Compartment", "Minimum Reaction Rate", and "Maximum Reaction Rate"
         for column in df.columns:
             if column not in [
-                "reaction",
-                "abbreviation",
+                "reaction id",
+                "boundary",
                 "compartment",
-                "minimum reaction rate",
-                "maximum reaction rate",
+                "lower bound",
+                "upper bound",
             ]:
                 raise ValueError(
                     f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', 'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}"
                 )
 
-        reaction_type: list[str] = df["reaction"].tolist()
-        reaction_abbreviation: list[str] = df["abbreviation"].tolist()
+        reaction_type: list[str] = df["reaction id"].tolist()
+        reaction_abbreviation: list[str] = df["boundary"].tolist()
         reaction_compartment: list[str] = df["compartment"].tolist()
-        boundary_rxns_lower = df["minimum reaction rate"].tolist()
-        boundary_rxns_upper = df["maximum reaction rate"].tolist()
+        boundary_rxns_lower = df["lower bound"].tolist()
+        boundary_rxns_upper = df["upper bound"].tolist()
 
-        reaction_formula: list[str] = []
         for i in range(len(reaction_type)):
             current_type: str = reaction_type[i]
             temp_reaction: str = ""
@@ -690,7 +694,6 @@ def main(argv):
             shorthand_compartment = Compartments.get(reaction_compartment[i])
             temp_reaction += f"{reaction_abbreviation[i]}[{shorthand_compartment}]"
             boundary_rxns.append(temp_reaction)
-            # reaction_formula.append(temp_reaction)
 
         del df
 
@@ -757,7 +760,7 @@ def main(argv):
                 )
                 sys.exit()
 
-            force_rxns = df["Abbreviation"].tolist()
+            force_rxns = df["Reaction ID"].tolist()
 
         except FileNotFoundError:
             print(
