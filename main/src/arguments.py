@@ -4,7 +4,7 @@ The purpose of this file is to create a uniform interface for the arguments that
 
 import argparse
 import math
-from typing import Callable, Union
+from typing import Callable
 
 
 def ranged_type(value_type, min_value, max_value) -> Callable:
@@ -166,7 +166,7 @@ min_count_arg = {
 
 quantile_arg = {
     "flag": "--quantile",
-    "type": ranged_type(float, 0.0, 1.0),
+    "type": ranged_type(int, 0, 100),
     "required": False,
     "default": 0.5,
     "dest": "quantile",
@@ -274,6 +274,7 @@ reconstruction_solver_arg = {
 output_filetypes_arg = {
     "flag": "--output-filetypes",
     "type": str,
+    "nargs": "+",
     "required": False,
     "default": "mat",
     "dest": "output_filetypes",
