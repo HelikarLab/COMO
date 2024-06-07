@@ -130,52 +130,75 @@ def gene_rule_evaluable(expression_in: str) -> str:
 
 
 def set_boundaries(
-    model_cobra: cobra.Model, bound_rxns: list, bound_lb, bound_ub
-) -> tuple[cobra.Model, list]:
-    all_rxns = model_cobra.reactions  # get all reactions
-    bound_rm_rxns = []
+    model: cobra.Model,
+    boundary_reactions: list,
+    lower_bounds: list,
+    upper_bounds: list,
+) -> cobra.Model:
+    """
+    Sets the boundaries for reactions in a COBRA model based on specified lists of boundary reactions, lower bounds, and upper bounds.
 
-    # get boundary reactions
-    exchange_rxns = [rxn.id for rxn in all_rxns if re.search("EX_", rxn.id)]
-    sink_rxns = [rxn.id for rxn in all_rxns if re.search("sink_", rxn.id)]
-    demand_rxns = [rxn.id for rxn in all_rxns if re.search("DM_", rxn.id)]
+    This function modifies the given COBRA model by adjusting the lower and upper bounds of reactions specified in the boundary_reactions list.
+    It specifically targets sink, demand, and exchange reactions, setting their bounds according to the provided lists or to default values
+        if they are not included in the boundary_reactions list. This allows for the simulation of specific metabolic states or conditions.
+
+
+    Note:
+    - Sink reactions are prefixed with "sink_", demand reactions with "DM_", and exchange reactions with "EX_".
+    - For reactions not specified in boundary_reactions, sink and exchange reactions are closed (set to 0),
+        while demand reactions are allowed to export metabolites out of the model (upper bound set to 1000, lower bound to 0).
+
+    Parameters
+    ----------
+    model : cobra.Model
+        The metabolic model to be modified.
+    boundary_reactions : list
+        A list of reaction IDs that are to have their bounds modified. If this list is empty, all boundary reactions are allowed.
+    lower_bounds : list
+        A list of lower bounds for the reactions specified in boundary_reactions. Must be the same length as boundary_reactions.
+    upper_bounds : list
+          A list of upper bounds for the reactions specified in boundary_reactions. Must be the same length as boundary_reactions.
+
+    Returns
+    -------
+    cobra.Model
+        The modified COBRA model with updated reaction bounds.
+
+    Raises
+    ------
+    AssertionError
+        If the lengths of boundary_reactions, lower_bounds, and upper_bounds do not match.
+    """
+
+    assert len(boundary_reactions) == len(lower_bounds) == len(upper_bounds), (
+        "Boundary reactions, lower bounds, and upper bounds must be the same length. "
+        f"Found: {len(boundary_reactions)}, {len(lower_bounds)}, {len(upper_bounds)}"
+    )
 
     # set flag that allows all boundary reactions to be used if none are given
-    if len(bound_rxns) == 0:
-        allow_all_boundary_rxns = True
-    else:
-        allow_all_boundary_rxns = False
+    allow_all_boundary_rxns = True if len(boundary_reactions) == 0 else False
 
     # close sinks and demands not in boundary reactions unless no boundary reactions were given
     if not allow_all_boundary_rxns:
-        for i, rxn in enumerate(sink_rxns):  # set sinks to 0
-            if rxn not in bound_rxns:  # only allow sink accumulation
-                getattr(model_cobra.reactions, rxn).lower_bound = 0
-                getattr(model_cobra.reactions, rxn).upper_bound = 1000
-            else:  # set from file
-                getattr(model_cobra.reactions, rxn).lower_bound = bound_lb[i]
-                getattr(model_cobra.reactions, rxn).upper_bound = bound_ub[i]
+        sink_rxns = [rxn.id for rxn in model.reactions if str(rxn.id).startswith("sink_")]
+        for i, rxn in enumerate(sink_rxns):
+            getattr(model.reactions, rxn).lower_bound = lower_bounds[i] if rxn in boundary_reactions else 0
+            getattr(model.reactions, rxn).upper_bound = upper_bounds[i] if rxn in boundary_reactions else 1000
 
+        demand_rxns = [rxn.id for rxn in model.reactions if str(rxn.id).startswith("DM_")]
         for i, rxn in enumerate(demand_rxns):
-            if rxn not in bound_rxns:  # demand is one way - outside the system
-                getattr(model_cobra.reactions, rxn).lower_bound = 0
-                getattr(model_cobra.reactions, rxn).upper_bound = 1000
-            else:
-                getattr(model_cobra.reactions, rxn).lower_bound = 0
-                getattr(model_cobra.reactions, rxn).upper_bound = bound_ub[i]
+            # Demands can only move out of model, set lower bound to 0
+            getattr(model.reactions, rxn).lower_bound = 0
+            getattr(model.reactions, rxn).upper_bound = upper_bounds[i] if rxn in boundary_reactions else 1000
 
-    # Reaction media
-    medium = model_cobra.medium  # get reaction media to modify
-    for rxn in (
-        exchange_rxns
-    ):  # open exchanges from exchange file, close unspecified exchanges
-        if rxn not in bound_rxns:
-            medium[rxn] = 0.0
-        else:
-            medium[rxn] = -float(bound_lb[bound_rxns.index(rxn)])
-    model_cobra.medium = medium  # set new media
+    # open exchanges specified from file, close unspecified exchanges
+    exchange_rxns = [rxn.id for rxn in model.reactions if str(rxn.id).startswith("EX_")]
+    medium = model.medium.copy()
+    for rxn_id in exchange_rxns:
+        medium[rxn_id] = -float(lower_bounds[boundary_reactions.index(rxn_id)]) if rxn_id in boundary_reactions else 0  # fmt: skip
+    model.medium = medium
 
-    return model_cobra, bound_rm_rxns
+    return model
 
 
 def feasibility_test(model_cobra: cobra.Model, step: str):
@@ -415,6 +438,7 @@ def create_context_specific_model(
     file. Metabolite exchange (media), sinks, and demands are determined from exchanges file. Reactions can also be
     force excluded even if they meet GPR association requirements using the force exclude file.
     """
+    cobra_model: cobra.Model
     if general_model_file[-4:] == ".mat":
         cobra_model = cobra.io.load_matlab_model(general_model_file)
     elif general_model_file[-4:] == ".xml":
@@ -432,9 +456,7 @@ def create_context_specific_model(
         force_rxns.append(objective)
 
     # set boundaries
-    cobra_model, bound_rm_rxns = set_boundaries(
-        cobra_model, bound_rxns, bound_lb, bound_ub
-    )
+    cobra_model = set_boundaries(cobra_model, bound_rxns, bound_lb, bound_ub)
 
     # set solver
     cobra_model.solver = solver.lower()
