@@ -1,3 +1,40 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "COMO"
+dynamic = ["version"]
+#readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "cobra",
+    "fast-bioservices>=0.3.4",
+    "cobamp @ git+https://github.com/JoshLoecker/cobamp.git",
+    "geoparse",
+    "numpy",
+    "openpyxl",
+    "pandas",
+    "rpy2",
+    "sqlalchemy",
+    "troppo",
+]
+
+[tool.ruff]
+line-length = 150
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build]
+packages = ["main/como"]
+
+[tool.hatch.build.hooks.vcs]
+version-file = "_version.py"
+
+[tool.hatch.metadata]
+allow-direct-references=true
+
 [tool.pytest.ini_options]
 pythonpath = [
     "main/src"
