@@ -35,6 +35,6 @@ jobs:
             python=${{ matrix.python-version }}
 
       - name: Run tests
-        run: python -m pytest
+        run: "cd main && python -m pytest"
         shell: micromamba-shell {0}
 
