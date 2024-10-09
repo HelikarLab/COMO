@@ -1,19 +1,17 @@
 """
 This is the main driver-file for downloading proteomics data
 """
+
 import argparse
-from . import Crux
 import csv
-from .FileInformation import FileInformation
-from . import FTPManager
 import os
-import sys
 from pathlib import Path
 
+from . import Crux, FTPManager
+from .FileInformation import FileInformation
 
-class ArgParseFormatter(
-    argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter
-):
+
+class ArgParseFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
     """
     This allows us to use the RawTextHelpFormatter and the ArgumentDefaultsHelpFormatter in a single argparse parser()
     """
@@ -27,10 +25,10 @@ class ParseCSVInput:
     1. proteomeXchange URLs
     2. Cell Type
     3. Replicate (optional)
-    
+
     This class is meant to make it easier to access each of these things
-    
-    
+
+
     {
         "naiveB": {
             "url": [one, two, three],
@@ -42,10 +40,11 @@ class ParseCSVInput:
         }
     }
     """
+
     def __init__(self, input_csv_file: Path):
         self._input_csv_file: Path = input_csv_file
         self._data: [str, dict[str, list[str]]] = {}
-        
+
         # Get data from CSV
         with open(self._input_csv_file, "r") as i_stream:
             reader = csv.reader(i_stream)
@@ -60,10 +59,10 @@ class ParseCSVInput:
                         study = line[2]
                     except IndexError:
                         study = ""
-                    
+
                     if cell_type not in self._data:
                         self._data[cell_type] = {"url": [], "study": []}
-                    
+
                     self._data[cell_type]["url"].append(url)
                     self._data[cell_type]["study"].append(study)
 
@@ -72,21 +71,21 @@ class ParseCSVInput:
             urls = self._data[key]["url"]
             for i, url in enumerate(urls):
                 urls[i] = url.replace("/pride/data/archive", "/pride-archive")
-        
+
     @property
     def ftp_urls(self) -> list[str]:
         """
         This will return a list of FTP URLs contained in the input CSV
-        
+
         Example: ftp://ftp.my_server.com
         """
         master_urls: list[str] = []
         for cell_type in self._data.keys():
             urls = self._data[cell_type]["url"]
             master_urls.extend(urls)
-        
+
         return urls
-    
+
     @property
     def input_cell_types(self) -> list[str]:
         """
@@ -99,7 +98,7 @@ class ParseCSVInput:
             num_urls: int = len(self._data[key]["url"])
             cell_types.extend([key] * num_urls)
         return cell_types
-    
+
     @property
     def studies(self) -> list[str]:
         """
@@ -110,7 +109,7 @@ class ParseCSVInput:
             replicates = self._data[cell_type]["study"]
             master_studies.extend(replicates)
         return master_studies
-    
+
     @property
     def csv_dict(self) -> dict[str, dict[str, list[str]]]:
         """
@@ -132,12 +131,11 @@ class ParseCSVInput:
 
 class PopulateInformation:
     def __init__(
-            self,
-            file_information: list[FileInformation],
-            csv_data: ParseCSVInput,
-            skip_download: bool,
-            preferred_extensions: list[str] = None,
-
+        self,
+        file_information: list[FileInformation],
+        csv_data: ParseCSVInput,
+        skip_download: bool,
+        preferred_extensions: list[str] = None,
     ):
         self.file_information: list[FileInformation] = file_information
         self._csv_data: ParseCSVInput = csv_data
@@ -151,10 +149,10 @@ class PopulateInformation:
 
         self._gather_data()
         self._set_replicate_numbers()
-        
+
         if self._skip_download is False:
             self.print_download_size()
-            
+
     def _gather_data(self):
         # Iterate through the cell type and corresponding list of URLS
         # cell_type: naiveB
@@ -163,53 +161,41 @@ class PopulateInformation:
             ftp_urls: list[str] = self._csv_data[cell_type]["url"]
             studies: list[str] = self._csv_data[cell_type]["study"]
             url_count = 0
-        
+
             # Iterate through the URLs available
             for j, (url, study) in enumerate(zip(ftp_urls, studies)):
-            
                 # Print updates to he screen
                 print(
                     f"\rParsing cell type {i + 1} of {len(self._csv_data.keys())} ({cell_type}) | {j + 1} of {len(ftp_urls)} folders navigated",
                     end="",
-                    flush=True
+                    flush=True,
                 )
-                
-                ftp_data: FTPManager.Reader = FTPManager.Reader(
-                    root_link=url,
-                    file_extensions=self._preferred_extensions
-                )
-            
+
+                ftp_data: FTPManager.Reader = FTPManager.Reader(root_link=url, file_extensions=self._preferred_extensions)
+
                 urls = [url for url in ftp_data.files]
                 sizes = [size for size in ftp_data.file_sizes]
                 url_count += len(urls)
-            
+
                 # Iterate through all files and sizes found for url_##
                 for k, (file, size) in enumerate(zip(urls, sizes)):
-                
-                    self.file_information.append(
-                        FileInformation(
-                            cell_type=cell_type,
-                            download_url=file,
-                            file_size=size,
-                            study=study
-                        )
-                    )
-        
+                    self.file_information.append(FileInformation(cell_type=cell_type, download_url=file, file_size=size, study=study))
+
             # Print number of URLs found for each cell type
             # This is done after appending because some cell types may have more than 1 root URL, and it messes up the formatting
             if url_count == 1:
                 print(" | 1 file found")
             else:
                 print(f" | {url_count} files found")
-            
+
     def print_download_size(self):
         # Print the total size to download if we must download data
         total_size: int = 0
         for information in self.file_information:
             total_size += information.file_size
-        
+
         # Convert to MB
-        total_size = total_size // 1024 ** 2
+        total_size = total_size // 1024**2
         print(f"Total size to download: {total_size} MB")
 
     def _set_replicate_numbers(self):
@@ -217,9 +203,8 @@ class PopulateInformation:
         for information in self.file_information:
             if information.cell_type not in instances.keys():
                 instances[information.cell_type] = FileInformation.filter_instances(information.cell_type)
-        
-        for cell_type in instances.keys():
 
+        for cell_type in instances.keys():
             replicate_num: int = 1
             for i, file_information in enumerate(instances[cell_type]):
                 current_info: FileInformation = file_information
@@ -233,10 +218,10 @@ class PopulateInformation:
                     replicate_num += 1
                 else:
                     replicate_num: int = 1
-                    
+
                 replicate_value: str = f"R{replicate_num}"
                 current_info.set_replicate(replicate_value)
-                
+
     def _collect_cell_type_information(self, cell_type: str) -> list[FileInformation]:
         """
         This function is responsible for collecting all FileInformation objects of a given cell type
@@ -245,17 +230,15 @@ class PopulateInformation:
         for information in self.file_information:
             if information.cell_type == cell_type:
                 file_information_list.append(information)
-                
+
         return file_information_list
-            
-    
-def parse_args(args: list[str]) -> argparse.Namespace:
+
+
+def parse_args() -> argparse.Namespace:
     """
     This function is used to parse arguments from the command line
-
-    :param args: The list of arguments collected from the command line
     """
-    
+
     parser = argparse.ArgumentParser(
         prog="proteomics_preprocess.py",
         description="Download and analyze proteomics data from proteomeXchange\n"
@@ -303,7 +286,7 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         default=False,
         type=bool,
         help="If this action is passed in, FTP data will not be downloaded.\n"
-             "This assumes you have raw data under the folder specified by the option '--ftp-out-dir'",
+        "This assumes you have raw data under the folder specified by the option '--ftp-out-dir'",
     )
     parser.add_argument(
         "--skip-mzml",
@@ -334,10 +317,10 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         metavar="cores",
         default=os.cpu_count() // 2,
         help="This is the number of threads to use for downloading files.\n"
-             "It will default to the minimum of: half the available CPU cores available, or the number of input files found.\n"
-             "It will not use more cores than necessary\n"
-             "Options are an integer or 'all' to use all available cores.\n"
-             "Note: Downloading will use a MAX of 2 threads at once, as some FTP servers do not work well with multiple connections from the same IP address at once.",
+        "It will default to the minimum of: half the available CPU cores available, or the number of input files found.\n"
+        "It will not use more cores than necessary\n"
+        "Options are an integer or 'all' to use all available cores.\n"
+        "Note: Downloading will use a MAX of 2 threads at once, as some FTP servers do not work well with multiple connections from the same IP address at once.",
     )
     # TODO: Add option to delete intermediate files (raw, mzml, sqt)
 
@@ -349,30 +332,27 @@ def parse_args(args: list[str]) -> argparse.Namespace:
         print(f"Input file {args.input} does not exist!")
         raise FileNotFoundError
 
-    try:
-        # Try to get an integer, fails if "all" input
+    if args.core_count == "all":
+        args.core_count = os.cpu_count()
+    elif not args.core_count.is_integer():
+        raise ValueError(f"Invalid option '{args.core_count}' for option '--cores'. Enter an integer or 'all' to use all cores")
+    else:
         args.core_count = int(args.core_count)
         if args.core_count > os.cpu_count():
-            print(f"{args.core_count} cores not available, system only has {os.cpu_count()} cores. Setting '--cores' to {os.cpu_count()}")  # fmt: skip
+            print(f"{args.core_count} cores not available, system only has {os.cpu_count()} cores. Setting '--cores' to {os.cpu_count()}")
             args.core_count = os.cpu_count()
-    except ValueError:
-        if args.core_count == "all":
-            args.core_count = os.cpu_count()
-        else:
-            print(f"Invalid option '{args.core_count}' for option '--cores'. Enter an integer or 'all' to use all cores")  # fmt: skip
-            exit(2)
 
     return args
-        
 
-def main(args: list[str]):
+
+def main():
     """
     This is the main driver function
 
     :param args: The list of arguments collected from the command line
     """
     file_information: list[FileInformation] = []
-    args: argparse.Namespace = parse_args(args)
+    args: argparse.Namespace = parse_args()
     csv_data = ParseCSVInput(args.input_csv)
 
     """
@@ -395,14 +375,9 @@ def main(args: list[str]):
         args.skip_download = True
     elif args.skip_mzml:
         args.skip_download = True
-    
+
     # Populate the file_information list
-    PopulateInformation(
-        file_information=file_information,
-        csv_data=csv_data,
-        skip_download=args.skip_download,
-        preferred_extensions=args.extensions
-    )
+    PopulateInformation(file_information=file_information, csv_data=csv_data, skip_download=args.skip_download, preferred_extensions=args.extensions)
 
     # Download data if we should not skip anything
     if args.skip_download is False:
@@ -441,7 +416,7 @@ def main(args: list[str]):
     print("\nProtein intensities saved under:")
     for folder in root_folders:
         print(folder)
-    
+
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()
