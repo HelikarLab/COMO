@@ -12,14 +12,13 @@ RUN sed -i '/^python/d' /opt/conda/conda-meta/pinned && \
     echo "c.ServerApp.root_dir = '${HOME}/main'" >> "${HOME}/.jupyter/jupyter_notebook_config.py" && \
     echo "c.ServerApp.token = ''" >> "${HOME}/.jupyter/jupyter_notebook_config.py" && \
     echo "c.ServerApp.password = ''" >> "${HOME}/.jupyter/jupyter_notebook_config.py" && \
-    conda config --quiet --add channels conda-forge && \
-    conda config --quiet --add channels bioconda && \
-    conda config --quiet --add channels r && \
-    rm -rf "${HOME}/main/tests"  # Remove tests, they are not required for running COMO
+    mamba config --quiet --add channels conda-forge && \
+    mamba config --quiet --add channels bioconda && \
+    mamba config --quiet --add channels r && \
+    rm -rf "${HOME}/main/tests"  # Tests not required for running COMO
 
 # Update base environment
-RUN ls "${HOME}" && \
-    mamba env update --name=base --file="${HOME}/environment.yaml" && \
+RUN mamba env update --name=base --file="${HOME}/environment.yaml" && \
     R -e "devtools::install_github('babessell1/zFPKM')" && \
     pip cache purge && \
     mamba clean --all --yes
