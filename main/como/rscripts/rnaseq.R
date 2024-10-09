@@ -137,8 +137,8 @@ calculate_fpkm <- function(sample_metrics) {
         layout <- sample_metrics[[i]][["Layout"]] # get layout
         
         # normalize with fpkm if paired, rpkm if single end, kill if something else is specified
-        stopifnot(layout[1] == "paired-end" || layout == "single-end")
-        if (layout == "paired-end") { # fpkm
+        stopifnot(layout[1] == "paired-end" || layout[1] == "single-end")
+        if (layout[1] == "paired-end") { # fpkm
             count_matrix <- sample_metrics[[i]][["CountMatrix"]]
             gene_size <- sample_metrics[[i]][["GeneSizes"]]
             mean_fragment_lengths <- sample_metrics[[i]][["FragmentLengths"]]
@@ -459,7 +459,7 @@ filter_counts <- function(sample_metrics, technique, filt_options, context_name,
 
 save_rnaseq_tests <- function(
   counts_matrix_file,
-  config_file,
+  config_filepath,
   out_file,
   info_file,
   context_name,
@@ -517,7 +517,7 @@ save_rnaseq_tests <- function(
         print("Note: Single cell filtration does not normalize and assumes counts are counted with UMI")
     }
     
-    sample_metrics <- read_counts_matrix(counts_matrix_file, config_file, info_file, context_name) # read count matrix
+    sample_metrics <- read_counts_matrix(counts_matrix_file, config_filepath, info_file, context_name) # read count matrix
     entrez_all <- sample_metrics[[1]][["Entrez"]] #get entrez ids
     
     sample_metrics <- filter_counts(sample_metrics, technique, filt_options, context_name, prep) # normalize and filter count
@@ -527,7 +527,7 @@ save_rnaseq_tests <- function(
         expressedGenes <- c(expressedGenes, sample_metrics[[i]][["Entrez"]])
         topGenes <- c(topGenes, sample_metrics[[i]][["Entrez_hc"]])
     }
-    sample_metrics <- read_counts_matrix(counts_matrix_file, config_file, info_file, context_name) # read count matrix
+    sample_metrics <- read_counts_matrix(counts_matrix_file, config_filepath, info_file, context_name) # read count matrix
     
     entrez_all <- sample_metrics[[1]][["Entrez"]] #get entrez ids
     

@@ -1,7 +1,8 @@
-import rpy2
 import typing
 from pathlib import Path
-from rpy2.robjects import packages
+
+import rpy2
+import rpy2.robjects.packages
 
 
 class Rpy2:
