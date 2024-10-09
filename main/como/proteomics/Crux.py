@@ -1,10 +1,9 @@
 """
 TODO: Integrate crux percolator into this workflow
 """
-import asyncio
-import types
 
-from bioservices import BioDBNet
+import asyncio
+
 import multiprocessing
 from multiprocessing.sharedctypes import Synchronized
 import numpy as np
@@ -14,6 +13,7 @@ from pathlib import Path
 import re
 import subprocess
 import tqdm
+from fast_bioservices import BioDBNet, Input, Output, Taxon
 
 from .FileInformation import FileInformation
 from .FileInformation import clear_print
@@ -38,13 +38,12 @@ class RAWtoMZML:
         This is a wrapper function to multiprocess converting raw files to mzML using ThermoRawFileParser
         """
         print("")  # Get a new line to print on
-        
+
         # split self.file_information into self._core_count chunks
         # Always round this division up to ensure all files are processed
         num_chunks: int = int(np.ceil(len(self.file_information) / self._core_count))
         file_chunks: list[list[FileInformation]] = [
-            self.file_information[i:i + num_chunks]
-            for i in range(0, len(self.file_information), num_chunks)
+            self.file_information[i : i + num_chunks] for i in range(0, len(self.file_information), num_chunks)
         ]
 
         jobs: list[multiprocessing.Process] = []
@@ -52,7 +51,7 @@ class RAWtoMZML:
             # Parenthesis + comma needed to make tuple in "args"
             job = multiprocessing.Process(target=self.raw_to_mzml, args=(information,))
             jobs.append(job)
-    
+
         for job in jobs:
             job.start()
         for job in jobs:
@@ -65,19 +64,16 @@ class RAWtoMZML:
         This function is responsible or converting the list of raw files to mzML format
         """
         for information in file_information:
-
             self._conversion_counter.acquire()
             self._conversion_counter.value += 1
-            clear_print(f"Starting raw -> mzML conversion: {self._conversion_counter.value} / {len(self.file_information)} - {information.raw_file_name}")
+            clear_print(
+                f"Starting raw -> mzML conversion: {self._conversion_counter.value} / {len(self.file_information)} - {information.raw_file_name}"
+            )
             self._conversion_counter.release()
-            
+
             information.mzml_base_path.mkdir(parents=True, exist_ok=True)
             subprocess.run(
-                [
-                    "thermorawfileparser",
-                    f"--input={str(information.raw_file_path)}",
-                    f"--output_file={str(information.mzml_file_path)}"
-                ],
+                ["thermorawfileparser", f"--input={str(information.raw_file_path)}", f"--output_file={str(information.mzml_file_path)}"],
                 stdout=subprocess.PIPE,
             )
 
@@ -119,12 +115,18 @@ class MZMLtoSQT:
             # Only create the SQT file
             subprocess.run(
                 [
-                    "crux", "comet",
-                    "--output_sqtfile", "1",
-                    "--output-dir", file_information.sqt_base_path,
-                    "--overwrite", "T",
-                    "--decoy_search", "1",
-                    "--num_threads", str(self._core_count),
+                    "crux",
+                    "comet",
+                    "--output_sqtfile",
+                    "1",
+                    "--output-dir",
+                    file_information.sqt_base_path,
+                    "--overwrite",
+                    "T",
+                    "--decoy_search",
+                    "1",
+                    "--num_threads",
+                    str(self._core_count),
                     file_information.mzml_file_path,  # Input mzML file
                     self._fasta_database,  # Database to search
                 ],
@@ -133,21 +135,14 @@ class MZMLtoSQT:
             )
 
             # Replace all "comet.*" in output directory with the name of the file being processed
-            comet_files = [
-                str(file)
-                for file in os.listdir(file_information.sqt_base_path)
-                if str(file).startswith("comet.")
-            ]
+            comet_files = [str(file) for file in os.listdir(file_information.sqt_base_path) if str(file).startswith("comet.")]
             for file_name in comet_files:
-
                 # Determine the old file path
                 old_file_path: Path = Path(file_information.sqt_base_path, file_name)
 
                 # Determine the new file path
                 new_file_name = file_name.replace("comet", file_information.base_name)
-                new_file_path: Path = Path(
-                    file_information.sqt_base_path, new_file_name
-                )
+                new_file_path: Path = Path(file_information.sqt_base_path, new_file_name)
 
                 # Rename the file
                 os.rename(old_file_path, new_file_path)
@@ -161,10 +156,10 @@ class SQTtoCSV:
         """
         This class is meant to convert UniProt IDs to Entrez IDs using BioDBNet
         """
-        self._biodbnet: BioDBNet = BioDBNet(verbose=False)
+        self._biodbnet: BioDBNet = BioDBNet()
         self._file_information: list[FileInformation] = file_information
         self._core_count: int = min(core_count, 4)  # Maximum of 4 cores
-        
+
         # Merged frames contains all dataframes
         # Split frames contains the S1/S2/etc dataframes, extracted from Merged frames
         self._merged_frames: dict[str, pd.DataFrame] = {}
@@ -173,7 +168,7 @@ class SQTtoCSV:
         # Max of 15 asynchronous tasks at once
         # From: https://stackoverflow.com/a/48256949
         # self._semaphore = asyncio.Semaphore(50)
-        
+
         self.collect_uniprot_ids_and_ion_intensity()
         asyncio.run(self._convert_uniprot_wrapper())
         self.create_merged_frame()
@@ -206,9 +201,7 @@ class SQTtoCSV:
             fasta_headers: list[list[str]] = []
 
             # Use dictionary comprehension to create data dictionary
-            average_intensities_dict: dict = {
-                key: [] for key in list(file_information.intensity_df.columns)
-            }
+            average_intensities_dict: dict = {key: [] for key in list(file_information.intensity_df.columns)}
             # average_intensities: pd.DataFrame = pd.DataFrame(columns=["uniprot", replicate_name])  # fmt: skip
 
             with open(file_information.sqt_file_path, "r") as i_stream:
@@ -218,7 +211,6 @@ class SQTtoCSV:
                 The result will be each spectra value corresponds to a list of UniProt IDs
                 """
                 for j, line in enumerate(i_stream):
-
                     # If the line starts with an "S", collect it
                     if line.startswith("S"):
                         # If the length of ion_intensities is not equal to fasta_headers,
@@ -254,10 +246,10 @@ class SQTtoCSV:
                     # Create a new row in the dataframe
                     average_intensities_dict["uniprot"].append(uniprot_id)
                     average_intensities_dict[file_information.batch].append(current_intensity)
-            
+
             # Fill the "symbol" list with NA, as they are not converted yet
             average_intensities_dict["symbol"] = [np.nan] * len(average_intensities_dict["uniprot"])
-            
+
             # Assign the file_information intensity dataframe to the gathered values
             self._file_information[i].intensity_df = pd.DataFrame(average_intensities_dict)
             self._file_information[i].intensity_df = self._file_information[i].intensity_df.groupby("uniprot", as_index=False).mean()
@@ -266,11 +258,8 @@ class SQTtoCSV:
         """
         This function is a multiprocessing wrapper around the convert_ids function
         """
-        values = [
-            self.async_convert_uniprot(self._file_information[i])
-            for i in range(len(self._file_information))
-        ]
-        
+        values = [self.async_convert_uniprot(self._file_information[i]) for i in range(len(self._file_information))]
+
         # Create a progress bar of results
         # From: https://stackoverflow.com/a/61041328/
         progress_bar = tqdm.tqdm(desc="Starting UniProt to Gene Symbol conversion... ", total=len(self._file_information))
@@ -278,16 +267,15 @@ class SQTtoCSV:
             await result  # Get result from asyncio.as_completed
             progress_bar.set_description(f"Working on {i + 1} of {len(self._file_information)}")
             progress_bar.update()
-    
+
     async def async_convert_uniprot(self, file_information: FileInformation) -> None:
-        
         chunk_size: int = 400
         num_chunks: int = np.ceil(len(file_information.intensity_df) / chunk_size)
         frame_chunks: pd.DataFrame = np.array_split(file_information.intensity_df, num_chunks)
-        
+
         lower_iteration: int = 0
         upper_iteration: int = 0
-        
+
         chunk: pd.DataFrame
         for chunk in frame_chunks:
             upper_iteration += len(chunk)
@@ -297,20 +285,26 @@ class SQTtoCSV:
             loop = asyncio.get_event_loop()
             # async with self._semaphore:
             #     gene_symbols: pd.DataFrame = await loop.run_in_executor(None, self._biodbnet.db2db, "UniProt Accession", "Gene Symbol", input_values)
-            gene_symbols: pd.DataFrame = await loop.run_in_executor(None, self._biodbnet.db2db, "UniProt Accession", "Gene Symbol", input_values)
-            
+            gene_symbols: pd.DataFrame = await loop.run_in_executor(
+                None,
+                self._biodbnet.db2db,
+                input_values,
+                "UniProt Accession",
+                "Gene Symbol",
+            )
+
             # The index is UniProt IDs. Create a new column of these values
             gene_symbols["uniprot"] = gene_symbols.index
             gene_symbols.rename(columns={"Gene Symbol": "symbol"}, inplace=True)
-            
+
             # Create a new "index" column to reset the index of gene_symbols
             gene_symbols["index"] = range(lower_iteration, upper_iteration)
             gene_symbols.set_index("index", inplace=True, drop=True)
             gene_symbols = pd.merge(gene_symbols, chunk[[file_information.batch]], left_index=True, right_index=True)
-            
+
             lower_iteration += len(chunk)
             file_information.intensity_df.update(gene_symbols)
-        
+
     def create_merged_frame(self) -> None:
         """
         This function is responsible for merging all dataframes of a specific cell type into a single master frame
@@ -320,30 +314,30 @@ class SQTtoCSV:
             cell_type = file.cell_type
             if cell_type not in self._merged_frames.keys():
                 self._merged_frames[cell_type] = pd.DataFrame(columns=["symbol", "uniprot"])
-        
+
             self._merged_frames[cell_type] = pd.concat([self._merged_frames[cell_type], file.intensity_df])
 
             # Drop the 'uniprot' column and merge by cell type for each dataframe in master_frame
             self._merged_frames[cell_type].drop(columns=["uniprot"], inplace=True)
             self._merged_frames[cell_type] = self._merged_frames[cell_type].groupby("symbol").mean()
-            
+
             # Create a new column "symbol" that is the index
             self._merged_frames[cell_type]["symbol"] = self._merged_frames[cell_type].index
-            
+
             # Reset the index to ensure the dataframe is in the correct order
             self._merged_frames[cell_type].reset_index(inplace=True, drop=True)
-            
+
             # Replace all nan values with 0
             self._merged_frames[cell_type].fillna(0, inplace=True)
-    
+
     def split_abundance_values(self) -> None:
         """
         This function is responsible for splitting abundance values into separate columns based on their S#R# identifier
-        
+
         It will start by finding all S1R*, S2R*, etc. columns in each cell type under self._master_frames
         From here, it will merge these dataframes into a new dataframe under self._split_frames, corresponding to the cell type
         These split frames can then be written by self.write_data()
-        
+
         Example Dataframe:
             Starting
             --------
@@ -351,7 +345,7 @@ class SQTtoCSV:
             A     ,100        ,0          ,50
             B     ,200        ,75         ,100
             C     ,150        ,100        ,175
-            
+
             Ending
             ------
             symbol,naiveB_S1,naiveB_S2
@@ -361,12 +355,12 @@ class SQTtoCSV:
         """
         # Get a new line to print output on
         print("")
-        
+
         # Copy the dictionary keys from merged_frames into the split_frames
         for key in self._merged_frames.keys():
             if key not in self._split_frames.keys():
                 self._split_frames[key] = []
-        
+
         # 'cell_type' is a dictionary key
         for cell_type in self._merged_frames:
             # Must collect the maximum S# value found in the master_frame
@@ -379,15 +373,15 @@ class SQTtoCSV:
                     # Find the S# value using regex
                     # iteration: re.Match | None = int(re.search(r"S(\d+)", column).group(1))
                     iteration: re.Match | None = re.search(r"S(\d+)", column)
-                    
+
                     if isinstance(iteration, re.Match):
                         iteration_num: int = int(iteration.group(1))
-                    
+
                         # Find the maximum S# value
                         if iteration_num > max_iteration:
                             max_iteration = iteration_num
             # -------------------
-            
+
             # Aggregate all S# values from 1 to max_iteration
             # The new dataframes will go into the self._split_frames
             for i in range(1, max_iteration + 1):
@@ -397,7 +391,7 @@ class SQTtoCSV:
                 abundance_columns: list[str] = [column for column in split_frame.columns if re.match(rf"{cell_type}_S{i}R\d+", column)]
                 take_columns: list[str] = ["symbol"] + abundance_columns
                 average_intensity_name: str = f"{cell_type}_S{i}"
-                
+
                 # Calculate average intensities and assign a new column
                 average_intensity_values = split_frame[take_columns].mean(axis=1)
                 # split_frame.loc[:, take_columns].mean(axis=1)
@@ -407,15 +401,15 @@ class SQTtoCSV:
                 # We now have a new dataframe with "symbol" and "{cell_type}_S{i}" columns
                 # Unpack abundance_columns to create a single list
                 split_frame.drop(columns=abundance_columns, inplace=True)
-            
+
                 # If the "{cell_type}_S{i}" column is 0, remove it
                 split_frame = split_frame[split_frame[average_intensity_name] != 0]
                 split_frame.reset_index(inplace=True, drop=True)
-                
+
                 # Find duplicate "symbol" values and average across them
                 # Duplicate symbols are a result of protein isoforms mapping to the same gene
                 split_frame = split_frame.groupby("symbol", as_index=False).mean()
-                
+
                 self._split_frames[cell_type].append(split_frame)
 
     def new_write_data(self) -> None:
@@ -427,22 +421,22 @@ class SQTtoCSV:
         for information in self._file_information:
             if information.cell_type not in csv_file_location:
                 csv_file_location[information.cell_type] = information.intensity_csv
-                
+
         # Sort columns of each cell type dataframe
         for key in self._merged_frames.keys():
             # Get the "symbol" column so it can be placed at index 0
             symbol_column = self._merged_frames[key].pop("symbol")
-            
+
             # Sort {cell_type}_S# columns
             col_names: list[str] = list(self._merged_frames[key].columns)
             self._merged_frames[key].reindex(sorted(col_names), axis=1)
-            
+
             # Place the "symbol" column back in at index 0
             self._merged_frames[key].insert(0, "symbol", symbol_column)
-            
+
             # Write the dataframe to its appropriate location
             self._merged_frames[key].to_csv(csv_file_location[key], index=False)
-            
+
     def write_data(self) -> None:
         """
         This function creates a unique dataframe for each cell type found in the intensity dataframes
@@ -485,10 +479,10 @@ class SQTtoCSV:
         for cell_type in master_frames:
             master_frames[cell_type].replace(np.nan, 0, inplace=True)
             master_frames[cell_type].sort_values(by="symbol", inplace=True, ignore_index=True)
-            
+
             csv_path = FileInformation.intensity_file_path(cell_type=cell_type)
             master_frames[cell_type].to_csv(csv_path, index=False)
-            
+
     @property
     def file_information(self) -> list[FileInformation]:
         """
