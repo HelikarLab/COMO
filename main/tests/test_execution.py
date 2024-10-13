@@ -1,3 +1,3 @@
 def test_imports():
-    from como.como_utilities import Compartments, stringlist_to_list, split_gene_expression_data
+    from como.como_utilities import Compartments, split_gene_expression_data, stringlist_to_list
     from como.project import Config
