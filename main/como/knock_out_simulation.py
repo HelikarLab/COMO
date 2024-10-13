@@ -3,6 +3,7 @@ import os
 import re
 import sys
 from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Union
 
@@ -11,12 +12,12 @@ import numpy as np
 import pandas as pd
 from fast_bioservices import BioDBNet, Input, Output
 from project import Config
-from pydantic import BaseModel
 
 configs = Config()
 
 
-class KnockoutResults(BaseModel):
+@dataclass
+class KnockoutResults:
     model: cobra.Model
     gene_ind2genes: set[str]
     genes_with_metabolic_effects: list[str]
