@@ -5,7 +5,8 @@ sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 
 import argparse
 import re
-from typing import Optional, Union
+from dataclasses import dataclass
+from typing import Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -13,6 +14,39 @@ from fast_bioservices import BioDBNet, Input, Output, Taxon
 
 from como import como_utilities, rpy2_api
 from como.project import Config
+
+
+@dataclass
+class Arguments:
+    context_names: list[str]
+    gene_format: Input
+    taxon_id: Taxon | int | str
+    mode: Literal["create", "provide"]
+    provided_matrix_fname: str = None
+
+    def __post_init__(self):
+        if self.mode == "provide" and self.provided_matrix_fname is None:
+            raise ValueError("If provide_matrix is True, then provided_matrix_fname must be provided")
+
+        if self.gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
+            self.gene_format: Input = Input.ENSEMBL_GENE_ID
+        elif self.gene_format.upper() in ["HGNC SYMBOL", "HUGO", "HUGO SYMBOL", "SYMBOL", "HGNC", "GENE SYMBOL"]:
+            self.gene_format: Input = Input.GENE_SYMBOL
+        elif self.gene_format.upper() in ["ENTREZ", "ENTRES", "ENTREZ ID", "ENTREZ NUMBER" "GENE ID"]:
+            self.gene_format: Input = Input.GENE_ID
+        else:  # provided invalid gene format
+            raise ValueError(f"Gene format (--gene_format) is invalid; accepts 'Ensembl', 'Entrez', and 'HGNC symbol'; provided: {args.gene_format}")
+
+        # handle species alternative ids
+        if not self.taxon_id.isdigit():
+            if self.taxon_id.upper() in ["HUMAN", "HOMO SAPIENS"]:
+                self.taxon_id = Taxon.HOMO_SAPIENS
+            elif self.taxon_id.upper() in ["MOUSE", "MUS MUSCULUS"]:
+                self.taxon_id = Taxon.MUS_MUSCULUS
+            else:
+                raise ValueError(f"Taxon id (--taxon-id) is invalid; accepts 'human', 'mouse', or an integer value; provided: {self.taxon_id}")
+        else:
+            self.taxon_id = Taxon.from_int(int(self.taxon_id))
 
 
 def create_counts_matrix(context_name, r_file_path: Path):
@@ -235,7 +269,7 @@ def create_gene_info_file(matrix_file_list: list[str], input_format: Input, taxo
     print(f"Gene Info file written at '{gene_info_file}'")
 
 
-def handle_context_batch(context_names, mode, input_format: Input, taxon_id, provided_matrix_file, r_file_path: Path):
+def handle_context_batch(context_names: list[str], mode, input_format: Input, taxon_id, provided_matrix_file, r_file_path: Path):
     """
     Handle iteration through each context type and create files according to flag used (config, matrix, info)
     """
@@ -306,16 +340,22 @@ def handle_context_batch(context_names, mode, input_format: Input, taxon_id, pro
         create_gene_info_file(matrix_files, input_format, taxon_id)
 
 
-def rnaseq_preprocess(context_names: str, mode: str, input_format: Input, taxon_id: Union[int, str], matrix_file: Optional[str] = None) -> None:
+def rnaseq_preprocess(
+    context_names: list[str],
+    mode: str,
+    input_format: Input,
+    taxon_id: Union[int, str],
+    matrix_file: Optional[str | Path] = None,
+) -> None:
     r_file_path = Path(__file__).parent / "rscripts" / "generate_counts_matrix.R"
     if not r_file_path.exists():
         raise FileNotFoundError(f"Unable to find R script at {r_file_path}")
 
-    if not mode == "make" and not mode == "provide":
+    if mode not in ["make", "provide"]:
         raise ValueError("mode must be either 'make' or 'provide'")
 
     if input_format not in [Input.ENSEMBL_GENE_ID, Input.GENE_SYMBOL, Input.GENE_ID]:
-        raise ValueError("input_format must be either 'ENSEMBL_GENE_ID', 'GENE_SYMBOL', or 'GENE_ID'")
+        raise ValueError(f"input_format must be either 'ENSEMBL_GENE_ID', 'GENE_SYMBOL', or 'GENE_ID' (provided: {input_format})")
 
     if not isinstance(taxon_id, int) and taxon_id not in ["human", "mouse"]:
         raise ValueError("taxon_id must be either an integer, or accepted string ('mouse', 'human')")
@@ -325,7 +365,7 @@ def rnaseq_preprocess(context_names: str, mode: str, input_format: Input, taxon_
         mode=mode,
         input_format=input_format,
         taxon_id=taxon_id,
-        provided_matrix_file=matrix_file,
+        provided_matrix_file=Path(matrix_file if matrix_file is not None else "").as_posix(),
         r_file_path=r_file_path,
     )
 
@@ -381,100 +421,45 @@ def parse_args():
     )
 
     parser.add_argument(
-        "-i", "--taxon-id", required=False, default=9606, dest="taxon_id", help="BioDbNet taxon ID number, also accepts 'human', or 'mouse'"
-    )
-
-    group = parser.add_mutually_exclusive_group(required=True)
-
-    group.add_argument(
-        "-p",
-        "--provide-matrix",
-        action="store_true",
+        "-i",
+        "--taxon-id",
         required=False,
-        default=False,
-        dest="provide_matrix",
-        help="Provide your own count matrix. Requires additional argument '--matrix' which is .csv file "
-        "where colnames are sample names (in contextName_SXRY format) and rownames are genes in "
-        "in format specified by --gene-format",
-    )  # would be nice if this was a directory full matrices in case you want to do in batches
-
-    group.add_argument(
-        "-y",
-        "--create-matrix",
-        action="store_true",
-        required=False,
-        default=False,
-        dest="make_matrix",
-        help="Flag for if you want to make a counts matrix, but not a config file. "
-        "Requires a correctly structured COMO_input folder in /work/data/. Can make one using: "
-        "https://github.com/HelikarLab/FastqToGeneCounts",
+        default=9606,
+        dest="taxon_id",
+        help="BioDbNet taxon ID number, also accepts 'human', or 'mouse'",
     )
 
     parser.add_argument(
-        "-m",
+        "--mode",
+        type=str,
+        required=True,
+        dest="mode",
+        choices=["make", "provide"],
+        help="Mode of rnaseq_preprocess.py, either 'make' or 'provide'",
+    )
+    parser.add_argument(
         "--matrix",
-        required="--provide-matrix" in sys.argv,  # require if using --provide-matrix flag,
+        required=False,
         dest="provided_matrix_fname",
-        default="SKIP",
-        help="Name of provided counts matrix in " "/work/data/data_matrices/<context name>/<NAME OF FILE>.csv",
+        default=None,
+        help="Name of provided counts matrix in /work/data/data_matrices/<context name>/<NAME OF FILE>.csv",
     )
 
-    args = parser.parse_args()
-    args.context_names = como_utilities.stringlist_to_list(args.context_names)
+    parsed = parser.parse_args()
+    parsed.context_names = como_utilities.stringlist_to_list(parsed.context_names)
+    args = Arguments(**vars(parsed))
 
     return args
 
 
-def main():
-    args = parse_args()
-
-    r_file_path = Path(__file__).parent / "rscripts" / "generate_counts_matrix.R"
-    if not r_file_path.exists():
-        raise FileNotFoundError(f"Unable to find R script at {r_file_path}")
-
-    if args.gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
-        gene_format_database: Input = Input.ENSEMBL_GENE_ID
-
-    elif args.gene_format.upper() in ["HGNC SYMBOL", "HUGO", "HUGO SYMBOL", "SYMBOL", "HGNC", "GENE SYMBOL"]:
-        gene_format_database: Input = Input.GENE_SYMBOL
-
-    elif args.gene_format.upper() in ["ENTREZ", "ENTRES", "ENTREZ ID", "ENTREZ NUMBER" "GENE ID"]:
-        gene_format_database: Input = Input.GENE_ID
-
-    else:  # provided invalid gene format
-        raise ValueError(f"Gene format (--gene_format) is invalid; accepts 'Ensembl', 'Entrez', and 'HGNC symbol'; provided: {args.gene_format}")
-
-    # handle species alternative ids
-    if isinstance(args.taxon_id, str):
-        if args.taxon_id.upper() == "HUMAN" or args.taxon_id.upper() == "HOMO SAPIENS":
-            taxon_id = Taxon.HOMO_SAPIENS
-        elif args.taxon_id.upper() == "MOUSE" or args.taxon_id.upper() == "MUS MUSCULUS":
-            taxon_id = Taxon.MUS_MUSCULUS
-        else:
-            raise ValueError(f"Taxon id (--taxon-id) is invalid; accepts 'human', 'mouse'; provided: {args.taxon_id}")
-
-    elif isinstance(args.taxon_id, int):
-        taxon_id = args.taxon_id
-    else:
-        raise ValueError(f"Taxon id (--taxon-id) is invalid; accepts 'human', 'mouse'; provided: {args.taxon_id}")
-
-    # use mutually exclusive flag to set mode which tells which files to generate
-    if args.provide_matrix:
-        mode = "provide"
-    elif args.make_matrix:
-        mode = "make"
-    else:
-        raise ValueError("Must set either --provide-matrix or --make-matrix")
-
-    handle_context_batch(
-        context_names=args.context_names,
-        mode=mode,
-        input_format=gene_format_database,
-        taxon_id=taxon_id,
-        provided_matrix_file=args.provided_matrix_fname,
-        r_file_path=r_file_path,
-    )
-
-
 if __name__ == "__main__":
-    main()
+    args: Arguments = parse_args()
+    taxon_id_value = args.taxon_id.value if isinstance(args.taxon_id, Taxon) else args.taxon_id
+
+    rnaseq_preprocess(
+        context_names=args.context_names,
+        mode=args.mode,
+        input_format=args.gene_format,
+        taxon_id=taxon_id_value,
+        matrix_file=args.provided_matrix_fname,
+    )
