@@ -6,7 +6,7 @@ suppressPackageStartupMessages(library("ggplot2"))
 # Check if rlogs directory exists, From: https://stackoverflow.com/a/46008094
 # Then prevent messy messages from repeatedly writing to juypter
 work_dir <- getwd()
-r_log_directory <- str_interp("${work_dir}/logs")
+r_log_directory <- stringr::str_interp("${work_dir}/logs")
 if (!dir.exists(r_log_directory)) { dir.create(r_log_directory) }
 zz <- file(file.path(r_log_directory, "combine_distributions.Rout"), open = "wt")
 sink(zz, type = "message")
@@ -427,213 +427,195 @@ combine_omics_zdistros <- function(
 
 
 combine_zscores_main <- function(
-  wd,
-  contexts,
-  use_mrna_flag,
-  use_trna_flag,
-  use_scrna_flag,
-  use_proteins_flag,
+  working_dir,
+  context_names,
+  global_use_mrna,
+  global_use_trna,
+  global_use_scrna,
+  global_use_proteins,
   keep_gene_scores,
-  tweight_master = 1,
-  mweight_master = 1,
-  sweight_master = 1,
-  pweight_master = 2
+  global_trna_weight,
+  global_mrna_weight,
+  global_scrna_weight,
+  global_protein_weight
 ) {
   
-  fig_path <- file.path(wd, "figures")
-  if (!file.exists(fig_path)) { dir.create(fig_path) }
+  figure_output_dir <- file.path(working_dir, "figures")
+  if (!file.exists(figure_output_dir)) { dir.create(figure_output_dir) }
   
-  tbatches <- parse_contexts_zfpkm(wd, contexts, "total")
-  mbatches <- parse_contexts_zfpkm(wd, contexts, "mrna")
-  sbatches <- parse_contexts_zumi(wd, contexts, "scrna")
-  pbatches <- parse_contexts_zscore_prot(wd, contexts)
+  global_trna_batches <- parse_contexts_zfpkm(working_dir, context_names, "total")
+  global_mrna_batches <- parse_contexts_zfpkm(working_dir, context_names, "mrna")
+  global_scrna_batches <- parse_contexts_zumi(working_dir, context_names, "scrna")
+  global_protein_batches <- parse_contexts_zscore_prot(working_dir, context_names)
   
-  for (context in contexts) {
-    use_mrna <- use_mrna_flag
-    use_trna <- use_trna_flag
-    use_scrna <- use_scrna_flag
-    use_proteins <- use_proteins_flag
+  for (context in context_names) {
+    context_use_trna <- global_use_trna
+    context_use_mrna <- global_use_mrna
+    context_use_scrna <- global_use_scrna
+    context_use_proteins <- global_use_proteins
     
-    tweight <- tweight_master
-    mweight <- mweight_master
-    sweight <- sweight_master
-    pweight <- pweight_master
+    context_trna_weight <- global_trna_weight
+    context_mrna_weight <- global_mrna_weight
+    context_scrna_weight <- global_scrna_weight
+    context_protein_weight <- global_protein_weight
     
-    cont_tbatches <- tbatches[[context]]
-    cont_mbatches <- mbatches[[context]]
-    cont_sbatches <- sbatches[[context]]
-    cont_pbatches <- pbatches[[context]]
+    context_trna_batch <- global_trna_batches[[context]]
+    context_mrna_batch <- global_mrna_batches[[context]]
+    context_scrna_batch <- global_scrna_batches[[context]]
+    context_protein_batch <- global_protein_batches[[context]]
     
     
-    if (length(cont_tbatches) == 0 & use_trna_flag) {
-      use_trna <- FALSE
+    if (length(context_trna_batch) == 0 & global_use_trna) {
+      context_use_trna <- FALSE
       print(paste0("No total RNA-seq zFPKM Matrix files found for ", context, ". Will not use for this context."))
     }
     
-    if (length(cont_mbatches) == 0 & use_mrna_flag) {
-      use_mrna <- FALSE
+    if (length(context_mrna_batch) == 0 & global_use_mrna) {
+      context_use_mrna <- FALSE
       print(paste0("No polyA RNA-seq zFPKM Matrix files found for ", context, ". Will not use for this context."))
     }
     
-    if (length(cont_sbatches) == 0 & use_scrna_flag) {
-      use_scrna <- FALSE
+    if (length(context_scrna_batch) == 0 & global_use_scrna) {
+      context_use_scrna <- FALSE
       print(paste0("No SC RNA-seq zFPKM Matrix files found for ", context, ". Will not use for this context."))
     }
     
-    if (length(cont_pbatches) == 0 & use_proteins_flag) {
-      use_proteins <- FALSE
+    if (length(context_protein_batch) == 0 & global_use_proteins) {
+      context_use_proteins <- FALSE
       print(paste0("No proteomics z-score Matrix files found for ", context, ". Will not use for this context."))
     }
     
-    if (use_trna) {
+    if (context_use_trna) {
       print("Will merge total RNA-seq distributions")
-      twd <- file.path(wd, context, "total")
-      nreps <- c()
-      cnt <- 0
-      for (batch in cont_tbatches) {
-        res <- merge_batch(twd, context, batch)
+      trna_workdir <- file.path(working_dir, context, "total")
+      num_reps <- c()
+      count <- 0
+      for (batch in context_trna_batch) {
+        res <- merge_batch(trna_workdir, context, batch)
         zmat <- res[[1]]
-        nreps <- c(nreps, res[[2]])
-        comb_z <- combine_batch_zdistro(twd, context, batch, zmat)
+        num_reps <- c(num_reps, res[[2]])
+        comb_z <- combine_batch_zdistro(trna_workdir, context, batch, zmat)
         colnames(comb_z) <- c("ENTREZ_GENE_ID", batch)
-        if (!cnt) { merge_z <- comb_z }
+        if (!count) { merge_z <- comb_z }
         else { merge_z <- full_join(merge_z, comb_z, by = "ENTREZ_GENE_ID") }
-        cnt <- cnt + 1
+        count <- count + 1
       }
       
-      comb_batches_z_trna <- combine_context_zdistro(twd, context, nreps, merge_z)
-      filename <- file.path(twd, paste0("combined_zFPKM_", context, ".csv"))
+      comb_batches_z_trna <- combine_context_zdistro(trna_workdir, context, num_reps, merge_z)
+      filename <- file.path(trna_workdir, paste0("combined_zFPKM_", context, ".csv"))
       write.csv(comb_batches_z_trna, filename, row.names = FALSE)
       
-      if (!use_proteins & !use_mrna & !use_scrna) {
-        filename <- file.path(wd, context, "total", paste0("model_scores_", context, ".csv"))
+      if (!context_use_proteins & !context_use_mrna & !context_use_scrna) {
+        filename <- file.path(working_dir, context, "total", paste0("model_scores_", context, ".csv"))
         write.csv(comb_batches_z_trna, filename, row.names = FALSE)
       }
       
     } else { comb_batches_z_trna <- NA }
     
     
-    if (use_mrna) {
+    if (context_use_mrna) {
       print("Will merge polyA enriched RNA-seq distributions")
-      mwd <- file.path(wd, context, "mrna")
-      nreps <- c()
-      cnt <- 0
-      for (batch in cont_mbatches) {
-        res <- merge_batch(mwd, context, batch)
+      mrna_workdir <- file.path(working_dir, context, "mrna")
+      num_reps <- c()
+      count <- 0
+      for (batch in context_mrna_batch) {
+        res <- merge_batch(mrna_workdir, context, batch)
         zmat <- res[[1]]
-        nreps <- c(nreps, res[[2]])
-        comb_z <- combine_batch_zdistro(mwd, context, batch, zmat)
+        num_reps <- c(num_reps, res[[2]])
+        comb_z <- combine_batch_zdistro(mrna_workdir, context, batch, zmat)
         colnames(comb_z) <- c("ENTREZ_GENE_ID", batch)
-        if (!cnt) { merge_z <- comb_z }
+        if (!count) { merge_z <- comb_z }
         else { merge_z <- full_join(merge_z, comb_z, by = "ENTREZ_GENE_ID") }
-        cnt <- cnt + 1
+        count <- count + 1
       }
       
-      comb_batches_z_mrna <- combine_context_zdistro(mwd, context, nreps, merge_z)
-      filename <- file.path(mwd, paste0("combined_zFPKM_", context, ".csv"))
+      comb_batches_z_mrna <- combine_context_zdistro(mrna_workdir, context, num_reps, merge_z)
+      filename <- file.path(mrna_workdir, paste0("combined_zFPKM_", context, ".csv"))
       write.csv(comb_batches_z_mrna, filename, row.names = FALSE)
       
-      if (!use_proteins & !use_trna & !use_scrna) {
-        filename <- file.path(mwd, paste0("model_scores_", context, ".csv"))
+      if (!context_use_proteins & !context_use_trna & !context_use_scrna) {
+        filename <- file.path(mrna_workdir, paste0("model_scores_", context, ".csv"))
         write.csv(comb_batches_z_mrna, filename, row.names = FALSE)
       }
       
     } else { comb_batches_z_mrna <- NA }
     
     
-    if (use_scrna) {
+    if (context_use_scrna) {
       print("Will merge single-cell RNA-seq distributions")
-      swd <- file.path(wd, context, "scrna")
-      nreps <- c()
-      cnt <- 0
-      for (batch in cont_sbatches) {
-        res <- merge_batch(swd, context, batch)
+      scrna_workdir <- file.path(working_dir, context, "scrna")
+      num_reps <- c()
+      count <- 0
+      for (batch in context_scrna_batch) {
+        res <- merge_batch(scrna_workdir, context, batch)
         zmat <- res[[1]]
-        nreps <- c(nreps, res[[2]])
-        comb_z <- combine_batch_zdistro(swd, context, batch, zmat)
+        num_reps <- c(num_reps, res[[2]])
+        comb_z <- combine_batch_zdistro(scrna_workdir, context, batch, zmat)
         colnames(comb_z) <- c("ENTREZ_GENE_ID", batch)
-        if (!cnt) { merge_z <- comb_z }
+        if (!count) { merge_z <- comb_z }
         else { merge_z <- full_join(merge_z, comb_z, by = "ENTREZ_GENE_ID") }
-        cnt <- cnt + 1
+        count <- count + 1
       }
       
-      comb_batches_z_scrna <- combine_context_zdistro(swd, context, nreps, merge_z)
-      filename <- file.path(swd, paste0("combined_zFPKM_", context, ".csv"))
+      comb_batches_z_scrna <- combine_context_zdistro(scrna_workdir, context, num_reps, merge_z)
+      filename <- file.path(scrna_workdir, paste0("combined_zFPKM_", context, ".csv"))
       write.csv(comb_batches_z_scrna, filename, row.names = FALSE)
       
-      if (!use_proteins & !use_trna & !use_mrna) {
-        filename <- file.path(swd, paste0("model_scores_", context, ".csv"))
+      if (!context_use_proteins & !context_use_trna & !context_use_mrna) {
+        filename <- file.path(scrna_workdir, paste0("model_scores_", context, ".csv"))
         write.csv(comb_batches_z_scrna, filename, row.names = FALSE)
       }
       
     } else { comb_batches_z_scrna <- NA }
     
     
-    if (use_proteins) {
+    if (context_use_proteins) {
       print("Will merge protein abundance distributions")
-      pwd = file.path(wd, context, "proteomics")
-      nreps <- c()
-      cnt <- 0
-      for (batch in cont_pbatches) {
-        res <- merge_batch(pwd, context, batch)
+      protein_workdir <- file.path(working_dir, context, "proteomics")
+      num_reps <- c()
+      count <- 0
+      for (batch in context_protein_batch) {
+        res <- merge_batch(protein_workdir, context, batch)
         zmat <- res[[1]]
-        nreps <- c(nreps, res[[2]])
-        comb_z <- combine_batch_zdistro(pwd, context, batch, zmat)
+        num_reps <- c(num_reps, res[[2]])
+        comb_z <- combine_batch_zdistro(protein_workdir, context, batch, zmat)
         colnames(comb_z) <- c("ENTREZ_GENE_ID", batch)
-        if (!cnt) { merge_z <- comb_z }
+        if (!count) { merge_z <- comb_z }
         else { merge_z <- full_join(merge_z, comb_z, by = "ENTREZ_GENE_ID") }
-        cnt <- cnt + 1
+        count <- count + 1
       }
       
-      comb_batches_z_prot <- combine_context_zdistro(pwd, context, nreps, merge_z)
-      filename <- file.path(pwd, paste0("combined_zscore_proteinAbundance_", context, ".csv"))
+      comb_batches_z_prot <- combine_context_zdistro(protein_workdir, context, num_reps, merge_z)
+      filename <- file.path(protein_workdir, paste0("combined_zscore_proteinAbundance_", context, ".csv"))
       write.csv(comb_batches_z_prot, filename, row.names = FALSE)
       
-      if (!use_mrna & !use_trna & !use_scrna) {
-        filename <- file.path(pwd, paste0("model_scores_", context, ".csv"))
+      if (!context_use_mrna & !context_use_trna & !context_use_scrna) {
+        filename <- file.path(protein_workdir, paste0("model_scores_", context, ".csv"))
         write.csv(comb_batches_z_prot, filename, row.names = FALSE)
       }
       
     } else { comb_batches_z_prot <- NA }
     
-    if (!use_trna) { tweight <- 0 }
-    if (!use_mrna) { mweight <- 0 }
-    if (!use_scrna) { sweight <- 0 }
-    if (!use_proteins) { pweight <- 0 }
+    if (!context_use_trna) { context_trna_weight <- 0 }
+    if (!context_use_mrna) { context_mrna_weight <- 0 }
+    if (!context_use_scrna) { context_scrna_weight <- 0 }
+    if (!context_use_proteins) { context_protein_weight <- 0 }
     
     comb_omics_z <- combine_omics_zdistros(
-      wd,
+      working_dir,
       context,
       comb_batches_z_trna,
       comb_batches_z_mrna,
       comb_batches_z_scrna,
       comb_batches_z_prot,
-      tweight,
-      mweight,
-      sweight,
-      pweight
+      context_trna_weight,
+      context_mrna_weight,
+      context_scrna_weight,
+      context_protein_weight
     )
     
-    filename <- file.path(wd, context, paste0("model_scores_", context, ".csv"))
+    filename <- file.path(working_dir, context, paste0("model_scores_", context, ".csv"))
     write.csv(comb_omics_z, filename, row.names = FALSE)
   }
   
 }
-
-
-print(get_batch_name("test.csv"))
-
-# Call "combine_zscores_main"
-# combine_zscores_main(
-#   wd = "/Users/joshl/PycharmProjects/MADRID/main/data/results",
-#   context = c("naiveB"),
-#   use_trna = TRUE,
-#   use_mrna = TRUE,
-#   use_scrna = FALSE,
-#   use_proteins = FALSE,
-#   keep_gene_scores = TRUE,
-#   tweight = 1,
-#   mweight = 1,
-#   sweight = 1,
-#   pweight = 2
-# )
