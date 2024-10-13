@@ -1,0 +1,20 @@
+name: Format
+on: [push, pull_request]
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Format imports
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: "check --fix --select I"
+          changed-files: "true"
+
+      - name: Format code
+        uses: astral-sh/ruff-action@v1
+        with:
+          changed-files: "true"
