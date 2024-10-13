@@ -3,20 +3,19 @@ TODO: Integrate crux percolator into this workflow
 """
 
 import asyncio
-
 import multiprocessing
-from multiprocessing.sharedctypes import Synchronized
-import numpy as np
 import os
-import pandas as pd
-from pathlib import Path
 import re
 import subprocess
+from multiprocessing.sharedctypes import Synchronized
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
 import tqdm
 from fast_bioservices import BioDBNet, Input, Output, Taxon
 
-from .FileInformation import FileInformation
-from .FileInformation import clear_print
+from .FileInformation import FileInformation, clear_print
 
 
 class RAWtoMZML:
