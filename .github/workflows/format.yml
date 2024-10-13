@@ -19,5 +19,5 @@ jobs:
       - name: Format code
         uses: astral-sh/ruff-action@v1
         with:
-          args: "--ignore F841,F811"  # Ignore unused variables, re-definition of variables
+          args: "format"
           changed-files: "true"
