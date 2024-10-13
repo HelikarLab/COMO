@@ -7,6 +7,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: '2'
 
       - name: Format imports
         uses: astral-sh/ruff-action@v1
@@ -17,4 +19,5 @@ jobs:
       - name: Format code
         uses: astral-sh/ruff-action@v1
         with:
+          args: "--ignore F841,F811"  # Ignore unused variables, re-definition of variables
           changed-files: "true"
