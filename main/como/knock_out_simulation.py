@@ -3,7 +3,6 @@ import os
 import re
 import sys
 from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Union
 
@@ -12,12 +11,12 @@ import numpy as np
 import pandas as pd
 from fast_bioservices import BioDBNet, Input, Output
 from project import Config
+from pydantic import BaseModel
 
 configs = Config()
 
 
-@dataclass
-class KnockoutResults:
+class KnockoutResults(BaseModel):
     model: cobra.Model
     gene_ind2genes: set[str]
     genes_with_metabolic_effects: list[str]
@@ -118,12 +117,12 @@ def knock_out_simulation(
     flux_solution_diffs = flux_solution.sub(wild_type_model["fluxes"], axis=0)
 
     return KnockoutResults(
-        model,
-        gene_ind2genes,
-        genes_with_metabolic_effects,
-        flux_solution,
-        flux_solution_ratios,
-        flux_solution_diffs,
+        model=model,
+        gene_ind2genes=gene_ind2genes,
+        genes_with_metabolic_effects=genes_with_metabolic_effects,
+        flux_solution=flux_solution,
+        flux_solution_ratios=flux_solution_ratios,
+        flux_solution_diffs=flux_solution_diffs,
     )
 
 
