@@ -1,8 +1,9 @@
+import contextlib
 import io
 import sys
-import contextlib
-import pandas as pd
 from typing import Iterator
+
+import pandas as pd
 
 
 class Compartments:

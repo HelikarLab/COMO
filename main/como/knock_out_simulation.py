@@ -1,9 +1,8 @@
 import argparse
-from concurrent.futures import Future, as_completed, ProcessPoolExecutor, ThreadPoolExecutor
 import os
 import re
 import sys
-from concurrent.futures import Future, ProcessPoolExecutor, as_completed
+from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Union

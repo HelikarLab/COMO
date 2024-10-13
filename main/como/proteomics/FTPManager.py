@@ -4,16 +4,16 @@ This file is responsible downloading data found at FTP links
 TODO: Find a way to mark a file as "downloaded"
     - Keep a list of file names in a ".completd" hidden folder?
 """
-from .FileInformation import FileInformation
-from .FileInformation import clear_print
-
-import aioftp
 import asyncio
 import multiprocessing
-from multiprocessing.sharedctypes import Synchronized
 import time
 import typing
+from multiprocessing.sharedctypes import Synchronized
 from urllib.parse import urlparse
+
+import aioftp
+
+from .FileInformation import FileInformation, clear_print
 
 
 async def aioftp_client(

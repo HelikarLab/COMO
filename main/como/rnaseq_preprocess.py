@@ -1,7 +1,10 @@
-import argparse
-import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, Path(__file__).parent.parent.as_posix())
+
+import argparse
+import re
 from typing import Optional, Union
 
 import numpy as np
@@ -11,10 +14,8 @@ from fast_bioservices import BioDBNet, Input, Output, Taxon
 from como import como_utilities, rpy2_api
 from como.project import Config
 
-r_file_path: Path = Path(__file__).parent / "rscripts" / "generate_counts_matrix.R"
 
-
-def create_counts_matrix(context_name):
+def create_counts_matrix(context_name, r_file_path: Path):
     """
     Create a counts matrix by reading gene counts tables in COMO_input/<context name>/<study number>/geneCounts/
     Uses R in backend (generate_counts_matrix.R)
@@ -234,7 +235,7 @@ def create_gene_info_file(matrix_file_list: list[str], input_format: Input, taxo
     print(f"Gene Info file written at '{gene_info_file}'")
 
 
-def handle_context_batch(context_names, mode, input_format: Input, taxon_id, provided_matrix_file):
+def handle_context_batch(context_names, mode, input_format: Input, taxon_id, provided_matrix_file, r_file_path: Path):
     """
     Handle iteration through each context type and create files according to flag used (config, matrix, info)
     """
@@ -265,7 +266,7 @@ def handle_context_batch(context_names, mode, input_format: Input, taxon_id, pro
         matrix_path_mrna = matrix_output_dir / f"gene_counts_matrix_mrna_{context_name}.csv"
 
         if mode == "make":
-            create_counts_matrix(context_name)
+            create_counts_matrix(context_name, r_file_path)
             # TODO: warn user or remove samples that are all 0 to prevent density plot error in zFPKM
             df = create_config_df(context_name)
             df_t, df_m = split_config_df(df)
@@ -306,6 +307,10 @@ def handle_context_batch(context_names, mode, input_format: Input, taxon_id, pro
 
 
 def rnaseq_preprocess(context_names: str, mode: str, input_format: Input, taxon_id: Union[int, str], matrix_file: Optional[str] = None) -> None:
+    r_file_path = Path(__file__).parent / "rscripts" / "generate_counts_matrix.R"
+    if not r_file_path.exists():
+        raise FileNotFoundError(f"Unable to find R script at {r_file_path}")
+
     if not mode == "make" and not mode == "provide":
         raise ValueError("mode must be either 'make' or 'provide'")
 
@@ -315,7 +320,14 @@ def rnaseq_preprocess(context_names: str, mode: str, input_format: Input, taxon_
     if not isinstance(taxon_id, int) and taxon_id not in ["human", "mouse"]:
         raise ValueError("taxon_id must be either an integer, or accepted string ('mouse', 'human')")
 
-    handle_context_batch(context_names=context_names, mode=mode, input_format=input_format, taxon_id=taxon_id, provided_matrix_file=matrix_file)
+    handle_context_batch(
+        context_names=context_names,
+        mode=mode,
+        input_format=input_format,
+        taxon_id=taxon_id,
+        provided_matrix_file=matrix_file,
+        r_file_path=r_file_path,
+    )
 
 
 def parse_args():
@@ -416,6 +428,10 @@ def parse_args():
 def main():
     args = parse_args()
 
+    r_file_path = Path(__file__).parent / "rscripts" / "generate_counts_matrix.R"
+    if not r_file_path.exists():
+        raise FileNotFoundError(f"Unable to find R script at {r_file_path}")
+
     if args.gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
         gene_format_database: Input = Input.ENSEMBL_GENE_ID
 
@@ -456,6 +472,7 @@ def main():
         input_format=gene_format_database,
         taxon_id=taxon_id,
         provided_matrix_file=args.provided_matrix_fname,
+        r_file_path=r_file_path,
     )
 
 
