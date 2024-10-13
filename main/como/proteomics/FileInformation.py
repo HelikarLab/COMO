@@ -6,6 +6,7 @@ This should be implemented as a list of objects
 import os
 import sys
 from pathlib import Path
+
 import pandas as pd
 
 # Add parent directory to path, allows us to import the "project.py" file from the parent directory
