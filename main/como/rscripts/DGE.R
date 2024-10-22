@@ -1,17 +1,18 @@
 suppressPackageStartupMessages(library("DESeq2"))
 suppressPackageStartupMessages(library("edgeR"))
+suppressPackageStartupMessages(library("readr"))
 suppressPackageStartupMessages(library("readxl"))
 suppressPackageStartupMessages(library("stringr"))
 
 work_dir <- getwd()
-r_log_directory <- str_interp("${work_dir}/logs")
+r_log_directory <- stringr::str_interp("${work_dir}/logs")
 if (!dir.exists(r_log_directory)) { dir.create(r_log_directory) }
 zz <- file(file.path(r_log_directory, "DGE.Rout"), open = "wt")
 sink(zz, type = "message")
 
 readCountMatrix <- function(cmat_file, config_file, disease_name) {
-    conf <- read_excel(config_file, sheet = disease_name, col_names = TRUE)
-    cmat_whole <- read.csv(cmat_file, header = TRUE)
+    conf <- readxl::read_excel(config_file, sheet = disease_name, col_names = TRUE)
+    cmat_whole <- readr::read_csv(cmat_file)
     cmat_whole[, -1] <- lapply(cmat_whole[, -1], as.numeric)
     cmat_whole <- cmat_whole[rowSums(cmat_whole[, -1]) > 0,]
     genes <- as.character(cmat_whole$genes)
