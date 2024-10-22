@@ -17,7 +17,7 @@ from como.project import Config
 
 
 @dataclass
-class Arguments:
+class _Arguments:
     context_names: list[str]
     gene_format: Input
     taxon_id: Taxon | int | str
