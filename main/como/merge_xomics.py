@@ -425,6 +425,9 @@ def _handle_context_batch(
     """
     Handle merging of different data sources for each context type
     """
+    if all(file is None for file in [trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file]):
+        raise ValueError(f"No configuration file was passed!")
+
     config = Config()
     sheet_names = []
     for file in [
