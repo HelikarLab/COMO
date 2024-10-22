@@ -33,7 +33,7 @@ def test_arg_input(args: list[str]):
 
     sys.argv = args
     print(sys.argv)
-    parsed = rnaseq_preprocess.parse_args()
+    parsed = rnaseq_preprocess._parse_args()
 
     assert [context_name in parsed.context_names for context_name in context_names.split()]
     assert parsed.gene_format == gene_format
