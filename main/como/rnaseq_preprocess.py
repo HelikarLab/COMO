@@ -281,7 +281,6 @@ def _create_counts_matrix(context_name: str, config: Config):
     Create a counts matrix by reading gene counts tables in COMO_input/<context name>/<study number>/geneCounts/
     Uses R in backend (_create_context_counts_matrix.R)
     """
-    config = Config()
     input_dir = config.data_dir / "COMO_input" / context_name
     matrix_output_dir = config.data_dir / "data_matrices" / context_name
     _create_context_counts_matrix(data_dir=input_dir, output_dir=matrix_output_dir)
