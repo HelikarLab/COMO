@@ -35,7 +35,7 @@ class _Arguments:
         elif self.gene_format.upper() in ["ENTREZ", "ENTRES", "ENTREZ ID", "ENTREZ NUMBER" "GENE ID"]:
             self.gene_format: Input = Input.GENE_ID
         else:  # provided invalid gene format
-            raise ValueError(f"Gene format (--gene_format) is invalid; accepts 'Ensembl', 'Entrez', and 'HGNC symbol'; provided: {args.gene_format}")
+            raise ValueError(f"Gene format (--gene_format) is invalid; accepts 'Ensembl', 'Entrez', and 'HGNC symbol'; provided: {self.gene_format}")
 
         # handle species alternative ids
         if not self.taxon_id.isdigit():
