@@ -82,7 +82,7 @@ def _load_rnaseq_tests(filename, context_name, lib_type):
 
 
 # Merge Output
-def merge_logical_table(df: pd.DataFrame):
+def _merge_logical_table(df: pd.DataFrame):
     """
     Merge the Rows of Logical Table belongs to the same ENTREZ_GENE_ID
     :param df:
@@ -158,7 +158,7 @@ def merge_logical_table(df: pd.DataFrame):
     return df
 
 
-def get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
+def _get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
     """
     This function will get the following details of transcriptomic data:
     - Gene Symbol
@@ -358,7 +358,7 @@ def _merge_xomics(
         )
         merge_data = prote_data if merge_data is None else merge_data.join(prote_data, how="outer")
 
-    merge_data = merge_logical_table(merge_data)
+    merge_data = _merge_logical_table(merge_data)
 
     num_sources = len(expression_list)
     merge_data["Active"] = 0
@@ -396,7 +396,7 @@ def _merge_xomics(
     split_entrez.to_csv(filepath, index_label="ENTREZ_GENE_ID")
     files_dict[context_name] = filepath.as_posix()  # Must return as string to be able to serialize
 
-    transcriptomic_details = get_transcriptmoic_details(merge_data)
+    transcriptomic_details = _get_transcriptmoic_details(merge_data)
     transcriptomic_details_filepath = filepath.parent / f"TranscriptomicDetails_{context_name}.csv"
     transcriptomic_details.to_csv(transcriptomic_details_filepath, index=False)
 
@@ -405,7 +405,7 @@ def _merge_xomics(
     return files_dict
 
 
-def handle_context_batch(
+def _handle_context_batch(
     trnaseq_file,
     mrnaseq_file,
     scrnaseq_file,
@@ -526,7 +526,7 @@ def handle_context_batch(
     return
 
 
-class AdjustMethod(Enum):
+class _AdjustMethod(Enum):
     PROGRESSIVE = "progressive"
     REGRESSIVE = "regressive"
     FLAT = "flat"
@@ -543,7 +543,7 @@ def merge_xomics(
     sweight: float = 1,
     pweight: float = 2,
     expression_requirement: int = None,
-    adjust_method: AdjustMethod = AdjustMethod.FLAT,
+    adjust_method: _AdjustMethod = _AdjustMethod.FLAT,
     no_hc: bool = False,
     no_na: bool = False,
     custom_file: str = None,
@@ -573,10 +573,10 @@ def merge_xomics(
     elif expression_requirement < 1:
         raise ValueError("Expression requirement must be at least 1!")
 
-    if adjust_method not in AdjustMethod:
+    if adjust_method not in _AdjustMethod:
         raise ValueError("Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'")
 
-    handle_context_batch(
+    _handle_context_batch(
         trnaseq_file,
         mrnaseq_file,
         scrnaseq_file,
@@ -595,7 +595,7 @@ def merge_xomics(
     )
 
 
-def main():
+def _parse_args():
     """
     Merge expression tables of multiple sources, (RNA-seq, proteomics) into one list
     User can specify the number of sources with an active gene in order for it to be considered active in the model.
@@ -763,8 +763,11 @@ def main():
         dest="pweight",
         help="Proteomics weight for merging z-score distribution",
     )
+    return parser.parse_args()
 
-    args = parser.parse_args()
+
+if __name__ == "__main__":
+    args = _parse_args()
 
     proteomics_file = args.proteomics_file
     trnaseq_file = args.trnaseq_file
@@ -818,7 +821,7 @@ def main():
     if adjust_method not in ["progressive", "regressive", "flat", "custom"]:
         raise ValueError("Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'")
 
-    handle_context_batch(
+    merge_xomics(
         trnaseq_file=trnaseq_file,
         mrnaseq_file=mrnaseq_file,
         scrnaseq_file=scrnaseq_file,
@@ -831,13 +834,8 @@ def main():
         adjust_method=adjust_method,
         no_hc=no_hc,
         no_na=no_na,
-        custom_df=custom_df,
         merge_distro=merge_distro,
         keep_gene_score=keep_gene_score,
     )
 
     print("\nDone!")
-
-
-if __name__ == "__main__":
-    main()
