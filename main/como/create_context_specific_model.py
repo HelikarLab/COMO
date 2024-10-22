@@ -9,7 +9,6 @@ from warnings import warn
 import cobra
 import numpy as np
 import pandas as pd
-from cobamp.wrappers import COBRAModelObjectReader
 from cobra import Model
 from cobra.flux_analysis import pfba
 from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
@@ -347,42 +346,43 @@ def _create_context_specific_model(
     force excluded even if they meet GPR association requirements using the force exclude file.
     """
     config = Config()
+    model: cobra.Model
     match general_model_file.suffix:
         case ".mat":
-            cobra_model = cobra.io.load_matlab_model(general_model_file)
+            model = cobra.io.load_matlab_model(general_model_file)
         case ".xml":
-            cobra_model = cobra.io.read_sbml_model(general_model_file)
+            model = cobra.io.read_sbml_model(general_model_file)
         case ".json":
-            cobra_model = cobra.io.load_json_model(general_model_file)
+            model = cobra.io.load_json_model(general_model_file)
         case _:
             raise NameError("reference model format must be .xml, .mat, or .json")
 
-    cobra_model.objective = {getattr(cobra_model.reactions, objective): 1}  # set objective
+    model.objective = {getattr(model.reactions, objective): 1}  # set objective
 
     if objective not in force_rxns:
         force_rxns.append(objective)
 
     # set boundaries
-    cobra_model, bound_rm_rxns = set_boundaries(cobra_model, bound_rxns, bound_lb, bound_ub)
+    model, bound_rm_rxns = set_boundaries(model, bound_rxns, bound_lb, bound_ub)
 
     # set solver
-    cobra_model.solver = solver.lower()
+    model.solver = solver.lower()
 
     # check number of unsolvable reactions for reference model under media assumptions
     # incon_rxns, cobra_model = feasibility_test(cobra_model, "before_seeding")
     incon_rxns = []
 
-    # CoBAMP methods
-    cobamp_model = COBRAModelObjectReader(cobra_model)  # load model in readable format for CoBAMP
-    cobamp_model.get_irreversibilities(True)
-    s_matrix = cobamp_model.get_stoichiometric_matrix()
-    lb, ub = cobamp_model.get_model_bounds(False, True)
-    rx_names = cobamp_model.get_reaction_and_metabolite_ids()[0]
+    s_matrix = cobra.util.array.create_stoichiometric_matrix(model, array_type="dense")
+    lb = []
+    ub = []
+    rx_names = []
+    for reaction in model.reactions:
+        lb.append(reaction.lower_bound)
+        ub.append(reaction.upper_bound)
+        rx_names.append(reaction.id)
 
     # get expressed reactions
-    expression_rxns, expr_vector = map_expression_to_rxn(
-        cobra_model, gene_expression_file, recon_algorithm, high_thresh=high_thresh, low_thresh=low_thresh
-    )
+    expression_rxns, expr_vector = map_expression_to_rxn(model, gene_expression_file, recon_algorithm, high_thresh=high_thresh, low_thresh=low_thresh)
 
     # find reactions in the force reactions file that are not in general model and warn user
     for rxn in force_rxns:
@@ -419,14 +419,14 @@ def _create_context_specific_model(
 
     # switch case dictionary runs the functions making it too slow, better solution then elif ladder?
     if recon_algorithm == "GIMME":
-        context_model_cobra = seed_gimme(cobra_model, s_matrix, lb, ub, idx_obj, expr_vector)
+        context_model_cobra = seed_gimme(model, s_matrix, lb, ub, idx_obj, expr_vector)
     elif recon_algorithm == "FASTCORE":
-        context_model_cobra = seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver)
+        context_model_cobra = seed_fastcore(model, s_matrix, lb, ub, exp_idx_list, solver)
     elif recon_algorithm == "IMAT":
         flux_df: pd.DataFrame
         context_model_cobra: cobra.Model
         context_model_cobra, flux_df = seed_imat(
-            cobra_model,
+            model,
             s_matrix,
             lb,
             ub,
@@ -442,7 +442,7 @@ def _create_context_specific_model(
         flux_df.to_csv(config.data_dir / "results" / context_name / f"{recon_algorithm}_flux.csv")
 
     elif recon_algorithm == "TINIT":
-        context_model_cobra = seed_tinit(cobra_model, s_matrix, lb, ub, expr_vector, solver, idx_force)
+        context_model_cobra = seed_tinit(model, s_matrix, lb, ub, expr_vector, solver, idx_force)
     else:
         raise ValueError(f"Unsupported reconstruction algorithm: {recon_algorithm}. Must be 'IMAT', 'GIMME', or 'FASTCORE'")
 
