@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from loguru import logger
+
 
 class SingletonMeta(type):
     _instances = {}
@@ -16,22 +18,28 @@ class SingletonMeta(type):
 
 
 class Config(metaclass=SingletonMeta):
-    def __init__(self, data_dir: Path = None, config_dir: Path = None, result_dir: Path = None, code_dir: Path = None) -> None:
+    def __init__(
+        self,
+        data_dir: Path = None,
+        config_dir: Path = None,
+        result_dir: Path = None,
+    ) -> None:
+        current_dir = Path.cwd()
+
         self.data_dir = data_dir
         if self.data_dir is None:
-            self.data_dir = Path.cwd() / "data"
-            self.data_dir.mkdir(exist_ok=True)
+            logger.warning(f"'data_dir' not provided to Config, using {Path.cwd() / 'data'}")
+            self.data_dir = current_dir / "data"
+            self.data_dir.mkdir(parents=True, exist_ok=True)
 
         self.config_dir = config_dir
         if self.config_dir is None:
-            self.config_dir = Path.cwd() / "data" / "config_sheets"
-            self.config_dir.mkdir(exist_ok=True)
+            logger.warning(f"'config_dir' not provided to Config, using {self.data_dir / 'config_sheets'}")
+            self.config_dir = self.data_dir / "config_sheets"
+            self.config_dir.mkdir(parents=True, exist_ok=True)
 
         self.result_dir = result_dir
         if self.result_dir is None:
-            self.result_dir = Path.cwd() / "data" / "results"
-            self.result_dir.mkdir(exist_ok=True)
-
-        self.code_dir = code_dir
-        if self.code_dir is None:
-            self.code_dir = Path.cwd() / "como"
+            logger.warning(f"'results_dir' not provided to Config, using {self.data_dir / 'results'}")
+            self.result_dir = self.data_dir / "results"
+            self.result_dir.mkdir(parents=True, exist_ok=True)
