@@ -272,6 +272,7 @@ def _create_context_counts_matrix(data_dir: Path, output_dir: Path):
 
     output_filename = output_dir / f"gene_counts_matrix_full_{data_dir.stem}.csv"
     print(f"Writing context '{data_dir.stem}' gene count matrix: {output_filename}")
+    logger.info(f"Writing context '{data_dir.stem}' gene count matrix: {output_filename}")
     final_matrix.to_csv(output_filename, index=False)
 
 
@@ -345,7 +346,7 @@ def _create_config_df(context_name: str) -> pd.DataFrame:
         # Get layout
         layout = "UNKNOWN"
         if len(layout_files) == 0:
-            print(
+            logger.warning(
                 f"No layout file found for {label}, writing as 'UNKNOWN', this should be defined by user if using zFPKM or rnaseq_gen.py will not run"
             )
         elif len(layout_files) == 1:
@@ -357,9 +358,8 @@ def _create_config_df(context_name: str) -> pd.DataFrame:
         # Get strandedness
         strand = "UNKNOWN"
         if len(strand_files) == 0:
-            print(
-                f"No strandedness file found for {label}, writing as 'UNKNOWN'. "
-                f"This will not interfere with the analysis since you have already set rnaseq_preprocess.py to infer the strandedness when writing the counts matrix"
+            logger.warning(
+                f"No strandedness file found for {label}, writing as 'UNKNOWN'. This will not interfere with the analysis since you have already set rnaseq_preprocess.py to infer the strandedness when writing the counts matrix"
             )
         elif len(strand_files) == 1:
             with open(strand_files[0]) as file:
@@ -370,7 +370,7 @@ def _create_config_df(context_name: str) -> pd.DataFrame:
         # Get preparation method
         prep = "total"
         if len(prep_files) == 0:
-            print(f"No prep file found for {label}, assuming 'total' as in Total RNA library preparation")
+            logger.warning(f"No prep file found for {label}, assuming 'total' as in Total RNA library preparation")
         elif len(prep_files) == 1:
             with open(prep_files[0]) as file:
                 prep = file.read().strip().lower()
@@ -382,7 +382,7 @@ def _create_config_df(context_name: str) -> pd.DataFrame:
         # Get fragment length
         mean_fragment_size = 100
         if len(frag_files) == 0:
-            print(f"\nNo fragment file found for {label}, using '100'. This must be defined by the user in order to use zFPKM normalization")
+            logger.warning(f"\nNo fragment file found for {label}, using '100'. This must be defined by the user in order to use zFPKM normalization")
         elif len(frag_files) == 1:
             if layout == "single-end":
                 mean_fragment_size = 0
@@ -440,10 +440,10 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     """
     Split a counts-matrix dataframe into two seperate ones. One for Total RNA library prep, one for mRNA
     """
-    print(f"Reading {count_matrix_all=}")
+    logger.info(f"Reading gene count matrix file at '{count_matrix_all}'")
     matrix_all = pd.read_csv(count_matrix_all)
-    matrix_total = matrix_all[["genes"] + [n for n in matrix_all.columns if n in df_total["SampleName"].tolist()]]
-    matrix_mrna = matrix_all[["genes"] + [n for n in matrix_all.columns if n in df_mrna["SampleName"].tolist()]]
+    matrix_total = matrix_all[["ensembl_gene_id"] + [n for n in matrix_all.columns if n in df_total["sample_name"].tolist()]]
+    matrix_mrna = matrix_all[["ensembl_gene_id"] + [n for n in matrix_all.columns if n in df_mrna["sample_name"].tolist()]]
 
     return matrix_total, matrix_mrna
 
@@ -455,7 +455,7 @@ def create_gene_info_file(matrix_file_list: list[str], input_format: Input, taxo
     """
     config = Config()
 
-    print("Fetching gene info")
+    logger.info("Fetching gene info")
     gene_info_file = config.data_dir / "gene_info.csv"
     genes = set()
     for file in matrix_file_list:
@@ -484,7 +484,7 @@ def create_gene_info_file(matrix_file_list: list[str], input_format: Input, taxo
     gene_info.rename(columns={"Gene Symbol": "hgnc_symbol", "Gene ID": "entrez_gene_id"}, inplace=True)
     gene_info.drop(["Chromosomal Location"], axis=1, inplace=True)
     gene_info.to_csv(gene_info_file, index=False)
-    print(f"Gene Info file written at '{gene_info_file}'")
+    logger.info(f"Gene Info file written at '{gene_info_file}'")
 
 
 def _handle_context_batch(context_names: list[str], mode, input_format: Input, taxon_id, provided_matrix_file, r_file_path: Path):
@@ -498,20 +498,20 @@ def _handle_context_batch(context_names: list[str], mode, input_format: Input, t
     tflag = False  # turn on when any total set is found to prevent writer from being init multiple times or empty
     mflag = False  # turn on when any mrna set is found to prevent writer from being init multiple times or empty
 
-    print(f"Found {len(context_names)} contexts to process: {', '.join(context_names)}")
+    logger.info(f"Found {len(context_names)} contexts to process: {', '.join(context_names)}")
 
     tmatrix_files = []
     mmatrix_files = []
     for context_name in context_names:
         context_name = context_name.strip(" ")
-        print(f"Preprocessing {context_name}")
+        logger.info(f"Preprocessing {context_name}")
         gene_output_dir = config.result_dir / context_name
         matrix_output_dir = config.data_dir / "data_matrices" / context_name
 
         gene_output_dir.parent.mkdir(parents=True, exist_ok=True)
         matrix_output_dir.parent.mkdir(parents=True, exist_ok=True)
 
-        print('Gene info output directory is "{}"'.format(gene_output_dir))
+        logger.info(f"Gene info output directory is '{gene_output_dir}'")
 
         matrix_path_all = matrix_output_dir / f"gene_counts_matrix_full_{context_name}.csv"
         matrix_path_total = matrix_output_dir / f"gene_counts_matrix_total_{context_name}.csv"
