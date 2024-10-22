@@ -1,4 +1,5 @@
 suppressPackageStartupMessages(library("ggplot2"))
+suppressPackageStartupMessages(library("readr"))
 suppressPackageStartupMessages(library("tidyverse"))
 suppressPackageStartupMessages(library("zoo"))
 
@@ -171,7 +172,7 @@ rm_infinite <- function(abundance) {
 
 protein_transform_main <- function(abundance_matrix, out_dir, group_name) {
     dir.create(file.path(out_dir, "figures"), showWarnings = FALSE)
-    prot <- as.data.frame(read.csv(abundance_matrix))
+    prot <- as.data.frame(readr::read_csv(abundance_matrix))
     prot[is.na(prot)] <- 0
     min_thresh <- min(prot>0)
     #row.names(prot) <- prot$ENTREZ_GENE_ID
