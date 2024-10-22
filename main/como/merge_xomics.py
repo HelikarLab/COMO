@@ -40,6 +40,47 @@ class _HighExpressionHeaderNames:
     SCRNASEQ = f"{_MergedHeaderNames.SCRNASEQ}_high"
 
 
+def _load_rnaseq_tests(filename, context_name, lib_type):
+    """
+    Load rnaseq results returning a dictionary of test (context, context, cell, etc ) names and rnaseq expression data
+    """
+    config = Config()
+
+    def load_dummy_dict():
+        dat = pd.read_csv(config.data_dir / "data_matrices" / "placeholder" / "placeholder_empty_data.csv", index_col="ENTREZ_GENE_ID")
+        return "dummy", dat
+
+    if not filename or filename == "None":  # not using this data type, use empty dummy data matrix
+        return load_dummy_dict()
+
+    inquiry_full_path = config.data_dir / "config_sheets" / filename
+    if not inquiry_full_path.exists():  # check that config file exist (isn't needed to load, but helps user)
+        raise FileNotFoundError(f"Error: Config file not found at {inquiry_full_path}")
+
+    if lib_type == "total":  # if using total RNA-seq library prep
+        filename = f"rnaseq_total_{context_name}.csv"
+    elif lib_type == "mrna":  # if using mRNA-seq library prep
+        filename = f"rnaseq_mrna_{context_name}.csv"
+    elif lib_type == "scrna":  # if using single-cell RNA-seq
+        filename = f"rnaseq_scrna_{context_name}.csv"
+    else:
+        raise ValueError(f"Unsupported RNA-seq library type: {lib_type}. Must be one of 'total', 'mrna', 'sc'.")
+
+    save_filepath = config.result_dir / context_name / lib_type / filename
+    if save_filepath.exists():
+        data = pd.read_csv(save_filepath, index_col="ENTREZ_GENE_ID")
+        print(f"Read from {save_filepath}")
+        return context_name, data
+
+    else:
+        print(
+            f"{lib_type} gene expression file for {context_name} was not found at {save_filepath}. This may be "
+            f"intentional. Contexts where {lib_type} data can be found in /work/data/results/{context_name}/ will "
+            "still be used if found for other contexts."
+        )
+        return load_dummy_dict()
+
+
 # Merge Output
 def merge_logical_table(df: pd.DataFrame):
     """
