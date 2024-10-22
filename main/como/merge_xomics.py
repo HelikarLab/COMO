@@ -11,12 +11,10 @@ import numpy as np
 import pandas as pd
 from fast_bioservices import BioDBNet, Input, Output
 
-from como import proteomics_gen, rnaseq_gen, rpy2_api
+from como import proteomics_gen
+from como.combine_distributions import combine_zscores_main
 from como.como_utilities import split_gene_expression_data
 from como.project import Config
-
-config = Config()
-r_file_path = config.code_dir / "rscripts" / "combine_distributions.R"
 
 
 class _MergedHeaderNames:
@@ -133,8 +131,7 @@ def _merge_logical_table(df: pd.DataFrame):
         new_entrez_id = " /// ".join(sortlist)
         full_entrez_id_sets.add(new_entrez_id)
 
-    for i in full_entrez_id_sets:
-        entrez_dups_list.append(i.split(" /// "))
+    entrez_dups_list.extend(i.split(" /// ") for i in full_entrez_id_sets)
     entrez_dups_dict = dict(zip(full_entrez_id_sets, entrez_dups_list))
 
     for merged_entrez_id, entrez_dups_list in entrez_dups_dict.items():
@@ -295,12 +292,10 @@ def _merge_xomics(
     config = Config()
     print(f"Merging data for {context_name}")
     # load data for each source if it exists. IF not load an empty dummy dataset
-    trnaseq = rnaseq_gen.load_rnaseq_tests(filename=trnaseq_file, context_name=context_name, lib_type="total")
-    mrnaseq = rnaseq_gen.load_rnaseq_tests(filename=mrnaseq_file, context_name=context_name, lib_type="mrna")
-    scrnaseq = rnaseq_gen.load_rnaseq_tests(filename=scrnaseq_file, context_name=context_name, lib_type="scrna")
+    trnaseq = _load_rnaseq_tests(filename=trnaseq_file, context_name=context_name, lib_type="total")
+    mrnaseq = _load_rnaseq_tests(filename=mrnaseq_file, context_name=context_name, lib_type="mrna")
+    scrnaseq = _load_rnaseq_tests(filename=scrnaseq_file, context_name=context_name, lib_type="scrna")
     proteomics = proteomics_gen.load_proteomics_tests(filename=proteomics_file, context_name=context_name)
-
-    files_dict = dict()
 
     expression_list = []
     high_confidence_list = []
@@ -394,7 +389,7 @@ def _merge_xomics(
     split_entrez = split_gene_expression_data(merge_data)
     split_entrez.rename(columns={"Gene": "ENTREZ_GENE_ID", "Data": "Active"}, inplace=True)
     split_entrez.to_csv(filepath, index_label="ENTREZ_GENE_ID")
-    files_dict[context_name] = filepath.as_posix()  # Must return as string to be able to serialize
+    files_dict = {context_name: filepath.as_posix()}
 
     transcriptomic_details = _get_transcriptmoic_details(merge_data)
     transcriptomic_details_filepath = filepath.parent / f"TranscriptomicDetails_{context_name}.csv"
@@ -426,7 +421,7 @@ def _handle_context_batch(
     Handle merging of different data sources for each context type
     """
     if all(file is None for file in [trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file]):
-        raise ValueError(f"No configuration file was passed!")
+        raise ValueError("No configuration file was passed!")
 
     config = Config()
     sheet_names = []
@@ -441,10 +436,10 @@ def _handle_context_batch(
             xl = pd.ExcelFile(config_filepath, engine="openpyxl")
             sheet_names += xl.sheet_names
 
-    use_trna = True if trnaseq_file is not None else False
-    use_mrna = True if mrnaseq_file is not None else False
-    use_scrna = True if scrnaseq_file is not None else False
-    use_proteins = True if proteomics_file is not None else False
+    use_trna = trnaseq_file is not None
+    use_mrna = mrnaseq_file is not None
+    use_scrna = scrnaseq_file is not None
+    use_proteins = proteomics_file is not None
 
     counts = Counter(sheet_names)
     sheet_names = sorted(list(set(sheet_names)))
@@ -465,8 +460,7 @@ def _handle_context_batch(
 
     if merge_distro:
         print(f"Using {merge_distro} distribution for merging")
-        rpy2_api.Rpy2(
-            r_file_path,
+        combine_zscores_main(
             working_dir=config.result_dir.as_posix(),
             context_names=sheet_names,
             global_use_mrna=use_mrna,
@@ -478,7 +472,7 @@ def _handle_context_batch(
             global_mrna_weight=mweight,
             global_scrna_weight=sweight,
             global_protein_weight=pweight,
-        ).call_function("combine_zscores_main")
+        )
 
     for context_name in sheet_names:
         num_sources = counts[context_name]
@@ -519,7 +513,7 @@ def _handle_context_batch(
             no_na=no_na,
         )
 
-        dict_list.update(files_dict)
+        dict_list |= files_dict
 
     files_json = config.result_dir / "step1_results_files.json"
     files_json.parent.mkdir(parents=True, exist_ok=True)
@@ -564,14 +558,13 @@ def merge_xomics(
 
     if expression_requirement is None:
         expression_requirement = sum(
-            1
+            test is not None
             for test in [
                 trnaseq_file,
                 mrnaseq_file,
                 scrnaseq_file,
                 proteomics_file,
             ]
-            if test is not None
         )
     elif expression_requirement < 1:
         raise ValueError("Expression requirement must be at least 1!")
@@ -798,15 +791,12 @@ if __name__ == "__main__":
         custom_df = pd.DataFrame([])
 
     def_exp_req = sum(
-        [
-            1
-            for test in [
-                trnaseq_file,
-                mrnaseq_file,
-                scrnaseq_file,
-                proteomics_file,
-            ]
-            if test is None
+        test is None
+        for test in [
+            trnaseq_file,
+            mrnaseq_file,
+            scrnaseq_file,
+            proteomics_file,
         ]
     )
 
@@ -816,10 +806,10 @@ if __name__ == "__main__":
     else:
         try:
             expression_requirement = int(expression_requirement)
-            if int(expression_requirement) < 1:
+            if expression_requirement < 1:
                 raise ValueError("Expression requirement must be at least 1!")
-        except ValueError:
-            raise ValueError("Expression requirement must be able to be converted to an integer!")
+        except ValueError as e:
+            raise ValueError("Expression requirement must be able to be converted to an integer!") from e
 
     if adjust_method not in ["progressive", "regressive", "flat", "custom"]:
         raise ValueError("Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'")
