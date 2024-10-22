@@ -38,7 +38,7 @@ class _Arguments:
             raise ValueError(f"Gene format (--gene_format) is invalid; accepts 'Ensembl', 'Entrez', and 'HGNC symbol'; provided: {self.gene_format}")
 
         # handle species alternative ids
-        if not self.taxon_id.isdigit():
+        if isinstance(self.taxon_id, str) and not self.taxon_id.isdigit():
             if self.taxon_id.upper() in ["HUMAN", "HOMO SAPIENS"]:
                 self.taxon_id = Taxon.HOMO_SAPIENS
             elif self.taxon_id.upper() in ["MOUSE", "MUS MUSCULUS"]:
@@ -46,7 +46,11 @@ class _Arguments:
             else:
                 raise ValueError(f"Taxon id (--taxon-id) is invalid; accepts 'human', 'mouse', or an integer value; provided: {self.taxon_id}")
         else:
-            self.taxon_id = Taxon.from_int(int(self.taxon_id))
+            try:
+                # If taxon id can't be found in the Taxon Enum, do nothing
+                self.taxon_id = Taxon.from_int(int(self.taxon_id))
+            except ValueError:
+                pass
 
 
 @dataclass
