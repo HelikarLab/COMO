@@ -80,16 +80,16 @@ class _STARinformation:
             filepath,
             sep="\t",
             skiprows=4,
-            names=["gene_id", "unstranded_rna_counts", "first_read_transcription_strand", "second_read_transcription_strand"],
+            names=["ensembl_gene_id", "unstranded_rna_counts", "first_read_transcription_strand", "second_read_transcription_strand"],
         )
         # Remove NA values
-        df = df[~df["gene_id"].isna()]
+        df = df[~df["ensembl_gene_id"].isna()]
         return _STARinformation(
             num_unmapped=num_unmapped,
             num_multimapping=num_multimapping,
             num_no_feature=num_no_feature,
             num_ambiguous=num_ambiguous,
-            gene_names=df["gene_id"].values.tolist(),
+            gene_names=df["ensembl_gene_id"].values.tolist(),
             count_matrix=df,
         )
 
@@ -188,20 +188,20 @@ def _process_first_multirun_sample(strand_file: Path, all_counts_files: list[Pat
             strand_information = "unstranded_rna_counts"
 
         run_counts = star_information.count_matrix[["gene_id", strand_information]]
-        run_counts.columns = pd.Index(["genes", "counts"])
+        run_counts.columns = pd.Index(["ensembl_gene_id", "counts"])
         if sample_count.empty:
             sample_count = run_counts
         else:
             # Merge to take all items from both data frames
-            sample_count = sample_count.merge(run_counts, on="genes", how="outer")
+            sample_count = sample_count.merge(run_counts, on="ensembl_gene_id", how="outer")
 
     # Set na values to 0
     sample_count = sample_count.fillna(value="0")
     sample_count.iloc[:, 1:] = sample_count.iloc[:, 1:].apply(pd.to_numeric)
 
     count_sums: pd.DataFrame = pd.DataFrame(sample_count.sum(axis=1, numeric_only=True))
-    count_sums.insert(0, "genes", sample_count["genes"])
-    count_sums.columns = pd.Index(["genes", _sample_name_from_filepath(strand_file)])
+    count_sums.insert(0, "ensembl_gene_id", sample_count["ensembl_gene_id"])
+    count_sums.columns = pd.Index(["ensembl_gene_id", _sample_name_from_filepath(strand_file)])
     return count_sums
 
 
@@ -217,8 +217,8 @@ def _process_standard_replicate(counts_file: Path, strand_file: Path, sample_nam
     if strand_information == "none":
         strand_information = "unstranded_rna_counts"
 
-    sample_count = star_information.count_matrix[["gene_id", strand_information]]
-    sample_count.columns = pd.Index(["genes", sample_name])
+    sample_count = star_information.count_matrix[["ensembl_gene_id", strand_information]]
+    sample_count.columns = pd.Index(["ensembl_gene_id", sample_name])
     return sample_count
 
 
@@ -252,7 +252,7 @@ def _create_sample_counts_matrix(metrics: _StudyMetrics) -> pd.DataFrame:
             adjusted_index += 1
             continue
 
-        counts: pd.DataFrame = counts.merge(new_counts, on="genes", how="outer")
+        counts: pd.DataFrame = counts.merge(new_counts, on="ensembl_gene_id", how="outer")
         counts = counts.fillna(value=0)
 
         # Remove run number "r\d+" from multi-run names
@@ -268,7 +268,7 @@ def _create_context_counts_matrix(data_dir: Path, output_dir: Path):
     final_matrix: pd.DataFrame = pd.DataFrame()
     for metric in study_metrics:
         counts: pd.DataFrame = _create_sample_counts_matrix(metric)
-        final_matrix = counts if final_matrix.empty else pd.merge(final_matrix, counts, on="genes", how="outer")
+        final_matrix = counts if final_matrix.empty else pd.merge(final_matrix, counts, on="ensembl_gene_id", how="outer")
 
     output_filename = output_dir / f"gene_counts_matrix_full_{data_dir.stem}.csv"
     print(f"Writing context '{data_dir.stem}' gene count matrix: {output_filename}")
@@ -415,14 +415,14 @@ def _create_config_df(context_name: str) -> pd.DataFrame:
 
     out_df = pd.DataFrame(
         {
-            "SampleName": sample_names,
-            "FragmentLength": fragment_lengths,
-            "Layout": layouts,
-            "Strand": strands,
-            "Group": groups,
-            "LibraryPrep": preparation_method,
+            "sample_name": sample_names,
+            "fragment_length": fragment_lengths,
+            "layout": layouts,
+            "strand": strands,
+            "study": groups,
+            "library_prep": preparation_method,
         }
-    ).sort_values("SampleName")
+    ).sort_values("sample_name")
     return out_df
 
 
@@ -430,8 +430,8 @@ def split_config_df(df):
     """
     Split a config dataframe into two seperate ones. One for Total RNA library prep, one for mRNA
     """
-    df_t = df[df["LibraryPrep"] == "total"]
-    df_m = df[df["LibraryPrep"] == "mrna"]
+    df_t = df[df["library_prep"] == "total"]
+    df_m = df[df["library_prep"] == "mrna"]
 
     return df_t, df_m
 
@@ -460,7 +460,7 @@ def create_gene_info_file(matrix_file_list: list[str], input_format: Input, taxo
     genes = set()
     for file in matrix_file_list:
         df = pd.read_csv(file, low_memory=False)
-        genes.update(df["genes"].astype(str).tolist())
+        genes.update(df["ensembl_gene_id"].astype(str).tolist())
     genes = list(genes)
 
     # Create our output database format
@@ -481,7 +481,7 @@ def create_gene_info_file(matrix_file_list: list[str], input_format: Input, taxo
     gene_info.rename(columns={Output.ENSEMBL_GENE_ID.value: "ensembl_gene_id"}, inplace=True)
     gene_info["start_position"] = gene_info["Chromosomal Location"].str.extract(r"chr_start: (\d+)")
     gene_info["end_position"] = gene_info["Chromosomal Location"].str.extract(r"chr_end: (\d+)")
-    gene_info.rename(columns={"Gene Symbol": "hgnc_symbol", "Gene ID": "entrezgene_id"}, inplace=True)
+    gene_info.rename(columns={"Gene Symbol": "hgnc_symbol", "Gene ID": "entrez_gene_id"}, inplace=True)
     gene_info.drop(["Chromosomal Location"], axis=1, inplace=True)
     gene_info.to_csv(gene_info_file, index=False)
     print(f"Gene Info file written at '{gene_info_file}'")
