@@ -10,10 +10,10 @@ from typing import Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
-from como_utilities import stringlist_to_list
 from fast_bioservices import BioDBNet, Input, Output, Taxon
+from loguru import logger
 
-from como.project import Config
+from como import Config, stringlist_to_list
 
 
 @dataclass
