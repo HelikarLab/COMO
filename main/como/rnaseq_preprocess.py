@@ -271,12 +271,12 @@ def _create_context_counts_matrix(data_dir: Path, output_dir: Path):
         final_matrix = counts if final_matrix.empty else pd.merge(final_matrix, counts, on="ensembl_gene_id", how="outer")
 
     output_filename = output_dir / f"gene_counts_matrix_full_{data_dir.stem}.csv"
-    print(f"Writing context '{data_dir.stem}' gene count matrix: {output_filename}")
+    output_filename.parent.mkdir(parents=True, exist_ok=True)
     logger.info(f"Writing context '{data_dir.stem}' gene count matrix: {output_filename}")
     final_matrix.to_csv(output_filename, index=False)
 
 
-def _create_counts_matrix(context_name):
+def _create_counts_matrix(context_name: str, config: Config):
     """
     Create a counts matrix by reading gene counts tables in COMO_input/<context name>/<study number>/geneCounts/
     Uses R in backend (_create_context_counts_matrix.R)
@@ -426,7 +426,7 @@ def _create_config_df(context_name: str) -> pd.DataFrame:
     return out_df
 
 
-def split_config_df(df):
+def _split_config_df(df):
     """
     Split a config dataframe into two seperate ones. One for Total RNA library prep, one for mRNA
     """
@@ -436,7 +436,7 @@ def split_config_df(df):
     return df_t, df_m
 
 
-def split_counts_matrices(count_matrix_all, df_total, df_mrna):
+def _split_counts_matrices(count_matrix_all, df_total, df_mrna):
     """
     Split a counts-matrix dataframe into two seperate ones. One for Total RNA library prep, one for mRNA
     """
@@ -448,12 +448,11 @@ def split_counts_matrices(count_matrix_all, df_total, df_mrna):
     return matrix_total, matrix_mrna
 
 
-def create_gene_info_file(matrix_file_list: list[str], input_format: Input, taxon_id):
+def _create_gene_info_file(matrix_file_list: list[str], input_format: Input, taxon_id, config: Config):
     """
     Create gene info file for specified context by reading first column in its count matrix file at
      results/<context name>/gene_info_<context name>.csv
     """
-    config = Config()
 
     logger.info("Fetching gene info")
     gene_info_file = config.data_dir / "gene_info.csv"
@@ -487,11 +486,17 @@ def create_gene_info_file(matrix_file_list: list[str], input_format: Input, taxo
     logger.info(f"Gene Info file written at '{gene_info_file}'")
 
 
-def _handle_context_batch(context_names: list[str], mode, input_format: Input, taxon_id, provided_matrix_file, r_file_path: Path):
+def _handle_context_batch(
+    context_names: list[str],
+    mode,
+    input_format: Input,
+    taxon_id,
+    provided_matrix_file,
+    config: Config,
+):
     """
     Handle iteration through each context type and create files according to flag used (config, matrix, info)
     """
-    config = Config()
     trnaseq_config_filename = config.config_dir / "trnaseq_data_inputs_auto.xlsx"
     mrnaseq_config_filename = config.config_dir / "mrnaseq_data_inputs_auto.xlsx"
 
@@ -518,10 +523,10 @@ def _handle_context_batch(context_names: list[str], mode, input_format: Input, t
         matrix_path_mrna = matrix_output_dir / f"gene_counts_matrix_mrna_{context_name}.csv"
 
         if mode == "make":
-            _create_counts_matrix(context_name)
+            _create_counts_matrix(context_name, config=config)
             # TODO: warn user or remove samples that are all 0 to prevent density plot error in zFPKM
             df = _create_config_df(context_name)
-            df_t, df_m = split_config_df(df)
+            df_t, df_m = _split_config_df(df)
 
             if not df_t.empty:
                 if not tflag:
@@ -539,7 +544,7 @@ def _handle_context_batch(context_names: list[str], mode, input_format: Input, t
                 mmatrix_files.append(matrix_path_mrna)
                 df_m.to_excel(mwriter, sheet_name=context_name, header=True, index=False)
 
-            tmatrix, mmatrix = split_counts_matrices(matrix_path_all, df_t, df_m)
+            tmatrix, mmatrix = _split_counts_matrices(matrix_path_all, df_t, df_m)
             if len(tmatrix.columns) >= 1:
                 tmatrix.to_csv(matrix_path_total, header=True, index=False)
             if len(mmatrix.columns) >= 1:
@@ -551,11 +556,11 @@ def _handle_context_batch(context_names: list[str], mode, input_format: Input, t
         if mflag:
             mwriter.close()
 
-        create_gene_info_file(tmatrix_files + mmatrix_files, input_format, taxon_id)
+        _create_gene_info_file(tmatrix_files + mmatrix_files, input_format, taxon_id, config=config)
 
     else:
-        matrix_files: list[str] = como_utilities.stringlist_to_list(provided_matrix_file)
-        create_gene_info_file(matrix_files, input_format, taxon_id)
+        matrix_files: list[str] = stringlist_to_list(provided_matrix_file)
+        _create_gene_info_file(matrix_files, input_format, taxon_id, config=config)
 
 
 def rnaseq_preprocess(
@@ -564,11 +569,9 @@ def rnaseq_preprocess(
     input_format: Input,
     taxon_id: Union[int, str],
     matrix_file: Optional[str | Path] = None,
+    config: Config = None,
 ) -> None:
-    r_file_path = Path(__file__).parent / "rscripts" / "_create_context_counts_matrix.R"
-    if not r_file_path.exists():
-        raise FileNotFoundError(f"Unable to find R script at {r_file_path}")
-
+    config = Config() if config is None else config
     if mode not in ["make", "provide"]:
         raise ValueError("mode must be either 'make' or 'provide'")
 
@@ -584,11 +587,11 @@ def rnaseq_preprocess(
         input_format=input_format,
         taxon_id=taxon_id,
         provided_matrix_file=Path(matrix_file if matrix_file is not None else "").as_posix(),
-        r_file_path=r_file_path,
+        config=config,
     )
 
 
-def parse_args():
+def _parse_args():
     """
     Parse arguments to rnaseq_preprocess.py, create a gene info files for each provided context at:
     /work/data/results/<context name>/gene_info_<context name>.csv.
@@ -665,13 +668,13 @@ def parse_args():
 
     parsed = parser.parse_args()
     parsed.context_names = stringlist_to_list(parsed.context_names)
-    args = Arguments(**vars(parsed))
+    args = _Arguments(**vars(parsed))
 
     return args
 
 
 if __name__ == "__main__":
-    args: Arguments = parse_args()
+    args: _Arguments = _parse_args()
     taxon_id_value = args.taxon_id.value if isinstance(args.taxon_id, Taxon) else args.taxon_id
 
     rnaseq_preprocess(
