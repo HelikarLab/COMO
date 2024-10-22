@@ -467,17 +467,17 @@ def _handle_context_batch(
         print(f"Using {merge_distro} distribution for merging")
         rpy2_api.Rpy2(
             r_file_path,
-            config.result_dir.as_posix(),
-            sheet_names,
-            use_mrna,
-            use_trna,
-            use_scrna,
-            use_proteins,
-            keep_gene_score,
-            tweight,
-            mweight,
-            sweight,
-            pweight,
+            working_dir=config.result_dir.as_posix(),
+            context_names=sheet_names,
+            global_use_mrna=use_mrna,
+            global_use_trna=use_trna,
+            global_use_scrna=use_scrna,
+            global_use_proteins=use_proteins,
+            keep_gene_scores=keep_gene_score,
+            global_trna_weight=tweight,
+            global_mrna_weight=mweight,
+            global_scrna_weight=sweight,
+            global_protein_weight=pweight,
         ).call_function("combine_zscores_main")
 
     for context_name in sheet_names:
