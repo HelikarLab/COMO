@@ -4,14 +4,9 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-from rpy2.robjects import pandas2ri
 
-from como import Config, rpy2_api
-from como._arguments import RNASeqGen
-from como.rnaseq import FilteringTechnique
-
-# enable r to py conversion
-pandas2ri.activate()
+from como import Config
+from como.rnaseq import FilteringTechnique, save_rnaseq_tests
 
 
 @dataclass
@@ -81,23 +76,22 @@ def _handle_context_batch(
         print(f"Gene info:\t\t{gene_info_filepath}")
         print(f"Count matrix:\t\t{rnaseq_input_filepath}")
 
-        rpy2_api.Rpy2(
-            r_file_path=r_file_path,
-            counts_matrix_file=rnaseq_input_filepath.as_posix(),
-            config_file=config_filepath.as_posix(),
-            out_file=rnaseq_output_filepath.as_posix(),
-            info_file=gene_info_filepath.as_posix(),
+        save_rnaseq_tests(
             context_name=context_name,
+            counts_matrix_filepath=rnaseq_input_filepath,
+            config_filepath=config_filepath,
+            output_filepath=rnaseq_output_filepath.as_posix(),
+            gene_info_filepath=gene_info_filepath,
             prep=prep,
             replicate_ratio=replicate_ratio,
             batch_ratio=batch_ratio,
-            replicate_ratio_high=replicate_ratio_high,
-            batch_ratio_high=batch_ratio_high,
+            high_replicate_ratio=replicate_ratio_high,
+            high_batch_ratio=batch_ratio_high,
             technique=technique,
             quantile=quantile,
             min_count=min_count,
             min_zfpkm=min_zfpkm,
-        ).call_function("save_rnaseq_tests")
+        )
 
         print(f"Results saved at:\t{rnaseq_output_filepath}")
 
