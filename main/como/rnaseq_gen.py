@@ -1,63 +1,45 @@
 import argparse
-import re
-from enum import Enum
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
 from rpy2.robjects import pandas2ri
 
-from como import rpy2_api
-from como.project import Config
+from como import Config, rpy2_api
+from como._arguments import RNASeqGen
+from como.rnaseq import FilteringTechnique
 
 # enable r to py conversion
 pandas2ri.activate()
 
-r_file_path = Path(__file__).parent / "rscripts" / "rnaseq.R"
+
+@dataclass
+class RNASeqGen:
+    config_file: str
+    replicate_ratio: float
+    batch_ratio: float
+    high_replicate_ratio: float
+    high_batch_ratio: float
+    filtering_technique: FilteringTechnique
+    minimum_cutoff: int | str
+    library_prep: str
+
+    def __post_init__(self):
+        self.library_prep = self.library_prep.replace(" ", "")
+        if self.filtering_technique not in [t.value for t in FilteringTechnique]:
+            raise ValueError("filtering_technique must be either 'zfpkm', 'cpm', or 'tpm'")
+
+        if self.minimum_cutoff is None:
+            if self.filtering_technique == FilteringTechnique.TPM:
+                self.minimum_cutoff = 25
+            elif self.filtering_technique == FilteringTechnique.CPM:
+                self.minimum_cutoff = "default"
+            elif self.filtering_technique == FilteringTechnique.ZFPKM:
+                self.minimum_cutoff = -3
 
 
-def load_rnaseq_tests(filename, context_name, lib_type):
-    """
-    Load rnaseq results returning a dictionary of test (context, context, cell, etc ) names and rnaseq expression data
-    """
-    config = Config()
-
-    def load_dummy_dict():
-        dat = pd.read_csv(config.data_dir / "data_matrices" / "placeholder" / "placeholder_empty_data.csv", index_col="ENTREZ_GENE_ID")
-        return "dummy", dat
-
-    if not filename or filename == "None":  # not using this data type, use empty dummy data matrix
-        return load_dummy_dict()
-
-    inquiry_full_path = config.data_dir / "config_sheets" / filename
-    if not inquiry_full_path.exists():  # check that config file exist (isn't needed to load, but helps user)
-        raise FileNotFoundError(f"Error: Config file not found at {inquiry_full_path}")
-
-    if lib_type == "total":  # if using total RNA-seq library prep
-        filename = f"rnaseq_total_{context_name}.csv"
-    elif lib_type == "mrna":  # if using mRNA-seq library prep
-        filename = f"rnaseq_mrna_{context_name}.csv"
-    elif lib_type == "scrna":  # if using single-cell RNA-seq
-        filename = f"rnaseq_scrna_{context_name}.csv"
-    else:
-        raise ValueError(f"Unsupported RNA-seq library type: {lib_type}. Must be one of 'total', 'mrna', 'sc'.")
-
-    save_filepath = config.result_dir / context_name / lib_type / filename
-    if save_filepath.exists():
-        data = pd.read_csv(save_filepath, index_col="ENTREZ_GENE_ID")
-        print(f"Read from {save_filepath}")
-        return context_name, data
-
-    else:
-        print(
-            f"{lib_type} gene expression file for {context_name} was not found at {save_filepath}. This may be "
-            f"intentional. Contexts where {lib_type} data can be found in /work/data/results/{context_name}/ will "
-            "still be used if found for other contexts."
-        )
-        return load_dummy_dict()
-
-
-def handle_context_batch(
+def _handle_context_batch(
     config_filename,
     replicate_ratio,
     batch_ratio,
@@ -72,6 +54,10 @@ def handle_context_batch(
     """
     Handle iteration through each context type and create rnaseq expression file by calling rnaseq.R
     """
+    r_file_path = Path(__file__).parent / "rscripts" / "rnaseq.R"
+    if not r_file_path.exists():
+        raise FileNotFoundError(f"Unable to find 'rnaseq.R'! Looking for: {r_file_path}")
+
     config = Config()
 
     config_filepath = config.config_dir / config_filename
@@ -116,39 +102,36 @@ def handle_context_batch(
         print(f"Results saved at:\t{rnaseq_output_filepath}")
 
 
-class Technique(Enum):
-    ZFPKM = "zfpkm"
-    TPM = "quantile"
-    CPM = "cpm"
-
-
 def rnaseq_gen(
     config_filename: str,
     replicate_ratio: float = 0.5,
     batch_ratio: float = 0.5,
     replicate_ratio_high: float = 1.0,
     batch_ratio_high: float = 1.0,
-    technique: Technique = Technique.TPM,
+    technique: FilteringTechnique | str = FilteringTechnique.TPM,
     cut_off: Optional[int] = None,
     prep: Optional[str] = "",
 ) -> None:
-    if technique not in Technique:
-        raise ValueError(f"Technique must be one of {Technique}")
+    if isinstance(technique, str):
+        technique = FilteringTechnique(technique.lower())
 
-    if technique == Technique.TPM:
+    if technique.value not in [t.value for t in FilteringTechnique]:
+        raise ValueError(f"Technique must be one of {FilteringTechnique}")
+
+    if technique == FilteringTechnique.TPM:
         if cut_off is None:
             cut_off = 25
 
         if cut_off < 1 or cut_off > 100:
             raise ValueError("Quantile must be between 1 - 100")
 
-    elif technique == Technique.CPM:
+    elif technique == FilteringTechnique.CPM:
         if cut_off is not None and cut_off < 0:
             raise ValueError("Cutoff must be greater than 0")
 
         if cut_off is None:
             cut_off = "default"
-    elif technique == Technique.ZFPKM:
+    elif technique == FilteringTechnique.ZFPKM:
         # if cut_off is not None and (cut_off < -3 or cut_off > -2):
         #     raise ValueError("Cutoff must be between -3 and -2")
 
@@ -157,7 +140,7 @@ def rnaseq_gen(
 
     prep = prep.replace(" ", "")
 
-    handle_context_batch(
+    _handle_context_batch(
         config_filename,
         replicate_ratio,
         batch_ratio,
@@ -171,24 +154,7 @@ def rnaseq_gen(
     )
 
 
-def main():
-    """
-    Generate a list of active and high-confidence genes from a counts matrix using a user defined
-    at normalization-technique at /work/data/results/<context name>/rnaseq_<context_name>.csv
-    Currently, can filter raw RNA-seq counts using three normalization techniques. Which are defined in rnaseq.R
-    TPM Quantile, where each replicate is normalized with Transcripts-per-million and an upper quantile is taken to
-    create a boolean list of active genes for the replicate. Replicates are compared for consensus within the
-    study/batch number according to user-defined ratios and then study/batch numbers are checked for consensus
-    according to different user defined ratios.   **CITATION NEEDED** **Recomended if user wants more control over the
-    size of the model, like a smaller model that allows for only the most expressed reactions, or a larger more
-    encompassing one that contains less essential reactions.
-    zFPKM method outlined in: https://pubmed.ncbi.nlm.nih.gov/24215113/ can be used. Counts will be normalized using
-    zFPKM and genes > -3 will be considered expressed per thier recommendation. Expressed genes will be checked for
-    consensus at the replicate and study/batch levels the same as TPM Quantile. **Recommended if user wants to give
-    least input over gene essentially determination and use the most standardized method of active gene determination.
-    flat cutoff of CPM (counts per million) normalized values, check for consensus the same as other methods.
-    """
-
+def _parse_args():
     parser = argparse.ArgumentParser(
         prog="rnaseq_gen.py",
         description="Generate a list of active and high-confidence genes from a counts matrix using a user defined "
@@ -261,32 +227,12 @@ def main():
         "'flat-cpm'. More info about each method is discussed in pipeline.ipynb.",
     )
     parser.add_argument(
-        "-q",
-        "--quantile",
+        "--minimum-cutoff",
         type=int,
         required=False,
-        default=25,
-        dest="quantile",
-        help="Cutoff used for quantile-tpm normalization and filtration technique. Example: 25 means "
-        "that genes with TPM > 75% percentile wik=ll be considered active for that replicate.",
-    )
-    parser.add_argument(
-        "-m",
-        "--min-count",
-        required=False,
-        default="default",
-        dest="min_count",
-        help="Cutoff used for cpm. Minimum number of counts to be considered expressed, alternatively "
-        "use 'default' to use method outlined in CITATION NEEDED",
-    )
-    parser.add_argument(
-        "-z",
-        "--min-zfpkm",
-        required=False,
-        default="default",
-        dest="min_zfpkm",
-        help="Cutoff used for zfpkm. Minimum zfpkm to be considered expressed, according to the paper, "
-        "CITATION NEEDED, should be between -3 and -2.",
+        default=None,
+        dest="minimum_cutoff",
+        help="The minimum cutoff used for the filtration technique. If the filtering technique is zFPKM, the default is -3. If the filtering technique is quantile-tpm, the default is 25. If the filtering technique is flat-cpm, the default is determined dynamically. If the filtering technique is quantile, the default is 25.",
     )
     parser.add_argument(
         "-p",
@@ -297,48 +243,34 @@ def main():
         help="Library preparation used, will separate samples into groups to only compare similarly "
         "prepared libraries. For example, mRNA, total-rna, scRNA, etc",
     )
-
-    args = parser.parse_args()
-
-    config_filename = args.config_filename
-    replicate_ratio = args.replicate_ratio
-    batch_ratio = args.batch_ratio
-    replicate_ratio_high = args.replicate_ratio_high
-    batch_ratio_high = args.batch_ratio_high
-    technique = args.technique
-    quantile = args.quantile
-    min_count = args.min_count
-    prep = args.prep
-    min_zfpkm = args.min_zfpkm
-
-    if re.search("tpm", technique.lower()) or re.search("quantile", technique.lower()):
-        technique = "quantile"
-    elif re.search("cpm", technique.lower()):
-        technique = "cpm"
-    elif re.search("zfpkm", technique.lower()):
-        technique = "zfpkm"
-    else:
-        raise ValueError("Technique not recognized. Must be 'tpm-quantile', 'cpm', or 'zfpkm'.")
-
-    if int(quantile) > 100 or int(quantile) < 1:
-        print("Quantile must be between 1 - 100")
-
-    prep = prep.replace(" ", "")
-
-    handle_context_batch(
-        config_filename,
-        replicate_ratio,
-        batch_ratio,
-        replicate_ratio_high,
-        batch_ratio_high,
-        technique,
-        quantile,
-        min_count,
-        min_zfpkm,
-        prep,
-    )
-    print("\nDone!")
+    return RNASeqGen(**vars(parser.parse_args()))
 
 
 if __name__ == "__main__":
-    main()
+    """
+    Generate a list of active and high-confidence genes from a counts matrix using a user defined
+    at normalization-technique at /work/data/results/<context name>/rnaseq_<context_name>.csv
+    Currently, can filter raw RNA-seq counts using three normalization techniques. Which are defined in rnaseq.R
+    TPM Quantile, where each replicate is normalized with Transcripts-per-million and an upper quantile is taken to
+    create a boolean list of active genes for the replicate. Replicates are compared for consensus within the
+    study/batch number according to user-defined ratios and then study/batch numbers are checked for consensus
+    according to different user defined ratios.   **CITATION NEEDED** **Recomended if user wants more control over the
+    size of the model, like a smaller model that allows for only the most expressed reactions, or a larger more
+    encompassing one that contains less essential reactions.
+    zFPKM method outlined in: https://pubmed.ncbi.nlm.nih.gov/24215113/ can be used. Counts will be normalized using
+    zFPKM and genes > -3 will be considered expressed per thier recommendation. Expressed genes will be checked for
+    consensus at the replicate and study/batch levels the same as TPM Quantile. **Recommended if user wants to give
+    least input over gene essentially determination and use the most standardized method of active gene determination.
+    flat cutoff of CPM (counts per million) normalized values, check for consensus the same as other methods.
+    """
+    args = _parse_args()
+    rnaseq_gen(
+        config_filename=args.config_file,
+        replicate_ratio=args.replicate_ratio,
+        batch_ratio=args.batch_ratio,
+        replicate_ratio_high=args.high_replicate_ratio,
+        batch_ratio_high=args.high_batch_ratio,
+        technique=args.filtering_technique,
+        cut_off=args.minimum_cutoff,
+        prep=args.library_prep,
+    )
