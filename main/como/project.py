@@ -26,19 +26,19 @@ class Config(metaclass=SingletonMeta):
     ) -> None:
         current_dir = Path.cwd()
 
-        self.data_dir = data_dir
+        self.data_dir = Path(data_dir) if data_dir else None
         if self.data_dir is None:
             logger.warning(f"'data_dir' not provided to Config, using {Path.cwd() / 'data'}")
             self.data_dir = current_dir / "data"
             self.data_dir.mkdir(parents=True, exist_ok=True)
 
-        self.config_dir = config_dir
+        self.config_dir = Path(config_dir) if config_dir else None
         if self.config_dir is None:
             logger.warning(f"'config_dir' not provided to Config, using {self.data_dir / 'config_sheets'}")
             self.config_dir = self.data_dir / "config_sheets"
             self.config_dir.mkdir(parents=True, exist_ok=True)
 
-        self.result_dir = result_dir
+        self.result_dir = Path(result_dir) if result_dir else None
         if self.result_dir is None:
             logger.warning(f"'results_dir' not provided to Config, using {self.data_dir / 'results'}")
             self.result_dir = self.data_dir / "results"
