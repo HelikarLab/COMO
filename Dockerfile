@@ -1,18 +1,12 @@
-FROM jupyter/minimal-notebook:latest AS builder
+FROM python:3.10 AS app
 
-# Install UV for project dependencies
+WORKDIR /app
+ENV PATH="/app/.venv/bin:$PATH"
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-COPY --chown=1000:100 main "${HOME}/main"
-COPY --chown=1000:100 pyproject.toml "${HOME}"
+COPY --chown=1000:100 main /app/main/
+COPY --chown=1000:100 pyproject.toml /app/pyproject.toml
 
-RUN uv sync && \
-    jupyter lab --generate-config && \
-    echo "" > "${HOME}/.jupyter/jupyter_lab_config.py" && \
-    echo "c.ServerApp.token = ''" >> "${HOME}/.jupyter/jupyter_lab_config.py" && \
-    echo "c.ServerApp.password = ''" >> "${HOME}/.jupyter/jupyter_lab_config.py" && \
-    echo "c.ServerApp.allow_root = True" >> "${HOME}/.jupyter/jupyter_lab_config.py" && \
-    echo "c.ServerApp.root_dir = '${HOME}/main'" >> "${HOME}/.jupyter/jupyter_lab_config.py" && \
-    echo "c.ServerApp.ip = '0.0.0.0'" >> "${HOME}/.jupyter/jupyter_lab_config.py"
-
-
-VOLUME "${HOME}/main/data/local_files"
+RUN uv sync && uv pip install jupyterlab
+EXPOSE 8888
+VOLUME "/app/main/data/local_files"
+CMD ["jupyter", "lab", "--allow-root", "--no-browser", "--ip=0.0.0.0", "--port=8888", "--notebook-dir=/app/main", "--NotebookApp.token=''", "--NotebookApp.password=''"]
