@@ -1,18 +1,19 @@
 [project]
 name = "COMO"
 dynamic = ["version"]
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.11"
 dependencies = [
-    "cobamp>=0.2.2",
-    "cobra>=0.29.1",
-    "fast-bioservices>=0.3.6",
+    "cobamp>=0.2.1",
+    "cobra>=0.28.0",  # latest is 0.29.1
+    "fast-bioservices@git+https://github.com/JoshLoecker/fast_bioservices@drop-pandas-version",
     "loguru>=0.7.2",
-    "numpy>=2.1.2",
+    "numpy>=1.21.6",  # latest is 2.1.2
     "openpyxl>=3.1.5",
-    "pandas>=2.2.3",
+    "pandas>=1.3.5",  # latest is 2.2.3
     "plotly>=5.24.1",
-    "scipy>=1.14.1",
+    "scipy>=1.7.3",  # latest is 1.14.1
     "scikit-learn>=1.5.2",
+    "setuptools<60.0",
     "troppo>=0.0.7",
 ]
 
@@ -32,13 +33,8 @@ ignore = ["F401"]
 [tool.hatch.build]
 packages = ["main/como"]
 
-[tool.hatch.build.hooks.vcs]
-version-file = "_version.py"
-
 [tool.hatch.metadata]
 allow-direct-references = true
 
 [tool.pytest.ini_options]
-pythonpath = [
-    "main/src"
-]
+pythonpath = [ "main/src" ]
