@@ -1,0 +1,9 @@
+services:
+  como:
+    image: ghcr.io/helikarlab/como:latest
+    container_name: como
+    ports:
+      - "8888:8888"
+    volumes:
+      # Map "[LOCAL_DIRECTORY]/local_files to /app/main/data/local_files
+      - "$(pwd)/local_files:/app/main/data/local_files"
