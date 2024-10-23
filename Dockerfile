@@ -1,34 +1,18 @@
-FROM jupyter/r-notebook:latest as builder
+FROM jupyter/minimal-notebook:latest AS builder
 
-COPY environment.yaml "${HOME}/environment.yaml"
-
-# Install base packages and libraries
-RUN mamba config --quiet --add channels conda-forge && \
-    mamba config --quiet --add channels bioconda && \
-    mamba config --quiet --add channels r && \
-    sed -i '/^python/d' /opt/conda/conda-meta/pinned && \
-    echo "auto_activate_base: true" >> "${HOME}/.condarc" && \
-    mamba install --file="${HOME}/environment.yaml" --yes && \
-    R -e "devtools::install_github('babessell1/zFPKM')" && \
-    pip cache purge
-
-
-FROM jupyter/r-notebook as production
-
-COPY --from=builder "${HOME}/environment.yaml" "${HOME}/environment.yaml"
+# Install UV for project dependencies
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 COPY --chown=1000:100 main "${HOME}/main"
+COPY --chown=1000:100 pyproject.toml "${HOME}"
 
-# Remove tests directory
-RUN rm -rf "${HOME}/main/tests"
+RUN uv sync && \
+    jupyter lab --generate-config && \
+    echo "" > "${HOME}/.jupyter/jupyter_lab_config.py" && \
+    echo "c.ServerApp.token = ''" >> "${HOME}/.jupyter/jupyter_lab_config.py" && \
+    echo "c.ServerApp.password = ''" >> "${HOME}/.jupyter/jupyter_lab_config.py" && \
+    echo "c.ServerApp.allow_root = True" >> "${HOME}/.jupyter/jupyter_lab_config.py" && \
+    echo "c.ServerApp.root_dir = '${HOME}/main'" >> "${HOME}/.jupyter/jupyter_lab_config.py" && \
+    echo "c.ServerApp.ip = '0.0.0.0'" >> "${HOME}/.jupyter/jupyter_lab_config.py"
 
-# Configure jupyter notebook server
-ENV JUPYTER_TOKEN=""
-ENV JUPYTER_PASSWORD=""
-ENV JUPYTER_IP="0.0.0.0"
-ENV JUPYTER_ROOT_DIR="${HOME}/main"
 
-RUN jupyter trust "${HOME}/main/COMO.ipynb"
-
-VOLUME /home/jovyan/main/data/local_files
-
-USER 1000
+VOLUME "${HOME}/main/data/local_files"
