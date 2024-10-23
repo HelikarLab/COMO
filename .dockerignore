@@ -5,3 +5,4 @@ main/src/tests
 **/.ipynb_checkpoints/
 README.md
 LICENSE
+/.venv
