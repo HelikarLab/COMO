@@ -494,7 +494,7 @@ def _build_model(
 
     idx_obj = rx_names.index(objective)
     idx_force = [rx_names.index(rxn) for rxn in force_rxns if rxn in rx_names]
-    exp_idx_list = [idx for (idx, val) in enumerate(expr_vector) if val > 0]
+    exp_idx_list = [i for (i, val) in enumerate(expr_vector) if val > 0]
     exp_thresh = (low_thresh, high_thresh)
 
     # switch case dictionary runs the functions making it too slow, better solution then elif ladder?
