@@ -209,11 +209,8 @@ def _set_boundaries(model: cobra.Model, bound_rxns: list, bound_lb, bound_ub) ->
     sink_rxns = [rxn.id for rxn in all_rxns if re.search("sink_", rxn.id)]
     demand_rxns = [rxn.id for rxn in all_rxns if re.search("DM_", rxn.id)]
 
-    # set flag that allows all boundary reactions to be used if none are given
-    if len(bound_rxns) == 0:
-        allow_all_boundary_rxns = True
-    else:
-        allow_all_boundary_rxns = False
+    # Allows all boundary reactions to be used if none are given
+    allow_all_boundary_rxns = not bound_rxns
 
     # close sinks and demands not in boundary reactions unless no boundary reactions were given
     if not allow_all_boundary_rxns:
