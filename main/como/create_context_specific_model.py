@@ -240,9 +240,8 @@ def _set_boundaries(model: cobra.Model, bound_rxns: list, bound_lb, bound_ub) ->
 
 def _feasibility_test(model_cobra: cobra.Model, step: str):
     # check number of unsolvable reactions for reference model under media assumptions
-    model_cobra_rm = cobra.flux_analysis.fastcc(
-        model_cobra, flux_threshold=15, zero_cutoff=1e-7
-    )  # create flux consistant model (rmemoves some reactions)
+    # create flux consistant model (rmemoves some reactions)
+    model_cobra_rm = cobra.flux_analysis.fastcc(model_cobra, flux_threshold=15, zero_cutoff=1e-7)
     incon_rxns = set(model_cobra.reactions.list_attr("id")) - set(model_cobra_rm.reactions.list_attr("id"))
     incon_rxns_cnt = len(incon_rxns)
 
