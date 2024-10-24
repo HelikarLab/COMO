@@ -1,8 +1,10 @@
-#!/usr/bin/python3
-
-import argparse
 import sys
 from pathlib import Path
+
+sys.path.insert(0, Path(__file__).parent.parent.as_posix())
+
+
+import argparse
 
 import numpy as np
 import pandas as pd
