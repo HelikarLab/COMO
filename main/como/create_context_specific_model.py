@@ -376,7 +376,7 @@ def _map_expression_to_reaction(model_cobra, gene_expression_file, recon_algorit
     test_counter = 0
     for rxn in model_cobra.reactions:
         test_counter += 1
-        gene_reaction_rule = correct_bracket(rxn.gene_reaction_rule, rxn.gene_name_reaction_rule)
+        gene_reaction_rule = _correct_bracket(rxn.gene_reaction_rule, rxn.gene_name_reaction_rule)
         gene_ids = re.findall(r"\d+", gene_reaction_rule)
         expression_rxns[rxn.id] = unknown_val
         if gene_reaction_rule.strip() == "":
@@ -389,7 +389,7 @@ def _map_expression_to_reaction(model_cobra, gene_expression_file, recon_algorit
             gene_reaction_rule = " " + gene_reaction_rule + " "  # pad white space to prevent gene matches inside floats
             gene_reaction_rule = gene_reaction_rule.replace(" {} ".format(gid), rep_val, 1)
         try:
-            gene_reaction_by_rule = gene_rule_evaluable(gene_reaction_rule)
+            gene_reaction_by_rule = _gene_rule_evaluable(gene_reaction_rule)
             gene_reaction_by_rule = gene_reaction_by_rule.strip()
             expression_rxns[rxn.id] = eval(gene_reaction_by_rule)
 
@@ -441,13 +441,13 @@ def _build_model(
         force_rxns.append(objective)
 
     # set boundaries
-    model, bound_rm_rxns = set_boundaries(model, bound_rxns, bound_lb, bound_ub)
+    model, bound_rm_rxns = _set_boundaries(model, bound_rxns, bound_lb, bound_ub)
 
     # set solver
     model.solver = solver.lower()
 
     # check number of unsolvable reactions for reference model under media assumptions
-    # incon_rxns, cobra_model = feasibility_test(cobra_model, "before_seeding")
+    # incon_rxns, cobra_model = _feasibility_test(cobra_model, "before_seeding")
     incon_rxns = []
 
     s_matrix = cobra.util.array.create_stoichiometric_matrix(model, array_type="dense")
@@ -460,7 +460,9 @@ def _build_model(
         rx_names.append(reaction.id)
 
     # get expressed reactions
-    expression_rxns, expr_vector = map_expression_to_rxn(model, gene_expression_file, recon_algorithm, high_thresh=high_thresh, low_thresh=low_thresh)
+    expression_rxns, expr_vector = _map_expression_to_reaction(
+        model, gene_expression_file, recon_algorithm, high_thresh=high_thresh, low_thresh=low_thresh
+    )
 
     # find reactions in the force reactions file that are not in general model and warn user
     for rxn in force_rxns:
@@ -497,13 +499,13 @@ def _build_model(
 
     # switch case dictionary runs the functions making it too slow, better solution then elif ladder?
     if recon_algorithm == "GIMME":
-        context_model_cobra = seed_gimme(model, s_matrix, lb, ub, idx_obj, expr_vector)
+        context_model_cobra = _seed_gimme(model, s_matrix, lb, ub, idx_obj, expr_vector)
     elif recon_algorithm == "FASTCORE":
-        context_model_cobra = seed_fastcore(model, s_matrix, lb, ub, exp_idx_list, solver)
+        context_model_cobra = _seed_fastcore(model, s_matrix, lb, ub, exp_idx_list, solver)
     elif recon_algorithm == "IMAT":
         flux_df: pd.DataFrame
         context_model_cobra: cobra.Model
-        context_model_cobra, flux_df = seed_imat(
+        context_model_cobra, flux_df = _seed_imat(
             model,
             s_matrix,
             lb,
@@ -520,12 +522,12 @@ def _build_model(
         flux_df.to_csv(config.data_dir / "results" / context_name / f"{recon_algorithm}_flux.csv")
 
     elif recon_algorithm == "TINIT":
-        context_model_cobra = seed_tinit(model, s_matrix, lb, ub, expr_vector, solver, idx_force)
+        context_model_cobra = _seed_tinit(model, s_matrix, lb, ub, expr_vector, solver, idx_force)
     else:
         raise ValueError(f"Unsupported reconstruction algorithm: {recon_algorithm}. Must be 'IMAT', 'GIMME', or 'FASTCORE'")
 
     # check number of unsolvable reactions for seeded model under media assumptions
-    # incon_rxns_cs, context_model_cobra = feasibility_test(context_model_cobra, "after_seeding")
+    # incon_rxns_cs, context_model_cobra = _feasibility_test(context_model_cobra, "after_seeding")
     incon_rxns_cs = []
 
     # if recon_algorithm in ["IMAT"]:
