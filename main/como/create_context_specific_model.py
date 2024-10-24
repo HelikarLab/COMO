@@ -227,15 +227,15 @@ def _set_boundaries(model: cobra.Model, bound_rxns: list, bound_lb, bound_ub) ->
             getattr(model.reactions, rxn).upper_bounds = bound_ub[i] if rxn in bound_rxns else 0
 
     # Reaction media
-    medium = model_cobra.medium  # get reaction media to modify
+    medium = model.medium  # get reaction media to modify
     for rxn in exchange_rxns:  # open exchanges from exchange file, close unspecified exchanges
         if rxn not in bound_rxns:
             medium[rxn] = 0.0
         else:
             medium[rxn] = -float(bound_lb[bound_rxns.index(rxn)])
-    model_cobra.medium = medium  # set new media
+    model.medium = medium  # set new media
 
-    return model_cobra, bound_rm_rxns
+    return model, bound_rm_rxns
 
 
 def _feasibility_test(model_cobra: cobra.Model, step: str):
