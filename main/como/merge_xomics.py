@@ -623,7 +623,7 @@ def merge_xomics(
     )
 
 
-def _parse_args():
+def _parse_args() -> _Arguments:
     """
     Merge expression tables of multiple sources, (RNA-seq, proteomics) into one list
     User can specify the number of sources with an active gene in order for it to be considered active in the model.
