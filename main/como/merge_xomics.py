@@ -798,27 +798,11 @@ def _parse_args() -> _Arguments:
 
 if __name__ == "__main__":
     args = _parse_args()
-
-    proteomics_file = args.proteomics_file
-    trnaseq_file = args.trnaseq_file
-    mrnaseq_file = args.mrnaseq_file
-    scrnaseq_file = args.scrnaseq_file
-    expression_requirement = args.expression_requirement
-    adjust_method = args.adjust_method.lower()
-    custom_file = args.custom_file
-    no_hc = args.no_hc
-    no_na = args.no_na
-    merge_distro = args.merge_distro
-    keep_gene_score = args.keep_gene_score
-    tweight = args.tweight
-    mweight = args.mweight
-    sweight = args.sweight
-    pweight = args.pweight
     config = Config()
 
     # read custom expression requirment file if used
-    if custom_file != "SKIP":
-        custom_filepath = config.data_dir / custom_file
+    if args.custom_expression_filename:
+        custom_filepath = config.data_dir / args.custom_expression_filename
         custom_df = pd.read_excel(custom_filepath, sheet_name=0)
         custom_df.columns = ["context", "req"]
     else:
@@ -827,42 +811,28 @@ if __name__ == "__main__":
     def_exp_req = sum(
         test is None
         for test in [
-            trnaseq_file,
-            mrnaseq_file,
-            scrnaseq_file,
-            proteomics_file,
+            args.trnaseq_filename,
+            args.mrnaseq_filename,
+            args.scrnaseq_filename,
+            args.proteomics_filename,
         ]
     )
 
-    if expression_requirement.lower() == "default":
-        expression_requirement = def_exp_req
-
-    else:
-        try:
-            expression_requirement = int(expression_requirement)
-            if expression_requirement < 1:
-                raise ValueError("Expression requirement must be at least 1!")
-        except ValueError as e:
-            raise ValueError("Expression requirement must be able to be converted to an integer!") from e
-
-    if adjust_method not in ["progressive", "regressive", "flat", "custom"]:
-        raise ValueError("Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'")
-
     merge_xomics(
-        trnaseq_file=trnaseq_file,
-        mrnaseq_file=mrnaseq_file,
-        scrnaseq_file=scrnaseq_file,
-        proteomics_file=proteomics_file,
-        tweight=tweight,
-        mweight=mweight,
-        sweight=sweight,
-        pweight=pweight,
-        expression_requirement=expression_requirement,
-        adjust_method=adjust_method,
-        no_hc=no_hc,
-        no_na=no_na,
-        merge_distro=merge_distro,
-        keep_gene_score=keep_gene_score,
+        trnaseq_filepath=args.trnaseq_filename,
+        mrnaseq_filepath=args.mrnaseq_filename,
+        scrnaseq_filepath=args.scrnaseq_filename,
+        proteomics_filepath=args.proteomics_filename,
+        trna_weight=args.trna_weight,
+        mrna_weight=args.mrna_weight,
+        scrna_weight=args.scrna_weight,
+        proteomics_weight=args.proteomics_weight,
+        expression_requirement=args.expression_requirement,
+        adjust_method=args.adjustment_method,
+        no_high_confidence=args.no_high_confidence,
+        no_na=args.no_na,
+        merge_zfpkm_distribution=args.merge_zfpkm_distribution,
+        keep_transcriptomics_score=args.keep_transcriptomics_scores,
     )
 
     logger.success("Finished merging!")
