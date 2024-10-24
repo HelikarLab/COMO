@@ -34,10 +34,24 @@ class _FilteringOptions(NamedTuple):
 
 
 class FilteringTechnique(Enum):
-    CPM = "cpm"
-    ZFPKM = "zfpkm"
-    TPM = "quantile"
-    UMI = "umi"
+    cpm = "cpm"
+    zfpkm = "zfpkm"
+    tpm = "quantile"
+    umi = "umi"
+
+    @staticmethod
+    def from_string(value: str) -> "FilteringTechnique":
+        match value.lower():
+            case "cpm":
+                return FilteringTechnique.cpm
+            case "zfpkm":
+                return FilteringTechnique.zfpkm
+            case "tpm":
+                return FilteringTechnique.tpm
+            case "umi":
+                return FilteringTechnique.umi
+            case _:
+                raise ValueError(f"Filtering technique must be one of {FilteringTechnique}; got: {value}")
 
 
 @dataclass
