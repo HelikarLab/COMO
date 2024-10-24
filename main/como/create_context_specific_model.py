@@ -680,22 +680,21 @@ def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
     if solver not in Solver:
         print(f"Solver {solver} not supported. Please use 'GLPK' or 'GUROBI'")
 
-    print(f"Creating '{context_name}' model using '{algorithm}' reconstruction and '{solver}' solver")
-    context_model, core_list, infeas_df = _create_context_specific_model(
-        reference_model,
-        genes_file,
-        algorithm.value,
-        objective,
-        exclude_rxns,
-        force_rxns,
-        boundary_rxns,
-        boundary_rxns_lower,
-        boundary_rxns_upper,
-        solver.value,
-        context_name,
-        low_threshold,
-        high_threshold,
     logger.info(f"Creating '{context_name}' model using '{algorithm.value}' reconstruction and '{solver.value}' solver")
+    build_results: BuildResults = _build_model(
+        context_name=context_name,
+        general_model_file=reference_model,
+        gene_expression_file=genes_file,
+        recon_algorithm=algorithm.value,
+        objective=objective,
+        bound_rxns=boundary_reactions.reactions,
+        bound_lb=boundary_reactions.lower_bounds,
+        bound_ub=boundary_reactions.upper_bounds,
+        exclude_rxns=exclude_rxns,
+        force_rxns=force_rxns,
+        solver=solver.value,
+        low_thresh=low_threshold,
+        high_thresh=high_threshold,
     )
 
     infeas_df.to_csv(
