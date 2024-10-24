@@ -124,37 +124,32 @@ def _correct_bracket(rule: str, name: str) -> str:
     """
     Correct GPR rules to format readable by
     """
-    rmatch = re.search(r"or|and", rule)
-    nmatch = re.search(r"or|and", name)
-    if rmatch is None or nmatch is None:
-        lrule = rule
-        lname = name.strip()
-        rrule = ""
-        rname = ""
+    rule_match = re.search(r"or|and", rule)
+    name_match = re.search(r"or|and", name)
+    if rule_match is None or name_match is None:
+        left_rule = rule
+        left_name = name.strip()
+        right_rule = ""
+        right_name = ""
         operator = ""
     else:
-        lrule = rule[0 : rmatch.span()[0]]
-        lname = name[0 : nmatch.span()[0]].strip()
-        rrule = rule[rmatch.span()[1] :]
-        rname = name[nmatch.span()[1] :]
-        operator = rmatch.group()
+        left_rule = rule[: rule_match.span()[0]]
+        left_name = name[: name_match.span()[0]].strip()
+        right_rule = rule[rule_match.span()[1] :]
+        right_name = name[name_match.span()[1] :]
+        operator = rule_match.group()
 
-    rlist_new = []
-    for ch in list(lrule):
-        if ch.isspace() or ch.isdigit():  # re.match(r'\w+', ch)
-            rlist_new.append(ch)
-        elif len(lname) > 0:
-            if ch == lname[0]:
-                rlist_new.append(ch)
-                lname = lname[1:]
-    rule_left = "".join(rlist_new)
-
-    if rmatch is None:
-        rule_right = ""
-    else:
-        rule_right = correct_bracket(rrule, rname)
-
-    return " ".join([rule_left, operator, rule_right])
+    new_right_rule = []
+    for char in list(left_rule):
+        if char.isspace() or char.isdigit():
+            new_right_rule.append(char)
+        elif len(left_name) > 0:
+            if char == left_name[0]:
+                new_right_rule.append(char)
+                left_name = left_name[1:]
+    new_left_rule = "".join(new_right_rule)
+    final_right_rule = "" if rule_match is None else _correct_bracket(right_rule, right_name)
+    return " ".join([new_left_rule, operator, final_right_rule])
 
 
 def gene_rule_logical(expression_in: str, level: int = 0) -> str:
