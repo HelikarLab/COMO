@@ -193,7 +193,7 @@ def _gene_rule_evaluable(expression_in: str) -> str:
     """
     Make expression rule evaluable
     """
-    gene_reaction_by_rule = gene_rule_logical(expression_in)
+    gene_reaction_by_rule = _gene_rule_logical(expression_in)
     gene_reaction_by_rule = gene_reaction_by_rule.replace("{", "(")
     gene_reaction_by_rule = gene_reaction_by_rule.replace("}", ")")
 
