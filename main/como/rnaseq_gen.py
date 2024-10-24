@@ -1,9 +1,15 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, Path(__file__).parent.parent.as_posix())
+
+
 import argparse
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+from loguru import logger
 
 from como import Config
 from como.rnaseq import FilteringTechnique, save_rnaseq_tests
