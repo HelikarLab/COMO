@@ -4,6 +4,7 @@ from pathlib import Path
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 
 import argparse
+import contextlib
 import re
 from dataclasses import dataclass, field
 from typing import Literal, Optional, Union
@@ -32,7 +33,7 @@ class _Arguments:
             self.gene_format: Input = Input.ENSEMBL_GENE_ID
         elif self.gene_format.upper() in ["HGNC SYMBOL", "HUGO", "HUGO SYMBOL", "SYMBOL", "HGNC", "GENE SYMBOL"]:
             self.gene_format: Input = Input.GENE_SYMBOL
-        elif self.gene_format.upper() in ["ENTREZ", "ENTRES", "ENTREZ ID", "ENTREZ NUMBER" "GENE ID"]:
+        elif self.gene_format.upper() in ["ENTREZ", "ENTRES", "ENTREZ ID", "ENTREZ NUMBER", "GENE ID"]:
             self.gene_format: Input = Input.GENE_ID
         else:  # provided invalid gene format
             raise ValueError(f"Gene format (--gene_format) is invalid; accepts 'Ensembl', 'Entrez', and 'HGNC symbol'; provided: {self.gene_format}")
@@ -46,11 +47,9 @@ class _Arguments:
             else:
                 raise ValueError(f"Taxon id (--taxon-id) is invalid; accepts 'human', 'mouse', or an integer value; provided: {self.taxon_id}")
         else:
-            try:
+            with contextlib.suppress(ValueError):
                 # If taxon id can't be found in the Taxon Enum, do nothing
                 self.taxon_id = Taxon.from_int(int(self.taxon_id))
-            except ValueError:
-                pass
 
 
 @dataclass
