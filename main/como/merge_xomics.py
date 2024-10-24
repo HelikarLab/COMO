@@ -639,11 +639,11 @@ def _parse_args() -> _Arguments:
 
     parser.add_argument(
         "-d",
-        "--merge-distribution",
+        "--merge-zfpkm-distribution",
         action="store_true",
         required=False,
         default=False,
-        dest="merge_distro",
+        dest="merge_zfpkm_distribution",
         help="Flag to merge zFPKM distributions. Required if using iMAT reconstruction algorithm in "
         "create_context_specific_model.py. Must have run rnaseq_gen.py with 'zFPKM' as "
         "'--technique'. If --proteomics-config-file is given will merge proteomics distributions "
@@ -652,11 +652,11 @@ def _parse_args() -> _Arguments:
 
     parser.add_argument(
         "-k",
-        "--keep-gene-scores",
+        "--keep-transcriptomics-scores",
         action="store_true",
         required=False,
         default=True,
-        dest="keep_gene_score",
+        dest="keep_transcriptomics_scores",
         help="When merging z-score distributions of expression, if using both protein abundance and transcipt zFPKM "
         "flag true if you wish to keep z-score of genes with no protein data, flag false if you wish to discard "
         "and treat as no expression",
@@ -668,7 +668,7 @@ def _parse_args() -> _Arguments:
         type=str,
         required=False,
         default=None,
-        dest="trnaseq_file",
+        dest="trnaseq_filename",
         help="Name of total RNA-seq config .xlsx file in the /main/data/config_files/.",
     )
 
@@ -678,7 +678,7 @@ def _parse_args() -> _Arguments:
         type=str,
         required=False,
         default=None,
-        dest="mrnaseq_file",
+        dest="mrnaseq_filename",
         help="Name of mRNA-seq config .xlsx file in the /main/data/config_files/.",
     )
 
@@ -688,7 +688,7 @@ def _parse_args() -> _Arguments:
         type=str,
         required=False,
         default=None,
-        dest="scrnaseq_file",
+        dest="scrnaseq_filename",
         help="Name of RNA-seq config .xlsx file in the /main/data/config_files/.",
     )
 
@@ -698,7 +698,7 @@ def _parse_args() -> _Arguments:
         type=str,
         required=False,
         default=None,
-        dest="proteomics_file",
+        dest="proteomics_filename",
         help="Name of proteomics config .xlsx file in the /main/data/config_files/.",
     )
 
@@ -718,7 +718,7 @@ def _parse_args() -> _Arguments:
         type=str,
         required=False,
         default="flat",
-        dest="adjust_method",
+        dest="adjustment_method",
         help="Technique to adjust expression requirement based on differences in number of provided " "data source types.",
     )
 
@@ -726,18 +726,18 @@ def _parse_args() -> _Arguments:
         "-c",
         "--custom-requirement-file",
         required="custom" in sys.argv,  # required if --requriement-adjust is "custom",
-        dest="custom_file",
-        default="SKIP",
-        help="Name of .xlsx file where first column is context names and second column is expression " "requirement for that context, in /main/data/",
+        dest="custom_expression_filename",
+        default=None,
+        help="Name of .xlsx file where first column is context names and second column is expression requirement for that context, in /main/data/",
     )
 
     parser.add_argument(
-        "-hc",
         "--no-hc",
+        "--no-high-confidence",
         action="store_true",
         required=False,
         default=False,
-        dest="no_hc",
+        dest="no_high_confidence",
         help="Flag to prevent high-confidence genes forcing a gene to be used in final model " "irrespective of other other data sources",
     )
 
@@ -758,7 +758,7 @@ def _parse_args() -> _Arguments:
         required=False,
         default=1,
         type=float,
-        dest="tweight",
+        dest="trna_weight",
         help="Total RNA-seq weight for merging zFPKM distribution",
     )
 
@@ -768,7 +768,7 @@ def _parse_args() -> _Arguments:
         required=False,
         default=1,
         type=float,
-        dest="mweight",
+        dest="mrna_weight",
         help="PolyA enriched (messenger) RNA-seq weight for merging zFPKM distribution",
     )
 
@@ -778,7 +778,7 @@ def _parse_args() -> _Arguments:
         required=False,
         default=1,
         type=float,
-        dest="sweight",
+        dest="scrna_weight",
         help="Single-cell RNA-seq weight for merging zFPKM distribution",
     )
 
@@ -788,10 +788,12 @@ def _parse_args() -> _Arguments:
         required=False,
         default=2,
         type=float,
-        dest="pweight",
+        dest="proteomics_weight",
         help="Proteomics weight for merging z-score distribution",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    args.adjustment_method = AdjustmentMethod.from_string(args.adjustment_method)
+    return _Arguments(**vars(args))
 
 
 if __name__ == "__main__":
