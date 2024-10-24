@@ -608,15 +608,14 @@ def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
     )
 
 
-        print(f"Reading {exclude_rxns_filepath} for exclude reactions")
-        if exclude_rxns_filepath.suffix == ".csv":
-            df = pd.read_csv(exclude_rxns_filepath, header=0)
-        elif exclude_rxns_filepath.suffix == ".xlsx" or exclude_rxns_filepath.suffix == ".xls":
-            df = pd.read_excel(exclude_rxns_filepath, header=0)
-        else:
-            raise ValueError("exclude_rxns_filepath must be a path to a csv or xlsx file with one column.")
+def _write_model_to_disk(model: cobra.Model, output_directory: Path, context_name: str, output_filetypes: list[str], algorithm: Algorithm) -> None:
+    if "mat" in output_filetypes:
+        cobra.io.save_matlab_model(model, output_directory / f"{context_name}_SpecificModel_{algorithm.value}.mat")
+    if "xml" in output_filetypes:
+        cobra.io.write_sbml_model(model, output_directory / f"{context_name}_SpecificModel_{algorithm.value}.xml")
+    if "json" in output_filetypes:
+        cobra.io.save_json_model(model, output_directory / f"{context_name}_SpecificModel_{algorithm.value}.json")
 
-        exclude_rxns = df["Abbreviation"].tolist()
 
     force_rxns = []
     if force_rxns_filepath:
