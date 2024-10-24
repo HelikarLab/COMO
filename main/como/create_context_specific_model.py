@@ -819,176 +819,19 @@ def parse_args():
     return args
 
 
-def main():
-    """
-    Seed a context-specific model from a list of expressed genes, a reference
-    """
-    args = parse_args()
-
-    context_name: str = args.context_name
-    reference_model: Path = Path(args.modelfile)
-    genefile: Path = Path(args.genefile)
-    objective: str = args.objective
-    boundary_rxns_filepath = args.boundary_rxns_filepath
-    exclude_rxns_filepath = args.exclude_rxns_filepath
-    force_rxns_filepath = args.force_rxns_filepath
-    recon_alg = args.algorithm.upper()
-    low_threshold = args.low_threshold
-    high_threshold = args.high_threshold
-    solver = args.solver.upper()
-    output_filetypes = stringlist_to_list(args.output_filetypes)
-
-    if not reference_model.exists():
-        raise FileNotFoundError(f"Reference model not found at {reference_model}")
-
-    if not genefile.exists():
-        raise FileNotFoundError(f"Active genes file not found at {genefile}")
-
-    print(f"Active Genes: {genefile}")
-
-    boundary_rxns = []
-    boundary_rxns_upper: list[float] = []
-    boundary_rxns_lower: list[float] = []
-
-    if boundary_rxns_filepath:
-        boundary_rxns_filepath: Path = Path(boundary_rxns_filepath)
-
-        print(f"Boundary Reactions: {str(boundary_rxns_filepath)}")
-        if boundary_rxns_filepath.suffix == ".csv":
-            df: pd.DataFrame = pd.read_csv(boundary_rxns_filepath, header=0, sep=",")
-        elif boundary_rxns_filepath.suffix in [".xlsx", ".xls"]:
-            df: pd.DataFrame = pd.read_excel(boundary_rxns_filepath, header=0)
-        else:
-            raise FileNotFoundError(f"Boundary reactions file not found! Must be a csv or Excel file. Searching for: {boundary_rxns_filepath}")
-
-        # convert all columns to lowercase
-        df.columns = [column.lower() for column in df.columns]
-
-        # Make sure the columns are named correctly. They should be "Reaction", "Abbreviation", "Compartment", "Minimum Reaction Rate", and "Maximum Reaction Rate"
-        for column in df.columns:
-            if column not in ["reaction", "abbreviation", "compartment", "minimum reaction rate", "maximum reaction rate"]:
-                raise ValueError(
-                    f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', 'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}"
-                )
-
-        reaction_type: list[str] = df["reaction"].tolist()
-        reaction_abbreviation: list[str] = df["abbreviation"].tolist()
-        reaction_compartment: list[str] = df["compartment"].tolist()
-        boundary_rxns_lower = df["minimum reaction rate"].tolist()
-        boundary_rxns_upper = df["maximum reaction rate"].tolist()
-
-        reaction_formula: list[str] = []
-        for i in range(len(reaction_type)):
-            current_type: str = reaction_type[i]
-            temp_reaction: str = ""
-
-            match current_type.lower():
-                case "exchange":
-                    temp_reaction += "EX_"
-                case "demand":
-                    temp_reaction += "DM_"
-                case "sink":
-                    temp_reaction += "SK_"
-
-            shorthand_compartment = Compartments.get(reaction_compartment[i])
-            temp_reaction += f"{reaction_abbreviation[i]}[{shorthand_compartment}]"
-            boundary_rxns.append(temp_reaction)
-            # reaction_formula.append(temp_reaction)
-
-        del df
-
-    exclude_rxns = []
-    if exclude_rxns_filepath:
-        exclude_rxns_filepath: Path = Path(exclude_rxns_filepath)
-        if not exclude_rxns_filepath.exists():
-            raise FileNotFoundError(f"Exclude reactions file not found at {exclude_rxns_filepath}")
-        if exclude_rxns_filepath.suffix not in [".csv", ".xlsx", ".xls"]:
-            raise FileNotFoundError(f"Exclude reactions file not found! Must be a csv or Excel file. Searching for: {exclude_rxns_filepath}")
-
-        print(f"Reading {exclude_rxns_filepath} for exclude reactions")
-        df = pd.DataFrame()
-        if exclude_rxns_filepath.suffix == ".csv":
-            df = pd.read_csv(exclude_rxns_filepath, header=0)
-        elif exclude_rxns_filepath.suffix == ".xlsx" or exclude_rxns_filepath.suffix == ".xls":
-            df = pd.read_excel(exclude_rxns_filepath, header=0)
-        if "Abbreviation" not in df.columns:
-            raise ValueError("Exclude reactions file must have a column called 'Abbreviation'")
-
-        exclude_rxns = df["Abbreviation"].tolist()
-
-    force_rxns = []
-    if force_rxns_filepath:
-        force_rxns_filepath: Path = Path(force_rxns_filepath)
-        if not force_rxns_filepath.exists():
-            raise FileNotFoundError(f"Force reactions file not found at {force_rxns_filepath}")
-        if force_rxns_filepath.suffix not in [".csv", ".xlsx", ".xls"]:
-            raise FileNotFoundError(f"Force reactions file not found! Must be a csv or Excel file. Searching for: {force_rxns_filepath}")
-        print(f"Force Reactions: {force_rxns_filepath}")
-
-        df = pd.DataFrame()
-        if force_rxns_filepath.suffix == ".csv":
-            df = pd.read_csv(force_rxns_filepath, header=0)
-        elif force_rxns_filepath.suffix == ".xlsx" or force_rxns_filepath.suffix == ".xls":
-            df = pd.read_excel(force_rxns_filepath, header=0)
-        if "Abbreviation" not in df.columns:
-            raise ValueError("Force reactions file must have a column called 'Abbreviation'")
-        force_rxns = df["Abbreviation"].tolist()
-
-    config = Config()
-
-    # Assert output types are valid
-    for output_type in output_filetypes:
-        if output_type not in ["xml", "mat", "json"]:
-            raise ValueError("Output file type must be one of: xml, mat, json")
-
-    if recon_alg not in ["FASTCORE", "GIMME", "IMAT"]:
-        raise ValueError("Recon algorithm must be one of: FASTCORE, GIMME, IMAT")
-
-    if solver not in ["GUROBI", "GLPK"]:
-        raise ValueError("Solver must be one of: GUROBI, GLPK")
-
-    print(f"Creating '{context_name}' model using '{recon_alg}' reconstruction and '{solver}' solver")
-    context_model, core_list, infeas_df = _create_context_specific_model(
-        reference_model,
-        genefile,
-        recon_alg,
-        objective,
-        exclude_rxns,
-        force_rxns,
-        boundary_rxns,
-        boundary_rxns_lower,
-        boundary_rxns_upper,
-        solver,
-        context_name,
-        low_threshold,
-        high_threshold,
-    )
-
-    infeas_df.to_csv(
-        config.result_dir / context_name / f"{context_name}_infeasible_rxns.csv",
-        index=False,
-    )
-
-    if recon_alg == "FASTCORE":
-        pd.DataFrame(core_list).to_csv(
-            config.result_dir / context_name / f"{context_name}_core_rxns.csv",
-            index=False,
-        )
-
-    output_directory = config.result_dir / context_name
-    if "mat" in output_filetypes:
-        cobra.io.save_matlab_model(context_model, output_directory / f"{context_name}_SpecificModel_{recon_alg}.mat")
-    if "xml" in output_filetypes:
-        cobra.io.write_sbml_model(context_model, output_directory / f"{context_name}_SpecificModel_{recon_alg}.xml")
-    if "json" in output_filetypes:
-        cobra.io.save_json_model(context_model, output_directory / f"{context_name}_SpecificModel_{recon_alg}.json")
-
-    print("\nModel successfully created!")
-    print(f"Saved output file to {output_directory}")
-    print(f"Number of Genes: {len(context_model.genes):,}")
-    print(f"Number of Metabolites: {len(context_model.metabolites):,}")
-    print(f"Number of Reactions: {len(context_model.reactions):,}")
-
-
 if __name__ == "__main__":
-    main()
+    args = parse_args()
+    create_context_specific_model(
+        context_name=args.context_name,
+        reference_model=args.reference_model,
+        genes_file=args.active_genes_filepath,
+        objective=args.objective,
+        boundary_rxns_filepath=args.boundary_reactions_filepath,
+        exclude_rxns_filepath=args.exclude_reactions_filepath,
+        force_rxns_filepath=args.force_reactions_filepath,
+        algorithm=args.recon_algorithm,
+        low_threshold=args.low_threshold,
+        high_threshold=args.high_threshold,
+        solver=args.solver,
+        output_filetypes=args.output_filetypes,
+    )
