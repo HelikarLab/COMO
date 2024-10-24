@@ -558,15 +558,15 @@ def save_rnaseq_tests(
     config_filepath: Path,
     gene_info_filepath: Path,
     output_filepath: Path,
-    prep: RNASeqPreparationMethod = RNASeqPreparationMethod.TOTAL,
-    replicate_ratio: float = 0.5,
-    batch_ratio: float = 0.5,
-    high_replicate_ratio: float = 0.9,
-    high_batch_ratio: float = 0.9,
-    technique: FilteringTechnique = FilteringTechnique.ZFPKM,
-    quantile: float = 0.9,
-    min_count: int = 10,
-    min_zfpkm: int = -3,
+    prep: RNASeqPreparationMethod,
+    replicate_ratio: float,
+    batch_ratio: float,
+    high_replicate_ratio: float,
+    high_batch_ratio: float,
+    technique: FilteringTechnique,
+    quantile: float,
+    min_count: int,
+    min_zfpkm: int,
 ):
     filtering_options = _FilteringOptions(
         replicate_ratio=replicate_ratio,
@@ -579,7 +579,7 @@ def save_rnaseq_tests(
     )
 
     if prep == RNASeqPreparationMethod.SCRNA:
-        technique = FilteringTechnique.UMI
+        technique = FilteringTechnique.umi
         logger.warning("Single cell filtration does not normalize and assumes gene counts are counted with Unique Molecular Identifiers (UMIs)")
 
     read_counts_results: ReadMatrixResults = read_counts_matrix(
