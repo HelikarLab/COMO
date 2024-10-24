@@ -161,17 +161,15 @@ def _gene_rule_logical(expression_in: str, level: int = 0) -> str:
     except BaseException:
         if "and" in expression_in:
             expression_in = expression_in.replace("and", ",")
-            expression_in = "min{" + expression_in + "}"
+            return "min{" + expression_in + "}"
         elif "or" in expression_in:
             expression_in = expression_in.replace("or", ",")
-            expression_in = "max{" + expression_in + "}"
+            return "max{" + expression_in + "}"
         else:
             expression_in = expression_in.replace("[", "")
-            expression_in = expression_in.replace("]", "")
+            return expression_in.replace("]", "")
 
-        return expression_in
-
-    loc_l = expression_in[0:loc_r].rindex("(")
+    loc_l = expression_in[:loc_r].rindex("(")
     inner_string = expression_in[loc_l : loc_r + 1]
     inner_string = inner_string.replace("(", "[")
     inner_string = inner_string.replace(")", "]")
@@ -624,12 +622,14 @@ def create_context_specific_model(
         # convert all columns to lowercase
         df.columns = [column.lower() for column in df.columns]
 
-        # Make sure the columns are named correctly. They should be "Reaction", "Abbreviation", "Compartment", "Minimum Reaction Rate", and "Maximum Reaction Rate"
-        for column in df.columns:
-            if column not in ["reaction", "abbreviation", "compartment", "minimum reaction rate", "maximum reaction rate"]:
-                raise ValueError(
-                    f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', 'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}"
-                )
+
+def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
+    df = _create_df(path)
+    for column in df.columns:
+        if column not in ["reaction", "abbreviation", "compartment", "minimum reaction rate", "maximum reaction rate"]:
+            raise ValueError(
+                f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', 'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}"
+            )
 
         reaction_type: list[str] = df["reaction"].tolist()
         reaction_abbreviation: list[str] = df["abbreviation"].tolist()
