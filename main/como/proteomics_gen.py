@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from fast_bioservices.biodbnet import BioDBNet, Input, Output, Taxon
+from loguru import logger
 
 from como import rpy2_api
 from como.project import Config
@@ -21,13 +22,13 @@ def load_proteomics_data(datafilename, context_name):
     """
     config = Config()
     data_path = config.data_dir / "data_matrices" / context_name / datafilename
-    print('Data matrix is at "{}"'.format(data_path))
+    logger.info(f"Data Matrix Path: {data_path}")
 
     if data_path.exists():
         proteomics_data = pd.read_csv(data_path, header=0)
 
     else:
-        print("Error: file not found: {}".format(data_path))
+        logger.error(f"Error: file not found: {data_path}")
 
         return None
 
@@ -133,7 +134,7 @@ def to_bool_context(context_name, group_ratio, hi_group_ratio, group_names):
     out_df = pd.merge(merged_df, merged_hi_df, right_index=True, left_index=True)
     out_filepath = output_dir / f"Proteomics_{context_name}.csv"
     out_df.to_csv(out_filepath, index_label="ENTREZ_GENE_ID")
-    print("Test Data Saved to {}".format(out_filepath))
+    logger.success(f"Test Data Saved to {out_filepath}")
 
 
 # read data from csv files
@@ -159,11 +160,11 @@ def load_proteomics_tests(filename, context_name):
     full_save_filepath = config.result_dir / context_name / "proteomics" / filename
     if full_save_filepath.exists():
         data = pd.read_csv(full_save_filepath, index_col="ENTREZ_GENE_ID")
-        print(f"Read from {full_save_filepath}")
+        logger.success(f"Read from {full_save_filepath}")
         return context_name, data
 
     else:
-        print(f"Proteomics gene expression file for {context_name} was not found at {full_save_filepath}. Is this intentional?")
+        logger.warning(f"Proteomics gene expression file for {context_name} was not found at {full_save_filepath}. Is this intentional?")
         return load_empty_dict()
 
 
@@ -179,7 +180,7 @@ def proteomics_gen(
     quantile /= 100
 
     prot_config_filepath = config.data_dir / "config_sheets" / config_file
-    print('Config file is at "{}"'.format(prot_config_filepath))
+    logger.info(f"Config file is at '{prot_config_filepath}'")
 
     xl = pd.ExcelFile(prot_config_filepath)
     sheet_names = xl.sheet_names
