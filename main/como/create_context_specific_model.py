@@ -557,19 +557,19 @@ def _build_model(
     return BuildResults(model=context_model_cobra, expression_index_list=exp_idx_list, infeasible_reactions=infeasible_df)
 
 
-    if boundary_rxns_filepath:
-        boundary_rxns_filepath: Path = Path(boundary_rxns_filepath)
+def _create_df(path: Path) -> pd.DataFrame:
+    match path.suffix:
+        case ".csv":
+            df = pd.read_csv(path, header=0, sep=",")
+        case ".tsv":
+            df = pd.read_csv(path, header=0, sep="\t")
+        case ".xlsx" | ".xls":
+            df = pd.read_excel(path, header=0)
+        case _:
+            raise FileNotFoundError(f"File not found! Must be a csv, tsv, or Excel file. Searching for: {path}")
 
-        print(f"Boundary Reactions: {str(boundary_rxns_filepath)}")
-        if boundary_rxns_filepath.suffix == ".csv":
-            df: pd.DataFrame = pd.read_csv(boundary_rxns_filepath, header=0, sep=",")
-        elif boundary_rxns_filepath.suffix in [".xlsx", ".xls"]:
-            df: pd.DataFrame = pd.read_excel(boundary_rxns_filepath, header=0)
-        else:
-            raise FileNotFoundError(f"Boundary reactions file not found! Must be a csv or Excel file. Searching for: {boundary_rxns_filepath}")
-
-        # convert all columns to lowercase
-        df.columns = [column.lower() for column in df.columns]
+    df.columns = [column.lower() for column in df.columns]
+    return df
 
 
 def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
