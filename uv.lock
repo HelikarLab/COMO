@@ -113,6 +113,7 @@ dependencies = [
     { name = "cobamp" },
     { name = "cobra" },
     { name = "fast-bioservices" },
+    { name = "kaleido" },
     { name = "loguru" },
     { name = "numpy" },
     { name = "openpyxl" },
@@ -129,6 +130,7 @@ requires-dist = [
     { name = "cobamp", specifier = ">=0.2.1" },
     { name = "cobra", specifier = ">=0.28.0" },
     { name = "fast-bioservices", git = "https://github.com/JoshLoecker/fast_bioservices?rev=drop-pandas-version" },
+    { name = "kaleido", specifier = ">=0.2.1" },
     { name = "loguru", specifier = ">=0.7.2" },
     { name = "numpy", specifier = ">=1.21.6" },
     { name = "openpyxl", specifier = ">=3.1.5" },
@@ -339,6 +341,14 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/64/33/60135848598c076ce4b231e1b1895170f45fbcaeaa2c9d5e38b04db70c35/joblib-1.4.2.tar.gz", hash = "sha256:2382c5816b2636fbd20a09e0f4e9dad4736765fdfb7dca582943b9c1366b3f0e", size = 2116621 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/91/29/df4b9b42f2be0b623cbd5e2140cafcaa2bef0759a00b7b70104dcfe2fb51/joblib-1.4.2-py3-none-any.whl", hash = "sha256:06d478d5674cbc267e7496a410ee875abd68e4340feff4490bcb7afb88060ae6", size = 301817 },
+]
+
+[[package]]
+name = "kaleido"
+version = "0.2.1.post1"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/86/4b/d668e288b694661d2fbfc2b972db69cf1f30f8b8a91be14dcf9f000cab16/kaleido-0.2.1.post1-py2.py3-none-manylinux2014_armv7l.whl", hash = "sha256:d313940896c24447fc12c74f60d46ea826195fc991f58569a6e73864d53e5c20", size = 71653137 },
 ]
 
 [[package]]
