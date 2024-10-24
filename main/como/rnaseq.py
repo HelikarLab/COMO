@@ -405,13 +405,10 @@ def cpm_filter(*, context_name: str, metrics: NamedMetrics, filtering_options: _
         output_filepath.parent.mkdir(parents=True, exist_ok=True)
         counts_per_million: pd.DataFrame = (counts / library_size) * 1_000_000
         counts_per_million.insert(0, "entrez_gene_ids", pd.Series(entrez_ids))
-        print("Starting to write CPM matrix")
+        logger.debug(f"Writing CPM matrix to {output_filepath}")
         counts_per_million.to_csv(output_filepath, index=False)
 
         # TODO: Counts per million is adding ~61,500 columns (equal to the number of genes) for some reason. Most likely due to multiplying by 1_000_000, not exactly sure why
-
-        print(counts.head())
-        print(counts_per_million.head())
 
         min_samples = round(n_exp * len(counts.columns))
         top_samples = round(n_top * len(counts.columns))
@@ -419,7 +416,6 @@ def cpm_filter(*, context_name: str, metrics: NamedMetrics, filtering_options: _
         for i in range(len(counts_per_million.columns)):
             cutoff = 10e6 / (np.median(np.sum(counts[:, i]))) if min_count == "default" else 1e6 * min_count / np.median(np.sum(counts[:, i]))
             test_bools = test_bools.merge(counts_per_million[counts_per_million.iloc[:, i] > cutoff])
-        print(test_bools.head())
 
     return metrics
 
@@ -626,19 +622,4 @@ def save_rnaseq_tests(
         if gene in top_df["entrez_gene_id"]:
             boolean_matrix.loc[gene, "high"] = 1
 
-    print(boolean_matrix.head())
-    print(boolean_matrix.max())
-
     # TODO: Write boolean matrix to file
-
-
-if __name__ == "__main__":
-    logger.remove()
-    logger.add(sys.stderr, level="TRACE")
-    save_rnaseq_tests(
-        Path("/home/joshl/projects/COMO/main/data/data_matrices/naiveB/gene_counts_matrix_total_naiveB.csv"),
-        Path("/home/joshl/projects/COMO/main/data/config_sheets/trnaseq_data_inputs_auto.xlsx"),
-        Path("/home/joshl/projects/COMO/main/data/gene_info.csv"),
-        "naiveB",
-        technique=FilteringTechnique.ZFPKM,
-    )
