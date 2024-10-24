@@ -223,12 +223,8 @@ def _set_boundaries(model: cobra.Model, bound_rxns: list, bound_lb, bound_ub) ->
                 getattr(model.reactions, rxn).upper_bounds = bound_ub[i]
 
         for i, rxn in enumerate(demand_rxns):
-            if rxn not in bound_rxns:  # demand is one way - outside the system
-                getattr(model_cobra.reactions, rxn).lower_bound = 0
-                getattr(model_cobra.reactions, rxn).upper_bound = 1000
-            else:
-                getattr(model_cobra.reactions, rxn).lower_bound = 0
-                getattr(model_cobra.reactions, rxn).upper_bound = bound_ub[i]
+            getattr(model.reactions, rxn).lower_bounds = 0
+            getattr(model.reactions, rxn).upper_bounds = bound_ub[i] if rxn in bound_rxns else 0
 
     # Reaction media
     medium = model_cobra.medium  # get reaction media to modify
