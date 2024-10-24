@@ -540,13 +540,13 @@ def filter_counts(
     prep: RNASeqPreparationMethod,
 ) -> NamedMetrics:
     match technique:
-        case FilteringTechnique.CPM:
+        case FilteringTechnique.cpm:
             return cpm_filter(context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep)
-        case FilteringTechnique.TPM:
+        case FilteringTechnique.tpm:
             return TPM_quantile_filter(context_name=context_name, metrics=metrics, filtering_options=filtering_options)
-        case FilteringTechnique.ZFPKM:
+        case FilteringTechnique.zfpkm:
             return zfpkm_filter(context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep)
-        case FilteringTechnique.UMI:
+        case FilteringTechnique.umi:
             return umi_filter(context_name=context_name, metrics=metrics, filtering_options=filtering_options)
         case _:
             raise ValueError(f"Technique must be one of {FilteringTechnique}")
