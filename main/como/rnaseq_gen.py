@@ -68,10 +68,10 @@ def _handle_context_batch(
     xl = pd.ExcelFile(config_filepath)
     sheet_names = xl.sheet_names
 
-    print(f"Reading config file: {config_filepath}")
+    logger.info(f"Reading config file: {config_filepath}")
 
     for context_name in sheet_names:
-        print(f"\nStarting '{context_name}'")
+        logger.debug(f"Starting '{context_name}'")
 
         rnaseq_input_filepath = config.data_dir / "data_matrices" / context_name / f"gene_counts_matrix_{prep}_{context_name}.csv"
         if not rnaseq_input_filepath.exists():
@@ -82,8 +82,8 @@ def _handle_context_batch(
         rnaseq_output_filepath = config.result_dir / context_name / prep / f"rnaseq_{prep}_{context_name}.csv"
         rnaseq_output_filepath.parent.mkdir(parents=True, exist_ok=True)
 
-        print(f"Gene info:\t\t{gene_info_filepath}")
-        print(f"Count matrix:\t\t{rnaseq_input_filepath}")
+        logger.info(f"Gene info saved at: {gene_info_filepath}")
+        logger.info(f"Output file saved at: {rnaseq_output_filepath}")
 
         save_rnaseq_tests(
             context_name=context_name,
@@ -101,8 +101,7 @@ def _handle_context_batch(
             min_count=min_count,
             min_zfpkm=min_zfpkm,
         )
-
-        print(f"Results saved at:\t{rnaseq_output_filepath}")
+        logger.success(f"Results saved at '{rnaseq_output_filepath}'")
 
 
 def rnaseq_gen(
