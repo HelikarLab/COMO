@@ -28,15 +28,18 @@ class RNASeqGen:
 
     def __post_init__(self):
         self.library_prep = self.library_prep.replace(" ", "")
-        if self.filtering_technique not in [t.value for t in FilteringTechnique]:
-            raise ValueError("filtering_technique must be either 'zfpkm', 'cpm', or 'tpm'")
+
+        if str(self.filtering_technique).lower() in [t.value for t in FilteringTechnique]:
+            self.filtering_technique = FilteringTechnique.from_string(str(self.filtering_technique).lower())
+        else:
+            raise ValueError(f"filtering_technique must be either 'zfpkm', 'cpm', or 'tpm'; got: {self.filtering_technique}")
 
         if self.minimum_cutoff is None:
-            if self.filtering_technique == FilteringTechnique.TPM:
+            if self.filtering_technique == FilteringTechnique.tpm:
                 self.minimum_cutoff = 25
-            elif self.filtering_technique == FilteringTechnique.CPM:
+            elif self.filtering_technique == FilteringTechnique.cpm:
                 self.minimum_cutoff = "default"
-            elif self.filtering_technique == FilteringTechnique.ZFPKM:
+            elif self.filtering_technique == FilteringTechnique.zfpkm:
                 self.minimum_cutoff = -3
 
 
@@ -46,7 +49,7 @@ def _handle_context_batch(
     batch_ratio,
     replicate_ratio_high,
     batch_ratio_high,
-    technique,
+    technique: FilteringTechnique,
     quantile,
     min_count,
     min_zfpkm,
