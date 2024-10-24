@@ -4,7 +4,6 @@ from pathlib import Path
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 
 import argparse
-import contextlib
 import re
 from dataclasses import dataclass, field
 from typing import Literal, Optional, Union
@@ -24,32 +23,6 @@ class _Arguments:
     taxon_id: Taxon | int | str
     mode: Literal["create", "provide"]
     provided_matrix_fname: str = None
-
-    def __post_init__(self):
-        if self.mode == "provide" and self.provided_matrix_fname is None:
-            raise ValueError("If provide_matrix is True, then provided_matrix_fname must be provided")
-
-        if self.gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
-            self.gene_format: Input = Input.ENSEMBL_GENE_ID
-        elif self.gene_format.upper() in ["HGNC SYMBOL", "HUGO", "HUGO SYMBOL", "SYMBOL", "HGNC", "GENE SYMBOL"]:
-            self.gene_format: Input = Input.GENE_SYMBOL
-        elif self.gene_format.upper() in ["ENTREZ", "ENTRES", "ENTREZ ID", "ENTREZ NUMBER", "GENE ID"]:
-            self.gene_format: Input = Input.GENE_ID
-        else:  # provided invalid gene format
-            raise ValueError(f"Gene format (--gene_format) is invalid; accepts 'Ensembl', 'Entrez', and 'HGNC symbol'; provided: {self.gene_format}")
-
-        # handle species alternative ids
-        if isinstance(self.taxon_id, str) and not self.taxon_id.isdigit():
-            if self.taxon_id.upper() in ["HUMAN", "HOMO SAPIENS"]:
-                self.taxon_id = Taxon.HOMO_SAPIENS
-            elif self.taxon_id.upper() in ["MOUSE", "MUS MUSCULUS"]:
-                self.taxon_id = Taxon.MUS_MUSCULUS
-            else:
-                raise ValueError(f"Taxon id (--taxon-id) is invalid; accepts 'human', 'mouse', or an integer value; provided: {self.taxon_id}")
-        else:
-            with contextlib.suppress(ValueError):
-                # If taxon id can't be found in the Taxon Enum, do nothing
-                self.taxon_id = Taxon.from_int(int(self.taxon_id))
 
 
 @dataclass
@@ -148,8 +121,8 @@ def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
     root_gene_count_dir = Path(data_dir, "geneCounts")
     root_strandedness_dir = Path(data_dir, "strandedness")
 
-    gene_counts_directories: list[Path] = sorted(list(Path(root_gene_count_dir).glob("*")))
-    strandedness_directories: list[Path] = sorted(list(Path(root_strandedness_dir).glob("*")))
+    gene_counts_directories: list[Path] = sorted([p for p in Path(root_gene_count_dir).glob("*") if not p.name.startswith(".")])
+    strandedness_directories: list[Path] = sorted([p for p in Path(root_strandedness_dir).glob("*") if not p.name.startswith(".")])
 
     if len(gene_counts_directories) != len(strandedness_directories):
         raise ValueError(
@@ -271,8 +244,8 @@ def _create_context_counts_matrix(data_dir: Path, output_dir: Path):
 
     output_filename = output_dir / f"gene_counts_matrix_full_{data_dir.stem}.csv"
     output_filename.parent.mkdir(parents=True, exist_ok=True)
-    logger.info(f"Writing context '{data_dir.stem}' gene count matrix: {output_filename}")
     final_matrix.to_csv(output_filename, index=False)
+    logger.success(f"Wrote gene count matrix for '{data_dir.stem}' at '{output_filename}'")
 
 
 def _create_counts_matrix(context_name: str, config: Config):
@@ -336,7 +309,7 @@ def _create_config_df(context_name: str) -> pd.DataFrame:
                     frag_files.append(config.data_dir / "COMO_input" / context_name / "fragmentSizes" / study_number / frag_filename)
 
         context_path = config.data_dir / "COMO_input" / context_name
-        layout_files = list(Path(context_path, "layouts").rglob(f"{context_name}_{label}_layou.txt"))
+        layout_files = list(Path(context_path, "layouts").rglob(f"{context_name}_{label}_layout.txt"))
         strand_files = list(Path(context_path, "strandedness").rglob(f"{context_name}_{label}_strandedness.txt"))
         frag_files = list(Path(context_path, "fragmentSizes").rglob(f"{context_name}_{label}_fragment_size.txt"))
         prep_files = list(Path(context_path, "prepMethods").rglob(f"{context_name}_{label}_prep_method.txt"))
@@ -481,7 +454,7 @@ def _create_gene_info_file(matrix_file_list: list[str], input_format: Input, tax
     gene_info.rename(columns={"Gene Symbol": "hgnc_symbol", "Gene ID": "entrez_gene_id"}, inplace=True)
     gene_info.drop(["Chromosomal Location"], axis=1, inplace=True)
     gene_info.to_csv(gene_info_file, index=False)
-    logger.info(f"Gene Info file written at '{gene_info_file}'")
+    logger.success(f"Gene Info file written at '{gene_info_file}'")
 
 
 def _handle_context_batch(
@@ -501,7 +474,7 @@ def _handle_context_batch(
     tflag = False  # turn on when any total set is found to prevent writer from being init multiple times or empty
     mflag = False  # turn on when any mrna set is found to prevent writer from being init multiple times or empty
 
-    logger.info(f"Found {len(context_names)} contexts to process: {', '.join(context_names)}")
+    logger.success(f"Found {len(context_names)} contexts to process: {', '.join(context_names)}")
 
     tmatrix_files = []
     mmatrix_files = []
@@ -666,8 +639,38 @@ def _parse_args():
 
     parsed = parser.parse_args()
     parsed.context_names = stringlist_to_list(parsed.context_names)
-    args = _Arguments(**vars(parsed))
 
+    if parsed.mode == "provide" and parsed.provided_matrix_fname is None:
+        raise ValueError("If provide_matrix is True, then provided_matrix_fname must be provided")
+
+    match str(parsed.gene_format).upper():
+        case "ENSEMBL" | "ENSEMBLE" | "ENSG" | "ENSMUSG" | "ENSEMBL ID" | "ENSEMBL GENE ID":
+            parsed.gene_format = Input.ENSEMBL_GENE_ID
+        case "HGNC SYMBOL" | "HUGO" | "HUGO SYMBOL" | "SYMBOL" | "HGNC" | "GENE SYMBOL":
+            parsed.gene_format = Input.GENE_SYMBOL
+        case "ENTREZ" | "ENTRES" | "ENTREZ ID" | "ENTREZ NUMBER" | "GENE ID":
+            parsed.gene_format = Input.GENE_ID
+        case _:
+            raise ValueError(
+                f"Gene format (--gene_format) is invalid; accepts 'Ensembl', 'Entrez', and 'HGNC symbol'; provided: {parsed.gene_format}"
+            )
+
+    # handle species alternative ids
+    taxon_id = str(parsed.taxon_id)
+    if taxon_id.isdigit():
+        try:
+            parsed.taxon_id = Taxon.from_int(int(taxon_id))
+        except ValueError:
+            parsed.taxon_id = int(taxon_id)
+    else:
+        if taxon_id.upper() in {"HUMAN", "HOMO SAPIENS"}:
+            parsed.taxon_id = Taxon.HOMO_SAPIENS
+        elif taxon_id.upper() in {"MOUSE", "MUS MUSCULUS"}:
+            parsed.taxon_id = Taxon.MUS_MUSCULUS
+        else:
+            raise ValueError(f"Taxon id (--taxon-id) is invalid; accepts 'human', 'mouse', or an integer value; provided: {taxon_id}")
+
+    args = _Arguments(**vars(parsed))
     return args
 
 
