@@ -14,6 +14,7 @@ from enum import Enum
 import numpy as np
 import pandas as pd
 from fast_bioservices import BioDBNet, Input, Output
+from loguru import logger
 
 # from como import proteomics_gen
 from como.combine_distributions import combine_zscores_main
@@ -71,11 +72,11 @@ def _load_rnaseq_tests(filename, context_name, lib_type):
     save_filepath = config.result_dir / context_name / lib_type / filename
     if save_filepath.exists():
         data = pd.read_csv(save_filepath, index_col="ENTREZ_GENE_ID")
-        print(f"Read from {save_filepath}")
+        logger.success(f"Read from {save_filepath}")
         return context_name, data
 
     else:
-        print(
+        logger.warning(
             f"{lib_type} gene expression file for {context_name} was not found at {save_filepath}. This may be "
             f"intentional. Contexts where {lib_type} data can be found in /work/data/results/{context_name}/ will "
             "still be used if found for other contexts."
@@ -294,7 +295,7 @@ def _merge_xomics(
     :return: dictionary where keys are contexts, (tissue name, control type etc) and values are expression tables
     """
     config = Config()
-    print(f"Merging data for {context_name}")
+    logger.info(f"Merging data for {context_name}")
     # load data for each source if it exists. IF not load an empty dummy dataset
     trnaseq = _load_rnaseq_tests(filename=trnaseq_file, context_name=context_name, lib_type="total")
     mrnaseq = _load_rnaseq_tests(filename=mrnaseq_file, context_name=context_name, lib_type="mrna")
@@ -399,7 +400,7 @@ def _merge_xomics(
     transcriptomic_details_filepath = filepath.parent / f"TranscriptomicDetails_{context_name}.csv"
     transcriptomic_details.to_csv(transcriptomic_details_filepath, index=False)
 
-    print(f"{context_name}: Save to {filepath}\n")
+    logger.success(f"{context_name}: Save to {filepath}\n")
 
     return files_dict
 
@@ -447,23 +448,14 @@ def _handle_context_batch(
 
     counts = Counter(sheet_names)
     sheet_names = sorted(list(set(sheet_names)))
-    print("The data provided for each context listed will be merged. Data BETWEEN contexts will not be merged, only WITHIN a context")
-    for i in sheet_names:
-        # Print the sheet names in a list, like so
-        # name1, name2, and name3
-        print(i, end="")
-        if counts[i] > 1:
-            print(f" ({counts[i]}x)", end="")
-        print(", ", end="")
-    print("\b\b")
-
+    logger.info("The data provided for each context listed will be merged. Data BETWEEN contexts will not be merged, only WITHIN a context")
     dict_list = {}
 
     max_inputs = max(counts.values())
     min_inputs = min(counts.values())
 
     if merge_distro:
-        print(f"Using {merge_distro} distribution for merging")
+        logger.debug(f"Using {merge_distro} distribution for merging")
         combine_zscores_main(
             working_dir=config.result_dir.as_posix(),
             context_names=sheet_names,
@@ -489,19 +481,21 @@ def _handle_context_batch(
         else:
             exp_req = int(custom_df.iloc[custom_df["context"] == context_name, "req"].iloc[0])
 
-        print(f"Expression requirement of {expression_requirement} adjusted to {exp_req} using {adjust_method} adjustment method for {context_name}.")
+        logger.debug(
+            f"Expression requirement of {expression_requirement} adjusted to {exp_req} using {adjust_method} adjustment method for {context_name}."
+        )
 
         if exp_req > num_sources:
-            print(
-                f"WARNING: Expression requirement for {context_name} was calculated to be greater than max number of input data sources."
+            logger.warning(
+                f"Expression requirement for {context_name} was calculated to be greater than max number of input data sources."
                 f"Will be force changed to {num_sources} to prevent output from having 0 active genes. "
                 f"Consider lowering the expression requirement or changing the adjustment method."
             )
             exp_req = num_sources
 
         if exp_req < 1:  # never allow expression requirement to be less than one
-            print(
-                "WARNING: Expression requirement for {context_name} was calculated to be less than 1. "
+            logger.warning(
+                "Expression requirement for {context_name} was calculated to be less than 1. "
                 "Will be force changed to 1 to prevent output from having 0 active genes. "
             )
             exp_req = 1
@@ -835,4 +829,4 @@ if __name__ == "__main__":
         keep_gene_score=keep_gene_score,
     )
 
-    print("\nDone!")
+    logger.success("Finished merging!")
