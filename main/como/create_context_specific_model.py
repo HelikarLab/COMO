@@ -580,35 +580,33 @@ def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
                 f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', 'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}"
             )
 
-        reaction_type: list[str] = df["reaction"].tolist()
-        reaction_abbreviation: list[str] = df["abbreviation"].tolist()
-        reaction_compartment: list[str] = df["compartment"].tolist()
-        boundary_rxns_lower = df["minimum reaction rate"].tolist()
-        boundary_rxns_upper = df["maximum reaction rate"].tolist()
+    reactions: list[str] = []
+    reaction_type: list[str] = df["reaction"].tolist()
+    reaction_abbreviation: list[str] = df["abbreviation"].tolist()
+    reaction_compartment: list[str] = df["compartment"].tolist()
+    lower_bounds = df["minimum reaction rate"].tolist()
+    upper_bounds = df["maximum reaction rate"].tolist()
+    for i in range(len(reaction_type)):
+        current_type: str = reaction_type[i]
+        temp_reaction: str = ""
 
-        reaction_formula: list[str] = []
-        for i in range(len(reaction_type)):
-            current_type: str = reaction_type[i]
-            temp_reaction: str = ""
+        match current_type.lower():
+            case "exchange":
+                temp_reaction += "EX_"
+            case "demand":
+                temp_reaction += "DM_"
+            case "sink":
+                temp_reaction += "SK_"
 
-            match current_type.lower():
-                case "exchange":
-                    temp_reaction += "EX_"
-                case "demand":
-                    temp_reaction += "DM_"
-                case "sink":
-                    temp_reaction += "SK_"
+        shorthand_compartment = Compartments.get(reaction_compartment[i])
+        temp_reaction += f"{reaction_abbreviation[i]}[{shorthand_compartment}]"
+        reactions.append(temp_reaction)
+    return _BoundaryReactions(
+        reactions=reactions,
+        lower_bounds=lower_bounds,
+        upper_bounds=upper_bounds,
+    )
 
-            shorthand_compartment = Compartments.get(reaction_compartment[i])
-            temp_reaction += f"{reaction_abbreviation[i]}[{shorthand_compartment}]"
-            boundary_rxns.append(temp_reaction)
-            # reaction_formula.append(temp_reaction)
-
-        del df
-
-    exclude_rxns = []
-    if exclude_rxns_filepath:
-        exclude_rxns_filepath: Path = Path(exclude_rxns_filepath)
 
         print(f"Reading {exclude_rxns_filepath} for exclude reactions")
         if exclude_rxns_filepath.suffix == ".csv":
