@@ -110,7 +110,7 @@ def rnaseq_gen(
     batch_ratio: float = 0.5,
     replicate_ratio_high: float = 1.0,
     batch_ratio_high: float = 1.0,
-    technique: FilteringTechnique | str = FilteringTechnique.TPM,
+    technique: FilteringTechnique | str = FilteringTechnique.tpm,
     cut_off: Optional[int] = None,
     prep: Optional[str] = "",
 ) -> None:
@@ -120,20 +120,20 @@ def rnaseq_gen(
     if technique.value not in [t.value for t in FilteringTechnique]:
         raise ValueError(f"Technique must be one of {FilteringTechnique}")
 
-    if technique == FilteringTechnique.TPM:
+    if technique == FilteringTechnique.tpm:
         if cut_off is None:
             cut_off = 25
 
         if cut_off < 1 or cut_off > 100:
             raise ValueError("Quantile must be between 1 - 100")
 
-    elif technique == FilteringTechnique.CPM:
+    elif technique == FilteringTechnique.cpm:
         if cut_off is not None and cut_off < 0:
             raise ValueError("Cutoff must be greater than 0")
 
         if cut_off is None:
             cut_off = "default"
-    elif technique == FilteringTechnique.ZFPKM:
+    elif technique == FilteringTechnique.zfpkm:
         # if cut_off is not None and (cut_off < -3 or cut_off > -2):
         #     raise ValueError("Cutoff must be between -3 and -2")
 
@@ -148,7 +148,7 @@ def rnaseq_gen(
         batch_ratio,
         replicate_ratio_high,
         batch_ratio_high,
-        technique.value,
+        technique,
         cut_off,
         cut_off,
         cut_off,
