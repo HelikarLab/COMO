@@ -152,7 +152,7 @@ def _correct_bracket(rule: str, name: str) -> str:
     return " ".join([new_left_rule, operator, final_right_rule])
 
 
-def gene_rule_logical(expression_in: str, level: int = 0) -> str:
+def _gene_rule_logical(expression_in: str, level: int = 0) -> str:
     """
     creates an expression from GPR rule which can be evaluated as true or false
     """
@@ -191,7 +191,7 @@ def gene_rule_logical(expression_in: str, level: int = 0) -> str:
     return expression_out
 
 
-def gene_rule_evaluable(expression_in: str) -> str:
+def _gene_rule_evaluable(expression_in: str) -> str:
     """
     Make expression rule evaluable
     """
@@ -202,8 +202,8 @@ def gene_rule_evaluable(expression_in: str) -> str:
     return gene_reaction_by_rule
 
 
-def set_boundaries(model_cobra: cobra.Model, bound_rxns: list, bound_lb, bound_ub) -> tuple[cobra.Model, list]:
-    all_rxns = model_cobra.reactions  # get all reactions
+def _set_boundaries(model: cobra.Model, bound_rxns: list, bound_lb, bound_ub) -> tuple[cobra.Model, list]:
+    all_rxns = model.reactions  # get all reactions
     bound_rm_rxns = []
 
     # get boundary reactions
@@ -247,7 +247,7 @@ def set_boundaries(model_cobra: cobra.Model, bound_rxns: list, bound_lb, bound_u
     return model_cobra, bound_rm_rxns
 
 
-def feasibility_test(model_cobra: cobra.Model, step: str):
+def _feasibility_test(model_cobra: cobra.Model, step: str):
     # check number of unsolvable reactions for reference model under media assumptions
     model_cobra_rm = cobra.flux_analysis.fastcc(
         model_cobra, flux_threshold=15, zero_cutoff=1e-7
@@ -280,7 +280,7 @@ def feasibility_test(model_cobra: cobra.Model, step: str):
     return incon_rxns, model_cobra_rm
 
 
-def seed_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
+def _seed_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
     # `Becker and Palsson (2008). Context-specific metabolic networks are
     # consistent with experiments. PLoS Comput. Biol. 4, e1000082.`
     properties = GIMMEProperties(
@@ -306,7 +306,7 @@ def seed_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
     return context_cobra_model
 
 
-def seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
+def _seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
     # 'Vlassis, Pacheco, Sauter (2014). Fast reconstruction of compact
     # context-specific metabolic network models. PLoS Comput. Biol. 10,
     # e1003424.'
@@ -324,7 +324,7 @@ def seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
     return context_cobra_model
 
 
-def seed_imat(cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force, context_name):
+def _seed_imat(cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force, context_name):
     config = Config()
     expr_vector = np.array(expr_vector)
     properties = IMATProperties(exp_vector=expr_vector, exp_thresholds=expr_thesh, core=idx_force, epsilon=0.01)
@@ -354,7 +354,7 @@ def seed_imat(cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force,
     return context_cobra_model, flux_df
 
 
-def seed_tinit(cobra_model: cobra.Model, s_matrix, lb, ub, expr_vector, solver, idx_force) -> Model:
+def _seed_tinit(cobra_model: cobra.Model, s_matrix, lb, ub, expr_vector, solver, idx_force) -> Model:
     expr_vector = np.array(expr_vector)
     properties = tINITProperties(
         reactions_scores=expr_vector,
@@ -370,7 +370,7 @@ def seed_tinit(cobra_model: cobra.Model, s_matrix, lb, ub, expr_vector, solver, 
     return Model()
 
 
-def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm, low_thresh=None, high_thresh=None):
+def _map_expression_to_reaction(model_cobra, gene_expression_file, recon_algorithm, low_thresh=None, high_thresh=None):
     """
     Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules
     which are defined in general genome-scale metabolic model
@@ -419,21 +419,21 @@ def map_expression_to_rxn(model_cobra, gene_expression_file, recon_algorithm, lo
     return expression_rxns, expr_vector
 
 
-def _create_context_specific_model(
-    general_model_file,
-    gene_expression_file,
-    recon_algorithm,
-    objective,
-    exclude_rxns,
-    force_rxns,
-    bound_rxns,
-    bound_lb,
-    bound_ub,
-    solver,
-    context_name,
-    low_thresh,
-    high_thresh,
-):
+def _build_model(
+    context_name: str,
+    general_model_file: Path,
+    gene_expression_file: Path,
+    recon_algorithm: str,
+    objective: str,
+    bound_rxns: list[str],
+    exclude_rxns: list[str],
+    force_rxns: list[str],
+    bound_lb: list[float],
+    bound_ub: list[float],
+    solver: str,
+    low_thresh: float,
+    high_thresh: float,
+) -> BuildResults:
     """
     Seed a context specific model. Core reactions are determined from GPR associations with gene expression logicals.
     Core reactions that do not necessarily meet GPR association requirements can be forced if in the force reaction
