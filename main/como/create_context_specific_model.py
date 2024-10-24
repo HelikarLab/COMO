@@ -554,46 +554,8 @@ def _build_model(
         "ContextInfeasRxns",
     ]
 
-    return context_model_cobra, exp_idx_list, infeasible_df
+    return BuildResults(model=context_model_cobra, expression_index_list=exp_idx_list, infeasible_reactions=infeasible_df)
 
-
-class Algorithm(Enum):
-    GIMME = "GIMME"
-    FASTCORE = "FASTCORE"
-    IMAT = "IMAT"
-    TINIT = "TINIT"
-
-
-class Solver(Enum):
-    GLPK = "GLPK"
-    GUROBI = "GUROBI"
-
-
-def create_context_specific_model(
-    context_name: str,
-    reference_model: Path,
-    genes_file: Path,
-    objective: str = "biomass_reaction",
-    boundary_rxns_filepath: Optional[str] = None,
-    exclude_rxns_filepath: Optional[str] = None,
-    force_rxns_filepath: Optional[str] = None,
-    algorithm: Algorithm = Algorithm.GIMME,
-    low_threshold: float = -5,
-    high_threshold: float = -3,
-    solver: Solver = Solver.GLPK,
-    output_filetypes: list[str] = ["mat"],
-):
-    if not reference_model.exists():
-        raise FileNotFoundError(f"Reference model not found at {reference_model}")
-    if not genes_file.exists():
-        raise FileNotFoundError(f"Active genes file not found at {genes_file}")
-
-    config = Config()
-    print(f"Active Genes: {genes_file}")
-
-    boundary_rxns = []
-    boundary_rxns_upper: list[float] = []
-    boundary_rxns_lower: list[float] = []
 
     if boundary_rxns_filepath:
         boundary_rxns_filepath: Path = Path(boundary_rxns_filepath)
