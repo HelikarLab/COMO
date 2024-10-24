@@ -566,26 +566,26 @@ def _handle_context_batch(
 
 
 def merge_xomics(
-    trnaseq_file: str = None,
-    mrnaseq_file: str = None,
-    scrnaseq_file: str = None,
-    proteomics_file: str = None,
-    tweight: float = 1,
-    mweight: float = 1,
-    sweight: float = 1,
-    pweight: float = 2,
+    trnaseq_filepath: str = None,
+    mrnaseq_filepath: str = None,
+    scrnaseq_filepath: str = None,
+    proteomics_filepath: str = None,
+    trna_weight: float = 1,
+    mrna_weight: float = 1,
+    scrna_weight: float = 1,
+    proteomics_weight: float = 2,
     expression_requirement: int = None,
-    adjust_method: _AdjustMethod = _AdjustMethod.FLAT,
-    no_hc: bool = False,
+    adjust_method: AdjustmentMethod = AdjustmentMethod.FLAT,
+    no_high_confidence: bool = False,
     no_na: bool = False,
-    custom_file: str = None,
-    merge_distro: bool = False,
-    keep_gene_score: bool = True,
+    custom_expression_file: str = None,
+    merge_zfpkm_distribution: bool = False,
+    keep_transcriptomics_score: bool = True,
 ):
     config = Config()
     # read custom expression requirment file if used
-    if custom_file is not None:
-        custom_filepath = config.data_dir / custom_file
+    if custom_expression_file is not None:
+        custom_filepath = config.data_dir / custom_expression_file
         custom_df = pd.read_excel(custom_filepath, sheet_name=0)
         custom_df.columns = ["context", "req"]
     else:
@@ -595,34 +595,31 @@ def merge_xomics(
         expression_requirement = sum(
             test is not None
             for test in [
-                trnaseq_file,
-                mrnaseq_file,
-                scrnaseq_file,
-                proteomics_file,
+                trnaseq_filepath,
+                mrnaseq_filepath,
+                scrnaseq_filepath,
+                proteomics_filepath,
             ]
         )
     elif expression_requirement < 1:
         raise ValueError("Expression requirement must be at least 1!")
 
-    if adjust_method not in _AdjustMethod:
-        raise ValueError("Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'")
-
     _handle_context_batch(
-        trnaseq_file,
-        mrnaseq_file,
-        scrnaseq_file,
-        proteomics_file,
-        tweight,
-        mweight,
-        sweight,
-        pweight,
+        trnaseq_filepath,
+        mrnaseq_filepath,
+        scrnaseq_filepath,
+        proteomics_filepath,
+        trna_weight,
+        mrna_weight,
+        scrna_weight,
+        proteomics_weight,
         expression_requirement,
         adjust_method.value,
-        no_hc,
+        no_high_confidence,
         no_na,
         custom_df,
-        merge_distro,
-        keep_gene_score,
+        merge_zfpkm_distribution,
+        keep_transcriptomics_score,
     )
 
 
