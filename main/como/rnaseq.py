@@ -59,11 +59,11 @@ class _StudyMetrics:
     study: str
     num_samples: int
     count_matrix: pd.DataFrame
-    fragment_lengths: list[int]
+    fragment_lengths: npt.NDArray[np.float32]
     sample_names: list[str]
     layout: list[str]
     entrez_gene_ids: list[str]
-    gene_sizes: list[int]
+    gene_sizes: npt.NDArray[np.float32]
     __normalization_matrix: pd.DataFrame = field(default_factory=pd.DataFrame)
     __z_score_matrix: pd.DataFrame = field(default_factory=pd.DataFrame)
     __high_confidence_entrez_gene_ids: list[str] = field(default=list)
@@ -160,17 +160,17 @@ def read_counts_matrix(
 
     metrics: NamedMetrics = {}
 
-    num_samples: int = len(config_df["sample_name"])
+    num_samples: int = len(config_df["sample_name"].tolist())
     studies: list[str] = config_df["study"].unique().tolist()
     for study in studies:
         metrics[study] = _StudyMetrics(
             count_matrix=pd.DataFrame(index=counts_matrix.index, columns=config_df["sample_name"].unique().tolist()),
-            fragment_lengths=[0] * num_samples,
+            fragment_lengths=np.zeros(num_samples, dtype=int),
             sample_names=[""] * num_samples,
             layout=[""] * num_samples,
             num_samples=num_samples,
             entrez_gene_ids=genes,
-            gene_sizes=gene_info["size"].values.tolist(),
+            gene_sizes=np.array(gene_info["size"].values).astype(np.float32),
             study=study,
         )
 
@@ -182,9 +182,9 @@ def read_counts_matrix(
             logger.warning(f"'{sample_name}' not found in the gene count matrix")
             continue
 
-        fragment_length_value = config_df.at[i, "fragment_length"]
+        fragment_length_value = config_df.at[i, "fragment_length"].astype(np.float32)
         if pd.isna(fragment_length_value):
-            fragment_length_value = 0
+            fragment_length_value = np.float32(0)
 
         # Set metrics[group].count_matrix at column index 'i' equal to counts_matrix at column label 'entry'
 
@@ -231,9 +231,11 @@ def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
         for sample in range(metrics[study].num_samples):
             layout = metrics[study].layout[sample]
 
-            count_matrix = metrics[study].count_matrix.iloc[:, sample]
-
+            count_matrix: npt.NDArray = metrics[study].count_matrix.iloc[:, sample].values
             gene_size = metrics[study].gene_sizes
+
+            count_matrix = count_matrix.astype(np.float32)
+            gene_size = gene_size.astype(np.float32)
 
             if layout == "paired-end":  # Perform FPKM
                 mean_fragment_lengths = metrics[study].fragment_lengths[sample]
