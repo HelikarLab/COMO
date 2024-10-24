@@ -43,6 +43,50 @@ class _HighExpressionHeaderNames:
     SCRNASEQ = f"{_MergedHeaderNames.SCRNASEQ}_high"
 
 
+class AdjustmentMethod(Enum):
+    PROGRESSIVE = "progressive"
+    REGRESSIVE = "regressive"
+    FLAT = "flat"
+    CUSTOM = "custom"
+
+    @classmethod
+    def from_string(cls, value: str) -> "AdjustmentMethod":
+        if value.lower() not in [t.value for t in cls]:
+            raise ValueError(f"Adjustment method must be one of {cls}; got: {value}")
+        return cls(value)
+
+
+@dataclass
+class _Arguments:
+    trnaseq_filename: str
+    mrnaseq_filename: str
+    scrnaseq_filename: str
+    proteomics_filename: str
+    expression_requirement: str | int
+    adjustment_method: AdjustmentMethod
+    no_high_confidence: bool
+    no_na: bool
+    merge_zfpkm_distribution: bool
+    keep_transcriptomics_scores: bool
+    trna_weight: int
+    mrna_weight: int
+    scrna_weight: int
+    proteomics_weight: int
+    custom_expression_filename: str
+
+    def __post_init__(self):
+        if self.expression_requirement.isdigit():
+            self.expression_requirement = int(self.expression_requirement)
+            if self.expression_requirement < 1:
+                logger.warning(f"Expression requirement should be at least 1, setting to 1 now. Got {self.expression_requirement}")
+                self.expression_requirement = 1
+        elif self.expression_requirement != "default":
+            raise ValueError(f"Expression requirement should be an integer or 'default', got {self.expression_requirement}")
+
+        if self.adjustment_method.value.lower() not in ["progressive", "regressive", "flat", "custom"]:
+            raise ValueError("Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'")
+
+
 def _load_rnaseq_tests(filename, context_name, lib_type):
     """
     Load rnaseq results returning a dictionary of test (context, context, cell, etc ) names and rnaseq expression data
@@ -519,13 +563,6 @@ def _handle_context_batch(
         json.dump(dict_list, fp)
 
     return
-
-
-class _AdjustMethod(Enum):
-    PROGRESSIVE = "progressive"
-    REGRESSIVE = "regressive"
-    FLAT = "flat"
-    CUSTOM = "custom"
 
 
 def merge_xomics(
