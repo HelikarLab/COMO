@@ -27,7 +27,100 @@ from como.como_utilities import Compartments, split_gene_expression_data, string
 from como.project import Config
 
 
-def correct_bracket(rule: str, name: str) -> str:
+class Algorithm(Enum):
+    GIMME = "GIMME"
+    FASTCORE = "FASTCORE"
+    IMAT = "IMAT"
+    TINIT = "TINIT"
+
+    @staticmethod
+    def from_string(value: str) -> "Algorithm":
+        match value.lower():
+            case "gimme":
+                return Algorithm.GIMME
+            case "fastcore":
+                return Algorithm.FASTCORE
+            case "imat":
+                return Algorithm.IMAT
+            case "tinit":
+                return Algorithm.TINIT
+            case _:
+                raise ValueError(f"Unknown solver: {value}")
+
+
+class Solver(Enum):
+    GLPK = "GLPK"
+    GUROBI = "GUROBI"
+    SCIPY = "SCIPY"
+    GLPK_EXACT = "GLPK_EXACT"
+
+    @staticmethod
+    def from_string(value: str) -> "Solver":
+        match value.lower():
+            case "glpk":
+                return Solver.GLPK
+            case "gurobi":
+                return Solver.GUROBI
+            case "scipy":
+                return Solver.SCIPY
+            case "glpk_exact":
+                return Solver.GLPK_EXACT
+            case _:
+                raise ValueError(f"Unknown solver: {value}")
+
+
+class _BoundaryReactions(NamedTuple):
+    reactions: list[str]
+    lower_bounds: list[float]
+    upper_bounds: list[float]
+
+
+class BuildResults(NamedTuple):
+    model: cobra.Model
+    expression_index_list: list[int]
+    infeasible_reactions: pd.DataFrame
+
+
+@dataclass
+class _Arguments:
+    context_name: str
+    reference_model: Path
+    active_genes_filepath: Path
+    objective: str
+    boundary_reactions_filepath: Path
+    exclude_reactions_filepath: Path
+    force_reactions_filepath: Path
+    recon_algorithm: Algorithm
+    solver: Solver
+    low_threshold: int
+    high_threshold: int
+    output_filetypes: list[str]
+
+    def __post_init__(self):
+        self.reference_model = Path(self.reference_model)
+        self.active_genes_filepath = Path(self.active_genes_filepath)
+        self.boundary_reactions_filepath = Path(self.boundary_reactions_filepath) if self.boundary_reactions_filepath is not None else None
+        self.exclude_reactions_filepath = Path(self.exclude_reactions_filepath) if self.exclude_reactions_filepath is not None else None
+        self.force_reactions_filepath = Path(self.force_reactions_filepath) if self.force_reactions_filepath is not None else None
+
+        if not self.reference_model.exists():
+            raise FileNotFoundError(f"Reference model not found at {self.reference_model}")
+        if not self.active_genes_filepath.exists():
+            raise FileNotFoundError(f"Active genes file not found at {self.active_genes_filepath}")
+        if self.boundary_reactions_filepath and not self.boundary_reactions_filepath.exists():
+            raise FileNotFoundError(f"Boundary reactions file not found at {self.boundary_reactions_filepath}")
+        if self.exclude_reactions_filepath and not self.exclude_reactions_filepath.exists():
+            raise FileNotFoundError(f"Exclude reactions file not found at {self.exclude_reactions_filepath}")
+        if self.force_reactions_filepath and not self.force_reactions_filepath.exists():
+            raise FileNotFoundError(f"Force reactions file not found at {self.force_reactions_filepath}")
+
+        if self.high_threshold < self.low_threshold:
+            raise ValueError(
+                f"Low threshold must be less than high threshold. Received low threshold: {self.low_threshold}, high threshold: {self.high_threshold}"
+            )
+
+
+def _correct_bracket(rule: str, name: str) -> str:
     """
     Correct GPR rules to format readable by
     """
