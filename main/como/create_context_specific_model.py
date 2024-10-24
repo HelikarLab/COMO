@@ -246,26 +246,19 @@ def _feasibility_test(model_cobra: cobra.Model, step: str):
     incon_rxns_cnt = len(incon_rxns)
 
     if step == "before_seeding":
-        print(f"Under given boundary assumptions, there are {str(incon_rxns_cnt)} infeasible reactions in the " "reference model.\n")
-        print(
-            "These reactions will not be considered active in context specific model construction. If any infeasible "
-            "reactions are found to be active according to expression data, or, are found in the force reactions "
-            "list, they can be found found in 'InfeasibleRxns.csv'\n"
-        )
-        print(
-            "It is normal for this value to be quite large, however, if many of these reactions are active "
-            "according to your expression data, it is likely that you are missing some critical exchange (media) "
-            "reactions.\n"
+        logger.warning(
+            f"Under given boundary assumptions, there are {incon_rxns_cnt} infeasible reactions in the reference model. "
+            f"These reactions will not be considered active in context specific model construction. "
+            f"If any infeasible reactions are found to be active according to expression data, or, are found in the force reactions list, they can be found found in 'InfeasibleRxns.csv'. "
+            f"It is normal for this value to be quite large, however, if many of these reactions are active "
+            f"according to your expression data, it is likely that you are missing some critical exchange (media) reactions"
         )
     elif step == "after_seeding":
-        print(
-            f"Under given boundary assumptions, with infeasible reactions from the general model not considered "
-            f"there are {incon_rxns_cnt} new infeasible reactions in the context-specific model.\n"
+        logger.warning(
+            f"Under given boundary assumptions, with infeasible reactions from the general model not considered there are {incon_rxns_cnt} new infeasible reactions in the context-specific model. "
+            f"These reactions will be removed from the output model to ensure the model is solvable. "
+            f"Note that this value should be very low compared to the reference model."
         )
-        print("These reactions will be removed from the output model to ensure the model is solvable")
-        print("Note that this value should be very low compared to the reference model.")
-    else:
-        pass
 
     return incon_rxns, model_cobra_rm
 
@@ -301,8 +294,8 @@ def _seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
     # context-specific metabolic network models. PLoS Comput. Biol. 10,
     # e1003424.'
     warn("Fastcore requires a flux consistant model is used as refererence, " "to achieve this fastcc is required which is NOT reproducible.")
-    print("Creating feasible model...")
-    incon_rxns, cobra_model = feasibility_test(cobra_model, "other")
+    logger.debug("Creating feasible model")
+    incon_rxns, cobra_model = _feasibility_test(cobra_model, "other")
     properties = FastcoreProperties(core=exp_idx_list, solver=solver)
     algorithm = FASTcore(s_matrix, lb, ub, properties)
     context_rxns = algorithm.fastcore()
@@ -318,16 +311,16 @@ def _seed_imat(cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force
     config = Config()
     expr_vector = np.array(expr_vector)
     properties = IMATProperties(exp_vector=expr_vector, exp_thresholds=expr_thesh, core=idx_force, epsilon=0.01)
-    print("Setting properties")
+    logger.debug("Setting properties")
     algorithm = IMAT(s_matrix, lb, ub, properties)
 
-    print("Setting algorithm")
+    logger.debug("Setting algorithm")
     context_rxns = algorithm.run()
 
-    print("Running")
+    logger.debug("Running")
     fluxes = algorithm.sol.to_series()
 
-    print("Obtained flux values")
+    logger.debug("Obtained flux values")
     context_cobra_model = cobra_model.copy()
     r_ids = [r.id for r in context_cobra_model.reactions]
     pd.DataFrame({"rxns": r_ids}).to_csv(config.data_dir / "rxns_test.csv")
@@ -403,7 +396,7 @@ def _map_expression_to_reaction(model_cobra, gene_expression_file, recon_algorit
         except BaseException:
             cnt += 1
 
-    print("Map gene expression to reactions, {} errors.".format(cnt))
+    logger.info(f"Map gene expression to reactions, {cnt} errors.")
     expr_vector = np.array(list(expression_rxns.values()), dtype=float)
 
     return expression_rxns, expr_vector
@@ -702,6 +695,7 @@ def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
         context_name,
         low_threshold,
         high_threshold,
+    logger.info(f"Creating '{context_name}' model using '{algorithm.value}' reconstruction and '{solver.value}' solver")
     )
 
     infeas_df.to_csv(
@@ -732,16 +726,11 @@ def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
             output_directory / f"{context_name}_SpecificModel_{algorithm.value}.json",
         )
 
-    print("")
-    print(f"Saved output file to {output_directory}")
-    print(f"Number of Genes: {len(context_model.genes):,}")
-    print(f"Number of Metabolites: {len(context_model.metabolites):,}")
-    print(f"Number of Reactions: {len(context_model.reactions):,}")
-    print("\nModel successfully created!")
-
-
-def print_filetype_help():
-    print("Unsupported model format. Current support is for: 'xml', 'mat', and 'json'." "Or use multiple with: 'xml mat json'")
+    logger.success(f"Saved output file to {output_directory}")
+    logger.info(f"Number of Genes: {len(build_results.model.genes):,}")
+    logger.info(f"Number of Metabolites: {len(build_results.model.metabolites):,}")
+    logger.info(f"Number of Reactions: {len(build_results.model.reactions):,}")
+    logger.info("\nModel successfully created!")
 
 
 def parse_args():
