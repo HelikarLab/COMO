@@ -242,7 +242,7 @@ def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
 
                 effective_length = [max(0, size - mean_fragment_lengths + 1) for size in gene_size]  # Ensure non-negative value
                 N = count_matrix.sum()
-                fpkm = (count_matrix.values + 1) * 1e9 / (np.array(effective_length) * N)
+                fpkm = (count_matrix + 1) * 1e9 / (np.array(effective_length) * N)
                 matrix_values.append(fpkm)
             elif layout == "single-end":  # Perform RPKM
                 rate = np.log(count_matrix + 1) - np.log(gene_size)  # Add a pseudocount before log to ensure log(0) does not happen
