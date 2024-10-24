@@ -1,9 +1,13 @@
-#!/usr/bin/python3
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+sys.path.insert(0, Path(__file__).parent.parent.as_posix())
+
 
 import argparse
 import json
 import re
-import sys
 from collections import Counter
 from enum import Enum
 
@@ -11,7 +15,7 @@ import numpy as np
 import pandas as pd
 from fast_bioservices import BioDBNet, Input, Output
 
-from como import proteomics_gen
+# from como import proteomics_gen
 from como.combine_distributions import combine_zscores_main
 from como.como_utilities import split_gene_expression_data
 from como.project import Config
