@@ -216,11 +216,11 @@ def _set_boundaries(model: cobra.Model, bound_rxns: list, bound_lb, bound_ub) ->
     if not allow_all_boundary_rxns:
         for i, rxn in enumerate(sink_rxns):  # set sinks to 0
             if rxn not in bound_rxns:  # only allow sink accumulation
-                getattr(model_cobra.reactions, rxn).lower_bound = 0
-                getattr(model_cobra.reactions, rxn).upper_bound = 1000
+                getattr(model.reactions, rxn).lower_bounds = 0
+                getattr(model.reactions, rxn).upper_bounds = 1000
             else:  # set from file
-                getattr(model_cobra.reactions, rxn).lower_bound = bound_lb[i]
-                getattr(model_cobra.reactions, rxn).upper_bound = bound_ub[i]
+                getattr(model.reactions, rxn).lower_bounds = bound_lb[i]
+                getattr(model.reactions, rxn).upper_bounds = bound_ub[i]
 
         for i, rxn in enumerate(demand_rxns):
             if rxn not in bound_rxns:  # demand is one way - outside the system
