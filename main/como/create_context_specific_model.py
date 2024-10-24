@@ -183,8 +183,8 @@ def _gene_rule_logical(expression_in: str, level: int = 0) -> str:
         inner_string = inner_string.replace("[", "")
         inner_string = inner_string.replace("]", "")
 
-    expression_out = f"{expression_in[0:loc_l]}{inner_string}{expression_in[loc_r + 1 :]}"
-    expression_out = gene_rule_logical(expression_out, level + 1)
+    expression_out = f"{expression_in[:loc_l]}{inner_string}{expression_in[loc_r + 1 :]}"
+    expression_out = _gene_rule_logical(expression_out, level + 1)
 
     return expression_out
 
