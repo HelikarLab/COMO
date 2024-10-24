@@ -170,7 +170,7 @@ def _parse_args():
         "--config-file",
         type=str,
         required=True,
-        dest="config_filename",
+        dest="config_file",
         help="Name of config .xlsx file in the /work/data/config_files/. Can be generated using "
         "rnaseq_preprocess.py or manually created and imported into the Juypterlab",
     )
@@ -202,7 +202,7 @@ def _parse_args():
         type=float,
         required=False,
         default=1.0,
-        dest="replicate_ratio_high",
+        dest="high_replicate_ratio",
         help="Ratio of replicates required for a gene to be considered high-confidence. "
         "High-confidence genes ignore consensus with other data-sources, such as proteomics. "
         "Example: 0.9 means that for a gene to be high-confidence, at least 90% of replicates in a group must pass the cutoff after normalization",
@@ -213,7 +213,7 @@ def _parse_args():
         type=float,
         required=False,
         default=1.0,
-        dest="batch_ratio_high",
+        dest="high_batch_ratio",
         help="Ratio of groups (studies/batches) required for a gene to be considered high-confidence within that group. "
         "High-confidence genes ignore consensus with other data-sources, like proteomics. "
         "Example: 0.9 means that for a gene to be high-confidence, at least 90% of groups in a study must have passed the replicate ratio test",
@@ -224,7 +224,7 @@ def _parse_args():
         type=str,
         required=False,
         default="quantile-tpm",
-        dest="technique",
+        dest="filtering_technique",
         help="Technique to normalize and filter counts with. Either 'zfpkm', 'quantile-tpm' or "
         "'flat-cpm'. More info about each method is discussed in pipeline.ipynb.",
     )
@@ -241,11 +241,13 @@ def _parse_args():
         "--library-prep",
         required=False,
         default="",
-        dest="prep",
+        dest="library_prep",
         help="Library preparation used, will separate samples into groups to only compare similarly "
         "prepared libraries. For example, mRNA, total-rna, scRNA, etc",
     )
-    return RNASeqGen(**vars(parser.parse_args()))
+    args = parser.parse_args()
+    args.filtering_technique = args.filtering_technique.lower()
+    return RNASeqGen(**vars(args))
 
 
 if __name__ == "__main__":
