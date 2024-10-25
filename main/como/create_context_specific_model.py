@@ -383,7 +383,7 @@ def _map_expression_to_reaction(model_cobra, gene_expression_file, recon_algorit
             continue
         for gid in gene_ids:
             if gid in gene_expressions.index:
-                rep_val = f' {gene_expressions.at[gid, "Active"]} '
+                rep_val = f' {gene_expressions.at[gid, "active"]} '
             else:
                 rep_val = f" {str(unknown_val)} "
             gene_reaction_rule = " " + gene_reaction_rule + " "  # pad white space to prevent gene matches inside floats
