@@ -1,17 +1,9 @@
-from glob import glob
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import plotly.express as px
-
-# Prevent messy messages from repeatedly writing to juypter
-work_dir = Path.cwd()
-r_log_directory = work_dir / "logs"
-if not r_log_directory.exists():
-    r_log_directory.mkdir()
-zz = open(r_log_directory / "combine_distributions.Rout", "w")
-# TODO: Implement sink functionality in Python if needed
+from loguru import logger
 
 
 def get_batch_name(x):
