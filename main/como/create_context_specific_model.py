@@ -617,29 +617,55 @@ def _write_model_to_disk(model: cobra.Model, output_directory: Path, context_nam
         cobra.io.save_json_model(model, output_directory / f"{context_name}_SpecificModel_{algorithm.value}.json")
 
 
-    force_rxns = []
-    if force_rxns_filepath:
-        force_rxns_filepath: Path = Path(force_rxns_filepath)
+def create_context_specific_model(
+    context_name: str,
+    reference_model: Path,
+    genes_file: Path,
+    objective: str = "biomass_reaction",
+    boundary_rxns_filepath: Optional[str | Path] = None,
+    exclude_rxns_filepath: Optional[str | Path] = None,
+    force_rxns_filepath: Optional[str | Path] = None,
+    algorithm: Algorithm = Algorithm.GIMME,
+    low_threshold: float = -5,
+    high_threshold: float = -3,
+    solver: Solver = Solver.GLPK,
+    output_filetypes: list[str] = None,
+):
+    if not reference_model.exists():
+        raise FileNotFoundError(f"Reference model not found at {reference_model}")
+    if not genes_file.exists():
+        raise FileNotFoundError(f"Active genes file not found at {genes_file}")
+    if output_filetypes is None:
+        output_filetypes = ["mat"]
 
-        print(f"Force Reactions: {force_rxns_filepath}")
-        if force_rxns_filepath.suffix == ".csv":
-            df = pd.read_csv(force_rxns_filepath, header=0)
-        elif force_rxns_filepath.suffix == ".xlsx" or force_rxns_filepath.suffix == ".xls":
-            df = pd.read_excel(force_rxns_filepath, header=0)
-        else:
-            raise ValueError("--force-reactions-file must be a path to a csv or xlsx file with one column.")
-        force_rxns = df["Abbreviation"].tolist()
-
-    # Assert output types are valid
     for output_type in output_filetypes:
-        if output_type not in ["xml", "mat", "json"]:
+        if output_type not in {"xml", "mat", "json"}:
             raise ValueError(f"Output file type {output_type} not recognized. Must be one of: 'xml', 'mat', 'json'")
 
     if algorithm not in Algorithm:
         raise ValueError(f"Algorithm {algorithm} not supported. Please use one of: GIMME, FASTCORE, or IMAT")
 
     if solver not in Solver:
-        print(f"Solver {solver} not supported. Please use 'GLPK' or 'GUROBI'")
+        raise ValueError(f"Solver '{solver}' not supported. Use 'GLPK' or 'GUROBI'")
+
+    if boundary_rxns_filepath:
+        boundary_reactions = _collect_boundary_reactions(boundary_rxns_filepath)
+
+    exclude_rxns: list[str] = []
+    if exclude_rxns_filepath:
+        exclude_rxns_filepath: Path = Path(exclude_rxns_filepath)
+        df = _create_df(exclude_rxns_filepath)
+        if "abbreviation" not in df.columns:
+            raise ValueError("The exclude reactions file should have a single column with a header named Abbreviation")
+        exclude_rxns = df["abbreviation"].tolist()
+
+    force_rxns: list[str] = []
+    if force_rxns_filepath:
+        force_rxns_filepath: Path = Path(force_rxns_filepath)
+        df = _create_df(force_rxns_filepath)
+        if "abbreviation" not in df.columns:
+            raise ValueError("The force reactions file should have a single column with a header named Abbreviation")
+        force_rxns = df["abbreviation"].tolist()
 
     logger.info(f"Creating '{context_name}' model using '{algorithm.value}' reconstruction and '{solver.value}' solver")
     build_results: BuildResults = _build_model(
@@ -658,33 +684,20 @@ def _write_model_to_disk(model: cobra.Model, output_directory: Path, context_nam
         high_thresh=high_threshold,
     )
 
-    infeas_df.to_csv(
-        config.result_dir / context_name / f"{context_name}_infeasible_rxns.csv",
-        index=False,
-    )
+    config = Config()
+    build_results.infeasible_reactions.to_csv(config.result_dir / context_name / f"{context_name}_infeasible_rxns.csv", index=False)
 
     if algorithm == Algorithm.FASTCORE:
-        pd.DataFrame(core_list).to_csv(
-            config.result_dir / context_name / f"{context_name}_core_rxns.csv",
-            index=False,
-        )
+        pd.DataFrame(build_results.expression_index_list).to_csv(config.result_dir / context_name / f"{context_name}_core_rxns.csv", index=False)
 
     output_directory = config.result_dir / context_name
-    if "mat" in output_filetypes:
-        cobra.io.save_matlab_model(
-            context_model,
-            output_directory / f"{context_name}_SpecificModel_{algorithm.value}.mat",
-        )
-    if "xml" in output_filetypes:
-        cobra.io.write_sbml_model(
-            context_model,
-            output_directory / f"{context_name}_SpecificModel_{algorithm.value}.xml",
-        )
-    if "json" in output_filetypes:
-        cobra.io.save_json_model(
-            context_model,
-            output_directory / f"{context_name}_SpecificModel_{algorithm.value}.json",
-        )
+    _write_model_to_disk(
+        model=build_results.model,
+        output_directory=output_directory,
+        context_name=context_name,
+        output_filetypes=output_filetypes,
+        algorithm=algorithm,
+    )
 
     logger.success(f"Saved output file to {output_directory}")
     logger.info(f"Number of Genes: {len(build_results.model.genes):,}")
