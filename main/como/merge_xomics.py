@@ -16,7 +16,7 @@ import pandas as pd
 from fast_bioservices import BioDBNet, Input, Output
 from loguru import logger
 
-from como import proteomics_gen
+from como import proteomics_gen, return_placeholder_data
 from como.combine_distributions import combine_zscores_main
 from como.como_utilities import split_gene_expression_data
 from como.project import Config
@@ -94,8 +94,8 @@ def _load_rnaseq_tests(filename, context_name, lib_type):
     config = Config()
 
     def load_dummy_dict():
-        dat = pd.read_csv(config.data_dir / "data_matrices" / "placeholder" / "placeholder_empty_data.csv", index_col="entrez_gene_id")
-        return "dummy", dat
+        df = return_placeholder_data()
+        return "dummy", df
 
     if not filename or filename == "None":  # not using this data type, use empty dummy data matrix
         return load_dummy_dict()
