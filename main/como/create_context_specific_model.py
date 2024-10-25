@@ -733,7 +733,6 @@ def parse_args():
         "-o",
         "--objective",
         type=str,
-        required=False,
         default="biomass_reaction",
         dest="objective",
         help="Reaction ID of the objective function in the model. Generally a biomass function.",
@@ -742,7 +741,6 @@ def parse_args():
         "-b",
         "--boundary-reactions-filepath",
         type=str,
-        required=False,
         default=None,
         dest="boundary_rxns_filepath",
         help="Path to file contains the exchange (media), sink, and demand reactions which "
@@ -755,7 +753,6 @@ def parse_args():
         "-x",
         "--exclude-reactions-filepath",
         type=str,
-        required=False,
         default=None,
         dest="exclude_rxns_filepath",
         help="Filepath to file that contains reactions which will be removed from active reactions "
@@ -767,7 +764,6 @@ def parse_args():
         "-f",
         "--force-reactions-filepath",
         type=str,
-        required=False,
         default=None,
         dest="force_rxns_filepath",
         help="Filepath to file that contains reactions which will be added to active reactions for "
@@ -779,7 +775,6 @@ def parse_args():
         "-a",
         "--algorithm",
         type=str,
-        required=False,
         default="GIMME",
         dest="algorithm",
         help="Algorithm used to seed context specific model to the Genome-scale model. Can be either " "GIMME, FASTCORE, iMAT, or tINIT.",
@@ -794,7 +789,6 @@ def parse_args():
         "-s",
         "--solver",
         type=str,
-        required=False,
         default="glpk",
         dest="solver",
         help="Solver used to seed model and attempt to solve objective. Default is GLPK, also takes "
@@ -807,7 +801,6 @@ def parse_args():
         "--output-filetypes",
         type=str,
         nargs="+",
-        required=False,
         default="mat",
         dest="output_filetypes",
         help="Filetypes to save seeded model type. Can be either a string with one filetype such as "
@@ -816,7 +809,10 @@ def parse_args():
         "Note the outer quotes required to be interpreted by cmd. This a string, not a python list",
     )
     args = parser.parse_args()
-    return args
+    args.output_filetypes = stringlist_to_list(args.output_filetypes)
+    args.solver = Solver.from_string(args.solver)  # type: ignore
+    args.recon_algorithm = Algorithm.from_string(args.recon_algorithm)  # type: ignore
+    return _Arguments(**vars(args))
 
 
 if __name__ == "__main__":
