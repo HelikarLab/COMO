@@ -311,22 +311,22 @@ def combine_zscores_main(
 
         if len(context_trna_batch) == 0 and global_use_trna:
             context_use_trna = False
-            print(f"No total RNA-seq zFPKM Matrix files found for {context}. Will not use for this context.")
+            logger.warning(f"No total RNA-seq zFPKM Matrix files found for {context}. Will not use for this context.")
 
         if len(context_mrna_batch) == 0 and global_use_mrna:
             context_use_mrna = False
-            print(f"No polyA RNA-seq zFPKM Matrix files found for {context}. Will not use for this context.")
+            logger.warning(f"No polyA RNA-seq zFPKM Matrix files found for {context}. Will not use for this context.")
 
         if len(context_scrna_batch) == 0 and global_use_scrna:
             context_use_scrna = False
-            print(f"No SC RNA-seq zFPKM Matrix files found for {context}. Will not use for this context.")
+            logger.warning(f"No SC RNA-seq zFPKM Matrix files found for {context}. Will not use for this context.")
 
         if len(context_protein_batch) == 0 and global_use_proteins:
             context_use_proteins = False
-            print(f"No proteomics z-score Matrix files found for {context}. Will not use for this context.")
+            logger.warning(f"No proteomics z-score Matrix files found for {context}. Will not use for this context.")
 
         if context_use_trna:
-            print("Will merge total RNA-seq distributions")
+            logger.info("Will merge total RNA-seq distributions")
             trna_workdir = working_dir / context / "total"
             num_reps = []
             count = 0
@@ -355,7 +355,7 @@ def combine_zscores_main(
             comb_batches_z_trna = None
 
         if context_use_mrna:
-            print("Will merge polyA enriched RNA-seq distributions")
+            logger.info("Will merge polyA enriched RNA-seq distributions")
             mrna_workdir = working_dir / context / "mrna"
             num_reps = []
             count = 0
@@ -384,7 +384,7 @@ def combine_zscores_main(
             comb_batches_z_mrna = None
 
         if context_use_scrna:
-            print("Will merge single-cell RNA-seq distributions")
+            logger.info("Will merge single-cell RNA-seq distributions")
             scrna_workdir = working_dir / context / "scrna"
             num_reps = []
             count = 0
@@ -413,7 +413,7 @@ def combine_zscores_main(
             comb_batches_z_scrna = None
 
         if context_use_proteins:
-            print("Will merge protein abundance distributions")
+            logger.info("Will merge protein abundance distributions")
             protein_workdir = working_dir / context / "proteomics"
             num_reps = []
             count = 0
