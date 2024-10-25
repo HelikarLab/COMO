@@ -55,27 +55,22 @@ def merge_batch(wd, context, batch):
         zmat = zmat.dropna()
         zmat.columns = rep_names
 
-        stack_df = pd.concat([
-            pd.DataFrame({
-                "ENTREZ_GENE_ID": zmat["ENTREZ_GENE_ID"],
-                "zscore": zmat[col].astype(float),
-                "source": col
-            })
-            for col in zmat.columns[1:]
-        ])
+        stack_df = pd.concat(
+            [pd.DataFrame({"ENTREZ_GENE_ID": zmat["ENTREZ_GENE_ID"], "zscore": zmat[col].astype(float), "source": col}) for col in zmat.columns[1:]]
+        )
 
         plot_name_png = wd / "figures" / f"plot_{context}_{Path(f).stem}.png"
 
-        fig = px.histogram(stack_df, x="zscore", color="source",
-                           nbins=100,  # Adjust as needed
-                           marginal="rug",
-                           title=f"Z-score Distribution for {context} - {Path(f).stem}")
-
-        fig.update_layout(
-            xaxis_title="Z-score",
-            yaxis_title="Frequency",
-            font=dict(family="sans-serif", size=12)
+        fig = px.histogram(
+            stack_df,
+            x="zscore",
+            color="source",
+            nbins=100,  # Adjust as needed
+            marginal="rug",
+            title=f"Z-score Distribution for {context} - {Path(f).stem}",
         )
+
+        fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font=dict(family="sans-serif", size=12))
 
         # Simplified plot for many sources (optional)
         if len(stack_df["source"].unique()) > 10:
@@ -101,29 +96,27 @@ def combine_batch_zdistro(wd, context, batch, zmat):
         merge_df = pd.concat([zmat, pd.Series(combine_z, name="combined")], axis=1)
         combine_z = pd.DataFrame({"ENTREZ_GENE_ID": zmat["ENTREZ_GENE_ID"].astype(str), "combine_z": combine_z})
 
-        stack_df = pd.concat([
-            pd.DataFrame({
-                "ENTREZ_GENE_ID": merge_df["ENTREZ_GENE_ID"],
-                "zscore": merge_df[col].astype(float),
-                "source": col
-            })
-            for col in merge_df.columns[1:]
-        ])
+        stack_df = pd.concat(
+            [
+                pd.DataFrame({"ENTREZ_GENE_ID": merge_df["ENTREZ_GENE_ID"], "zscore": merge_df[col].astype(float), "source": col})
+                for col in merge_df.columns[1:]
+            ]
+        )
 
         # Simplified plot for many sources (optional)
         if len(stack_df["source"].unique()) > 10:
             stack_df = stack_df[stack_df["source"] == "combined"]
 
-        fig = px.histogram(stack_df, x="zscore", color="source",
-                           nbins=100,  # Adjust as needed
-                           marginal="rug",
-                           title=f"Combined Z-score Distribution for {context} - {batch}")
-
-        fig.update_layout(
-            xaxis_title="Z-score",
-            yaxis_title="Frequency",
-            font=dict(family="sans-serif", size=12)
+        fig = px.histogram(
+            stack_df,
+            x="zscore",
+            color="source",
+            nbins=100,  # Adjust as needed
+            marginal="rug",
+            title=f"Combined Z-score Distribution for {context} - {batch}",
         )
+
+        fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font=dict(family="sans-serif", size=12))
 
         fig.write_image(plot_name_png)
 
@@ -146,7 +139,7 @@ def combine_context_zdistro(wd, context, n_reps, zmat):
             n_reps = np.delete(n_reps, nas)
         weights = n_reps / np.sum(n_reps)
         numer = np.sum(weights * x)
-        denom = np.sqrt(np.sum(weights ** 2))
+        denom = np.sqrt(np.sum(weights**2))
         result = numer / denom
         return np.clip(result, floor_score, ceil_score)
 
@@ -155,25 +148,23 @@ def combine_context_zdistro(wd, context, n_reps, zmat):
         merge_df = pd.concat([zmat, pd.Series(combine_z, name="combined")], axis=1)
         combine_z = pd.DataFrame({"ENTREZ_GENE_ID": zmat["ENTREZ_GENE_ID"].astype(str), "combine_z": combine_z})
 
-        stack_df = pd.concat([
-            pd.DataFrame({
-                "ENTREZ_GENE_ID": merge_df["ENTREZ_GENE_ID"],
-                "zscore": merge_df[col].astype(float),
-                "source": col
-            })
-            for col in merge_df.columns[1:]
-        ])
-
-        fig = px.histogram(stack_df, x="zscore", color="source",
-                           nbins=100,  # Adjust as needed
-                           marginal="rug",
-                           title=f"Combined Batches Z-score Distribution for {context}")
-
-        fig.update_layout(
-            xaxis_title="Z-score",
-            yaxis_title="Frequency",
-            font=dict(family="sans-serif", size=12)
+        stack_df = pd.concat(
+            [
+                pd.DataFrame({"ENTREZ_GENE_ID": merge_df["ENTREZ_GENE_ID"], "zscore": merge_df[col].astype(float), "source": col})
+                for col in merge_df.columns[1:]
+            ]
         )
+
+        fig = px.histogram(
+            stack_df,
+            x="zscore",
+            color="source",
+            nbins=100,  # Adjust as needed
+            marginal="rug",
+            title=f"Combined Batches Z-score Distribution for {context}",
+        )
+
+        fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font=dict(family="sans-serif", size=12))
 
         fig.write_image(plot_name_png)
 
@@ -195,7 +186,7 @@ def combine_omics_zdistros(
     mweight,
     sweight,
     pweight,
-    keep_gene_scores=True
+    keep_gene_scores=True,
 ):
     fig_path = wd / context / "figures"
     if not fig_path.exists():
@@ -237,7 +228,7 @@ def combine_omics_zdistros(
             weights = np.delete(weights, nas)
         weights = weights / np.sum(weights)
         numer = np.sum(weights * x)
-        denom = np.sqrt(np.sum(weights ** 2))
+        denom = np.sqrt(np.sum(weights**2))
         result = numer / denom
         return np.clip(result, floor_score, ceil_score)
 
@@ -256,25 +247,23 @@ def combine_omics_zdistros(
     merge_df = pd.concat([zmat, pd.Series(combine_z, name="combined")], axis=1)
     combine_z = pd.DataFrame({"ENTREZ_GENE_ID": zmat["ENTREZ_GENE_ID"].astype(str), "combine_z": combine_z})
 
-    stack_df = pd.concat([
-        pd.DataFrame({
-            "ENTREZ_GENE_ID": merge_df["ENTREZ_GENE_ID"],
-            "zscore": merge_df[col].astype(float),
-            "source": col
-        })
-        for col in merge_df.columns[1:]
-    ])
-
-    fig = px.histogram(stack_df, x="zscore", color="source",
-                       nbins=100,  # Adjust as needed
-                       marginal="rug",
-                       title=f"Combined Omics Z-score Distribution for {context}")
-
-    fig.update_layout(
-        xaxis_title="Z-score",
-        yaxis_title="Frequency",
-        font=dict(family="sans-serif", size=12)
+    stack_df = pd.concat(
+        [
+            pd.DataFrame({"ENTREZ_GENE_ID": merge_df["ENTREZ_GENE_ID"], "zscore": merge_df[col].astype(float), "source": col})
+            for col in merge_df.columns[1:]
+        ]
     )
+
+    fig = px.histogram(
+        stack_df,
+        x="zscore",
+        color="source",
+        nbins=100,  # Adjust as needed
+        marginal="rug",
+        title=f"Combined Omics Z-score Distribution for {context}",
+    )
+
+    fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font=dict(family="sans-serif", size=12))
 
     fig.write_image(plot_name_png)
 
@@ -292,7 +281,7 @@ def combine_zscores_main(
     global_trna_weight,
     global_mrna_weight,
     global_scrna_weight,
-    global_protein_weight
+    global_protein_weight,
 ):
     working_dir = Path(working_dir)
     figure_output_dir = working_dir / "figures"
@@ -471,7 +460,7 @@ def combine_zscores_main(
             context_trna_weight,
             context_mrna_weight,
             context_scrna_weight,
-            context_protein_weight
+            context_protein_weight,
         )
 
         filename = working_dir / context / f"model_scores_{context}.csv"
