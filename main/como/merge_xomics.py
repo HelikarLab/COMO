@@ -16,7 +16,7 @@ import pandas as pd
 from fast_bioservices import BioDBNet, Input, Output
 from loguru import logger
 
-# from como import proteomics_gen
+from como import proteomics_gen
 from como.combine_distributions import combine_zscores_main
 from como.como_utilities import split_gene_expression_data
 from como.project import Config
@@ -94,7 +94,7 @@ def _load_rnaseq_tests(filename, context_name, lib_type):
     config = Config()
 
     def load_dummy_dict():
-        dat = pd.read_csv(config.data_dir / "data_matrices" / "placeholder" / "placeholder_empty_data.csv", index_col="ENTREZ_GENE_ID")
+        dat = pd.read_csv(config.data_dir / "data_matrices" / "placeholder" / "placeholder_empty_data.csv", index_col="entrez_gene_id")
         return "dummy", dat
 
     if not filename or filename == "None":  # not using this data type, use empty dummy data matrix
@@ -115,7 +115,7 @@ def _load_rnaseq_tests(filename, context_name, lib_type):
 
     save_filepath = config.result_dir / context_name / lib_type / filename
     if save_filepath.exists():
-        data = pd.read_csv(save_filepath, index_col="ENTREZ_GENE_ID")
+        data = pd.read_csv(save_filepath, index_col="entrez_gene_id")
         logger.success(f"Read from {save_filepath}")
         return context_name, data
 
@@ -131,18 +131,18 @@ def _load_rnaseq_tests(filename, context_name, lib_type):
 # Merge Output
 def _merge_logical_table(df: pd.DataFrame):
     """
-    Merge the Rows of Logical Table belongs to the same ENTREZ_GENE_ID
+    Merge the Rows of Logical Table belongs to the same entrez_gene_id
     :param df:
     :return: pandas dataframe of merged table
     """
     # step 1: get all plural ENTREZ_GENE_IDs in the input table, extract unique IDs
 
     df.reset_index(drop=False, inplace=True)
-    df.dropna(axis=0, subset=["ENTREZ_GENE_ID"], inplace=True)
-    df["ENTREZ_GENE_ID"] = df["ENTREZ_GENE_ID"].str.replace(" /// ", "//").astype(str)
+    df.dropna(axis=0, subset=["entrez_gene_id"], inplace=True)
+    df["entrez_gene_id"] = df["entrez_gene_id"].str.replace(" /// ", "//").astype(str)
 
-    single_entrez_ids: list[str] = df[~df["ENTREZ_GENE_ID"].str.contains("//")]["ENTREZ_GENE_ID"].tolist()
-    multiple_entrez_ids: list[str] = df[df["ENTREZ_GENE_ID"].str.contains("//")]["ENTREZ_GENE_ID"].tolist()
+    single_entrez_ids: list[str] = df[~df["entrez_gene_id"].str.contains("//")]["entrez_gene_id"].tolist()
+    multiple_entrez_ids: list[str] = df[df["entrez_gene_id"].str.contains("//")]["entrez_gene_id"].tolist()
     id_list: list[str] = []
     for i in multiple_entrez_ids:
         ids = i.split("//")
@@ -150,12 +150,12 @@ def _merge_logical_table(df: pd.DataFrame):
 
         duplicate_rows = pd.DataFrame([])
         for j in ids:
-            rows = df.loc[df["ENTREZ_GENE_ID"] == i].copy()
-            rows["ENTREZ_GENE_ID"] = j
+            rows = df.loc[df["entrez_gene_id"] == i].copy()
+            rows["entrez_gene_id"] = j
             duplicate_rows = pd.concat([duplicate_rows, rows], axis=0)
 
         df = pd.concat([df, pd.DataFrame(duplicate_rows)], axis=0, ignore_index=True)
-        df.drop(df[df["ENTREZ_GENE_ID"] == i].index, inplace=True)
+        df.drop(df[df["entrez_gene_id"] == i].index, inplace=True)
 
     full_entrez_id_sets: set[str] = set()
     entrez_dups_list: list[list[str]] = []
@@ -184,9 +184,9 @@ def _merge_logical_table(df: pd.DataFrame):
     entrez_dups_dict = dict(zip(full_entrez_id_sets, entrez_dups_list))
 
     for merged_entrez_id, entrez_dups_list in entrez_dups_dict.items():
-        df["ENTREZ_GENE_ID"].replace(to_replace=entrez_dups_list, value=merged_entrez_id, inplace=True)
+        df["entrez_gene_id"].replace(to_replace=entrez_dups_list, value=merged_entrez_id, inplace=True)
 
-    df.set_index("ENTREZ_GENE_ID", inplace=True)
+    df.set_index("entrez_gene_id", inplace=True)
     df = df.fillna(-1).groupby(level=0).max()
     df.replace(-1, np.nan, inplace=True)
 
@@ -209,7 +209,7 @@ def _get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
     This function will get the following details of transcriptomic data:
     - Gene Symbol
     - Gene Name
-    - ENTREZ_GENE_ID
+    - entrez_gene_id
 
     The resulting dataframe will have its columns created in the order listed above
     It will return a pandas dataframe with this information
@@ -430,14 +430,14 @@ def _merge_xomics(
     merge_data = merge_data
 
     filepath = config.result_dir / context_name / f"merged_{context_name}.csv"
-    merge_data.to_csv(filepath, index_label="ENTREZ_GENE_ID")
+    merge_data.to_csv(filepath, index_label="entrez_gene_id")
 
     filepath = config.result_dir / context_name / f"ActiveGenes_{context_name}_Merged.csv"
     merge_data.reset_index(drop=False, inplace=True)
 
     split_entrez = split_gene_expression_data(merge_data)
-    split_entrez.rename(columns={"Gene": "ENTREZ_GENE_ID", "Data": "Active"}, inplace=True)
-    split_entrez.to_csv(filepath, index_label="ENTREZ_GENE_ID")
+    split_entrez.rename(columns={"Gene": "entrez_gene_id", "Data": "Active"}, inplace=True)
+    split_entrez.to_csv(filepath, index_label="entrez_gene_id")
     files_dict = {context_name: filepath.as_posix()}
 
     transcriptomic_details = _get_transcriptmoic_details(merge_data)
@@ -474,15 +474,13 @@ def _handle_context_batch(
 
     config = Config()
     sheet_names = []
-    for file in [
-        trnaseq_file,
-        mrnaseq_file,
-        scrnaseq_file,
-        proteomics_file,
-    ]:
+    for file in [trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file]:
         if file is not None:
             config_filepath = config.config_dir / file
-            xl = pd.ExcelFile(config_filepath, engine="openpyxl")
+            try:
+                xl = pd.ExcelFile(config_filepath, engine="openpyxl")
+            except Exception as e:
+                raise ValueError(f"Unable to read file '{config_filepath}'") from e
             sheet_names += xl.sheet_names
 
     use_trna = trnaseq_file is not None
@@ -797,42 +795,42 @@ def _parse_args() -> _Arguments:
 
 
 if __name__ == "__main__":
-    args = _parse_args()
+    # args = _parse_args()
     config = Config()
 
     # read custom expression requirment file if used
-    if args.custom_expression_filename:
-        custom_filepath = config.data_dir / args.custom_expression_filename
-        custom_df = pd.read_excel(custom_filepath, sheet_name=0)
-        custom_df.columns = ["context", "req"]
-    else:
-        custom_df = pd.DataFrame([])
+    # if args.custom_expression_filename:
+    #     custom_filepath = config.data_dir / args.custom_expression_filename
+    #     custom_df = pd.read_excel(custom_filepath, sheet_name=0)
+    #     custom_df.columns = ["context", "req"]
+    # else:
+    #     custom_df = pd.DataFrame([])
 
-    def_exp_req = sum(
-        test is None
-        for test in [
-            args.trnaseq_filename,
-            args.mrnaseq_filename,
-            args.scrnaseq_filename,
-            args.proteomics_filename,
-        ]
-    )
+    # def_exp_req = sum(
+    #     test is None
+    #     for test in [
+    #         args.trnaseq_filename,
+    #         args.mrnaseq_filename,
+    #         args.scrnaseq_filename,
+    #         args.proteomics_filename,
+    #     ]
+    # )
 
     merge_xomics(
-        trnaseq_filepath=args.trnaseq_filename,
-        mrnaseq_filepath=args.mrnaseq_filename,
-        scrnaseq_filepath=args.scrnaseq_filename,
-        proteomics_filepath=args.proteomics_filename,
-        trna_weight=args.trna_weight,
-        mrna_weight=args.mrna_weight,
-        scrna_weight=args.scrna_weight,
-        proteomics_weight=args.proteomics_weight,
-        expression_requirement=args.expression_requirement,
-        adjust_method=args.adjustment_method,
-        no_high_confidence=args.no_high_confidence,
-        no_na=args.no_na,
-        merge_zfpkm_distribution=args.merge_zfpkm_distribution,
-        keep_transcriptomics_score=args.keep_transcriptomics_scores,
+        trnaseq_filepath="/Users/joshl/Downloads/rnaseq_total_naiveB.csv",
+        mrnaseq_filepath=None,  # args.mrnaseq_filename,
+        scrnaseq_filepath=None,  # args.scrnaseq_filename,
+        proteomics_filepath=None,  # args.proteomics_filename,
+        trna_weight=6,  # args.trna_weight,
+        mrna_weight=6,  # args.mrna_weight,
+        scrna_weight=6,  # args.scrna_weight,
+        proteomics_weight=6,  # args.proteomics_weight,
+        expression_requirement=3,  # args.expression_requirement,
+        adjust_method=AdjustmentMethod.REGRESSIVE,  # args.adjustment_method,
+        no_high_confidence=True,  # args.no_high_confidence,
+        no_na=True,  # args.no_na,
+        merge_zfpkm_distribution=True,  # args.merge_zfpkm_distribution,
+        keep_transcriptomics_score=True,  # args.keep_transcriptomics_scores,
     )
 
     logger.success("Finished merging!")
