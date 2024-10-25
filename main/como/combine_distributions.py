@@ -35,9 +35,10 @@ def parse_contexts_zscore_prot(wd, contexts):
 
 
 def merge_batch(wd, context, batch):
-    files = wd.glob(f"*{batch}*")
+    files = list(wd.glob(f"*{batch}*"))
     nrep = []
-    assert len(files) > 0
+    if not files:
+        raise ValueError(f"No files found for {context} - {batch}")
 
     for f in files:
         zmat = pd.read_csv(f)
