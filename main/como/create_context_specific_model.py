@@ -713,7 +713,7 @@ def parse_args():
         "--reference-model-filepath",
         type=str,
         required=True,
-        dest="modelfile",
+        dest="reference_model",
         help="Name of Genome-scale metabolic model to seed the context model to. For example, the "
         "GeneralModelUpdatedV2.mat, is a modified Recon3D model. We also provide iMM_madrid for mouse."
         "OT can be .mat, .xml, or .json.",
@@ -723,7 +723,7 @@ def parse_args():
         "--active-genes-filepath",
         type=str,
         required=True,
-        dest="genefile",
+        dest="active_genes_filepath",
         help="Path to logical table of active genes output from merge_xomics.py called "
         "ActiveGenes_contextName_Merged.csv. Should be in the corresponding context/context folder "
         "inside /main/data/results/contextName/. The json file output from the function using "
@@ -742,7 +742,7 @@ def parse_args():
         "--boundary-reactions-filepath",
         type=str,
         default=None,
-        dest="boundary_rxns_filepath",
+        dest="boundary_reactions_filepath",
         help="Path to file contains the exchange (media), sink, and demand reactions which "
         "the model should use to fulfill the reactions governed by transcriptomic and proteomics "
         "data inputs. It must be a csv or xlsx with three columns: Rxn, Lowerbound, Upperbound. If not "
@@ -754,7 +754,7 @@ def parse_args():
         "--exclude-reactions-filepath",
         type=str,
         default=None,
-        dest="exclude_rxns_filepath",
+        dest="exclude_reactions_filepath",
         help="Filepath to file that contains reactions which will be removed from active reactions "
         "the model to use when seeding, even if considered active from transcriptomic and "
         "proteomics data inputs. It must be a csv or xlsx with one column of reaction IDs consistent with "
@@ -765,7 +765,7 @@ def parse_args():
         "--force-reactions-filepath",
         type=str,
         default=None,
-        dest="force_rxns_filepath",
+        dest="force_reactions_filepath",
         help="Filepath to file that contains reactions which will be added to active reactions for "
         "the model to use when seeding (unless it causes the model to be unsolvable), regardless "
         "of results of transcriptomic and proteomics data inputs. It must be a csv or xlsx with one "
@@ -776,14 +776,24 @@ def parse_args():
         "--algorithm",
         type=str,
         default="GIMME",
-        dest="algorithm",
-        help="Algorithm used to seed context specific model to the Genome-scale model. Can be either " "GIMME, FASTCORE, iMAT, or tINIT.",
+        dest="recon_algorithm",
+        help="Algorithm used to seed context specific model to the Genome-scale model. Can be either GIMME, FASTCORE, iMAT, or tINIT.",
     )
     parser.add_argument(
-        "-lt", "--low-threshold", type=float, required=False, default=-5, dest="low_threshold", help="Low to mid bin cutoff for iMAT solution"
+        "-lt",
+        "--low-threshold",
+        type=float,
+        default=-5,
+        dest="low_threshold",
+        help="Low to mid bin cutoff for iMAT solution",
     )
     parser.add_argument(
-        "-ht", "--high-threshold", type=float, required=False, default=-3, dest="high_threshold", help="Mid to high bin cutoff for iMAT solution"
+        "-ht",
+        "--high-threshold",
+        type=float,
+        default=-3,
+        dest="high_threshold",
+        help="Mid to high bin cutoff for iMAT solution",
     )
     parser.add_argument(
         "-s",
