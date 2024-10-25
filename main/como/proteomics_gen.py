@@ -8,13 +8,12 @@ import argparse
 
 import numpy as np
 import pandas as pd
-from fast_bioservices.biodbnet import BioDBNet, Input, Output, Taxon
+from fast_bioservices.biodbnet import BioDBNet, Input, Output
 from loguru import logger
 
-from como import rpy2_api
+from como import return_placeholder_data
 from como.project import Config
-
-r_file_path = Path(__file__).parent / "rscripts" / "protein_transform.R"
+from como.proteomics_processing import protein_transform_main
 
 
 # Load Proteomics
@@ -147,9 +146,7 @@ def load_proteomics_tests(filename, context_name):
     config = Config()
 
     def load_empty_dict():
-        savepath = config.data_dir / "data_matrices" / "placeholder" / "placeholder_empty_data.csv"
-        dat = pd.read_csv(savepath, index_col="ENTREZ_GENE_ID")
-        return "dummy", dat
+        return "dummy", return_placeholder_data()
 
     if not filename or filename == "None":  # if not using proteomics load empty dummy data matrix
         return load_empty_dict()
