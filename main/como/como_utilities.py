@@ -98,27 +98,27 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
     return stringlist
 
 
-def split_gene_expression_data(expression_data, recon_algorithm="GIMME"):
+def split_gene_expression_data(expression_data: pd.DataFrame, recon_algorithm: str = "GIMME"):
     """
     Splits genes that have mapped to multiple Entrez IDs are formated as "gene12//gene2//gene3"
     """
-    if recon_algorithm in ["IMAT", "TINIT"]:
-        expression_data.rename(columns={"ENTREZ_GENE_ID": "Gene", "combine_z": "Data"}, inplace=True)
+    if recon_algorithm in {"IMAT", "TINIT"}:
+        expression_data.rename(columns={"ENTREZ_GENE_ID": "Gene", "combine_z": "Active"}, inplace=True)
     else:
-        expression_data.rename(columns={"ENTREZ_GENE_ID": "Gene", "Active": "Data"}, inplace=True)
+        expression_data.rename(columns={"ENTREZ_GENE_ID": "Gene"}, inplace=True)
 
-    expression_data = expression_data.loc[:, ["Gene", "Data"]]
+    expression_data = expression_data.loc[:, ["Gene", "Active"]]
     expression_data["Gene"] = expression_data["Gene"].astype(str)
     single_gene_names = expression_data[~expression_data.Gene.str.contains("//")].reset_index(drop=True)
     multiple_gene_names = expression_data[expression_data.Gene.str.contains("//")].reset_index(drop=True)
-    breaks_gene_names = pd.DataFrame(columns=["Gene", "Data"])
+    breaks_gene_names = pd.DataFrame(columns=["Gene", "Active"])
 
     for index, row in multiple_gene_names.iterrows():
         for genename in row["Gene"].split("///"):
             breaks_gene_names = pd.concat(
                 [
                     breaks_gene_names,
-                    pd.DataFrame([{"Gene": genename, "Data": row["Data"]}]),
+                    pd.DataFrame([{"Gene": genename, "Active": row["Active"]}]),
                 ],
                 axis=0,
                 ignore_index=True,
