@@ -622,4 +622,4 @@ def save_rnaseq_tests(
         if gene in top_df["entrez_gene_id"]:
             boolean_matrix.loc[gene, "high"] = 1
 
-    # TODO: Write boolean matrix to file
+    boolean_matrix.to_csv(output_filepath, index=False)
