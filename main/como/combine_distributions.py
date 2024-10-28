@@ -338,10 +338,6 @@ def combine_zscores_main(
                 res = merge_batch(trna_workdir, context, batch)
                 zmat = res[0]
                 num_reps.extend(res[1])
-                comb_z = combine_batch_zdistro(trna_workdir, context, batch, zmat)
-                comb_z.columns = ["ENTREZ_GENE_ID", batch]
-                if merge_z.empty:
-                    merge_z = comb_z
                 combine_z_matrix = _combine_batch_zdistro(trna_workdir, context, batch, z_matrix)
                 combine_z_matrix.columns = ["entrez_gene_id", batch]
                 if merge_z_data.empty:
@@ -391,7 +387,7 @@ def combine_zscores_main(
             comb_batches_z_mrna = None
 
         if context_use_scrna:
-            logger.info("Will merge single-cell RNA-seq distributions")
+            logger.info(f"Will merge single-cell RNA-seq distributions for {context}")
             scrna_workdir = working_dir / context / "scrna"
             num_reps = []
             count = 0
