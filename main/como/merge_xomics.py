@@ -795,42 +795,42 @@ def _parse_args() -> _Arguments:
 
 
 if __name__ == "__main__":
-    # args = _parse_args()
+    args = _parse_args()
     config = Config()
 
     # read custom expression requirment file if used
-    # if args.custom_expression_filename:
-    #     custom_filepath = config.data_dir / args.custom_expression_filename
-    #     custom_df = pd.read_excel(custom_filepath, sheet_name=0)
-    #     custom_df.columns = ["context", "req"]
-    # else:
-    #     custom_df = pd.DataFrame([])
+    if args.custom_expression_filename:
+        custom_filepath = config.data_dir / args.custom_expression_filename
+        custom_df = pd.read_excel(custom_filepath, sheet_name=0)
+        custom_df.columns = ["context", "req"]
+    else:
+        custom_df = pd.DataFrame([])
 
-    # def_exp_req = sum(
-    #     test is None
-    #     for test in [
-    #         args.trnaseq_filename,
-    #         args.mrnaseq_filename,
-    #         args.scrnaseq_filename,
-    #         args.proteomics_filename,
-    #     ]
-    # )
+    def_exp_req = sum(
+        test is None
+        for test in [
+            args.trnaseq_filename,
+            args.mrnaseq_filename,
+            args.scrnaseq_filename,
+            args.proteomics_filename,
+        ]
+    )
 
     merge_xomics(
-        trnaseq_filepath="/Users/joshl/Downloads/rnaseq_total_naiveB.csv",
-        mrnaseq_filepath=None,  # args.mrnaseq_filename,
-        scrnaseq_filepath=None,  # args.scrnaseq_filename,
-        proteomics_filepath=None,  # args.proteomics_filename,
-        trna_weight=6,  # args.trna_weight,
-        mrna_weight=6,  # args.mrna_weight,
-        scrna_weight=6,  # args.scrna_weight,
-        proteomics_weight=6,  # args.proteomics_weight,
-        expression_requirement=3,  # args.expression_requirement,
-        adjust_method=AdjustmentMethod.REGRESSIVE,  # args.adjustment_method,
-        no_high_confidence=True,  # args.no_high_confidence,
-        no_na=True,  # args.no_na,
-        merge_zfpkm_distribution=True,  # args.merge_zfpkm_distribution,
-        keep_transcriptomics_score=True,  # args.keep_transcriptomics_scores,
+        trnaseq_filepath=args.trnaseq_filename,
+        mrnaseq_filepath=args.mrnaseq_filename,
+        scrnaseq_filepath=args.scrnaseq_filename,
+        proteomics_filepath=args.proteomics_filename,
+        trna_weight=args.trna_weight,
+        mrna_weight=args.mrna_weight,
+        scrna_weight=args.scrna_weight,
+        proteomics_weight=args.proteomics_weight,
+        expression_requirement=args.expression_requirement,
+        adjust_method=args.adjustment_method,
+        no_high_confidence=args.no_high_confidence,
+        no_na=args.no_na,
+        merge_zfpkm_distribution=args.merge_zfpkm_distribution,
+        keep_transcriptomics_score=args.keep_transcriptomics_scores,
     )
 
     logger.success("Finished merging!")
