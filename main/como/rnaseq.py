@@ -413,7 +413,7 @@ def cpm_filter(*, context_name: str, metrics: NamedMetrics, filtering_options: _
     return metrics
 
 
-def TPM_quantile_filter(*, context_name: str, metrics: NamedMetrics, filtering_options: _FilteringOptions) -> NamedMetrics:
+def TPM_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions) -> NamedMetrics:
     """
     Apply quantile-based filtering to the TPM matrix for a given sample.
     """
@@ -462,7 +462,7 @@ def TPM_quantile_filter(*, context_name: str, metrics: NamedMetrics, filtering_o
     return metrics
 
 
-def zfpkm_filter(*, context_name: str, metrics: NamedMetrics, filtering_options: _FilteringOptions, prep: RNASeqPreparationMethod) -> NamedMetrics:
+def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions, prep: RNASeqPreparationMethod) -> NamedMetrics:
     n_exp = filtering_options.replicate_ratio
     n_top = filtering_options.high_replicate_ratio
     cutoff = filtering_options.min_zfpkm
@@ -497,7 +497,7 @@ def zfpkm_filter(*, context_name: str, metrics: NamedMetrics, filtering_options:
     return metrics
 
 
-def umi_filter(*, context_name: str, metrics: NamedMetrics, filtering_options: _FilteringOptions) -> NamedMetrics:
+def umi_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions) -> NamedMetrics:
     for metric in metrics.values():
         entrez_ids = metric.entrez_gene_ids
         count_matrix = count_matrix[count_matrix.sum(axis=0) > 0, :]
@@ -535,11 +535,11 @@ def filter_counts(
         case FilteringTechnique.cpm:
             return cpm_filter(context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep)
         case FilteringTechnique.tpm:
-            return TPM_quantile_filter(context_name=context_name, metrics=metrics, filtering_options=filtering_options)
+            return TPM_quantile_filter(metrics=metrics, filtering_options=filtering_options)
         case FilteringTechnique.zfpkm:
-            return zfpkm_filter(context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep)
+            return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, prep=prep)
         case FilteringTechnique.umi:
-            return umi_filter(context_name=context_name, metrics=metrics, filtering_options=filtering_options)
+            return umi_filter(metrics=metrics, filtering_options=filtering_options)
         case _:
             raise ValueError(f"Technique must be one of {FilteringTechnique}")
 
