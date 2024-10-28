@@ -196,24 +196,24 @@ def _combine_omics_zdistros(
     names = []
     dfs = []
     counter = 0
-    if tweight > 0:
+    if trna_weight > 0:
         counter += 1
-        weights.append(tweight)
+        weights.append(trna_weight)
         names.append("total")
         dfs.append(comb_batches_z_trna)
-    if mweight > 0:
+    if mrna_weight > 0:
         counter += 1
-        weights.append(mweight)
+        weights.append(mrna_weight)
         names.append("polyA")
         dfs.append(comb_batches_z_mrna)
-    if sweight > 0:
+    if scrna_weight > 0:
         counter += 1
-        weights.append(sweight)
+        weights.append(scrna_weight)
         names.append("singleCell")
         dfs.append(comb_batches_z_scrna)
-    if pweight > 0:
+    if proteomics_weight > 0:
         counter += 1
-        weights.append(pweight)
+        weights.append(proteomics_weight)
         names.append("proteome")
         dfs.append(comb_batches_z_prot)
 
@@ -298,28 +298,22 @@ def combine_zscores_main(
         context_use_scrna = global_use_scrna
         context_use_proteins = global_use_proteins
 
-        context_trna_weight = global_trna_weight
-        context_mrna_weight = global_mrna_weight
-        context_scrna_weight = global_scrna_weight
-        context_protein_weight = global_protein_weight
-
         context_trna_batch = global_trna_batches.get(context, [])
-        context_mrna_batch = global_mrna_batches.get(context, [])
-        context_scrna_batch = global_scrna_batches.get(context, [])
-        context_protein_batch = global_protein_batches.get(context, [])
-
         if len(context_trna_batch) == 0 and global_use_trna:
             context_use_trna = False
             logger.warning(f"No total RNA-seq zFPKM Matrix files found for {context}. Will not use for this context.")
 
+        context_mrna_batch = global_mrna_batches.get(context, [])
         if len(context_mrna_batch) == 0 and global_use_mrna:
             context_use_mrna = False
             logger.warning(f"No polyA RNA-seq zFPKM Matrix files found for {context}. Will not use for this context.")
 
+        context_scrna_batch = global_scrna_batches.get(context, [])
         if len(context_scrna_batch) == 0 and global_use_scrna:
             context_use_scrna = False
             logger.warning(f"No SC RNA-seq zFPKM Matrix files found for {context}. Will not use for this context.")
 
+        context_protein_batch = global_protein_batches.get(context, [])
         if len(context_protein_batch) == 0 and global_use_proteins:
             context_use_proteins = False
             logger.warning(f"No proteomics z-score Matrix files found for {context}. Will not use for this context.")
@@ -328,11 +322,11 @@ def combine_zscores_main(
             logger.info("Will merge total RNA-seq distributions")
             trna_workdir = working_dir / context / "total"
             num_reps = []
-            count = 0
-            merge_z = pd.DataFrame()  # Initialize an empty DataFrame
+            merge_z_data = pd.DataFrame()
+
             for batch in context_trna_batch:
-                res = merge_batch(trna_workdir, context, batch)
-                zmat = res[0]
+                res = _merge_batch(trna_workdir, context, batch)
+                z_matrix = res[0]
                 num_reps.extend(res[1])
                 combine_z_matrix = _combine_batch_zdistro(trna_workdir, context, batch, z_matrix)
                 combine_z_matrix.columns = ["entrez_gene_id", batch]
@@ -347,7 +341,7 @@ def combine_zscores_main(
             comb_batches_z_trna.to_csv(filename, index=False)
 
             if not context_use_proteins and not context_use_mrna and not context_use_scrna:
-                filename = working_dir / context / "total" / f"model_scores_{context}.csv"
+                filename = trna_workdir / f"model_scores_{context}.csv"
                 comb_batches_z_trna.to_csv(filename, index=False)
 
         else:
@@ -358,7 +352,7 @@ def combine_zscores_main(
             mrna_workdir = working_dir / context / "mrna"
             num_reps = []
             count = 0
-            merge_z = pd.DataFrame()  # Initialize an empty DataFrame
+            merge_z_data = pd.DataFrame()
             for batch in context_mrna_batch:
                 res = _merge_batch(mrna_workdir, context, batch)
                 z_matrix = res[0]
@@ -368,7 +362,7 @@ def combine_zscores_main(
                 if merge_z_data.empty:
                     merge_z_data = combine_z_matrix
                 else:
-                    merge_z = pd.merge(merge_z, comb_z, on="ENTREZ_GENE_ID", how="outer")
+                    merge_z_data = pd.merge(merge_z_data, combine_z_matrix, on="entrez_gene_id", how="outer")
                 count += 1
 
             comb_batches_z_mrna = _combine_context_zdistro(mrna_workdir, context, num_reps, merge_z_data)
@@ -387,10 +381,10 @@ def combine_zscores_main(
             scrna_workdir = working_dir / context / "scrna"
             num_reps = []
             count = 0
-            merge_z = pd.DataFrame()  # Initialize an empty DataFrame
+            merge_z_data = pd.DataFrame()
             for batch in context_scrna_batch:
-                res = merge_batch(scrna_workdir, context, batch)
-                zmat = res[0]
+                res = _merge_batch(scrna_workdir, context, batch)
+                z_matrix = res[0]
                 num_reps.extend(res[1])
                 combine_z_matrix = _combine_batch_zdistro(scrna_workdir, context, batch, z_matrix)
                 combine_z_matrix.columns = ["entrez_gene_id", batch]
@@ -416,7 +410,7 @@ def combine_zscores_main(
             protein_workdir = working_dir / context / "proteomics"
             num_reps = []
             count = 0
-            merge_z = pd.DataFrame()  # Initialize an empty DataFrame
+            merge_z_data = pd.DataFrame()
             for batch in context_protein_batch:
                 res = _merge_batch(protein_workdir, context, batch)
                 z_matrix = res[0]
