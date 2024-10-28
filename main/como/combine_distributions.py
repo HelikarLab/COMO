@@ -94,6 +94,7 @@ def _combine_batch_zdistro(wd, context, batch, zmat):
         result = np.sum(x) / np.sqrt(len(x))
         return np.clip(result, floor_score, ceil_score)
 
+    combine_z = zmat
     if zmat.shape[1] > 2:
         combine_z = np.apply_along_axis(weighted_z, axis=1, arr=zmat.iloc[:, 1:].values)
         merge_df = pd.concat([zmat, pd.Series(combine_z, name="combined")], axis=1)
@@ -114,7 +115,7 @@ def _combine_batch_zdistro(wd, context, batch, zmat):
             stack_df,
             x="zscore",
             color="source",
-            nbins=100,  # Adjust as needed
+            nbins=100,
             marginal="rug",
             title=f"Combined Z-score Distribution for {context} - {batch}",
         )
