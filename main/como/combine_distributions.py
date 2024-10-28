@@ -284,8 +284,7 @@ def combine_zscores_main(
 ):
     working_dir = Path(working_dir)
     figure_output_dir = working_dir / "figures"
-    if not figure_output_dir.exists():
-        figure_output_dir.mkdir()
+    figure_output_dir.mkdir(parents=True, exist_ok=True)
 
     global_trna_batches = _parse_contexts_zfpkm(working_dir, context_names, "total")
     global_mrna_batches = _parse_contexts_zfpkm(working_dir, context_names, "mrna")
