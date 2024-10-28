@@ -435,17 +435,15 @@ def TPM_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
         min_samples = round(n_exp * len(tpm_matrix.columns))
         top_samples = round(n_top * len(tpm_matrix.columns))
 
-        for i in range(len(tpm_matrix.columns)):
-            tpm_q: pd.Series = tpm_matrix.iloc[:, i]
-            tpm_q = tpm_q[tpm_q > 0]
-            q_cutoff = np.quantile(tpm_q.values.flatten(), 1 - (quantile / 100))
-            test_bools.iloc[:, i] = tpm_matrix.iloc[:, i] > q_cutoff
+        tpm_quantile = tpm_matrix[tpm_matrix > 0]
+        quantile_cutoff = np.quantile(a=tpm_quantile.values, q=1 - (quantile / 100), axis=0)  # Compute quantile across columns
+        boolean_expression = pd.DataFrame(data=tpm_matrix > quantile_cutoff, index=tpm_matrix.index, columns=tpm_matrix.columns).astype(int)
 
         min_func = k_over_a(min_samples, 0.9)
         top_func = k_over_a(top_samples, 0.9)
 
-        min_genes: npt.NDArray[bool] = genefilter(test_bools, min_func)
-        top_genes: npt.NDArray[bool] = genefilter(test_bools, top_func)
+        min_genes: npt.NDArray[bool] = genefilter(boolean_expression, min_func)
+        top_genes: npt.NDArray[bool] = genefilter(boolean_expression, top_func)
 
         # Only keep `entrez_gene_ids` that pass `min_genes`
         metric.entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, min_genes) if keep]
