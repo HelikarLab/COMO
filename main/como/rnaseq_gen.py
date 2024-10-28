@@ -71,7 +71,7 @@ def _handle_context_batch(
 
         rnaseq_input_filepath = config.data_dir / "data_matrices" / context_name / f"gene_counts_matrix_{prep}_{context_name}.csv"
         if not rnaseq_input_filepath.exists():
-            print(f"Gene counts matrix not found at {rnaseq_input_filepath}, skipping...")
+            logger.warning(f"Gene counts matrix not found at {rnaseq_input_filepath}, skipping...")
             continue
 
         gene_info_filepath = config.data_dir / "gene_info.csv"
@@ -136,8 +136,6 @@ def rnaseq_gen(
         if cut_off is None:
             cut_off = "default"
 
-    prep = prep.replace(" ", "")
-
     _handle_context_batch(
         config_filename,
         replicate_ratio,
@@ -148,7 +146,7 @@ def rnaseq_gen(
         cut_off,
         cut_off,
         cut_off,
-        prep,
+        prep.value,
     )
 
 
@@ -219,10 +217,9 @@ def _parse_args():
         "--filt-technique",
         type=str,
         required=False,
-        default="quantile-tpm",
+        default="quantile",
         dest="filtering_technique",
-        help="Technique to normalize and filter counts with. Either 'zfpkm', 'quantile-tpm' or "
-        "'flat-cpm'. More info about each method is discussed in pipeline.ipynb.",
+        help="Technique to normalize and filter counts with. Either 'zfpkm', 'quantile', or 'cpm'. More info about each method is discussed in pipeline.ipynb.",
     )
     parser.add_argument(
         "--minimum-cutoff",
@@ -235,11 +232,10 @@ def _parse_args():
     parser.add_argument(
         "-p",
         "--library-prep",
-        required=False,
-        default="",
+        required=True,
+        choices=["total", "mrna", "scrna"],
         dest="library_prep",
-        help="Library preparation used, will separate samples into groups to only compare similarly "
-        "prepared libraries. For example, mRNA, total-rna, scRNA, etc",
+        help="Library preparation used, will separate samples into groups to only compare similarly prepared libraries. For example, mRNA, total-rna, scRNA, etc",
     )
     args = parser.parse_args()
     args.filtering_technique = args.filtering_technique.lower()
