@@ -322,7 +322,7 @@ def zfpkm_transform(
     return results, zfpkm_df
 
 
-def zfpkm_plot(results, *, plot_xfloor: int = -20, subplot_titles: bool = True):
+def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
     """
     Plot the log2(FPKM) density and fitted Gaussian for each sample.
 
