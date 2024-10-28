@@ -6,35 +6,35 @@ import plotly.express as px
 from loguru import logger
 
 
-def get_batch_name(x):
+def _get_batch_name(x):
     return Path(x).stem
 
 
-def parse_contexts_zfpkm(wd, contexts, prep):
+def _parse_contexts_zfpkm(wd, contexts, prep):
     batches = {}
     for context in contexts:
         files = (wd / context / prep).glob(f"zFPKM_Matrix_{prep}_*.csv")
-        batches[context] = [get_batch_name(f) for f in files]
+        batches[context] = [_get_batch_name(f) for f in files]
     return batches
 
 
-def parse_contexts_zumi(wd, contexts, prep):
+def _parse_contexts_zumi(wd, contexts, prep):
     batches = {}
     for context in contexts:
         files = (wd / context / prep).glob(f"zUMI_Matrix_{prep}_*.csv")
-        batches[context] = [get_batch_name(f) for f in files]
+        batches[context] = [_get_batch_name(f) for f in files]
     return batches
 
 
-def parse_contexts_zscore_prot(wd, contexts):
+def _parse_contexts_zscore_prot(wd, contexts):
     batches = {}
     for context in contexts:
         files = (wd / context / "proteomics").glob("protein_zscore_Matrix_*.csv")
-        batches[context] = [get_batch_name(f) for f in files]
+        batches[context] = [_get_batch_name(f) for f in files]
     return batches
 
 
-def merge_batch(wd, context, batch):
+def _merge_batch(wd, context, batch):
     files = list(wd.glob(f"*{batch}*"))
     nrep = []
     if not files:
@@ -81,7 +81,7 @@ def merge_batch(wd, context, batch):
     return zmat, nrep
 
 
-def combine_batch_zdistro(wd, context, batch, zmat):
+def _combine_batch_zdistro(wd, context, batch, zmat):
     plot_name_png = wd / "figures" / f"plot_{context}_{batch}_combine_distro.png"
 
     def weighted_z(x):
@@ -126,7 +126,7 @@ def combine_batch_zdistro(wd, context, batch, zmat):
     return combine_z
 
 
-def combine_context_zdistro(wd, context, n_reps, zmat):
+def _combine_context_zdistro(wd, context, n_reps, zmat):
     plot_name_png = wd / "figures" / f"plot_{context}_combine_batches_distro.png"
 
     def weighted_z(x, n_reps):
@@ -175,7 +175,7 @@ def combine_context_zdistro(wd, context, n_reps, zmat):
     return combine_z
 
 
-def combine_omics_zdistros(
+def _combine_omics_zdistros(
     wd,
     context,
     comb_batches_z_trna,
@@ -288,10 +288,10 @@ def combine_zscores_main(
     if not figure_output_dir.exists():
         figure_output_dir.mkdir()
 
-    global_trna_batches = parse_contexts_zfpkm(working_dir, context_names, "total")
-    global_mrna_batches = parse_contexts_zfpkm(working_dir, context_names, "mrna")
-    global_scrna_batches = parse_contexts_zumi(working_dir, context_names, "scrna")
-    global_protein_batches = parse_contexts_zscore_prot(working_dir, context_names)
+    global_trna_batches = _parse_contexts_zfpkm(working_dir, context_names, "total")
+    global_mrna_batches = _parse_contexts_zfpkm(working_dir, context_names, "mrna")
+    global_scrna_batches = _parse_contexts_zumi(working_dir, context_names, "scrna")
+    global_protein_batches = _parse_contexts_zscore_prot(working_dir, context_names)
 
     for context in context_names:
         context_use_trna = global_use_trna
@@ -421,16 +421,18 @@ def combine_zscores_main(
             for batch in context_protein_batch:
                 res = merge_batch(protein_workdir, context, batch)
                 zmat = res[0]
+                res = _merge_batch(protein_workdir, context, batch)
                 num_reps.extend(res[1])
                 comb_z = combine_batch_zdistro(protein_workdir, context, batch, zmat)
                 comb_z.columns = ["ENTREZ_GENE_ID", batch]
                 if merge_z.empty:
                     merge_z = comb_z
+                combine_z_matrix = _combine_batch_zdistro(protein_workdir, context, batch, z_matrix)
                 else:
                     merge_z = pd.merge(merge_z, comb_z, on="ENTREZ_GENE_ID", how="outer")
                 count += 1
 
-            comb_batches_z_prot = combine_context_zdistro(protein_workdir, context, num_reps, merge_z)
+            comb_batches_z_prot = _combine_context_zdistro(protein_workdir, context, num_reps, merge_z_data)
             filename = protein_workdir / f"combined_zscore_proteinAbundance_{context}.csv"
             comb_batches_z_prot.to_csv(filename, index=False)
 
@@ -441,26 +443,17 @@ def combine_zscores_main(
         else:
             comb_batches_z_prot = None
 
-        if not context_use_trna:
-            context_trna_weight = 0
-        if not context_use_mrna:
-            context_mrna_weight = 0
-        if not context_use_scrna:
-            context_scrna_weight = 0
-        if not context_use_proteins:
-            context_protein_weight = 0
-
-        comb_omics_z = combine_omics_zdistros(
-            working_dir,
-            context,
-            comb_batches_z_trna,
-            comb_batches_z_mrna,
-            comb_batches_z_scrna,
-            comb_batches_z_prot,
-            context_trna_weight,
-            context_mrna_weight,
-            context_scrna_weight,
-            context_protein_weight,
+        comb_omics_z = _combine_omics_zdistros(
+            wd=working_dir,
+            context=context,
+            comb_batches_z_trna=comb_batches_z_trna,
+            comb_batches_z_mrna=comb_batches_z_mrna,
+            comb_batches_z_scrna=comb_batches_z_scrna,
+            comb_batches_z_prot=comb_batches_z_prot,
+            trna_weight=global_trna_weight,
+            mrna_weight=global_mrna_weight,
+            scrna_weight=global_scrna_weight,
+            proteomics_weight=global_protein_weight,
         )
 
         filename = working_dir / context / f"model_scores_{context}.csv"
