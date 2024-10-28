@@ -46,12 +46,13 @@ class FilteringTechnique(Enum):
                 return FilteringTechnique.cpm
             case "zfpkm":
                 return FilteringTechnique.zfpkm
-            case "tpm":
+            case "quantile":
                 return FilteringTechnique.tpm
             case "umi":
                 return FilteringTechnique.umi
             case _:
-                raise ValueError(f"Filtering technique must be one of {FilteringTechnique}; got: {value}")
+                possible_values = [t.value for t in FilteringTechnique]
+                raise ValueError(f"Filtering technique must be one of {possible_values}; got: {value}")
 
 
 @dataclass
