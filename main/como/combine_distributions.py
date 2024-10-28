@@ -42,13 +42,16 @@ def _merge_batch(wd, context, batch):
 
     for f in files:
         zmat = pd.read_csv(f)
-        zmat = zmat.astype({col: float for col in zmat.columns if col != "ENTREZ_GENE_ID"})
-        zmat = zmat.astype({"ENTREZ_GENE_ID": str})
-        zmat = zmat.groupby("ENTREZ_GENE_ID").max().reset_index()
+        zmat.columns = pd.Index([c.lower() for c in zmat.columns])
+        zmat["entrez_gene_id"] = zmat["entrez_gene_id"].str.split("//").str[0]
+
+        zmat = zmat.astype({col: float for col in zmat.columns if col != "entrez_gene_id"})
+        zmat = zmat.astype({"entrez_gene_id": str})
+        zmat = zmat.groupby("entrez_gene_id").max().reset_index()
         zmat = zmat.dropna()
 
         nrep.append(zmat.shape[1] - 1)
-        entrez_gene = zmat["ENTREZ_GENE_ID"]
+        entrez_gene = zmat["entrez_gene_id"]
         rep_names = zmat.columns
         zmat = pd.concat([zmat[col] for col in zmat.columns[1:]], axis=1)
         zmat = pd.concat([entrez_gene, zmat], axis=1)
@@ -56,7 +59,7 @@ def _merge_batch(wd, context, batch):
         zmat.columns = rep_names
 
         stack_df = pd.concat(
-            [pd.DataFrame({"ENTREZ_GENE_ID": zmat["ENTREZ_GENE_ID"], "zscore": zmat[col].astype(float), "source": col}) for col in zmat.columns[1:]]
+            [pd.DataFrame({"entrez_gene_id": zmat["entrez_gene_id"], "zscore": zmat[col].astype(float), "source": col}) for col in zmat.columns[1:]]
         )
 
         plot_name_png = wd / "figures" / f"plot_{context}_{Path(f).stem}.png"
@@ -94,11 +97,11 @@ def _combine_batch_zdistro(wd, context, batch, zmat):
     if zmat.shape[1] > 2:
         combine_z = np.apply_along_axis(weighted_z, axis=1, arr=zmat.iloc[:, 1:].values)
         merge_df = pd.concat([zmat, pd.Series(combine_z, name="combined")], axis=1)
-        combine_z = pd.DataFrame({"ENTREZ_GENE_ID": zmat["ENTREZ_GENE_ID"].astype(str), "combine_z": combine_z})
+        combine_z = pd.DataFrame({"entrez_gene_id": zmat["entrez_gene_id"].astype(str), "combine_z": combine_z})
 
         stack_df = pd.concat(
             [
-                pd.DataFrame({"ENTREZ_GENE_ID": merge_df["ENTREZ_GENE_ID"], "zscore": merge_df[col].astype(float), "source": col})
+                pd.DataFrame({"entrez_gene_id": merge_df["entrez_gene_id"], "zscore": merge_df[col].astype(float), "source": col})
                 for col in merge_df.columns[1:]
             ]
         )
@@ -146,11 +149,11 @@ def _combine_context_zdistro(wd, context, n_reps, zmat):
     if zmat.shape[1] > 2:
         combine_z = np.apply_along_axis(weighted_z, axis=1, arr=zmat.iloc[:, 1:].values, n_reps=n_reps)
         merge_df = pd.concat([zmat, pd.Series(combine_z, name="combined")], axis=1)
-        combine_z = pd.DataFrame({"ENTREZ_GENE_ID": zmat["ENTREZ_GENE_ID"].astype(str), "combine_z": combine_z})
+        combine_z = pd.DataFrame({"entrez_gene_id": zmat["entrez_gene_id"].astype(str), "combine_z": combine_z})
 
         stack_df = pd.concat(
             [
-                pd.DataFrame({"ENTREZ_GENE_ID": merge_df["ENTREZ_GENE_ID"], "zscore": merge_df[col].astype(float), "source": col})
+                pd.DataFrame({"entrez_gene_id": merge_df["entrez_gene_id"], "zscore": merge_df[col].astype(float), "source": col})
                 for col in merge_df.columns[1:]
             ]
         )
@@ -170,7 +173,7 @@ def _combine_context_zdistro(wd, context, n_reps, zmat):
 
     else:
         combine_z = zmat
-        combine_z.columns = ["ENTREZ_GENE_ID", "combine_z"]
+        combine_z.columns = ["entrez_gene_id", "combine_z"]
 
     return combine_z
 
@@ -233,11 +236,11 @@ def _combine_omics_zdistros(
         return np.clip(result, floor_score, ceil_score)
 
     zmat = dfs[0].copy()
-    zmat.columns = ["ENTREZ_GENE_ID", names[0]]
+    zmat.columns = ["entrez_gene_id", names[0]]
     for i in range(1, counter):
         add_df = dfs[i]
-        add_df.columns = ["ENTREZ_GENE_ID", names[i]]
-        zmat = pd.merge(zmat, add_df, on="ENTREZ_GENE_ID", how="outer")
+        add_df.columns = ["entrez_gene_id", names[i]]
+        zmat = pd.merge(zmat, add_df, on="entrez_gene_id", how="outer")
 
     if zmat.shape[1] > 2:
         combine_z = np.apply_along_axis(weighted_z, axis=1, arr=zmat.iloc[:, 1:].values, weights=weights)
@@ -245,11 +248,11 @@ def _combine_omics_zdistros(
         combine_z = zmat.iloc[:, 1:].values
 
     merge_df = pd.concat([zmat, pd.Series(combine_z, name="combined")], axis=1)
-    combine_z = pd.DataFrame({"ENTREZ_GENE_ID": zmat["ENTREZ_GENE_ID"].astype(str), "combine_z": combine_z})
+    combine_z = pd.DataFrame({"entrez_gene_id": zmat["entrez_gene_id"].astype(str), "combine_z": combine_z})
 
     stack_df = pd.concat(
         [
-            pd.DataFrame({"ENTREZ_GENE_ID": merge_df["ENTREZ_GENE_ID"], "zscore": merge_df[col].astype(float), "source": col})
+            pd.DataFrame({"entrez_gene_id": merge_df["entrez_gene_id"], "zscore": merge_df[col].astype(float), "source": col})
             for col in merge_df.columns[1:]
         ]
     )
@@ -339,11 +342,15 @@ def combine_zscores_main(
                 comb_z.columns = ["ENTREZ_GENE_ID", batch]
                 if merge_z.empty:
                     merge_z = comb_z
+                combine_z_matrix = _combine_batch_zdistro(trna_workdir, context, batch, z_matrix)
+                combine_z_matrix.columns = ["entrez_gene_id", batch]
+                if merge_z_data.empty:
+                    merge_z_data = combine_z_matrix
                 else:
-                    merge_z = pd.merge(merge_z, comb_z, on="ENTREZ_GENE_ID", how="outer")
+                    merge_z_data = pd.merge(merge_z_data, combine_z_matrix, on="entrez_gene_id", how="outer")
                 count += 1
 
-            comb_batches_z_trna = combine_context_zdistro(trna_workdir, context, num_reps, merge_z)
+            comb_batches_z_trna = _combine_context_zdistro(trna_workdir, context, num_reps, merge_z_data)
             filename = trna_workdir / f"combined_zFPKM_{context}.csv"
             comb_batches_z_trna.to_csv(filename, index=False)
 
@@ -361,18 +368,18 @@ def combine_zscores_main(
             count = 0
             merge_z = pd.DataFrame()  # Initialize an empty DataFrame
             for batch in context_mrna_batch:
-                res = merge_batch(mrna_workdir, context, batch)
-                zmat = res[0]
+                res = _merge_batch(mrna_workdir, context, batch)
+                z_matrix = res[0]
                 num_reps.extend(res[1])
-                comb_z = combine_batch_zdistro(mrna_workdir, context, batch, zmat)
-                comb_z.columns = ["ENTREZ_GENE_ID", batch]
-                if merge_z.empty:
-                    merge_z = comb_z
+                combine_z_matrix = _combine_batch_zdistro(mrna_workdir, context, batch, z_matrix)
+                combine_z_matrix.columns = ["entrez_gene_id", batch]
+                if merge_z_data.empty:
+                    merge_z_data = combine_z_matrix
                 else:
                     merge_z = pd.merge(merge_z, comb_z, on="ENTREZ_GENE_ID", how="outer")
                 count += 1
 
-            comb_batches_z_mrna = combine_context_zdistro(mrna_workdir, context, num_reps, merge_z)
+            comb_batches_z_mrna = _combine_context_zdistro(mrna_workdir, context, num_reps, merge_z_data)
             filename = mrna_workdir / f"combined_zFPKM_{context}.csv"
             comb_batches_z_mrna.to_csv(filename, index=False)
 
@@ -393,15 +400,15 @@ def combine_zscores_main(
                 res = merge_batch(scrna_workdir, context, batch)
                 zmat = res[0]
                 num_reps.extend(res[1])
-                comb_z = combine_batch_zdistro(scrna_workdir, context, batch, zmat)
-                comb_z.columns = ["ENTREZ_GENE_ID", batch]
-                if merge_z.empty:
-                    merge_z = comb_z
+                combine_z_matrix = _combine_batch_zdistro(scrna_workdir, context, batch, z_matrix)
+                combine_z_matrix.columns = ["entrez_gene_id", batch]
+                if merge_z_data.empty:
+                    merge_z_data = combine_z_matrix
                 else:
-                    merge_z = pd.merge(merge_z, comb_z, on="ENTREZ_GENE_ID", how="outer")
+                    merge_z_data = pd.merge(merge_z_data, combine_z_matrix, on="entrez_gene_id", how="outer")
                 count += 1
 
-            comb_batches_z_scrna = combine_context_zdistro(scrna_workdir, context, num_reps, merge_z)
+            comb_batches_z_scrna = _combine_context_zdistro(scrna_workdir, context, num_reps, merge_z_data)
             filename = scrna_workdir / f"combined_zFPKM_{context}.csv"
             comb_batches_z_scrna.to_csv(filename, index=False)
 
@@ -419,17 +426,15 @@ def combine_zscores_main(
             count = 0
             merge_z = pd.DataFrame()  # Initialize an empty DataFrame
             for batch in context_protein_batch:
-                res = merge_batch(protein_workdir, context, batch)
-                zmat = res[0]
                 res = _merge_batch(protein_workdir, context, batch)
+                z_matrix = res[0]
                 num_reps.extend(res[1])
-                comb_z = combine_batch_zdistro(protein_workdir, context, batch, zmat)
-                comb_z.columns = ["ENTREZ_GENE_ID", batch]
-                if merge_z.empty:
-                    merge_z = comb_z
                 combine_z_matrix = _combine_batch_zdistro(protein_workdir, context, batch, z_matrix)
+                combine_z_matrix.columns = ["entrez_gene_id", batch]
+                if merge_z_data.empty:
+                    merge_z_data = combine_z_matrix
                 else:
-                    merge_z = pd.merge(merge_z, comb_z, on="ENTREZ_GENE_ID", how="outer")
+                    merge_z_data = pd.merge(merge_z_data, combine_z_matrix, on="entrez_gene_id", how="outer")
                 count += 1
 
             comb_batches_z_prot = _combine_context_zdistro(protein_workdir, context, num_reps, merge_z_data)
