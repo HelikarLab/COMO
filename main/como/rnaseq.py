@@ -198,10 +198,7 @@ def read_counts_matrix(
         metrics[study].layout[i] = config_df.at[i, "layout"]
 
     for study in studies:
-        sample_matrix = metrics[study].count_matrix
-
-        sample_matrix.iloc[:, 1:] = sample_matrix.iloc[:, 1:].apply(pd.to_numeric)
-        metrics[study].count_matrix = sample_matrix
+        metrics[study].count_matrix.iloc[:, 1:] = metrics[study].count_matrix.iloc[:, 1:].apply(pd.to_numeric)
 
     return ReadMatrixResults(metrics=metrics, entrez_gene_ids=gene_info["entrez_gene_id"].values.tolist())
 
@@ -219,8 +216,6 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
             denominator = np.log(np.sum(np.exp(rate)))
             tpm_value = np.exp(rate - denominator + np.log(1e6))
             tpm_matrix.iloc[:, i] = tpm_value
-
-        tpm_matrix.columns = pd.Index([f"col{i}" for i in range(count_matrix.shape[1])], name="gene_id")
         metrics[sample].normalization_matrix = tpm_matrix
 
     return metrics
