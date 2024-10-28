@@ -181,10 +181,10 @@ def _combine_omics_zdistros(
     comb_batches_z_mrna,
     comb_batches_z_scrna,
     comb_batches_z_prot,
-    tweight,
-    mweight,
-    sweight,
-    pweight,
+    trna_weight: int,
+    mrna_weight: int,
+    scrna_weight: int,
+    proteomics_weight: int,
     keep_gene_scores=True,
 ):
     fig_path = wd / context / "figures"
