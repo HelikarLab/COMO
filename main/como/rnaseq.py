@@ -372,11 +372,8 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
 def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
     for sample in metrics.keys():
         log_matrix = np.log(metrics[sample].normalization_matrix)
-
         z_matrix = pd.DataFrame(data=sklearn.preprocessing.scale(log_matrix, axis=1), columns=metrics[sample].sample_names)
-
         metrics[sample].z_score_matrix = z_matrix
-
     return metrics
 
 
@@ -438,7 +435,6 @@ def TPM_quantile_filter(*, context_name: str, metrics: NamedMetrics, filtering_o
 
         min_samples = round(n_exp * len(tpm_matrix.columns))
         top_samples = round(n_top * len(tpm_matrix.columns))
-        test_bools = pd.DataFrame(data=None, index=pd.Index(entrez_ids, name="entrez_gene_id"), columns=tpm_matrix.columns)
 
         for i in range(len(tpm_matrix.columns)):
             tpm_q: pd.Series = tpm_matrix.iloc[:, i]
