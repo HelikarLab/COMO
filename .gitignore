@@ -23,3 +23,9 @@ main/data/config_sheets/*
 main/data/GSE*_RAW
 main/data/gpl*entrez.csv
 main/src/microarray.db
+
+# COMO data
+main/data/data_matrices/naiveB
+main/data/data_matrices/smB
+
+
