@@ -115,6 +115,7 @@ def _load_rnaseq_tests(filename, context_name, lib_type):
 
     save_filepath = config.result_dir / context_name / lib_type / filename
     if save_filepath.exists():
+        logger.debug(f"Reading from {save_filepath}")
         data = pd.read_csv(save_filepath, index_col="entrez_gene_id")
         logger.success(f"Read from {save_filepath}")
         return context_name, data
@@ -436,7 +437,6 @@ def _merge_xomics(
     merge_data.reset_index(drop=False, inplace=True)
 
     split_entrez = split_gene_expression_data(merge_data)
-    split_entrez.rename(columns={"Gene": "entrez_gene_id", "Data": "Active"}, inplace=True)
     split_entrez.to_csv(filepath, index_label="entrez_gene_id")
     files_dict = {context_name: filepath.as_posix()}
 
@@ -490,7 +490,7 @@ def _handle_context_batch(
 
     counts = Counter(sheet_names)
     sheet_names = sorted(list(set(sheet_names)))
-    logger.info("The data provided for each context listed will be merged. Data BETWEEN contexts will not be merged, only WITHIN a context")
+    logger.info("Beginning to merge data within contexts")
     dict_list = {}
 
     max_inputs = max(counts.values())
