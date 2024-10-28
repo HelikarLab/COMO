@@ -102,31 +102,18 @@ def split_gene_expression_data(expression_data: pd.DataFrame, recon_algorithm: s
     """
     Splits genes that have mapped to multiple Entrez IDs are formated as "gene12//gene2//gene3"
     """
+    expression_data.columns = [c.lower() for c in expression_data.columns]
     if recon_algorithm in {"IMAT", "TINIT"}:
-        expression_data.rename(columns={"ENTREZ_GENE_ID": "Gene", "combine_z": "Active"}, inplace=True)
-    else:
-        expression_data.rename(columns={"ENTREZ_GENE_ID": "Gene"}, inplace=True)
+        expression_data.rename(columns={"combine_z": "active"}, inplace=True)
 
-    expression_data = expression_data.loc[:, ["Gene", "Active"]]
-    expression_data["Gene"] = expression_data["Gene"].astype(str)
-    single_gene_names = expression_data[~expression_data.Gene.str.contains("//")].reset_index(drop=True)
-    multiple_gene_names = expression_data[expression_data.Gene.str.contains("//")].reset_index(drop=True)
-    breaks_gene_names = pd.DataFrame(columns=["Gene", "Active"])
+    expression_data = expression_data[["entrez_gene_id", "active"]]
+    expression_data["entrez_gene_id"] = expression_data["entrez_gene_id"].astype(str)
+    single_gene_names = expression_data[~expression_data["entrez_gene_id"].str.contains("//")]
+    multiple_gene_names = expression_data[expression_data["entrez_gene_id"].str.contains("//")]
+    split_gene_names = multiple_gene_names.assign(entrez_gene_id=multiple_gene_names["entrez_gene_id"].str.split("///")).explode("entrez_gene_id")
 
-    for index, row in multiple_gene_names.iterrows():
-        for genename in row["Gene"].split("///"):
-            breaks_gene_names = pd.concat(
-                [
-                    breaks_gene_names,
-                    pd.DataFrame([{"Gene": genename, "Active": row["Active"]}]),
-                ],
-                axis=0,
-                ignore_index=True,
-            )
-
-    gene_expressions = pd.concat([single_gene_names, breaks_gene_names], axis=0, ignore_index=True)
-    gene_expressions.set_index("Gene", inplace=True)
-
+    gene_expressions = pd.concat([single_gene_names, split_gene_names], axis=0, ignore_index=True)
+    gene_expressions.set_index("entrez_gene_id", inplace=True)
     return gene_expressions
 
 
