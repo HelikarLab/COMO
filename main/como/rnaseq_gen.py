@@ -11,7 +11,7 @@ from typing import Optional
 import pandas as pd
 from loguru import logger
 
-from como import Config
+from como import Config, RNASeqPreparationMethod
 from como.rnaseq import FilteringTechnique, save_rnaseq_tests
 
 
@@ -24,15 +24,11 @@ class RNASeqGen:
     high_batch_ratio: float
     filtering_technique: FilteringTechnique
     minimum_cutoff: int | str
-    library_prep: str
+    library_prep: RNASeqPreparationMethod
 
     def __post_init__(self):
-        self.library_prep = self.library_prep.replace(" ", "")
-
-        if str(self.filtering_technique).lower() in [t.value for t in FilteringTechnique]:
-            self.filtering_technique = FilteringTechnique.from_string(str(self.filtering_technique).lower())
-        else:
-            raise ValueError(f"filtering_technique must be either 'zfpkm', 'cpm', or 'tpm'; got: {self.filtering_technique}")
+        self.library_prep = RNASeqPreparationMethod.from_string(str(self.library_prep))
+        self.filtering_technique = FilteringTechnique.from_string(str(self.filtering_technique))
 
         if self.minimum_cutoff is None:
             if self.filtering_technique == FilteringTechnique.tpm:
@@ -106,6 +102,7 @@ def _handle_context_batch(
 
 def rnaseq_gen(
     config_filename: str,
+    prep: RNASeqPreparationMethod,
     replicate_ratio: float = 0.5,
     batch_ratio: float = 0.5,
     replicate_ratio_high: float = 1.0,
