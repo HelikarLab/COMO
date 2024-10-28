@@ -426,8 +426,7 @@ def TPM_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
     metrics = calculate_tpm(metrics)
 
     sample: str
-    metrics: _StudyMetrics
-
+    metric: _StudyMetrics
     for sample, metric in metrics.items():
         entrez_ids = metric.entrez_gene_ids
         gene_size = metric.gene_sizes
