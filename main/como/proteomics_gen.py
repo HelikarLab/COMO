@@ -13,7 +13,7 @@ from loguru import logger
 
 from como import return_placeholder_data
 from como.project import Config
-from como.proteomics_processing import protein_transform_main
+from como.proteomics_preprocessing import protein_transform_main
 
 
 # Load Proteomics
@@ -27,7 +27,6 @@ def load_proteomics_data(datafilename, context_name):
 
     if data_path.exists():
         proteomics_data = pd.read_csv(data_path, header=0)
-
     else:
         logger.error(f"Error: file not found: {data_path}")
 
