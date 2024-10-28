@@ -49,7 +49,7 @@ def _handle_context_batch(
     quantile,
     min_count,
     min_zfpkm,
-    prep,
+    prep: str,
 ):
     """
     Handle iteration through each context type and create rnaseq expression file by calling rnaseq.R
@@ -109,7 +109,6 @@ def rnaseq_gen(
     batch_ratio_high: float = 1.0,
     technique: FilteringTechnique | str = FilteringTechnique.tpm,
     cut_off: Optional[int] = None,
-    prep: Optional[str] = "",
 ) -> None:
     if isinstance(technique, str):
         technique = FilteringTechnique(technique.lower())
