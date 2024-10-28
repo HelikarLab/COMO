@@ -119,13 +119,8 @@ def _combine_batch_zdistro(wd, context, batch, zmat):
             marginal="rug",
             title=f"Combined Z-score Distribution for {context} - {batch}",
         )
-
         fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font=dict(family="sans-serif", size=12))
-
         fig.write_image(plot_name_png)
-
-    else:
-        combine_z = zmat
 
     return combine_z
 
