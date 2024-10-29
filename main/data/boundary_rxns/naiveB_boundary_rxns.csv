@@ -1,4 +1,4 @@
-Reaction,Abbreviation,Compartment,Minimum Reaction Rate,Maximum Reaction Rate
+Reaction Type,Abbreviation,Compartment,Minimum Reaction Rate,Maximum Reaction Rate
 Exchange,glc_D,Extracellular,-100,1000
 Exchange,fe2,Extracellular,-1000,1000
 Exchange,gal,Extracellular,0,1000
