@@ -27,7 +27,7 @@ jobs:
           changed-files: "true"
 
       - name: Commit Changes
-        uses: stefanweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "style: format code and imports with `ruff`"
           file_pattern: "main/como/*.py"
