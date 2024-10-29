@@ -180,7 +180,7 @@ def read_counts_matrix(
         study = config_df.at[i, "study"]
 
         if sample_name not in counts_matrix.columns:
-            logger.warning(f"'{sample_name}' not found in the gene count matrix")
+            logger.critical(f"'{sample_name}' not found in the gene count matrix")
             continue
 
         fragment_length_value = config_df.at[i, "fragment_length"].astype(np.float32)
@@ -188,13 +188,9 @@ def read_counts_matrix(
             fragment_length_value = np.float32(0)
 
         # Set metrics[group].count_matrix at column index 'i' equal to counts_matrix at column label 'entry'
-
         metrics[study].count_matrix.iloc[:, i] = counts_matrix.loc[:, sample_name]
-
         metrics[study].fragment_lengths[i] = fragment_length_value
-
         metrics[study].sample_names[i] = sample_name
-
         metrics[study].layout[i] = config_df.at[i, "layout"]
 
     for study in studies:
