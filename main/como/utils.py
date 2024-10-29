@@ -4,6 +4,7 @@ import sys
 from typing import Iterator
 
 import pandas as pd
+from fast_bioservices import BioDBNet, Output, Taxon
 
 __all__ = ["Compartments", "stringlist_to_list", "split_gene_expression_data", "suppress_stdout"]
 
@@ -125,3 +126,9 @@ def suppress_stdout() -> Iterator[None]:
             yield
         finally:
             sys.stdout = sys.__stdout__
+
+
+def _format_cohersion(biodbnet: BioDBNet, *, requested_output: Output, input_values: list[str], taxon: Taxon) -> pd.DataFrame:
+    cohersion = biodbnet.dbFind(values=input_values, output_db=requested_output, taxon=taxon).drop(columns=["Input Type"])
+    cohersion.columns = pd.Index(["input_value", requested_output.value.replace(" ", "_").lower()])
+    return cohersion
