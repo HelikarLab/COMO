@@ -140,7 +140,7 @@ def _merge_logical_table(df: pd.DataFrame):
 
     df.reset_index(drop=False, inplace=True)
     df.dropna(axis=0, subset=["entrez_gene_id"], inplace=True)
-    df["entrez_gene_id"] = df["entrez_gene_id"].str.replace(" /// ", "//").astype(str)
+    df["entrez_gene_id"] = df["entrez_gene_id"].astype(str).str.replace(" /// ", "//").astype(str)
 
     single_entrez_ids: list[str] = df[~df["entrez_gene_id"].str.contains("//")]["entrez_gene_id"].tolist()
     multiple_entrez_ids: list[str] = df[df["entrez_gene_id"].str.contains("//")]["entrez_gene_id"].tolist()
