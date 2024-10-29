@@ -25,7 +25,4 @@ main/data/gpl*entrez.csv
 main/src/microarray.db
 
 # COMO data
-main/data/data_matrices/naiveB
-main/data/data_matrices/smB
-
-
+main/data/data_matrices
