@@ -14,18 +14,12 @@ docs/Gemfile.lock
 # COMO-specific files
 **/*.Rout
 main/logs/
-main/data/results/
-main/data/config_sheets/*_data_inputs_auto.xlsx
 main/data/gene_info.csv
 main/data/Repurposing_Hub_Preproc.tsv
-main/microarray.db
-main/data/config_sheets/*
-main/data/GSE*_RAW
-main/data/gpl*entrez.csv
-main/src/microarray.db
+main/data/results/
+main/data/config_sheets
 
 # COMO data
-main/data/data_matrices/naiveB
-main/data/data_matrices/smB
+main/data/data_matrices
 
 
