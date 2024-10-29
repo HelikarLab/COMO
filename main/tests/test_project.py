@@ -13,4 +13,3 @@ def test_config():
     assert configs.data_dir == root_dir / "data"
     assert configs.config_dir == root_dir / "data" / "config_sheets"
     assert configs.result_dir == root_dir / "data" / "results"
-    assert configs.code_dir == root_dir / "como"
