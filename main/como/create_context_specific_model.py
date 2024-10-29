@@ -575,19 +575,19 @@ def _create_df(path: Path) -> pd.DataFrame:
 def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
     df = _create_df(path)
     for column in df.columns:
-        if column not in ["reaction type", "abbreviation", "compartment", "minimum reaction rate", "maximum reaction rate"]:
+        if column not in ["boundary", "abbreviation", "compartment", "minimum reaction rate", "maximum reaction rate"]:
             raise ValueError(
                 f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', 'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}"
             )
 
     reactions: list[str] = []
-    reaction_type: list[str] = df["reaction type"].tolist()
+    boundary_type: list[str] = df["boundary"].tolist()
     reaction_abbreviation: list[str] = df["abbreviation"].tolist()
     reaction_compartment: list[str] = df["compartment"].tolist()
     lower_bounds = df["minimum reaction rate"].tolist()
     upper_bounds = df["maximum reaction rate"].tolist()
-    for i in range(len(reaction_type)):
-        current_type: str = reaction_type[i]
+    for i in range(len(boundary_type)):
+        current_type: str = boundary_type[i]
         temp_reaction: str = ""
 
         match current_type.lower():
