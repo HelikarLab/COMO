@@ -12,14 +12,14 @@ name = "anndata"
 version = "0.10.5.post1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "array-api-compat", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "exceptiongroup", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "h5py", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "natsort", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "numpy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "packaging", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "pandas", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "scipy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "array-api-compat" },
+    { name = "exceptiongroup", marker = "python_full_version == '3.10.*'" },
+    { name = "h5py" },
+    { name = "natsort" },
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "pandas" },
+    { name = "scipy" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c1/40/8e8c3baca1b00f107cdd2f9b376bcf97de1a7912786b7b4012343228d143/anndata-0.10.5.post1.tar.gz", hash = "sha256:9a17c6eda9fc40759b3f5f81742f5d18c1a0a1acdf02f13e1646700ec082c155", size = 163852 }
 wheels = [
@@ -40,10 +40,10 @@ name = "anyio"
 version = "4.6.2.post1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "exceptiongroup", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "idna", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "sniffio", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "typing-extensions", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "exceptiongroup", marker = "python_full_version == '3.10.*'" },
+    { name = "idna" },
+    { name = "sniffio" },
+    { name = "typing-extensions", marker = "python_full_version == '3.10.*'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9f/09/45b9b7a6d4e45c6bcb5bf61d19e3ab87df68e0601fa8c5293de3542546cc/anyio-4.6.2.post1.tar.gz", hash = "sha256:4c8bc31ccdb51c7f7bd251f51c609e038d63e34219b44aa86e47576389880b4c", size = 173422 }
 wheels = [
@@ -82,20 +82,20 @@ name = "cobra"
 version = "0.28.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "appdirs", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "depinfo", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "diskcache", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "future", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "httpx", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "importlib-resources", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "numpy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "optlang", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "pandas", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "pydantic", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "python-libsbml", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "rich", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "ruamel-yaml", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "swiglpk", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "appdirs" },
+    { name = "depinfo" },
+    { name = "diskcache" },
+    { name = "future" },
+    { name = "httpx" },
+    { name = "importlib-resources" },
+    { name = "numpy" },
+    { name = "optlang" },
+    { name = "pandas" },
+    { name = "pydantic" },
+    { name = "python-libsbml" },
+    { name = "rich" },
+    { name = "ruamel-yaml" },
+    { name = "swiglpk" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/86/18/91a5759f70e72b2b5d6059171891ef2fc3502a260e558bc892d94d94c686/cobra-0.28.0.tar.gz", hash = "sha256:49cfe0f4b2bb281d7398c43d037f88ea687c788714676c32ccb76c911e3d0367", size = 1164669 }
 wheels = [
@@ -116,19 +116,19 @@ name = "como"
 version = "1.10.0"
 source = { editable = "." }
 dependencies = [
-    { name = "cobra", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "fast-bioservices", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "gurobipy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "kaleido", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "loguru", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "numpy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "openpyxl", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "pandas", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "plotly", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "scanpy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "scikit-learn", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "scipy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "setuptools", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "cobra" },
+    { name = "fast-bioservices" },
+    { name = "gurobipy" },
+    { name = "kaleido" },
+    { name = "loguru" },
+    { name = "numpy" },
+    { name = "openpyxl" },
+    { name = "pandas" },
+    { name = "plotly" },
+    { name = "scanpy" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "setuptools" },
 ]
 
 [package.metadata]
@@ -138,7 +138,7 @@ requires-dist = [
     { name = "gurobipy", specifier = ">=11.0" },
     { name = "kaleido", specifier = "==0.2.1" },
     { name = "loguru", specifier = ">=0.7.2" },
-    { name = "numpy", specifier = ">=1.16.5,<1.23.0" },
+    { name = "numpy", specifier = ">=1.22.0,<1.23.0" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas", specifier = ">=1.3.5" },
     { name = "plotly", specifier = ">=5.24.1" },
@@ -153,7 +153,7 @@ name = "contourpy"
 version = "1.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "numpy" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/8d/9e/e4786569b319847ffd98a8326802d5cf8a5500860dbfc2df1f0f4883ed99/contourpy-1.2.1.tar.gz", hash = "sha256:4d8908b3bee1c889e547867ca4cdc54e5ab6be6d3e078556814a22457f49423c", size = 13457196 }
 wheels = [
@@ -239,11 +239,11 @@ name = "fast-bioservices"
 version = "0.3.6"
 source = { git = "https://github.com/JoshLoecker/fast_bioservices?rev=drop-pandas-version#64d3d0070a8ba0628168bdaa68371558b847c8f1" }
 dependencies = [
-    { name = "appdirs", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "hishel", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "httpx", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "loguru", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "pandas", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "appdirs" },
+    { name = "hishel" },
+    { name = "httpx" },
+    { name = "loguru" },
+    { name = "pandas" },
 ]
 
 [[package]]
@@ -327,7 +327,7 @@ name = "h5py"
 version = "3.12.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "numpy" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cc/0c/5c2b0a88158682aeafb10c1c2b735df5bc31f165bfe192f2ee9f2a23b5f1/h5py-3.12.1.tar.gz", hash = "sha256:326d70b53d31baa61f00b8aa5f95c2fcb9621a3ee8365d770c551a13dbbcbfdf", size = 411457 }
 wheels = [
@@ -358,8 +358,8 @@ name = "hishel"
 version = "0.0.33"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "httpx", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "typing-extensions", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "httpx" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ce/cf/d4414a62b77d1f3f58a0d812be20efe4a647fc1e103cec7c9ac559efe576/hishel-0.0.33.tar.gz", hash = "sha256:ab5b2661d5e2252f305fd0fb20e8c76bfab3ea73458f20f2591c53c37b270089", size = 35331 }
 wheels = [
@@ -371,8 +371,8 @@ name = "httpcore"
 version = "1.0.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "certifi", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "h11", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "certifi" },
+    { name = "h11" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b6/44/ed0fa6a17845fb033bd885c03e842f08c1b9406c86a2e60ac1ae1b9206a6/httpcore-1.0.6.tar.gz", hash = "sha256:73f6dbd6eb8c21bbf7ef8efad555481853f5f6acdeaff1edb0694289269ee17f", size = 85180 }
 wheels = [
@@ -384,11 +384,11 @@ name = "httpx"
 version = "0.27.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anyio", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "certifi", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "httpcore", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "idna", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "sniffio", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "anyio" },
+    { name = "certifi" },
+    { name = "httpcore" },
+    { name = "idna" },
+    { name = "sniffio" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/78/82/08f8c936781f67d9e6b9eeb8a0c8b4e406136ea4c3d1f89a5db71d42e0e6/httpx-0.27.2.tar.gz", hash = "sha256:f7c2be1d2f3c3c3160d441802406b206c2b76f5947b11115e6df10c6c65e66c2", size = 144189 }
 wheels = [
@@ -537,8 +537,8 @@ name = "loguru"
 version = "0.7.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "(platform_system != 'Windows' and sys_platform == 'win32' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows' and sys_platform == 'win32') or (platform_python_implementation == 'PyPy' and sys_platform == 'win32' and python_full_version == '3.10.*')" },
-    { name = "win32-setctime", marker = "(platform_system != 'Windows' and sys_platform == 'win32' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows' and sys_platform == 'win32') or (platform_python_implementation == 'PyPy' and sys_platform == 'win32' and python_full_version == '3.10.*')" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "win32-setctime", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9e/30/d87a423766b24db416a46e9335b9602b054a72b96a88a241f2b09b560fa8/loguru-0.7.2.tar.gz", hash = "sha256:e671a53522515f34fd406340ee968cb9ecafbc4b36c679da03c18fd8d0bd51ac", size = 145103 }
 wheels = [
@@ -550,7 +550,7 @@ name = "markdown-it-py"
 version = "3.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "mdurl", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "mdurl" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/38/71/3b932df36c1a044d397a1f92d1cf91ee0a503d91e470cbd670aa66b07ed0/markdown-it-py-3.0.0.tar.gz", hash = "sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb", size = 74596 }
 wheels = [
@@ -562,15 +562,15 @@ name = "matplotlib"
 version = "3.8.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "contourpy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "cycler", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "fonttools", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "kiwisolver", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "numpy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "packaging", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "pillow", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "pyparsing", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "python-dateutil", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "contourpy" },
+    { name = "cycler" },
+    { name = "fonttools" },
+    { name = "kiwisolver" },
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "pillow" },
+    { name = "pyparsing" },
+    { name = "python-dateutil" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/38/4f/8487737a74d8be4ab5fbe6019b0fae305c1604cf7209500969b879b5f462/matplotlib-3.8.4.tar.gz", hash = "sha256:8aac397d5e9ec158960e31c381c5ffc52ddd52bd9a47717e2a694038167dffea", size = 35934425 }
 wheels = [
@@ -635,8 +635,8 @@ name = "numba"
 version = "0.58.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "llvmlite", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "numpy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "llvmlite" },
+    { name = "numpy" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c6/95/985695c7355606dc631f0ba75609e004aa5d36dc5d3d56fbb5a747a214df/numba-0.58.0.tar.gz", hash = "sha256:e5d5a318dc65a101ef846d7fd93f3cf2f7942494019e8342e51238b360739125", size = 2623297 }
 wheels = [
@@ -654,17 +654,17 @@ wheels = [
 
 [[package]]
 name = "numpy"
-version = "1.21.6"
+version = "1.22.4"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/45/b7/de7b8e67f2232c26af57c205aaad29fe17754f793404f59c8a730c7a191a/numpy-1.21.6.zip", hash = "sha256:ecb55251139706669fdec2ff073c98ef8e9a84473e51e716211b41aa0f18e656", size = 10274544 }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/d8/ab692a75f584d13c6542c3994f75def5bce52ded9399f52e230fe402819d/numpy-1.22.4.zip", hash = "sha256:425b390e4619f58d8526b3dcf656dde069133ae5c240229821f01b5f44ea07af", size = 11458830 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ff/c6/05ae3c7f75b596e1bb3d78131c331eada9376a03d1af9801bd40e4675023/numpy-1.21.6-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:8737609c3bbdd48e380d463134a35ffad3b22dc56295eff6f79fd85bd0eeeb25", size = 27203123 },
-    { url = "https://files.pythonhosted.org/packages/4a/72/a3379f83172f1431d7949138373e3a24beed68184c9362dab1b4d465be26/numpy-1.21.6-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:fdffbfb6832cd0b300995a2b08b8f6fa9f6e856d562800fea9182316d99c4e8e", size = 16965603 },
-    { url = "https://files.pythonhosted.org/packages/26/e7/4a6f579af8186372b03e8480e47df309520d91cfead8759b64dd5ac62688/numpy-1.21.6-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:3820724272f9913b597ccd13a467cc492a0da6b05df26ea09e78b171a0bb9da6", size = 12364595 },
-    { url = "https://files.pythonhosted.org/packages/57/ba/d8cbdfd507b541bb247beff24d9d7304ac8ffc379cf585701187d45d4512/numpy-1.21.6-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:f17e562de9edf691a42ddb1eb4a5541c20dd3f9e65b09ded2beb0799c0cf29bb", size = 13019278 },
-    { url = "https://files.pythonhosted.org/packages/6f/7b/036000a55680e6c7eb81502b0aa27ce0ed65d4d8805613909967d9f8baf6/numpy-1.21.6-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5f30427731561ce75d7048ac254dbe47a2ba576229250fb60f0fb74db96501a1", size = 15906004 },
-    { url = "https://files.pythonhosted.org/packages/b0/77/ff8bbe56ff6cbbdbdb8a641c67cee61e29b2e8bfbb18732c2e1d2961fe4d/numpy-1.21.6-cp310-cp310-win32.whl", hash = "sha256:d4bf4d43077db55589ffc9009c0ba0a94fa4908b9586d6ccce2e0b164c86303c", size = 11706182 },
-    { url = "https://files.pythonhosted.org/packages/ec/03/93702ca9c4bd61791e46c80ff1f24943febb2317484cf7e8207688bbbd95/numpy-1.21.6-cp310-cp310-win_amd64.whl", hash = "sha256:d136337ae3cc69aa5e447e78d8e1514be8c3ec9b54264e680cf0b4bd9011574f", size = 14008913 },
+    { url = "https://files.pythonhosted.org/packages/d0/4a/5677dc12d2b0c2f9fa901cc43b3f6b8d99ddac00fcfca93e9989bca1d93c/numpy-1.22.4-cp310-cp310-macosx_10_14_x86_64.whl", hash = "sha256:ba9ead61dfb5d971d77b6c131a9dbee62294a932bf6a356e48c75ae684e635b3", size = 17649001 },
+    { url = "https://files.pythonhosted.org/packages/95/6a/319e9fafb828e4a651b03b9622b781dfd80b5f1f5f31cfa6c9b734ce7cda/numpy-1.22.4-cp310-cp310-macosx_10_15_x86_64.whl", hash = "sha256:1ce7ab2053e36c0a71e7a13a7475bd3b1f54750b4b433adc96313e127b870887", size = 17652668 },
+    { url = "https://files.pythonhosted.org/packages/9b/12/14529e4a0749c165c2f9df5cb09873f35ffe1bac7cfdf9a26fe90bfd587a/numpy-1.22.4-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:7228ad13744f63575b3a972d7ee4fd61815b2879998e70930d4ccf9ec721dce0", size = 12761458 },
+    { url = "https://files.pythonhosted.org/packages/91/18/7949972b5254f88f040f53dc6f019fcb21597d6f37f7446d71019acece03/numpy-1.22.4-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:43a8ca7391b626b4c4fe20aefe79fec683279e31e7c79716863b4b25021e0e74", size = 13348049 },
+    { url = "https://files.pythonhosted.org/packages/b0/f4/d67c8c39efe3c45dfd32bb2a3fc49cbbe5496e575cc42b8bac60fe7b6701/numpy-1.22.4-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a911e317e8c826ea632205e63ed8507e0dc877dcdc49744584dfc363df9ca08c", size = 16817233 },
+    { url = "https://files.pythonhosted.org/packages/2a/fa/f00ba4919bc06073af4c674b1ddc0c93d339abb2b2ec935136db8c55f87d/numpy-1.22.4-cp310-cp310-win32.whl", hash = "sha256:9ce7df0abeabe7fbd8ccbf343dc0db72f68549856b863ae3dd580255d009648e", size = 12222860 },
+    { url = "https://files.pythonhosted.org/packages/b5/50/d7978137464251c393df28fe0592fbb968110f752d66f60c7a53f7158076/numpy-1.22.4-cp310-cp310-win_amd64.whl", hash = "sha256:3e1ffa4748168e1cc8d3cde93f006fe92b5421396221a02f2274aab6ac83b077", size = 14725999 },
 ]
 
 [[package]]
@@ -672,7 +672,7 @@ name = "openpyxl"
 version = "3.1.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "et-xmlfile", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "et-xmlfile" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3d/f9/88d94a75de065ea32619465d2f77b29a0469500e99012523b91cc4141cd1/openpyxl-3.1.5.tar.gz", hash = "sha256:cf0e3cf56142039133628b5acffe8ef0c12bc902d2aadd3e0fe5878dc08d1050", size = 186464 }
 wheels = [
@@ -684,9 +684,9 @@ name = "optlang"
 version = "1.5.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "six", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "swiglpk", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "sympy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "six" },
+    { name = "swiglpk" },
+    { name = "sympy" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/08/09/e87caa6d45be1bb5c787428822bc7694945d1bf2c9278939cbe5b2a11a2f/optlang-1.5.2.tar.gz", hash = "sha256:5514364aa06bf24381c6777188b2df79b13def2743312bdb80277392cdbb6477", size = 135085 }
 wheels = [
@@ -707,9 +707,9 @@ name = "pandas"
 version = "1.3.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "python-dateutil", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "pytz", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "numpy", marker = "python_full_version == '3.10.*'" },
+    { name = "python-dateutil" },
+    { name = "pytz" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/99/f0/f99700ef327e51d291efdf4a6de29e685c4d198cbf8531541fc84d169e0e/pandas-1.3.5.tar.gz", hash = "sha256:1e4285f5de1012de20ca46b188ccf33521bff61ba5c5ebd78b4fb28e5416a9f1", size = 4736591 }
 wheels = [
@@ -726,8 +726,8 @@ name = "patsy"
 version = "0.5.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "six", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "numpy" },
+    { name = "six" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c6/18/12e76e52d589c4a812a2f1fb2406b486c226b7ac263ac8ef4b5f4bb04058/patsy-0.5.6.tar.gz", hash = "sha256:95c6d47a7222535f84bff7f63d7303f2e297747a598db89cf5c67f0c0c7d2cdb", size = 398011 }
 wheels = [
@@ -806,8 +806,8 @@ name = "plotly"
 version = "5.24.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "packaging", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "tenacity", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "packaging" },
+    { name = "tenacity" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/79/4f/428f6d959818d7425a94c190a6b26fbc58035cbef40bf249be0b62a9aedd/plotly-5.24.1.tar.gz", hash = "sha256:dbc8ac8339d248a4bcc36e08a5659bacfe1b079390b8953533f4eb22169b4bae", size = 9479398 }
 wheels = [
@@ -819,9 +819,9 @@ name = "pydantic"
 version = "2.9.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "annotated-types", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "pydantic-core", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "typing-extensions", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "annotated-types" },
+    { name = "pydantic-core" },
+    { name = "typing-extensions", marker = "python_full_version == '3.10.*'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a9/b7/d9e3f12af310e1120c21603644a1cd86f59060e040ec5c3a80b8f05fae30/pydantic-2.9.2.tar.gz", hash = "sha256:d155cef71265d1e9807ed1c32b4c8deec042a44a50a4188b25ac67ecd81a9c0f", size = 769917 }
 wheels = [
@@ -833,7 +833,7 @@ name = "pydantic-core"
 version = "2.23.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e2/aa/6b6a9b9f8537b872f552ddd46dd3da230367754b6f707b8e1e963f515ea3/pydantic_core-2.23.4.tar.gz", hash = "sha256:2584f7cf844ac4d970fba483a717dbe10c1c1c96a969bf65d61ffe94df1b2863", size = 402156 }
 wheels = [
@@ -909,11 +909,11 @@ name = "pynndescent"
 version = "0.5.13"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "joblib", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "llvmlite", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "numba", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "scikit-learn", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "scipy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "joblib" },
+    { name = "llvmlite" },
+    { name = "numba" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/7e/58/560a4db5eb3794d922fe55804b10326534ded3d971e1933c1eef91193f5e/pynndescent-0.5.13.tar.gz", hash = "sha256:d74254c0ee0a1eeec84597d5fe89fedcf778593eeabe32c2f97412934a9800fb", size = 2975955 }
 wheels = [
@@ -934,7 +934,7 @@ name = "python-dateutil"
 version = "2.9.0.post0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "six", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "six" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/66/c0/0c8b6ad9f17a802ee498c46e004a0eb49bc148f2fd230864601a86dcf6db/python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3", size = 342432 }
 wheels = [
@@ -999,9 +999,9 @@ name = "rich"
 version = "13.9.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "markdown-it-py", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "pygments", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "typing-extensions", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "markdown-it-py" },
+    { name = "pygments" },
+    { name = "typing-extensions", marker = "python_full_version == '3.10.*'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d9/e9/cf9ef5245d835065e6673781dbd4b8911d352fb770d56cf0879cf11b7ee1/rich-13.9.3.tar.gz", hash = "sha256:bc1e01b899537598cf02579d2b9f4a415104d3fc439313a7a2c165d76557a08e", size = 222889 }
 wheels = [
@@ -1013,7 +1013,7 @@ name = "ruamel-yaml"
 version = "0.18.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ruamel-yaml-clib", marker = "(platform_python_implementation == 'CPython' and python_full_version == '3.10.*') or (platform_python_implementation == 'CPython' and platform_system == 'Windows')" },
+    { name = "ruamel-yaml-clib", marker = "platform_python_implementation == 'CPython' and python_full_version == '3.10.*'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/29/81/4dfc17eb6ebb1aac314a3eb863c1325b907863a1b8b1382cdffcb6ac0ed9/ruamel.yaml-0.18.6.tar.gz", hash = "sha256:8b27e6a217e786c6fbe5634d8f3f11bc63e0f80f6a5890f28863d9c45aac311b", size = 143362 }
 wheels = [
@@ -1065,25 +1065,25 @@ name = "scanpy"
 version = "1.9.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anndata", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "h5py", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "joblib", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "matplotlib", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "natsort", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "networkx", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "numba", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "numpy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "packaging", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "pandas", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "patsy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "scikit-learn", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "scipy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "seaborn", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "session-info", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "anndata" },
+    { name = "h5py" },
+    { name = "joblib" },
+    { name = "matplotlib" },
+    { name = "natsort" },
+    { name = "networkx" },
+    { name = "numba" },
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "pandas" },
+    { name = "patsy" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "seaborn" },
+    { name = "session-info" },
     { name = "statsmodels", version = "0.13.2", source = { registry = "https://pypi.org/simple" }, marker = "platform_python_implementation != 'PyPy' and platform_system == 'Windows'" },
     { name = "statsmodels", version = "0.14.1", source = { registry = "https://pypi.org/simple" }, marker = "platform_system != 'Windows' or platform_python_implementation == 'PyPy'" },
-    { name = "tqdm", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "umap-learn", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "tqdm" },
+    { name = "umap-learn" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/84/95/2dad7cb2ce41aa433169f189d98d9d17e8eb6dfc5b02c7200fc69e9805c0/scanpy-1.9.8.tar.gz", hash = "sha256:2ab1790d2b82eadb0cf8d487f468beac7a8f6a3a8fd7112d1ae989f8c52a4353", size = 4592581 }
 wheels = [
@@ -1095,10 +1095,10 @@ name = "scikit-learn"
 version = "1.5.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "joblib", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "numpy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "scipy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "threadpoolctl", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "joblib" },
+    { name = "numpy" },
+    { name = "scipy" },
+    { name = "threadpoolctl" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/37/59/44985a2bdc95c74e34fef3d10cb5d93ce13b0e2a7baefffe1b53853b502d/scikit_learn-1.5.2.tar.gz", hash = "sha256:b4237ed7b3fdd0a4882792e68ef2545d5baa50aca3bb45aa7df468138ad8f94d", size = 7001680 }
 wheels = [
@@ -1129,7 +1129,7 @@ name = "scipy"
 version = "1.7.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numpy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "numpy" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/61/67/1a654b96309c991762ee9bc39c363fc618076b155fe52d295211cf2536c7/scipy-1.7.3.tar.gz", hash = "sha256:ab5875facfdef77e0a47d5fd39ea178b58e60e454a4c85aa1e52fcb80db7babf", size = 36102562 }
 wheels = [
@@ -1146,9 +1146,9 @@ name = "seaborn"
 version = "0.13.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "matplotlib", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "numpy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "pandas", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pandas" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/86/59/a451d7420a77ab0b98f7affa3a1d78a313d2f7281a57afb1a34bae8ab412/seaborn-0.13.2.tar.gz", hash = "sha256:93e60a40988f4d65e9f4885df477e2fdaff6b73a9ded434c1ab356dd57eefff7", size = 1457696 }
 wheels = [
@@ -1160,7 +1160,7 @@ name = "session-info"
 version = "1.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "stdlib-list", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "stdlib-list" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/94/e4/ea615bb8185a298b21df1ac52a4a5db4e3351823a218f47ef3f883def88c/session_info-1.0.0.tar.gz", hash = "sha256:3cda5e03cca703f32ae2eadbd6bd80b6c21442cfb60e412c21cb8ad6d5cbb6b7", size = 24345 }
 
@@ -1294,7 +1294,7 @@ name = "sympy"
 version = "1.13.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "mpmath", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "mpmath" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/11/8a/5a7fd6284fa8caac23a26c9ddf9c30485a48169344b4bd3b0f02fef1890f/sympy-1.13.3.tar.gz", hash = "sha256:b27fd2c6530e0ab39e275fc9b683895367e51d5da91baa8d3d64db2565fec4d9", size = 7533196 }
 wheels = [
@@ -1324,7 +1324,7 @@ name = "tqdm"
 version = "4.66.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "(platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_system == 'Windows' and python_full_version == '3.10.*')" },
+    { name = "colorama", marker = "platform_system == 'Windows'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e9/34/bef135b27fe1864993a5284ad001157ee9b5538e859ac90f5b0e8cc8c9ec/tqdm-4.66.6.tar.gz", hash = "sha256:4bdd694238bef1485ce839d67967ab50af8f9272aab687c0d7702a01da0be090", size = 169533 }
 wheels = [
@@ -1345,12 +1345,12 @@ name = "umap-learn"
 version = "0.5.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numba", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "numpy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "pynndescent", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "scikit-learn", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "scipy", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
-    { name = "tqdm", marker = "(platform_system != 'Windows' and python_full_version == '3.10.*') or (platform_python_implementation != 'PyPy' and platform_system == 'Windows') or (platform_python_implementation == 'PyPy' and python_full_version == '3.10.*')" },
+    { name = "numba" },
+    { name = "numpy" },
+    { name = "pynndescent" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "tqdm" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6f/d4/9ed627905f7993349671283b3c5bf2d9f543ef79229fa1c7e01324eb900c/umap-learn-0.5.7.tar.gz", hash = "sha256:b2a97973e4c6ffcebf241100a8de589a4c84126a832ab40f296c6d9fcc5eb19e", size = 92680 }
 wheels = [
