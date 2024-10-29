@@ -4,6 +4,7 @@ This file is responsible downloading data found at FTP links
 TODO: Find a way to mark a file as "downloaded"
     - Keep a list of file names in a ".completd" hidden folder?
 """
+
 import asyncio
 import multiprocessing
 import time
@@ -16,13 +17,7 @@ import aioftp
 from .FileInformation import FileInformation, clear_print
 
 
-async def aioftp_client(
-        host: str,
-        username: str = "anonymous",
-        password: str = "guest",
-        port: int = 21,
-        max_attempts: int = 3
-) -> aioftp.Client:
+async def aioftp_client(host: str, username: str = "anonymous", password: str = "guest", port: int = 21, max_attempts: int = 3) -> aioftp.Client:
     """
     This class is responsible for creating a "client" connection
     """
@@ -37,7 +32,6 @@ async def aioftp_client(
             await client.login(user=username, password=password)
             connection_successful = True
         except ConnectionResetError:
-
             # Make sure this print statement is on a new line on the first error
             if attempt_num == 1:
                 print("")
@@ -55,13 +49,7 @@ async def aioftp_client(
 
 class Reader:
     def __init__(
-            self,
-            root_link: str,
-            file_extensions: list[str],
-            max_attempts: int = 3,
-            port: int = 21,
-            user: str = "anonymous",
-            passwd: str = "guest"
+        self, root_link: str, file_extensions: list[str], max_attempts: int = 3, port: int = 21, user: str = "anonymous", passwd: str = "guest"
     ) -> None:
         """
         This class is responsible for reading data about root FTP links
@@ -75,7 +63,7 @@ class Reader:
 
         self._files: list[str] = []
         self._file_sizes: list[int] = []
-        
+
         self._get_info_wrapper()
 
     def _get_info_wrapper(self) -> None:
@@ -91,7 +79,7 @@ class Reader:
         This function is responsible for getting all files under the root_link
         """
         url_parse = urlparse(self._root_link)
-        
+
         scheme: str
         host: str
         folder: str
@@ -109,7 +97,7 @@ class Reader:
             raise ValueError(f"Unable to identify folder or path from url: {self._root_link}")
 
         client = await aioftp_client(host=host)
-        for path, info in (await client.list(folder, recursive=True)):
+        for path, info in await client.list(folder, recursive=True):
             if str(path).endswith(tuple(self._extensions)):
                 download_url: str = f"{scheme}://{host}{path}"
                 self._files.append(download_url)
@@ -150,7 +138,7 @@ class Download:
 
         # Find files to download
         self._download_data_wrapper()
-        
+
     def _download_data_wrapper(self) -> None:
         """
         This function is responsible for "kicking off" asynchronous data downloading
@@ -172,14 +160,9 @@ class Download:
         event_loop.run_until_complete(asyncio.wait(async_tasks))
         event_loop.close()
 
-    async def _aioftp_download_data(
-            self,
-            file_information: FileInformation,
-            semaphore: asyncio.Semaphore
-    ) -> None:
-        
+    async def _aioftp_download_data(self, file_information: FileInformation, semaphore: asyncio.Semaphore) -> None:
         url_parse = urlparse(file_information.download_url)
-        
+
         scheme: str
         host: str
         folder: str
@@ -197,13 +180,15 @@ class Download:
             raise ValueError(f"Unable to identify folder or path from url: {file_information.download_url}")
 
         # Convert file size from byte to MB
-        size_mb: int = round(file_information.file_size / (1024 ** 2))
+        size_mb: int = round(file_information.file_size / (1024**2))
 
         # Use a semaphore so only N number of tasks can be started at once
         async with semaphore:
             client = await aioftp_client(host)
             self._download_counter.acquire()
-            clear_print(f"Started download {self._download_counter.value:02d} / {len(self._file_information):02d} ({size_mb} MB) - {file_information.raw_file_name}")
+            clear_print(
+                f"Started download {self._download_counter.value:02d} / {len(self._file_information):02d} ({size_mb} MB) - {file_information.raw_file_name}"
+            )
             self._download_counter.value += 1
             self._download_counter.release()
 
