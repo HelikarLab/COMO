@@ -4,16 +4,19 @@ from pathlib import Path
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 
 import argparse
+import asyncio
 import re
 from dataclasses import dataclass, field
 from typing import Literal, Optional, Union
 
 import numpy as np
 import pandas as pd
+import scanpy as sc
 from fast_bioservices import BioDBNet, Input, Output, Taxon
 from loguru import logger
 
 from como import Config, stringlist_to_list
+from como.utils import _format_cohersion
 
 
 @dataclass

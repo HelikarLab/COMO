@@ -20,6 +20,7 @@ from como import proteomics_gen, return_placeholder_data
 from como.combine_distributions import combine_zscores_main
 from como.como_utilities import split_gene_expression_data
 from como.project import Config
+from como.utils import split_gene_expression_data
 
 
 class _MergedHeaderNames:

@@ -19,7 +19,7 @@ from scipy.signal import find_peaks
 from scipy.stats import norm
 from sklearn.neighbors import KernelDensity
 
-from como import RNASeqPreparationMethod
+from como.custom_types import RNASeqPreparationMethod
 from como.project import Config
 
 

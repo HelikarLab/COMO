@@ -5,10 +5,7 @@ import numpy as np
 import rpy2_api
 from como_utilities import stringlist_to_list
 from project import Config
-
-# read and translate R functions
-configs = Config()
-r_file_path = Path(configs.code_dir, "rscripts", "cluster_samples.R")
+from utils import stringlist_to_list
 
 
 def main() -> None:
