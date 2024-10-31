@@ -25,6 +25,7 @@ from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
 
 from como.como_utilities import Compartments, split_gene_expression_data, stringlist_to_list
 from como.project import Config
+from como.utils import Compartments, split_gene_expression_data, stringlist_to_list
 
 
 class Algorithm(Enum):

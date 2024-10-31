@@ -3,15 +3,17 @@ from pathlib import Path
 
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 
-
 import argparse
+import asyncio
 from dataclasses import dataclass
 from typing import Optional
 
 import pandas as pd
+from fast_bioservices import Taxon
 from loguru import logger
 
-from como import Config, RNASeqPreparationMethod
+from como import Config
+from como.custom_types import RNASeqPreparationMethod
 from como.rnaseq import FilteringTechnique, save_rnaseq_tests
 
 

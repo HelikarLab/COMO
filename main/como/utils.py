@@ -1,9 +1,13 @@
 import contextlib
 import io
+import sre_constants
 import sys
+from pathlib import Path
 from typing import Iterator
 
+import aiofiles
 import pandas as pd
+import scanpy as sc
 from fast_bioservices import BioDBNet, Output, Taxon
 
 __all__ = ["Compartments", "stringlist_to_list", "split_gene_expression_data", "suppress_stdout"]
@@ -128,7 +132,20 @@ def suppress_stdout() -> Iterator[None]:
             sys.stdout = sys.__stdout__
 
 
-def _format_cohersion(biodbnet: BioDBNet, *, requested_output: Output, input_values: list[str], taxon: Taxon) -> pd.DataFrame:
-    cohersion = biodbnet.dbFind(values=input_values, output_db=requested_output, taxon=taxon).drop(columns=["Input Type"])
-    cohersion.columns = pd.Index(["input_value", requested_output.value.replace(" ", "_").lower()])
+async def _format_cohersion(biodbnet: BioDBNet, *, requested_output: Output | list[Output], input_values: list[str], taxon: Taxon) -> pd.DataFrame:
+    requested_output = [requested_output] if isinstance(requested_output, Output) else requested_output
+    cohersion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(columns=["Input Type"])
+    cohersion.columns = pd.Index(["input_value", *[o.value.replace(" ", "_").lower() for o in requested_output]])
     return cohersion
+
+
+async def _async_read_csv(path: Path, **kwargs) -> pd.DataFrame:
+    async with aiofiles.open(path, "r") as f:
+        content = await f.read()
+        return pd.read_csv(io.StringIO(content), **kwargs)
+
+
+async def _async_read_excel(path: Path, **kwargs) -> pd.DataFrame:
+    async with aiofiles.open(path, "rb") as f:
+        content = await f.read()
+        return pd.read_excel(io.StringIO(content.decode()), **kwargs)
