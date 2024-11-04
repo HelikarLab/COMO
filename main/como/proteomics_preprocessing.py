@@ -1,7 +1,5 @@
 import colorsys
 import random
-from asyncio import as_completed
-from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from pathlib import Path
 
