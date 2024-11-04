@@ -277,22 +277,6 @@ def _parse_args() -> _Arguments:
 
 
 if __name__ == "__main__":
-    """
-    Generate a list of active and high-confidence genes from a counts matrix using a user defined
-    at normalization-technique at /work/data/results/<context name>/rnaseq_<context_name>.csv
-    Currently, can filter raw RNA-seq counts using three normalization techniques. Which are defined in rnaseq.R
-    TPM Quantile, where each replicate is normalized with Transcripts-per-million and an upper quantile is taken to
-    create a boolean list of active genes for the replicate. Replicates are compared for consensus within the
-    study/batch number according to user-defined ratios and then study/batch numbers are checked for consensus
-    according to different user defined ratios.   **CITATION NEEDED** **Recomended if user wants more control over the
-    size of the model, like a smaller model that allows for only the most expressed reactions, or a larger more
-    encompassing one that contains less essential reactions.
-    zFPKM method outlined in: https://pubmed.ncbi.nlm.nih.gov/24215113/ can be used. Counts will be normalized using
-    zFPKM and genes > -3 will be considered expressed per thier recommendation. Expressed genes will be checked for
-    consensus at the replicate and study/batch levels the same as TPM Quantile. **Recommended if user wants to give
-    least input over gene essentially determination and use the most standardized method of active gene determination.
-    flat cutoff of CPM (counts per million) normalized values, check for consensus the same as other methods.
-    """
     args = _parse_args()
     rnaseq_gen(
         config_filename=args.config_file,
