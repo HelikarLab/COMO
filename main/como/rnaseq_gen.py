@@ -18,7 +18,7 @@ from como.rnaseq import FilteringTechnique, save_rnaseq_tests
 
 
 @dataclass
-class RNASeqGen:
+class _Arguments:
     config_file: str
     replicate_ratio: float
     batch_ratio: float
@@ -241,7 +241,7 @@ def _parse_args():
     )
     args = parser.parse_args()
     args.filtering_technique = args.filtering_technique.lower()
-    return RNASeqGen(**vars(args))
+    return _Arguments(**vars(args))
 
 
 if __name__ == "__main__":
