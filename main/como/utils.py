@@ -124,6 +124,11 @@ def split_gene_expression_data(expression_data: pd.DataFrame, recon_algorithm: s
 
 @contextlib.contextmanager
 def suppress_stdout() -> Iterator[None]:
+    """
+    Suppresses stdout output from the current context
+
+    :return: The context manager
+    """
     with io.StringIO() as buffer:
         try:
             sys.stdout = buffer
@@ -140,12 +145,51 @@ async def _format_cohersion(biodbnet: BioDBNet, *, requested_output: Output | li
 
 
 async def _async_read_csv(path: Path, **kwargs) -> pd.DataFrame:
+    """
+    Asynchronously reads a CSV file and returns a pandas DataFrame.
+
+    :param path: The path to read from
+    :param kwargs: Additional arguments to pass to pandas.read_csv
+    :return: A pandas DataFrame
+    """
+    if not path.exists():
+        raise FileNotFoundError(f"File {path} does not exist")
+    if path.suffix not in {".csv", ".tsv"}:
+        raise ValueError(f"File {path} is not a CSV file")
+
+    kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")
     async with aiofiles.open(path, "r") as f:
         content = await f.read()
         return pd.read_csv(io.StringIO(content), **kwargs)
 
 
 async def _async_read_excel(path: Path, **kwargs) -> pd.DataFrame:
+    """
+    Asynchronously reads an Excel file and returns a pandas DataFrame.
+
+    :param path: The path to read from
+    :param kwargs: Additional arguments to pass to pandas.read_excel
+    :return: A pandas DataFrame
+    """
+    if not path.exists():
+        raise FileNotFoundError(f"File {path} does not exist")
+    if path.suffix not in {".xls", ".xlsx"}:
+        raise ValueError(f"File {path} is not an Excel file")
+
     async with aiofiles.open(path, "rb") as f:
         content = await f.read()
         return pd.read_excel(io.StringIO(content.decode()), **kwargs)
+
+
+def is_notebook() -> bool:
+    """
+    Checks if the current environment is a Jupyter Notebook.
+
+    :returns: True if the current environment is a Jupyter Notebook, False otherwise.
+    """
+    try:
+        from IPython import get_ipython
+
+        return get_ipython() is not None
+    except ModuleNotFoundError:
+        return False
