@@ -103,7 +103,11 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
 
 def split_gene_expression_data(expression_data: pd.DataFrame, recon_algorithm: str = "GIMME"):
     """
-    Splits genes that have mapped to multiple Entrez IDs are formated as "gene12//gene2//gene3"
+    Split the gene expression data into single-gene and multiple-gene names.
+
+    :param expression_data: The gene expression data to map
+    :param recon_algorithm: The recon algorithm used to generate the gene expression data
+    :return:
     """
     expression_data.columns = [c.lower() for c in expression_data.columns]
     if recon_algorithm in {"IMAT", "TINIT"}:
