@@ -54,7 +54,18 @@ def _handle_context_batch(
     prep: str,
 ):
     """
-    Handle iteration through each context type and create rnaseq expression file by calling rnaseq.R
+    Handle iteration through each context type and create rnaseq expression file
+
+    :param config_filename: The configuration filename to read
+    :param replicate_ratio: The percentage of replicates that a gene must appear in for a gene to be marked as "active" in a batch/study
+    :param batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked as 'active"
+    :param replicate_ratio_high: The percentage of replicates that a gene must appear in for a gene to be marked "highly confident" in its expression in a batch/study
+    :param batch_ratio_high: The percentage of batches that a gene must appear in for a gene to be marked "highly confident" in its expression
+    :param technique: The filtering technique to use
+    :param cut_off: The cutoff value to use for the provided filtering technique
+    :param prep: The library preparation method
+    :param taxon: The NCBI Taxon ID
+    :return: None
     """
     r_file_path = Path(__file__).parent / "rscripts" / "rnaseq.R"
     if not r_file_path.exists():
@@ -112,6 +123,23 @@ def rnaseq_gen(
     technique: FilteringTechnique | str = FilteringTechnique.tpm,
     cut_off: Optional[int] = None,
 ) -> None:
+    """
+    The main entrypoint for processing bulk total, bulk mRNA, and single-cell RNA sequencing data.
+    Generate a list of active and high-confidence genes from a gene count matrix.
+    Replicates are compared for consensus within the study/batch number according to replicate ratios, then study/batch numbers are checked for consensus according to batch ratios.
+    The zFPKM method is outlined here: https://pubmed.ncbi.nlm.nih.gov/24215113/
+
+    :param config_filename: The configuration filename to read
+    :param prep: The preparation method
+    :param taxon_id: The NCBI Taxon ID
+    :param replicate_ratio: The percentage of replicates that a gene must appear in for a gene to be marked as "active" in a batch/study
+    :param batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked as 'active"
+    :param high_replicate_ratio: The percentage of replicates that a gene must appear in for a gene to be marked "highly confident" in its expression in a batch/study
+    :param high_batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked "highly confident" in its expression
+    :param technique: The filtering technique to use
+    :param cut_off: The cutoff value to use for the provided filtering technique
+    :return: None
+    """
     if isinstance(technique, str):
         technique = FilteringTechnique(technique.lower())
 
@@ -152,7 +180,11 @@ def rnaseq_gen(
     )
 
 
-def _parse_args():
+def _parse_args() -> _Arguments:
+    """
+    Parse the command line arguments
+    :return: The parsed arguments
+    """
     parser = argparse.ArgumentParser(
         prog="rnaseq_gen.py",
         description="Generate a list of active and high-confidence genes from a counts matrix using a user defined "
