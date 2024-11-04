@@ -3,9 +3,9 @@ from pathlib import Path
 
 import numpy as np
 import rpy2_api
-from como_utilities import stringlist_to_list
 from project import Config
-from utils import stringlist_to_list
+
+from como.utils import stringlist_to_list
 
 
 def main() -> None:
