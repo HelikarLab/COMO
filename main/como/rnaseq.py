@@ -1,16 +1,14 @@
-import sys
+from collections import namedtuple
 from dataclasses import dataclass, field
-from pathlib import Path
-
-sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-
 from enum import Enum
+from pathlib import Path
 from typing import Callable, NamedTuple
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import plotly.graph_objs as go
+import scanpy as sc
 import sklearn
 import sklearn.neighbors
 from loguru import logger
