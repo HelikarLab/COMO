@@ -207,7 +207,7 @@ def _prepare_sample_counts(sample_name: str, counts_file: Path, strand_file: Pat
         return _process_standard_replicate(counts_file, strand_file, sample_name)
 
 
-def _create_sample_counts_matrix(metrics: _StudyMetrics) -> pd.DataFrame:
+async def _create_sample_counts_matrix(metrics: _StudyMetrics) -> pd.DataFrame:
     adjusted_index = 0
     counts: pd.DataFrame | Literal["SKIP"] = _prepare_sample_counts(
         sample_name=metrics.sample_names[0],
@@ -239,6 +239,7 @@ def _create_sample_counts_matrix(metrics: _StudyMetrics) -> pd.DataFrame:
 
 
 def _create_context_counts_matrix(data_dir: Path, output_dir: Path):
+async def _create_counts_matrix(context_name: str, config: Config):
     study_metrics = _organize_gene_counts_files(data_dir=data_dir)
     final_matrix: pd.DataFrame = pd.DataFrame()
     for metric in study_metrics:
@@ -251,17 +252,7 @@ def _create_context_counts_matrix(data_dir: Path, output_dir: Path):
     logger.success(f"Wrote gene count matrix for '{data_dir.stem}' at '{output_filename}'")
 
 
-def _create_counts_matrix(context_name: str, config: Config):
-    """
-    Create a counts matrix by reading gene counts tables in COMO_input/<context name>/<study number>/geneCounts/
-    Uses R in backend (_create_context_counts_matrix.R)
-    """
-    input_dir = config.data_dir / "COMO_input" / context_name
-    matrix_output_dir = config.data_dir / "data_matrices" / context_name
-    _create_context_counts_matrix(data_dir=input_dir, output_dir=matrix_output_dir)
-
-
-def _create_config_df(context_name: str) -> pd.DataFrame:
+async def _create_config_df(context_name: str) -> pd.DataFrame:
     """
     Create configuration sheet at /main/data/config_sheets/rnaseq_data_inputs_auto.xlsx
     based on the gene counts matrix. If using zFPKM normalization technique, fetch mean fragment lengths from
@@ -422,7 +413,7 @@ def _split_counts_matrices(count_matrix_all, df_total, df_mrna):
     return matrix_total, matrix_mrna
 
 
-def _create_gene_info_file(matrix_file_list: list[str], input_format: Input, taxon_id, config: Config):
+async def _create_gene_info_file(*, matrix_files: list[Path], taxon_id, config: Config):
     """
     Create gene info file for specified context by reading first column in its count matrix file at
      results/<context name>/gene_info_<context name>.csv
@@ -463,7 +454,7 @@ def _create_gene_info_file(matrix_file_list: list[str], input_format: Input, tax
     logger.success(f"Gene Info file written at '{gene_info_file}'")
 
 
-def _handle_context_batch(
+async def _handle_context_batch(
     context_names: list[str],
     mode,
     input_format: Input,
@@ -539,8 +530,7 @@ def _handle_context_batch(
         matrix_files: list[str] = stringlist_to_list(provided_matrix_file)
         _create_gene_info_file(matrix_files, input_format, taxon_id, config=config)
 
-
-def rnaseq_preprocess(
+async def rnaseq_preprocess(
     context_names: list[str],
     mode: str,
     input_format: Input,
@@ -558,7 +548,7 @@ def rnaseq_preprocess(
     if not isinstance(taxon_id, int) and taxon_id not in ["human", "mouse"]:
         raise ValueError("taxon_id must be either an integer, or accepted string ('mouse', 'human')")
 
-    _handle_context_batch(
+    await _handle_context_batch(
         context_names=context_names,
         mode=mode,
         input_format=input_format,
@@ -684,10 +674,11 @@ if __name__ == "__main__":
     args: _Arguments = _parse_args()
     taxon_id_value = args.taxon_id.value if isinstance(args.taxon_id, Taxon) else args.taxon_id
 
-    rnaseq_preprocess(
-        context_names=args.context_names,
-        mode=args.mode,
-        input_format=args.gene_format,
-        taxon_id=taxon_id_value,
-        matrix_file=args.provided_matrix_fname,
+    asyncio.run(
+        rnaseq_preprocess(
+            context_names=args.context_names,
+            mode=args.mode,
+            taxon_id=taxon_id_value,
+            matrix_file=args.provided_matrix_fname,
+        )
     )
