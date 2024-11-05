@@ -430,7 +430,6 @@ async def _create_gene_info_file(*, matrix_files: list[Path], taxon_id, config: 
 
     biodbnet = BioDBNet(cache=True)
     logger.info("Fetching gene info")
-    gene_info_file = config.data_dir / "gene_info.csv"
     genes = set()
     for file in matrix_files:
         data: pd.DataFrame | sc.AnnData = pd.read_csv(file) if file.suffix == ".csv" else sc.read_h5ad(file)
