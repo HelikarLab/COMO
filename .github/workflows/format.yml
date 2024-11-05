@@ -1,6 +1,9 @@
 name: Format
 on: [pull_request]
 
+env:
+  UV_SYSTEM_PYTHON: 0
+
 jobs:
   format:
     runs-on: ubuntu-latest
