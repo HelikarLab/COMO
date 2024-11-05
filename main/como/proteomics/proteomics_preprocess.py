@@ -324,7 +324,7 @@ def parse_args() -> argparse.Namespace:
     )
     # TODO: Add option to delete intermediate files (raw, mzml, sqt)
 
-    args: argparse.Namespace = parser.parse_args(args)
+    args: argparse.Namespace = parser.parse_args()
     args.extensions = args.extensions.split(",")
 
     # Validte the input file exists
@@ -348,8 +348,6 @@ def parse_args() -> argparse.Namespace:
 def main():
     """
     This is the main driver function
-
-    :param args: The list of arguments collected from the command line
     """
     file_information: list[FileInformation] = []
     args: argparse.Namespace = parse_args()
