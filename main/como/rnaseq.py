@@ -537,10 +537,12 @@ def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions,
 
 
 def umi_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions) -> NamedMetrics:
-    for metric in metrics.values():
+    for study, metric in metrics.items():
         entrez_ids = metric.entrez_gene_ids
-        count_matrix = count_matrix[count_matrix.sum(axis=0) > 0, :]
-        minimums = count_matrix[count_matrix == 0]
+        count_matrix = metric.count_matrix
+
+        count_matrix = count_matrix[count_matrix.sum(axis=1) > 0]
+        minimums = count_matrix == 0
 
         zfpkm_results, z_matrix = zfpkm_transform(count_matrix)
         z_matrix[minimums] = -4
