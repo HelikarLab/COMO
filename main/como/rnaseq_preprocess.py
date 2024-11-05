@@ -247,8 +247,9 @@ async def _create_counts_matrix(context_name: str, config: Config):
 
     study_metrics = _organize_gene_counts_files(data_dir=data_dir)
     final_matrix: pd.DataFrame = pd.DataFrame()
+
     for metric in study_metrics:
-        counts: pd.DataFrame = _create_sample_counts_matrix(metric)
+        counts: pd.DataFrame = await _create_sample_counts_matrix(metric)
         final_matrix = counts if final_matrix.empty else pd.merge(final_matrix, counts, on="ensembl_gene_id", how="outer")
 
     output_filename = output_dir / f"gene_counts_matrix_full_{data_dir.stem}.csv"
