@@ -588,7 +588,6 @@ async def save_rnaseq_tests(
         technique = FilteringTechnique.umi
         logger.warning("Single cell filtration does not normalize and assumes gene counts are counted with Unique Molecular Identifiers (UMIs)")
 
-    read_counts_results: ReadMatrixResults = read_counts_matrix(
     read_counts_results: ReadMatrixResults = await _read_counts_matrix(
         biodbnet=biodbnet,
         context_name=context_name,
