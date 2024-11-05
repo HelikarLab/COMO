@@ -395,7 +395,7 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
     )
 
     subplot_titles = list(results.keys()) if subplot_titles else None
-    fig = make_subplots(rows=len(results), cols=1, subplot_titles=subplot_titles, vertical_spacing=0.05)
+    fig = make_subplots(rows=len(results), cols=1, subplot_titles=subplot_titles, vertical_spacing=min(0.05, (1 / (len(results) - 1))))
 
     for i, (name, group) in enumerate(mega_df.groupby("sample_name"), start=1):
         fig.add_trace(
