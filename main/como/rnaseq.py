@@ -11,6 +11,7 @@ import plotly.graph_objs as go
 import scanpy as sc
 import sklearn
 import sklearn.neighbors
+from fast_bioservices import BioDBNet, Output, Taxon
 from loguru import logger
 from plotly.subplots import make_subplots
 from scipy.signal import find_peaks
@@ -70,7 +71,7 @@ class _StudyMetrics:
     def __post_init__(self):
         for layout in self.layout:
             if layout not in ["paired-end", "single-end", ""]:
-                raise ValueError(f"Layout must be 'paired-end' or 'single-end'; got: {self.layout}")
+                raise ValueError(f"Layout must be 'paired-end' or 'single-end'; got: {layout}")
 
     @property
     def normalization_matrix(self) -> pd.DataFrame:
@@ -150,10 +151,12 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
 
 async def _read_counts_matrix(
     *,
+    biodbnet: BioDBNet,
     context_name: str,
     counts_matrix_filepath: Path,
     config_filepath: Path,
     gene_info_filepath: Path,
+    taxon_id: Taxon,
 ) -> ReadMatrixResults:
     """
     Reads the counts matrix and returns the results.
@@ -574,6 +577,7 @@ async def save_rnaseq_tests(
     min_count: int,
     min_zfpkm: int,
 ):
+    biodbnet: BioDBNet = BioDBNet()
     filtering_options = _FilteringOptions(
         replicate_ratio=replicate_ratio,
         batch_ratio=batch_ratio,
