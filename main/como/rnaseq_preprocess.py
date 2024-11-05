@@ -455,13 +455,15 @@ async def _create_gene_info_file(*, matrix_files: list[Path], taxon_id, config: 
         }
     )
 
-    gene_info.rename(columns={Output.ENSEMBL_GENE_ID.value: "ensembl_gene_id"}, inplace=True)
-    gene_info["start_position"] = gene_info["Chromosomal Location"].str.extract(r"chr_start: (\d+)")
-    gene_info["end_position"] = gene_info["Chromosomal Location"].str.extract(r"chr_end: (\d+)")
-    gene_info.rename(columns={"Gene Symbol": "hgnc_symbol", "Gene ID": "entrez_gene_id"}, inplace=True)
-    gene_info.drop(["Chromosomal Location"], axis=1, inplace=True)
-    gene_info.to_csv(gene_info_file, index=False)
-    logger.success(f"Gene Info file written at '{gene_info_file}'")
+    gene_info = gene_info[~((gene_info["entrez_gene_id"] == "-") & (gene_info["ensembl_gene_id"] == "-") & (gene_info["hgnc_symbol"] == "-"))]
+    gene_info["chromosome_location"].replace(to_replace="-", value=0, inplace=True)
+    gene_info["start_position"] = gene_info["chromosome_location"].apply(lambda x: extract_location(x, "chr_start"))
+    gene_info["end_position"] = gene_info["chromosome_location"].apply(lambda x: extract_location(x, "chr_end"))
+    gene_info["size"] = gene_info["end_position"].astype(int) - gene_info["start_position"].astype(int)
+    gene_info.drop(columns=["chromosome_location", "start_position", "end_position"], inplace=True)
+    output_filepath = config.data_dir / "gene_info.csv"
+    gene_info.to_csv(output_filepath, index=False)
+    logger.success(f"Gene Info file written at '{output_filepath}'")
 
 
 async def _handle_context_batch(
