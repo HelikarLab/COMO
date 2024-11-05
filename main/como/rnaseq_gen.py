@@ -74,6 +74,8 @@ async def _handle_context_batch(
     config = Config()
 
     config_filepath = config.config_dir / config_filename
+    if not config_filepath.exists():
+        raise FileNotFoundError(f"Unable to find '{config_filename}' at the path: '{config_filepath}'")
     xl = pd.ExcelFile(config_filepath)
     sheet_names = xl.sheet_names
 
