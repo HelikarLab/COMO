@@ -295,7 +295,7 @@ def zfpkm_transform(
     bandwidth: int = 0.5,
     peak_parameters: tuple[float, float] = (0.02, 1.0),
 ) -> tuple[dict[str, zFPKMresult], pd.DataFrame]:
-    def calc(col: pd.Series, bandwidth: int, peak_parameters: tuple[float, float]) -> zFPKMresult:
+    def calc(col: npt.NDArray, name: str, bandwidth: int, peak_parameters: tuple[float, float]) -> zFPKMresult:
         """
         Log2 Transformations
             - Stabilize the variance in the data to make the distribution more symmetric; this is helpful for Gaussian fitting
@@ -332,25 +332,33 @@ def zfpkm_transform(
             - Research shows that a zFPKM value of -3 or greater can be used as a threshold for calling a gene as "expressed"
                 : https://doi.org/10.1186/1471-2164-14-778
         """
-        col_log2: pd.DataFrame = np.log2(col)
-        kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(col_log2.values.reshape(-1, 1))  # type: ignore
+        col_log2: npt.NDArray = np.log2(col + 1)
+        col_log2 = np.nan_to_num(col_log2, nan=0)
+
+        kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(col_log2.reshape(-1, 1))  # type: ignore
         x_range = np.linspace(col_log2.min(), col_log2.max(), 1000)
         density = np.exp(kde.score_samples(x_range.reshape(-1, 1)))
         peaks, _ = find_peaks(density, height=peak_parameters[0], distance=peak_parameters[1])
         peak_positions = x_range[peaks]
 
-        mu = peak_positions.max()
-        max_fpkm = density[peaks[np.argmax(peak_positions)]]
-        u = col_log2[col_log2 > mu].mean()
-        stddev = (u - mu) * np.sqrt(np.pi / 2)
-        zfpkm = (col_log2 - mu) / stddev
+        mu = 0
+        max_fpkm = 0
+        u = 0
+        stddev = 1
+
+        if len(peaks) != 0:
+            mu = peak_positions.max()
+            max_fpkm = density[peaks[np.argmax(peak_positions)]]
+            u = col_log2[col_log2 > mu].mean()
+            stddev = (u - mu) * np.sqrt(np.pi / 2)
+        zfpkm = pd.Series((col_log2 - mu) / stddev, dtype=np.float32, name=name)
 
         return zFPKMresult(zfpkm=zfpkm, density=Density(x_range, density), mu=mu, std_dev=stddev, max_fpkm=max_fpkm)
 
-    zfpkm_df = pd.DataFrame(index=fpkm_df.index)
+    zfpkm_df = pd.DataFrame(data=0, index=fpkm_df.index, columns=fpkm_df.columns)
     results = {}
     for col in fpkm_df.columns:
-        results[col] = calc(fpkm_df[col], bandwidth, peak_parameters)
+        results[col] = calc(fpkm_df[col], name=col, bandwidth=bandwidth, peak_parameters=peak_parameters)
         zfpkm_df[col] = results[col].zfpkm
 
     return results, zfpkm_df
