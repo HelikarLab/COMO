@@ -592,6 +592,7 @@ async def save_rnaseq_tests(
     gene_info_filepath: Path,
     output_filepath: Path,
     prep: RNASeqPreparationMethod,
+    taxon_id: Taxon,
     replicate_ratio: float,
     batch_ratio: float,
     high_replicate_ratio: float,
@@ -618,6 +619,7 @@ async def save_rnaseq_tests(
         counts_matrix_filepath=counts_matrix_filepath,
         config_filepath=config_filepath,
         gene_info_filepath=gene_info_filepath,
+        taxon_id=taxon_id,
     )
     metrics = read_counts_results.metrics
     entrez_gene_ids = read_counts_results.entrez_gene_ids
