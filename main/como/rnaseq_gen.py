@@ -71,10 +71,6 @@ async def _handle_context_batch(
     :param taxon: The NCBI Taxon ID
     :return: None
     """
-    r_file_path = Path(__file__).parent / "rscripts" / "rnaseq.R"
-    if not r_file_path.exists():
-        raise FileNotFoundError(f"Unable to find 'rnaseq.R'! Looking for: {r_file_path}")
-
     config = Config()
 
     config_filepath = config.config_dir / config_filename
