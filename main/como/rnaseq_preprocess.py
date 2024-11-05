@@ -16,7 +16,7 @@ from fast_bioservices import BioDBNet, Input, Output, Taxon
 from loguru import logger
 
 from como import Config, stringlist_to_list
-from como.utils import _format_cohersion
+from como.utils import _format_determination
 
 
 @dataclass
@@ -431,10 +431,13 @@ def _create_gene_info_file(matrix_file_list: list[str], input_format: Input, tax
     logger.info("Fetching gene info")
     gene_info_file = config.data_dir / "gene_info.csv"
     genes = set()
-    for file in matrix_file_list:
-        df = pd.read_csv(file, low_memory=False)
-        genes.update(df["ensembl_gene_id"].astype(str).tolist())
-    genes = list(genes)
+    for file in matrix_files:
+        data: pd.DataFrame | sc.AnnData = pd.read_csv(file) if file.suffix == ".csv" else sc.read_h5ad(file)
+        input_values = data.iloc[:, 0].tolist() if isinstance(data, pd.DataFrame) else data.var_names.tolist()
+        coherced_format: pd.DataFrame = await _format_determination(
+            biodbnet, requested_output=Output.GENE_ID, input_values=input_values, taxon=taxon_id
+        )
+        genes.update(coherced_format["gene_id"].astype(str).tolist())
 
     # Create our output database format
     # Do not include values equal to "form"
