@@ -29,7 +29,6 @@ jobs:
         uses: astral-sh/ruff-action@v1
         with:
           args: "format"
-          changed-files: "true"
 
       - name: Format Notebook
         uses: astral-sh/ruff-action@v1
