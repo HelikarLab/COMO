@@ -53,11 +53,10 @@ async def _handle_context_batch(
     replicate_ratio_high: float,
     batch_ratio_high: float,
     technique: FilteringTechnique,
-    quantile,
-    min_count,
-    min_zfpkm,
-    prep: str,
-):
+    cut_off: int | float | str,
+    prep: RNASeqPreparationMethod,
+    taxon: Taxon,
+) -> None:
     """
     Handle iteration through each context type and create rnaseq expression file
 
@@ -108,9 +107,8 @@ async def _handle_context_batch(
             high_replicate_ratio=replicate_ratio_high,
             high_batch_ratio=batch_ratio_high,
             technique=technique,
-            quantile=quantile,
-            min_count=min_count,
-            min_zfpkm=min_zfpkm,
+            cut_off=cut_off,
+            taxon_id=taxon,
         )
         logger.success(f"Results saved at '{rnaseq_output_filepath}'")
 
@@ -124,7 +122,7 @@ async def rnaseq_gen(
     batch_ratio: float = 0.5,
     high_batch_ratio: float = 1.0,
     technique: FilteringTechnique | str = FilteringTechnique.tpm,
-    cut_off: Optional[int] = None,
+    cut_off: Optional[int | float] = None,
 ) -> None:
     """
     The main entrypoint for processing bulk total, bulk mRNA, and single-cell RNA sequencing data.
@@ -164,12 +162,8 @@ async def rnaseq_gen(
 
         if cut_off is None:
             cut_off = "default"
-    elif technique == FilteringTechnique.zfpkm:
-        # if cut_off is not None and (cut_off < -3 or cut_off > -2):
-        #     raise ValueError("Cutoff must be between -3 and -2")
-
-        if cut_off is None:
-            cut_off = "default"
+    elif technique == FilteringTechnique.zfpkm and cut_off is None:
+        cut_off = "default"
 
     await _handle_context_batch(
         config_filename=config_filename,
