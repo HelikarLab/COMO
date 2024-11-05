@@ -84,13 +84,18 @@ async def _handle_context_batch(
     for context_name in sheet_names:
         logger.debug(f"Starting '{context_name}'")
 
-        rnaseq_input_filepath = config.data_dir / "data_matrices" / context_name / f"gene_counts_matrix_{prep}_{context_name}.csv"
+        rnaseq_input_filepath = config.data_dir / "data_matrices" / context_name / f"gene_counts_matrix_{prep.value}_{context_name}"
+        if prep == RNASeqPreparationMethod.SCRNA:
+            rnaseq_input_filepath = rnaseq_input_filepath.with_suffix(".h5ad")
+        elif prep in {RNASeqPreparationMethod.TOTAL, RNASeqPreparationMethod.MRNA}:
+            rnaseq_input_filepath = rnaseq_input_filepath.with_suffix(".csv")
+
         if not rnaseq_input_filepath.exists():
             logger.warning(f"Gene counts matrix not found at {rnaseq_input_filepath}, skipping...")
             continue
 
         gene_info_filepath = config.data_dir / "gene_info.csv"
-        rnaseq_output_filepath = config.result_dir / context_name / prep / f"rnaseq_{prep}_{context_name}.csv"
+        rnaseq_output_filepath = config.result_dir / context_name / prep.value / f"rnaseq_{prep.value}_{context_name}.csv"
         rnaseq_output_filepath.parent.mkdir(parents=True, exist_ok=True)
 
         await save_rnaseq_tests(
