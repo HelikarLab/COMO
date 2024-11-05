@@ -96,9 +96,12 @@ class _StudyMetrics:
         self.__high_confidence_entrez_gene_ids = values
 
 
+Density = namedtuple("Density", ["x", "y"])
+
+
 class zFPKMresult(NamedTuple):
-    zfpkm: pd.DataFrame
-    density: dict[str, npt.NDArray]
+    zfpkm: pd.Series
+    density: Density
     mu: float
     std_dev: float
     max_fpkm: float
@@ -329,7 +332,7 @@ def zfpkm_transform(
         stddev = (u - mu) * np.sqrt(np.pi / 2)
         zfpkm = (col_log2 - mu) / stddev
 
-        return zFPKMresult(zfpkm=zfpkm, density={"z": x_range, "y": density}, mu=mu, std_dev=stddev, max_fpkm=max_fpkm)
+        return zFPKMresult(zfpkm=zfpkm, density=Density(x_range, density), mu=mu, std_dev=stddev, max_fpkm=max_fpkm)
 
     zfpkm_df = pd.DataFrame(index=fpkm_df.index)
     results = {}
