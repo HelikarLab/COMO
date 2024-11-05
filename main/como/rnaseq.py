@@ -142,12 +142,13 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
     :param filter_func: THe function to filter the data by
     :return: A NumPy array of the filtered data.
     """
-    if isinstance(data, pd.DataFrame):
-        return data.apply(filter_func, axis=1).values
-    elif isinstance(data, npt.NDArray):
-        return np.apply_along_axis(filter_func, axis=1, arr=data)
-    else:
-        raise ValueError("Unsupported data type. Must be a Pandas DataFrame or a NumPy array.")
+    match type(data):
+        case pd.DataFrame:
+            return data.apply(filter_func, axis=1).values
+        case npt.NDArray:
+            return np.apply_along_axis(filter_func, axis=1, arr=data)
+        case _:
+            raise ValueError("Unsupported data type. Must be a Pandas DataFrame or a NumPy array.")
 
 
 async def _read_counts_matrix(
