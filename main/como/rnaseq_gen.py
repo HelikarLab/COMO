@@ -27,10 +27,15 @@ class _Arguments:
     filtering_technique: FilteringTechnique
     minimum_cutoff: int | str
     library_prep: RNASeqPreparationMethod
+    taxon: Taxon
 
     def __post_init__(self):
         self.library_prep = RNASeqPreparationMethod.from_string(str(self.library_prep))
         self.filtering_technique = FilteringTechnique.from_string(str(self.filtering_technique))
+
+        if not str(self.taxon).isdigit():
+            raise ValueError(f"Expected '--taxon-id' to be an integer; got: {self.taxon}")
+        self.taxon = Taxon.from_int(int(self.taxon))
 
         if self.minimum_cutoff is None:
             if self.filtering_technique == FilteringTechnique.tpm:
@@ -113,6 +118,7 @@ async def _handle_context_batch(
 async def rnaseq_gen(
     config_filename: str,
     prep: RNASeqPreparationMethod,
+    taxon_id: int | str | Taxon,
     replicate_ratio: float = 0.5,
     batch_ratio: float = 0.5,
     replicate_ratio_high: float = 1.0,
@@ -139,6 +145,8 @@ async def rnaseq_gen(
     """
     if isinstance(technique, str):
         technique = FilteringTechnique(technique.lower())
+    if isinstance(taxon_id, (str, int)):
+        taxon_id = Taxon.from_string(str(taxon_id))
 
     if technique.value not in [t.value for t in FilteringTechnique]:
         raise ValueError(f"Technique must be one of {FilteringTechnique}")
@@ -241,6 +249,14 @@ def _parse_args() -> _Arguments:
         help="Ratio of groups (studies/batches) required for a gene to be considered high-confidence within that group. "
         "High-confidence genes ignore consensus with other data-sources, like proteomics. "
         "Example: 0.9 means that for a gene to be high-confidence, at least 90% of groups in a study must have passed the replicate ratio test",
+    )
+    parser.add_argument(
+        "--taxon",
+        "--taxon-id",
+        type=str,
+        required=True,
+        dest="taxon",
+        help="The NCBI Taxonomy ID that is being proessed. '9606' for humans, '10090' for mice.",
     )
     parser.add_argument(
         "-t",
