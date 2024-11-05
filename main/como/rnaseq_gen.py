@@ -122,8 +122,7 @@ async def rnaseq_gen(
     replicate_ratio: float = 0.5,
     high_replicate_ratio: float = 1.0,
     batch_ratio: float = 0.5,
-    replicate_ratio_high: float = 1.0,
-    batch_ratio_high: float = 1.0,
+    high_batch_ratio: float = 1.0,
     technique: FilteringTechnique | str = FilteringTechnique.tpm,
     cut_off: Optional[int] = None,
 ) -> None:
