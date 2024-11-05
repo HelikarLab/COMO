@@ -24,7 +24,7 @@ class Rpy2:
             self._args = args
         if self._kwargs == {}:
             self._kwargs = kwargs
-        
+
         func_ = rpy2.robjects.packages.SignatureTranslatedAnonymousPackage(self._r_file_read, "func_")
 
         # Dynamically call the func_ function, using the arguments passed in
