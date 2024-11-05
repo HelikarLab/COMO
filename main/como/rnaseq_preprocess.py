@@ -432,19 +432,20 @@ async def _create_gene_info_file(*, matrix_files: list[Path], taxon_id, config: 
         )
         genes.update(coherced_format["gene_id"].astype(str).tolist())
 
-    # Create our output database format
-    # Do not include values equal to "form"
-    # Remove items not equal to `form` because the input database cannot exist as an output database
-    output_db: list[Output] = [
-        i for i in [Output.ENSEMBL_GENE_ID, Output.GENE_SYMBOL, Output.GENE_ID, Output.CHROMOSOMAL_LOCATION] if i.value != input_format.value
-    ]
-
-    biodbnet = BioDBNet(cache=True)
-    gene_info = biodbnet.db2db(
-        input_values=genes,
-        input_db=input_format,
-        output_db=output_db,
-        taxon=taxon_id,
+    gene_info: pd.DataFrame = (
+        await biodbnet.db2db(
+            values=list(genes),
+            input_db=Input.GENE_ID,
+            output_db=[Output.ENSEMBL_GENE_ID, Output.GENE_SYMBOL, Output.CHROMOSOMAL_LOCATION],
+            taxon=taxon_id,
+        )
+    ).rename(
+        columns={
+            "Ensembl Gene ID": "ensembl_gene_id",
+            "Gene Symbol": "hgnc_symbol",
+            "Gene ID": "entrez_gene_id",
+            "Chromosomal Location": "chromosome_location",
+        }
     )
 
     gene_info.rename(columns={Output.ENSEMBL_GENE_ID.value: "ensembl_gene_id"}, inplace=True)
