@@ -462,8 +462,7 @@ async def _create_gene_info_file(*, matrix_files: list[Path], taxon_id, config: 
 
 async def _handle_context_batch(
     context_names: list[str],
-    mode,
-    input_format: Input,
+    mode: Literal["create", "provide"],
     taxon_id,
     provided_matrix_file,
     config: Config,
@@ -605,13 +604,12 @@ def _parse_args():
         dest="taxon_id",
         help="BioDbNet taxon ID number, also accepts 'human', or 'mouse'",
     )
-
     parser.add_argument(
         "--mode",
         type=str,
         required=True,
         dest="mode",
-        choices=["make", "provide"],
+        choices={"create", "provide"},
         help="Mode of rnaseq_preprocess.py, either 'make' or 'provide'",
     )
     parser.add_argument(
