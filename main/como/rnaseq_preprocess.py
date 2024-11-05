@@ -252,7 +252,7 @@ async def _create_counts_matrix(context_name: str, config: Config):
         counts: pd.DataFrame = await _create_sample_counts_matrix(metric)
         final_matrix = counts if final_matrix.empty else pd.merge(final_matrix, counts, on="ensembl_gene_id", how="outer")
 
-    output_filename = output_dir / f"gene_counts_matrix_full_{data_dir.stem}.csv"
+    output_filename = matrix_output_dir / f"gene_counts_matrix_full_{data_dir.stem}.csv"
     output_filename.parent.mkdir(parents=True, exist_ok=True)
     final_matrix.to_csv(output_filename, index=False)
     logger.success(f"Wrote gene count matrix for '{data_dir.stem}' at '{output_filename}'")
@@ -274,16 +274,16 @@ async def _create_config_df(context_name: str) -> pd.DataFrame:
     groups: list[str] = []
     preparation_method: list[str] = []
 
-    for gcfilename in sorted(gene_counts_files):
+    for gene_count_filename in sorted(gene_counts_files):
         try:
             # Match S___R___r___
             # \d{1,3} matches 1-3 digits
             # (?:r\d{1,3})? matches an option "r" followed by three digits
-            label = re.findall(r"S\d{1,3}R\d{1,3}(?:r\d{1,3})?", gcfilename.as_posix())[0]
+            label = re.findall(r"S\d{1,3}R\d{1,3}(?:r\d{1,3})?", gene_count_filename.as_posix())[0]
 
         except IndexError:
             raise IndexError(
-                f"\n\nFilename of '{gcfilename}' is not valid. Should be 'contextName_SXRYrZ.tab', where X is the "
+                f"\n\nFilename of '{gene_count_filename}' is not valid. Should be 'contextName_SXRYrZ.tab', where X is the "
                 "study/batch number, Y is the replicate number, and Z is the run number."
                 "\n\nIf not a multi-run sample, exclude 'rZ' from the filename."
             )
