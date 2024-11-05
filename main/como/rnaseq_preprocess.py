@@ -479,67 +479,68 @@ async def _handle_context_batch(
     trnaseq_config_filename = config.config_dir / "trnaseq_data_inputs_auto.xlsx"
     mrnaseq_config_filename = config.config_dir / "mrnaseq_data_inputs_auto.xlsx"
 
-    tflag = False  # turn on when any total set is found to prevent writer from being init multiple times or empty
-    mflag = False  # turn on when any mrna set is found to prevent writer from being init multiple times or empty
+    using_trna = False  # turn on when any total set is found to prevent writer from being init multiple times or empty
+    using_mrna = False  # turn on when any mrna set is found to prevent writer from being init multiple times or empty
 
     logger.success(f"Found {len(context_names)} contexts to process: {', '.join(context_names)}")
 
-    tmatrix_files = []
-    mmatrix_files = []
-    for context_name in context_names:
-        context_name = context_name.strip(" ")
-        logger.info(f"Preprocessing {context_name}")
-        gene_output_dir = config.result_dir / context_name
-        matrix_output_dir = config.data_dir / "data_matrices" / context_name
+    tmatrix_files: list[Path] = []
+    mmatrix_files: list[Path] = []
+    match mode:
+        case "create":
+            for context_name in context_names:
+                context_name = context_name.strip(" ")
+                logger.info(f"Processing {context_name}")
+                gene_output_dir = config.result_dir / context_name
+                matrix_output_dir = config.data_dir / "data_matrices" / context_name
 
-        gene_output_dir.parent.mkdir(parents=True, exist_ok=True)
-        matrix_output_dir.parent.mkdir(parents=True, exist_ok=True)
+                gene_output_dir.parent.mkdir(parents=True, exist_ok=True)
+                matrix_output_dir.parent.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Gene info output directory is '{gene_output_dir}'")
+                logger.info(f"Gene info output directory is '{gene_output_dir}'")
 
-        matrix_path_all = matrix_output_dir / f"gene_counts_matrix_full_{context_name}.csv"
-        matrix_path_total = matrix_output_dir / f"gene_counts_matrix_total_{context_name}.csv"
-        matrix_path_mrna = matrix_output_dir / f"gene_counts_matrix_mrna_{context_name}.csv"
+                await _create_counts_matrix(context_name, config=config)
+                # TODO: warn user or remove samples that are all 0 to prevent density plot error in zFPKM
+                config_df = await _create_config_df(context_name)
+                trna_df, mrna_df = _split_config_df(config_df)
 
-        if mode == "make":
-            _create_counts_matrix(context_name, config=config)
-            # TODO: warn user or remove samples that are all 0 to prevent density plot error in zFPKM
-            df = _create_config_df(context_name)
-            df_t, df_m = _split_config_df(df)
+                matrix_path_total = matrix_output_dir / f"gene_counts_matrix_total_{context_name}.csv"
+                if not trna_df.empty:
+                    if not using_trna:
+                        using_trna = True
+                        twriter = pd.ExcelWriter(trnaseq_config_filename)
 
-            if not df_t.empty:
-                if not tflag:
-                    tflag = True
-                    twriter = pd.ExcelWriter(trnaseq_config_filename)
+                    tmatrix_files.append(matrix_path_total)
+                    trna_df.to_excel(twriter, sheet_name=context_name, header=True, index=False)
 
-                tmatrix_files.append(matrix_path_total)
-                df_t.to_excel(twriter, sheet_name=context_name, header=True, index=False)
+                matrix_path_mrna = matrix_output_dir / f"gene_counts_matrix_mrna_{context_name}.csv"
+                if not mrna_df.empty:
+                    if not using_mrna:
+                        using_mrna = True
+                        mwriter = pd.ExcelWriter(mrnaseq_config_filename)
 
-            if not df_m.empty:
-                if not mflag:
-                    mflag = True
-                    mwriter = pd.ExcelWriter(mrnaseq_config_filename)
+                    mmatrix_files.append(matrix_path_mrna)
+                    mrna_df.to_excel(mwriter, sheet_name=context_name, header=True, index=False)
 
-                mmatrix_files.append(matrix_path_mrna)
-                df_m.to_excel(mwriter, sheet_name=context_name, header=True, index=False)
+                matrix_path_all = matrix_output_dir / f"gene_counts_matrix_full_{context_name}.csv"
+                trna_matrix, mrna_matrix = _split_counts_matrices(matrix_path_all, trna_df, mrna_df)
+                if len(trna_matrix.columns) >= 1:
+                    trna_matrix.to_csv(matrix_path_total, header=True, index=False)
+                if len(mrna_matrix.columns) >= 1:
+                    mrna_matrix.to_csv(matrix_path_mrna, header=True, index=False)
 
-            tmatrix, mmatrix = _split_counts_matrices(matrix_path_all, df_t, df_m)
-            if len(tmatrix.columns) >= 1:
-                tmatrix.to_csv(matrix_path_total, header=True, index=False)
-            if len(mmatrix.columns) >= 1:
-                mmatrix.to_csv(matrix_path_mrna, header=True, index=False)
+            if using_trna:
+                twriter.close()
+            if using_mrna:
+                mwriter.close()
 
-    if mode == "make":
-        if tflag:
-            twriter.close()
-        if mflag:
-            mwriter.close()
+            await _create_gene_info_file(matrix_files=tmatrix_files + mmatrix_files, taxon_id=taxon_id, config=config)
+        case "provide":
+            matrix_files: list[Path] = [Path(p) for p in stringlist_to_list(provided_matrix_file)]
+            await _create_gene_info_file(matrix_files=matrix_files, taxon_id=taxon_id, config=config)
+        case _:
+            raise ValueError("'--mode' must be either 'create' or 'provide'")
 
-        _create_gene_info_file(tmatrix_files + mmatrix_files, input_format, taxon_id, config=config)
-
-    else:
-        matrix_files: list[str] = stringlist_to_list(provided_matrix_file)
-        _create_gene_info_file(matrix_files, input_format, taxon_id, config=config)
 
 async def rnaseq_preprocess(
     context_names: list[str],
