@@ -41,12 +41,12 @@ class _Arguments:
                 self.minimum_cutoff = -3
 
 
-def _handle_context_batch(
-    config_filename,
-    replicate_ratio,
-    batch_ratio,
-    replicate_ratio_high,
-    batch_ratio_high,
+async def _handle_context_batch(
+    config_filename: str,
+    replicate_ratio: float,
+    batch_ratio: float,
+    replicate_ratio_high: float,
+    batch_ratio_high: float,
     technique: FilteringTechnique,
     quantile,
     min_count,
@@ -91,10 +91,7 @@ def _handle_context_batch(
         rnaseq_output_filepath = config.result_dir / context_name / prep / f"rnaseq_{prep}_{context_name}.csv"
         rnaseq_output_filepath.parent.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Gene info saved at: {gene_info_filepath}")
-        logger.info(f"Output file saved at: {rnaseq_output_filepath}")
-
-        save_rnaseq_tests(
+        await save_rnaseq_tests(
             context_name=context_name,
             counts_matrix_filepath=rnaseq_input_filepath,
             config_filepath=config_filepath,
@@ -113,7 +110,7 @@ def _handle_context_batch(
         logger.success(f"Results saved at '{rnaseq_output_filepath}'")
 
 
-def rnaseq_gen(
+async def rnaseq_gen(
     config_filename: str,
     prep: RNASeqPreparationMethod,
     replicate_ratio: float = 0.5,
@@ -177,6 +174,16 @@ def rnaseq_gen(
         cut_off,
         cut_off,
         prep.value,
+    await _handle_context_batch(
+        config_filename=config_filename,
+        replicate_ratio=replicate_ratio,
+        replicate_ratio_high=high_replicate_ratio,
+        batch_ratio=batch_ratio,
+        batch_ratio_high=high_batch_ratio,
+        technique=technique,
+        cut_off=cut_off,
+        prep=prep,
+        taxon=taxon_id,
     )
 
 
@@ -278,13 +285,16 @@ def _parse_args() -> _Arguments:
 
 if __name__ == "__main__":
     args = _parse_args()
-    rnaseq_gen(
-        config_filename=args.config_file,
-        replicate_ratio=args.replicate_ratio,
-        batch_ratio=args.batch_ratio,
-        replicate_ratio_high=args.high_replicate_ratio,
-        batch_ratio_high=args.high_batch_ratio,
-        technique=args.filtering_technique,
-        cut_off=args.minimum_cutoff,
-        prep=args.library_prep,
+    asyncio.run(
+        rnaseq_gen(
+            config_filename=args.config_file,
+            replicate_ratio=args.replicate_ratio,
+            batch_ratio=args.batch_ratio,
+            high_replicate_ratio=args.high_replicate_ratio,
+            high_batch_ratio=args.high_batch_ratio,
+            technique=args.filtering_technique,
+            cut_off=args.minimum_cutoff,
+            prep=args.library_prep,
+            taxon_id=args.taxon,
+        )
     )

@@ -148,7 +148,7 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
         raise ValueError("Unsupported data type. Must be a Pandas DataFrame or a NumPy array.")
 
 
-def read_counts_matrix(
+async def _read_counts_matrix(
     *,
     context_name: str,
     counts_matrix_filepath: Path,
@@ -558,7 +558,7 @@ def filter_counts(
             raise ValueError(f"Technique must be one of {FilteringTechnique}")
 
 
-def save_rnaseq_tests(
+async def save_rnaseq_tests(
     context_name: str,
     counts_matrix_filepath: Path,
     config_filepath: Path,
@@ -589,6 +589,8 @@ def save_rnaseq_tests(
         logger.warning("Single cell filtration does not normalize and assumes gene counts are counted with Unique Molecular Identifiers (UMIs)")
 
     read_counts_results: ReadMatrixResults = read_counts_matrix(
+    read_counts_results: ReadMatrixResults = await _read_counts_matrix(
+        biodbnet=biodbnet,
         context_name=context_name,
         counts_matrix_filepath=counts_matrix_filepath,
         config_filepath=config_filepath,
@@ -629,3 +631,25 @@ def save_rnaseq_tests(
             boolean_matrix.loc[gene, "high"] = 1
 
     boolean_matrix.to_csv(output_filepath, index=False)
+
+
+if __name__ == "__main__":
+    import asyncio
+
+    asyncio.run(
+        save_rnaseq_tests(
+            context_name="naiveCD4",
+            counts_matrix_filepath=Path("/Users/joshl/Projects/COMO/main/data/data_matrices/naiveCD4/gene_counts_matrix_scrna_naiveCD4.h5ad"),
+            config_filepath=Path("/Users/joshl/Projects/COMO/main/data/config_sheets/scrnaseq_data_inputs_auto.xlsx"),
+            gene_info_filepath=Path("/Users/joshl/Projects/COMO/main/data/gene_info.csv"),
+            output_filepath=Path("/Users/joshl/Projects/COMO/main/data/results/naiveCD4/scrna/rnaseq_scrna_naiveCD4.csv"),
+            prep=RNASeqPreparationMethod.SCRNA,
+            taxon_id=Taxon.HOMO_SAPIENS,
+            replicate_ratio=0.5,
+            high_replicate_ratio=1.0,
+            batch_ratio=0.5,
+            high_batch_ratio=1.0,
+            technique=FilteringTechnique.umi,
+            cut_off=-3,
+        )
+    )
