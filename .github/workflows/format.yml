@@ -19,8 +19,6 @@ jobs:
 
       - name: Install Jupyter
         run: uv pip install jupyter nbconvert
-        env:
-          UV_SYSTEM_PYTHON: 1
 
       - name: Format Python Imports
         uses: astral-sh/ruff-action@v1
