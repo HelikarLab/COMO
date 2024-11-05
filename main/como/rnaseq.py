@@ -255,19 +255,19 @@ def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
             count_matrix = count_matrix.astype(np.float32)
             gene_size = gene_size.astype(np.float32)
 
-            if layout == "paired-end":  # Perform FPKM
-                mean_fragment_lengths = metrics[study].fragment_lengths[sample]
-
-                effective_length = [max(0, size - mean_fragment_lengths + 1) for size in gene_size]  # Ensure non-negative value
-                N = count_matrix.sum()
-                fpkm = (count_matrix + 1) * 1e9 / (np.array(effective_length) * N)
-                matrix_values.append(fpkm)
-            elif layout == "single-end":  # Perform RPKM
-                rate = np.log(count_matrix + 1) - np.log(gene_size)  # Add a pseudocount before log to ensure log(0) does not happen
-                exp_rate = np.exp(rate - np.log(np.sum(count_matrix)) + np.log(1e9))
-                matrix_values.append(exp_rate)
-            else:
-                raise ValueError("Invalid normalization method specified")
+            match layout:
+                case "paired-end":  # FPKM
+                    mean_fragment_lengths = metrics[study].fragment_lengths[sample]
+                    effective_length = [max(0, size - mean_fragment_lengths + 1) for size in gene_size]  # Ensure non-negative value
+                    N = count_matrix.sum()
+                    fpkm = (count_matrix + 1) * 1e9 / (np.array(effective_length) * N)
+                    matrix_values.append(fpkm)
+                case "single-end":  # RPKM
+                    rate = np.log(count_matrix + 1) - np.log(gene_size)  # Add a pseudocount before log to ensure log(0) does not happen
+                    exp_rate = np.exp(rate - np.log(np.sum(count_matrix)) + np.log(1e9))
+                    matrix_values.append(exp_rate)
+                case _:
+                    raise ValueError("Invalid normalization method specified")
 
         fpkm_matrix = pd.DataFrame(matrix_values).T  # Transpose is needed because values were appended as rows
         fpkm_matrix = fpkm_matrix[~pd.isna(fpkm_matrix)]
