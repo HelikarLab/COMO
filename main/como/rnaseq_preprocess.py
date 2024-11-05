@@ -309,12 +309,12 @@ async def _create_config_df(context_name: str) -> pd.DataFrame:
                     frag_files.append(config.data_dir / "COMO_input" / context_name / "fragmentSizes" / study_number / frag_filename)
 
         context_path = config.data_dir / "COMO_input" / context_name
-        layout_files = list(Path(context_path, "layouts").rglob(f"{context_name}_{label}_layout.txt"))
-        strand_files = list(Path(context_path, "strandedness").rglob(f"{context_name}_{label}_strandedness.txt"))
-        frag_files = list(Path(context_path, "fragmentSizes").rglob(f"{context_name}_{label}_fragment_size.txt"))
-        prep_files = list(Path(context_path, "prepMethods").rglob(f"{context_name}_{label}_prep_method.txt"))
 
-        # Get layout
+        layout_files = list((context_path / "layouts").rglob(f"{context_name}_{label}_layout.txt"))
+        strand_files = list((context_path / "strandedness").rglob(f"{context_name}_{label}_strandedness.txt"))
+        frag_files = list((context_path / "fragmentSizes").rglob(f"{context_name}_{label}_fragment_size.txt"))
+        prep_files = list((context_path / "prepMethods").rglob(f"{context_name}_{label}_prep_method.txt"))
+
         layout = "UNKNOWN"
         if len(layout_files) == 0:
             logger.warning(
@@ -326,7 +326,6 @@ async def _create_config_df(context_name: str) -> pd.DataFrame:
         elif len(layout_files) > 1:
             raise ValueError(f"Multiple matching layout files for {label}, make sure there is only one copy for each replicate in COMO_input")
 
-        # Get strandedness
         strand = "UNKNOWN"
         if len(strand_files) == 0:
             logger.warning(
@@ -338,7 +337,6 @@ async def _create_config_df(context_name: str) -> pd.DataFrame:
         elif len(strand_files) > 1:
             raise ValueError(f"Multiple matching strandedness files for {label}, make sure there is only one copy for each replicate in COMO_input")
 
-        # Get preparation method
         prep = "total"
         if len(prep_files) == 0:
             logger.warning(f"No prep file found for {label}, assuming 'total' as in Total RNA library preparation")
@@ -350,7 +348,6 @@ async def _create_config_df(context_name: str) -> pd.DataFrame:
         elif len(prep_files) > 1:
             raise ValueError(f"Multiple matching prep files for {label}, make sure there is only one copy for each replicate in COMO_input")
 
-        # Get fragment length
         mean_fragment_size = 100
         if len(frag_files) == 0:
             logger.warning(f"\nNo fragment file found for {label}, using '100'. This must be defined by the user in order to use zFPKM normalization")
@@ -421,8 +418,7 @@ def _split_counts_matrices(count_matrix_all, df_total, df_mrna):
 
 async def _create_gene_info_file(*, matrix_files: list[Path], taxon_id, config: Config):
     """
-    Create gene info file for specified context by reading first column in its count matrix file at
-     results/<context name>/gene_info_<context name>.csv
+    Create gene info file for specified context by reading first column in its count matrix file
     """
 
     logger.info("Fetching gene info")
