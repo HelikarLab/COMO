@@ -25,9 +25,7 @@ from como.project import Config
 class _FilteringOptions(NamedTuple):
     replicate_ratio: float
     batch_ratio: float
-    quantile: float
-    min_count: int
-    min_zfpkm: int
+    cut_off: float
     high_replicate_ratio: float
     high_batch_ratio: float
 
@@ -354,15 +352,15 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
 
     mega_df = pd.DataFrame()
     for name, result in results.items():
-        d = result["d"]
-        mu = result["m"]
-        stdev = result["s"]
-        max_fpkm = result["y"]
+        d = result.density
+        mu = result.mu
+        stdev = result.std_dev
+        max_fpkm = result.max_fpkm
 
-        fitted = norm.pdf(d["x"], loc=mu, scale=stdev)
+        fitted = norm.pdf(d.x, loc=mu, scale=stdev)
         scale_fitted = fitted * (max_fpkm / fitted.max())
 
-        df = pd.DataFrame({"sample_name": name, "log2fpkm": d["x"], "fpkm_density": d["y"], "fitted_density_scaled": scale_fitted})
+        df = pd.DataFrame({"sample_name": name, "log2fpkm": d.x, "fpkm_density": d.y, "fitted_density_scaled": scale_fitted})
         mega_df = pd.concat([mega_df, df], ignore_index=True)
 
     mega_df = mega_df.melt(
@@ -401,7 +399,7 @@ def cpm_filter(*, context_name: str, metrics: NamedMetrics, filtering_options: _
     config = Config()
     n_exp = filtering_options.replicate_ratio
     n_top = filtering_options.high_replicate_ratio
-    min_count = filtering_options.min_count
+    cut_off = filtering_options.cut_off
 
     sample: str
     metric: _StudyMetrics
@@ -427,7 +425,7 @@ def cpm_filter(*, context_name: str, metrics: NamedMetrics, filtering_options: _
         top_samples = round(n_top * len(counts.columns))
         test_bools = pd.DataFrame({"entrez_gene_ids": entrez_ids})
         for i in range(len(counts_per_million.columns)):
-            cutoff = 10e6 / (np.median(np.sum(counts[:, i]))) if min_count == "default" else 1e6 * min_count / np.median(np.sum(counts[:, i]))
+            cutoff = 10e6 / (np.median(np.sum(counts[:, i]))) if cut_off == "default" else 1e6 * cut_off / np.median(np.sum(counts[:, i]))
             test_bools = test_bools.merge(counts_per_million[counts_per_million.iloc[:, i] > cutoff])
 
     return metrics
@@ -442,7 +440,7 @@ def TPM_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
 
     n_exp = filtering_options.replicate_ratio
     n_top = filtering_options.high_replicate_ratio
-    quantile = filtering_options.quantile
+    cut_off = filtering_options.cut_off
     metrics = calculate_tpm(metrics)
 
     sample: str
@@ -456,7 +454,7 @@ def TPM_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
         top_samples = round(n_top * len(tpm_matrix.columns))
 
         tpm_quantile = tpm_matrix[tpm_matrix > 0]
-        quantile_cutoff = np.quantile(a=tpm_quantile.values, q=1 - (quantile / 100), axis=0)  # Compute quantile across columns
+        quantile_cutoff = np.quantile(a=tpm_quantile.values, q=1 - (cut_off / 100), axis=0)  # Compute quantile across columns
         boolean_expression = pd.DataFrame(data=tpm_matrix > quantile_cutoff, index=tpm_matrix.index, columns=tpm_matrix.columns).astype(int)
 
         min_func = k_over_a(min_samples, 0.9)
@@ -482,7 +480,7 @@ def TPM_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
 def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions, prep: RNASeqPreparationMethod) -> NamedMetrics:
     n_exp = filtering_options.replicate_ratio
     n_top = filtering_options.high_replicate_ratio
-    cutoff = filtering_options.min_zfpkm
+    cut_off = filtering_options.cut_off
 
     metrics = calculate_fpkm(metrics)
 
@@ -501,8 +499,8 @@ def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions,
         min_samples = round(n_exp * len(zfpkm_df.columns))
         top_samples = round(n_top * len(zfpkm_df.columns))
 
-        min_func = k_over_a(min_samples, cutoff)
-        top_func = k_over_a(top_samples, cutoff)
+        min_func = k_over_a(min_samples, cut_off)
+        top_func = k_over_a(top_samples, cut_off)
 
         min_genes: npt.NDArray[bool] = genefilter(zfpkm_df, min_func)
         top_genes: npt.NDArray[bool] = genefilter(zfpkm_df, top_func)
@@ -528,8 +526,8 @@ def umi_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions) -
         min_samples = round(filtering_options.replicate_ratio * len(z_matrix.columns))
         top_samples = round(filtering_options.high_replicate_ratio * len(z_matrix.columns))
 
-        min_func = k_over_a(min_samples, filtering_options.min_zfpkm)
-        top_func = k_over_a(top_samples, filtering_options.min_zfpkm)
+        min_func = k_over_a(min_samples, filtering_options.cut_off)
+        top_func = k_over_a(top_samples, filtering_options.cut_off)
 
         min_genes: npt.NDArray[bool] = genefilter(z_matrix, min_func)
         top_genes: npt.NDArray[bool] = genefilter(z_matrix, top_func)
@@ -573,17 +571,13 @@ async def save_rnaseq_tests(
     high_replicate_ratio: float,
     high_batch_ratio: float,
     technique: FilteringTechnique,
-    quantile: float,
-    min_count: int,
-    min_zfpkm: int,
+    cut_off: int | float,
 ):
     biodbnet: BioDBNet = BioDBNet()
     filtering_options = _FilteringOptions(
         replicate_ratio=replicate_ratio,
         batch_ratio=batch_ratio,
-        quantile=quantile,
-        min_count=min_count,
-        min_zfpkm=min_zfpkm,
+        cut_off=cut_off,
         high_replicate_ratio=high_replicate_ratio,
         high_batch_ratio=high_batch_ratio,
     )
