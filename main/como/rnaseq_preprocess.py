@@ -421,6 +421,14 @@ async def _create_gene_info_file(*, matrix_files: list[Path], taxon_id, config: 
     Create gene info file for specified context by reading first column in its count matrix file
     """
 
+    def extract_location(location, prefix: Literal["chr_start", "chr_end"]):
+        location = str(location)
+        if location == "0":
+            return 0
+        match = re.search(rf"{prefix}: (\d+)", location)
+        return int(match.group(1)) if match else 0
+
+    biodbnet = BioDBNet(cache=True)
     logger.info("Fetching gene info")
     gene_info_file = config.data_dir / "gene_info.csv"
     genes = set()
