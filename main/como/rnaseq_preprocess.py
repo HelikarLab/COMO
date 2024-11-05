@@ -404,7 +404,7 @@ def _split_config_df(df):
     return df_t, df_m
 
 
-def _split_counts_matrices(count_matrix_all, df_total, df_mrna):
+def _split_counts_matrices(count_matrix_all: Path, df_total: pd.DataFrame, df_mrna: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Split a counts-matrix dataframe into two seperate ones. One for Total RNA library prep, one for mRNA
     """
