@@ -163,17 +163,6 @@ async def rnaseq_gen(
         if cut_off is None:
             cut_off = "default"
 
-    _handle_context_batch(
-        config_filename,
-        replicate_ratio,
-        batch_ratio,
-        replicate_ratio_high,
-        batch_ratio_high,
-        technique,
-        cut_off,
-        cut_off,
-        cut_off,
-        prep.value,
     await _handle_context_batch(
         config_filename=config_filename,
         replicate_ratio=replicate_ratio,

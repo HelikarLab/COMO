@@ -238,8 +238,14 @@ async def _create_sample_counts_matrix(metrics: _StudyMetrics) -> pd.DataFrame:
     return counts
 
 
-def _create_context_counts_matrix(data_dir: Path, output_dir: Path):
 async def _create_counts_matrix(context_name: str, config: Config):
+    """
+    Create a counts matrix by reading gene counts tables in COMO_input/<context name>/<study number>/geneCounts/
+    Uses R in backend (_create_context_counts_matrix.R)
+    """
+    data_dir = config.data_dir / "COMO_input" / context_name
+    matrix_output_dir = config.data_dir / "data_matrices" / context_name
+
     study_metrics = _organize_gene_counts_files(data_dir=data_dir)
     final_matrix: pd.DataFrame = pd.DataFrame()
     for metric in study_metrics:
