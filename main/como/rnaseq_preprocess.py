@@ -22,7 +22,6 @@ from como.utils import _format_determination
 @dataclass
 class _Arguments:
     context_names: list[str]
-    gene_format: Input
     taxon_id: Taxon | int | str
     mode: Literal["create", "provide"]
     provided_matrix_fname: str = None
@@ -538,18 +537,14 @@ async def _handle_context_batch(
 
 async def rnaseq_preprocess(
     context_names: list[str],
-    mode: str,
-    input_format: Input,
+    mode: Literal["create", "provide"],
     taxon_id: Union[int, str],
     matrix_file: Optional[str | Path] = None,
     config: Config = None,
 ) -> None:
     config = Config() if config is None else config
-    if mode not in ["make", "provide"]:
-        raise ValueError("mode must be either 'make' or 'provide'")
-
-    if input_format not in [Input.ENSEMBL_GENE_ID, Input.GENE_SYMBOL, Input.GENE_ID]:
-        raise ValueError(f"input_format must be either 'ENSEMBL_GENE_ID', 'GENE_SYMBOL', or 'GENE_ID' (provided: {input_format})")
+    if mode not in {"create", "provide"}:
+        raise ValueError("mode must be either 'create' or 'provide'")
 
     if not isinstance(taxon_id, int) and taxon_id not in ["human", "mouse"]:
         raise ValueError("taxon_id must be either an integer, or accepted string ('mouse', 'human')")
@@ -557,7 +552,6 @@ async def rnaseq_preprocess(
     await _handle_context_batch(
         context_names=context_names,
         mode=mode,
-        input_format=input_format,
         taxon_id=taxon_id,
         provided_matrix_file=Path(matrix_file if matrix_file is not None else "").as_posix(),
         config=config,
@@ -589,7 +583,6 @@ def _parse_args():
             For additional help, please post questions/issues in the MADRID GitHub repo at
             https://github.com/HelikarLab/MADRID or email babessell@gmail.com""",
     )
-
     parser.add_argument(
         "-n",
         "--context-names",
@@ -603,17 +596,6 @@ def _parse_args():
                              the count matrix as an imported .csv file. If making multiple models in a batch, then
                              use the format: "context1 context2 context3". """,
     )
-
-    parser.add_argument(
-        "-f",
-        "--gene-format",
-        type=str,
-        required=False,
-        default="Ensembl Gene ID",
-        dest="gene_format",
-        help="Format of Genes, accepts 'Ensembl', 'Entrez', or'HGNC symbol'",
-    )
-
     parser.add_argument(
         "-i",
         "--taxon-id",
@@ -644,18 +626,6 @@ def _parse_args():
 
     if parsed.mode == "provide" and parsed.provided_matrix_fname is None:
         raise ValueError("If provide_matrix is True, then provided_matrix_fname must be provided")
-
-    match str(parsed.gene_format).upper():
-        case "ENSEMBL" | "ENSEMBLE" | "ENSG" | "ENSMUSG" | "ENSEMBL ID" | "ENSEMBL GENE ID":
-            parsed.gene_format = Input.ENSEMBL_GENE_ID
-        case "HGNC SYMBOL" | "HUGO" | "HUGO SYMBOL" | "SYMBOL" | "HGNC" | "GENE SYMBOL":
-            parsed.gene_format = Input.GENE_SYMBOL
-        case "ENTREZ" | "ENTRES" | "ENTREZ ID" | "ENTREZ NUMBER" | "GENE ID":
-            parsed.gene_format = Input.GENE_ID
-        case _:
-            raise ValueError(
-                f"Gene format (--gene_format) is invalid; accepts 'Ensembl', 'Entrez', and 'HGNC symbol'; provided: {parsed.gene_format}"
-            )
 
     # handle species alternative ids
     taxon_id = str(parsed.taxon_id)
