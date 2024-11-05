@@ -1,27 +1,28 @@
-import os
 import sys
 
 import pytest
 
-# Add parent directory to path, allows us to import the "project.py" file from the parent directory
-# From: https://stackoverflow.com/a/30536516/13885200
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import rnaseq_preprocess
-
 
 # Define a list of arguments to test
-# fmt: off
 @pytest.mark.skip("Not testing args because the input 'argv' has been removed")
 @pytest.mark.parametrize(
     "args",
     [
         # Test using data in COMO_input data
         ["--context-names", "naiveB immNK", "--gene-format", "Ensembl", "--taxon-id", "9606", "--create-matrix"],
-        ["--context-names", "dimNK brightNK", "--gene-format", "SYMBOL", "--taxon-id", "human", "--provide-matrix", "--matrix", "COMO_input/counts_matrix.tsv"],
+        [
+            "--context-names",
+            "dimNK brightNK",
+            "--gene-format",
+            "SYMBOL",
+            "--taxon-id",
+            "human",
+            "--provide-matrix",
+            "--matrix",
+            "COMO_input/counts_matrix.tsv",
+        ],
     ],
 )
-# fmt: on
-
 def test_arg_input(args: list[str]):
     """
     This function asserts that the arguments passed into the function are correct
