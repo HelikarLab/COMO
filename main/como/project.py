@@ -43,3 +43,10 @@ class Config(metaclass=SingletonMeta):
             logger.warning(f"'results_dir' not provided to Config, using {self.data_dir / 'results'}")
             self.result_dir = self.data_dir / "results"
             self.result_dir.mkdir(parents=True, exist_ok=True)
+
+    def update(self, **kwargs):
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, Path(value) if value else getattr(self, key))
+            else:
+                logger.warning(f"{key} is not a valid attribute of Config")
