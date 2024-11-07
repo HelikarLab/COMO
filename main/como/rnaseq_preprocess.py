@@ -546,6 +546,7 @@ async def rnaseq_preprocess(
     context_names: list[str],
     mode: Literal["create", "provide"],
     taxon_id: Union[int, str],
+    input_format: Input,
     matrix_file: Optional[str | Path] = None,
     config: Config = None,
 ) -> None:
