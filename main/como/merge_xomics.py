@@ -2,6 +2,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from como.custom_types import RNASeqPreparationMethod
+
 sys.path.insert(0, Path(__file__).parent.parent.as_posix())
 
 
@@ -87,7 +89,7 @@ class _Arguments:
             raise ValueError("Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'")
 
 
-def _load_rnaseq_tests(filename, context_name, lib_type):
+def _load_rnaseq_tests(filename, context_name, prep_method: RNASeqPreparationMethod) -> tuple[str, pd.DataFrame]:
     """
     Load rnaseq results returning a dictionary of test (context, context, cell, etc ) names and rnaseq expression data
     """
@@ -104,27 +106,24 @@ def _load_rnaseq_tests(filename, context_name, lib_type):
     if not inquiry_full_path.exists():  # check that config file exist (isn't needed to load, but helps user)
         raise FileNotFoundError(f"Error: Config file not found at {inquiry_full_path}")
 
-    if lib_type == "total":  # if using total RNA-seq library prep
-        filename = f"rnaseq_total_{context_name}.csv"
-    elif lib_type == "mrna":  # if using mRNA-seq library prep
-        filename = f"rnaseq_mrna_{context_name}.csv"
-    elif lib_type == "scrna":  # if using single-cell RNA-seq
-        filename = f"rnaseq_scrna_{context_name}.csv"
-    else:
-        raise ValueError(f"Unsupported RNA-seq library type: {lib_type}. Must be one of 'total', 'mrna', 'sc'.")
+    match prep_method:
+        case RNASeqPreparationMethod.TOTAL:
+            filename = f"rnaseq_total_{context_name}.csv"
+        case RNASeqPreparationMethod.MRNA:
+            filename = f"rnaseq_mrna_{context_name}.csv"
+        case RNASeqPreparationMethod.SCRNA:
+            filename = f"rnaseq_scrna_{context_name}.csv"
+        case _:
+            raise ValueError(f"Unsupported RNA-seq library type: {prep_method.value}. Must be an option defined in 'RNASeqPreparationMethod'.")
 
-    save_filepath = config.result_dir / context_name / lib_type / filename
+    save_filepath = config.result_dir / context_name / prep_method / filename
     if save_filepath.exists():
-        logger.debug(f"Reading from {save_filepath}")
         data = pd.read_csv(save_filepath, index_col="entrez_gene_id")
-        logger.success(f"Read from {save_filepath}")
         return context_name, data
 
     else:
         logger.warning(
-            f"{lib_type} gene expression file for {context_name} was not found at {save_filepath}. This may be "
-            f"intentional. Contexts where {lib_type} data can be found in /work/data/results/{context_name}/ will "
-            "still be used if found for other contexts."
+            f"'{prep_method.value}' gene expression file for '{context_name}' was not found at '{save_filepath}'. If this is not intentional, please fix the filename to match '{save_filepath}'."
         )
         return load_dummy_dict()
 
@@ -205,7 +204,7 @@ def _merge_logical_table(df: pd.DataFrame):
     return df
 
 
-def _get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
+async def _get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
     """
     This function will get the following details of transcriptomic data:
     - Gene Symbol
@@ -261,8 +260,8 @@ def _get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
         transcriptomic_df: pd.DataFrame = merged_df.copy()
 
     biodbnet = BioDBNet()
-    gene_details: pd.DataFrame = biodbnet.db2db(
-        input_values=transcriptomic_df.index.astype(str).values.tolist(),
+    gene_details: pd.DataFrame = await biodbnet.db2db(
+        values=transcriptomic_df.index.astype(str).values.tolist(),
         input_db=Input.GENE_ID,
         output_db=[
             Output.GENE_SYMBOL,
@@ -315,7 +314,7 @@ def _get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
     return gene_details
 
 
-def _merge_xomics(
+async def _merge_xomics(
     context_name: str,
     expression_requirement,
     proteomics_file=None,
@@ -342,9 +341,9 @@ def _merge_xomics(
     config = Config()
     logger.info(f"Merging data for {context_name}")
     # load data for each source if it exists. IF not load an empty dummy dataset
-    trnaseq = _load_rnaseq_tests(filename=trnaseq_file, context_name=context_name, lib_type="total")
-    mrnaseq = _load_rnaseq_tests(filename=mrnaseq_file, context_name=context_name, lib_type="mrna")
-    scrnaseq = _load_rnaseq_tests(filename=scrnaseq_file, context_name=context_name, lib_type="scrna")
+    trnaseq = _load_rnaseq_tests(filename=trnaseq_file, context_name=context_name, prep_method=RNASeqPreparationMethod.TOTAL)
+    mrnaseq = _load_rnaseq_tests(filename=mrnaseq_file, context_name=context_name, prep_method=RNASeqPreparationMethod.MRNA)
+    scrnaseq = _load_rnaseq_tests(filename=scrnaseq_file, context_name=context_name, prep_method=RNASeqPreparationMethod.SCRNA)
     proteomics = proteomics_gen.load_proteomics_tests(filename=proteomics_file, context_name=context_name)
 
     expression_list = []
@@ -442,7 +441,7 @@ def _merge_xomics(
     split_entrez.to_csv(filepath, index_label="entrez_gene_id")
     files_dict = {context_name: filepath.as_posix()}
 
-    transcriptomic_details = _get_transcriptmoic_details(merge_data)
+    transcriptomic_details = await _get_transcriptmoic_details(merge_data)
     transcriptomic_details_filepath = filepath.parent / f"TranscriptomicDetails_{context_name}.csv"
     transcriptomic_details.to_csv(transcriptomic_details_filepath, index=False)
 
@@ -451,7 +450,7 @@ def _merge_xomics(
     return files_dict
 
 
-def _handle_context_batch(
+async def _handle_context_batch(
     trnaseq_file,
     mrnaseq_file,
     scrnaseq_file,
@@ -544,7 +543,7 @@ def _handle_context_batch(
             )
             exp_req = 1
 
-        files_dict = _merge_xomics(
+        files_dict = await _merge_xomics(
             context_name,
             expression_requirement=exp_req,
             proteomics_file=proteomics_file,
@@ -565,7 +564,7 @@ def _handle_context_batch(
     return
 
 
-def merge_xomics(
+async def merge_xomics(
     trnaseq_filepath: str = None,
     mrnaseq_filepath: str = None,
     scrnaseq_filepath: str = None,
@@ -604,7 +603,7 @@ def merge_xomics(
     elif expression_requirement < 1:
         raise ValueError("Expression requirement must be at least 1!")
 
-    _handle_context_batch(
+    await _handle_context_batch(
         trnaseq_filepath,
         mrnaseq_filepath,
         scrnaseq_filepath,
@@ -797,6 +796,8 @@ def _parse_args() -> _Arguments:
 
 
 if __name__ == "__main__":
+    import asyncio
+
     args = _parse_args()
     config = Config()
 
@@ -818,21 +819,23 @@ if __name__ == "__main__":
         ]
     )
 
-    merge_xomics(
-        trnaseq_filepath=args.trnaseq_filename,
-        mrnaseq_filepath=args.mrnaseq_filename,
-        scrnaseq_filepath=args.scrnaseq_filename,
-        proteomics_filepath=args.proteomics_filename,
-        trna_weight=args.trna_weight,
-        mrna_weight=args.mrna_weight,
-        scrna_weight=args.scrna_weight,
-        proteomics_weight=args.proteomics_weight,
-        expression_requirement=args.expression_requirement,
-        adjust_method=args.adjustment_method,
-        no_high_confidence=args.no_high_confidence,
-        no_na=args.no_na,
-        merge_zfpkm_distribution=args.merge_zfpkm_distribution,
-        keep_transcriptomics_score=args.keep_transcriptomics_scores,
+    asyncio.run(
+        merge_xomics(
+            trnaseq_filepath=args.trnaseq_filename,
+            mrnaseq_filepath=args.mrnaseq_filename,
+            scrnaseq_filepath=args.scrnaseq_filename,
+            proteomics_filepath=args.proteomics_filename,
+            trna_weight=args.trna_weight,
+            mrna_weight=args.mrna_weight,
+            scrna_weight=args.scrna_weight,
+            proteomics_weight=args.proteomics_weight,
+            expression_requirement=args.expression_requirement,
+            adjust_method=args.adjustment_method,
+            no_high_confidence=args.no_high_confidence,
+            no_na=args.no_na,
+            merge_zfpkm_distribution=args.merge_zfpkm_distribution,
+            keep_transcriptomics_score=args.keep_transcriptomics_scores,
+        )
     )
 
     logger.success("Finished merging!")
