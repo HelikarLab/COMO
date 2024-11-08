@@ -24,6 +24,7 @@ class _Arguments:
     context_names: list[str]
     taxon_id: Taxon | int | str
     mode: Literal["create", "provide"]
+    input_format: str
     provided_matrix_fname: str = None
 
 
@@ -416,7 +417,7 @@ def _split_counts_matrices(count_matrix_all: Path, df_total: pd.DataFrame, df_mr
     return matrix_total, matrix_mrna
 
 
-async def _create_gene_info_file(*, matrix_files: list[Path], taxon_id, config: Config):
+async def _create_gene_info_file(*, matrix_files: list[Path], taxon_id, config: Config, input_format: Input | str):
     """
     Create gene info file for specified context by reading first column in its count matrix file
     """
@@ -434,10 +435,18 @@ async def _create_gene_info_file(*, matrix_files: list[Path], taxon_id, config: 
     for file in matrix_files:
         data: pd.DataFrame | sc.AnnData = pd.read_csv(file) if file.suffix == ".csv" else sc.read_h5ad(file)
         input_values = data.iloc[:, 0].tolist() if isinstance(data, pd.DataFrame) else data.var_names.tolist()
+
+        conversion = await biodbnet.async_db2db(
+            values=input_values,
+            input_db=Input.ENSEMBL_GENE_ID,
+            output_db=Output.GENE_ID,
+            taxon=taxon_id,
+        )
+
         coherced_format: pd.DataFrame = await _format_determination(
             biodbnet, requested_output=Output.GENE_ID, input_values=input_values, taxon=taxon_id
         )
-        genes.update(coherced_format["gene_id"].astype(str).tolist())
+        genes.update(conversion["gene_id"].astype(str).tolist())
 
     gene_info: pd.DataFrame = (
         await biodbnet.db2db(
@@ -472,6 +481,7 @@ async def _handle_context_batch(
     taxon_id,
     provided_matrix_file,
     config: Config,
+    input_format: Input | str,
 ):
     """
     Handle iteration through each context type and create files according to flag used (config, matrix, info)
@@ -534,10 +544,10 @@ async def _handle_context_batch(
             if using_mrna:
                 mwriter.close()
 
-            await _create_gene_info_file(matrix_files=tmatrix_files + mmatrix_files, taxon_id=taxon_id, config=config)
+            await _create_gene_info_file(matrix_files=tmatrix_files + mmatrix_files, taxon_id=taxon_id, config=config, input_format=input_format)
         case "provide":
             matrix_files: list[Path] = [Path(p) for p in stringlist_to_list(provided_matrix_file)]
-            await _create_gene_info_file(matrix_files=matrix_files, taxon_id=taxon_id, config=config)
+            await _create_gene_info_file(matrix_files=matrix_files, taxon_id=taxon_id, config=config, input_format=input_format)
         case _:
             raise ValueError("'--mode' must be either 'create' or 'provide'")
 
@@ -546,7 +556,7 @@ async def rnaseq_preprocess(
     context_names: list[str],
     mode: Literal["create", "provide"],
     taxon_id: Union[int, str],
-    input_format: Input,
+    input_format: Input | str,
     matrix_file: Optional[str | Path] = None,
     config: Config = None,
 ) -> None:
@@ -557,12 +567,18 @@ async def rnaseq_preprocess(
     if not isinstance(taxon_id, int) and taxon_id not in ["human", "mouse"]:
         raise ValueError("taxon_id must be either an integer, or accepted string ('mouse', 'human')")
 
+    if isinstance(input_format, str):
+        print(f"{input_format=}")
+        input_format = Input.from_string(input_format)
+        print(f"Using input format '{input_format}'")
+
     await _handle_context_batch(
         context_names=context_names,
         mode=mode,
         taxon_id=taxon_id,
         provided_matrix_file=Path(matrix_file if matrix_file is not None else "").as_posix(),
         config=config,
+        input_format=input_format,
     )
 
 
@@ -611,6 +627,12 @@ def _parse_args():
         default=9606,
         dest="taxon_id",
         help="BioDbNet taxon ID number, also accepts 'human', or 'mouse'",
+    )
+    parser.add_argument(
+        "--input-format",
+        required=True,
+        dest="input_format",
+        help="The data input format, such as Ensembl, Entrez, etc.",
     )
     parser.add_argument(
         "--mode",
@@ -663,5 +685,6 @@ if __name__ == "__main__":
             mode=args.mode,
             taxon_id=taxon_id_value,
             matrix_file=args.provided_matrix_fname,
+            input_format=args.input_format,
         )
     )
