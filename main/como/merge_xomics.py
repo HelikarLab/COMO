@@ -403,6 +403,8 @@ def _merge_xomics(
         )
         merge_data = prote_data if merge_data is None else merge_data.join(prote_data, how="outer")
 
+    if merge_data is None:
+        raise ValueError(f"No data is available to be merged")
     merge_data = _merge_logical_table(merge_data)
 
     num_sources = len(expression_list)
