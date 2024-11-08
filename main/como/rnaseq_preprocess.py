@@ -436,20 +436,13 @@ async def _create_gene_info_file(*, matrix_files: list[Path], taxon_id, config: 
         data: pd.DataFrame | sc.AnnData = pd.read_csv(file) if file.suffix == ".csv" else sc.read_h5ad(file)
         input_values = data.iloc[:, 0].tolist() if isinstance(data, pd.DataFrame) else data.var_names.tolist()
 
-        conversion = await biodbnet.async_db2db(
-            values=input_values,
-            input_db=Input.ENSEMBL_GENE_ID,
-            output_db=Output.GENE_ID,
-            taxon=taxon_id,
-        )
-
         coherced_format: pd.DataFrame = await _format_determination(
             biodbnet, requested_output=Output.GENE_ID, input_values=input_values, taxon=taxon_id
         )
-        genes.update(conversion["gene_id"].astype(str).tolist())
+        genes.update(coherced_format["gene_id"].astype(str).tolist())
 
     gene_info: pd.DataFrame = (
-        await biodbnet.db2db(
+        await biodbnet.async_db2db(
             values=list(genes),
             input_db=Input.GENE_ID,
             output_db=[Output.ENSEMBL_GENE_ID, Output.GENE_SYMBOL, Output.CHROMOSOMAL_LOCATION],
