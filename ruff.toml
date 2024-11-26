@@ -1,0 +1,43 @@
+line-length = 120
+extend-include = ["docs/**/*.py", "tests/**/*.py"]
+exclude = ["__init__.py"]
+
+[format]
+quote-style = "double"
+docstring-code-format = true
+
+[lint]
+# Linting rules: https://docs.astral.sh/ruff/rules/
+select = [
+    "A",        # do not use python builtins for variables or parameters; https://pypi.org/project/flake8-builtins/
+    "ASYNC",    # identify asynchronous-related problems; https://pypi.org/project/flake8-async/
+    "B",        # find likely bugs and design problems; https://pypi.org/project/flake8-bugbear/
+    "C4",       # create better list, set, & dict comprehensions; https://pypi.org/project/flake8-comprehensions/
+    "C90",      # check for complexity; https://pypi.org/project/mccabe/
+    "D",        # docstring style checker; https://pypi.org/project/pydocstyle/
+    "DOC",      # docstring linter; https://pypi.org/project/pydoclint/
+    "E",        # style guide checking; https://pypi.org/project/pycodestyle/
+    "F",        # check for errors; https://pypi.org/project/pyflakes/
+    "RUF",      # ruff-specific linting rules; https://docs.astral.sh/ruff/rules/#ruff-specific-rules-ruf
+    "FA",       # use from __future__ import annotations if needed; https://pypi.org/project/flake8-future-annotations/
+    "FURB",     # refurbish and modernize Python codebases; https://pypi.org/project/refurb/
+    "I",        # sorting imports rules; https://pypi.org/project/isort/
+    "N",        # check naming conventions; https://pypi.org/project/pep8-naming/
+    "PERF",     # check performance anti-patterns; https://pypi.org/project/perflint/
+    "PT",       # check common style issues or inconsistencies in pytest; https://pypi.org/project/flake8-pytest-style/
+    "PTH",      # use pathlib where possible; https://pypi.org/project/flake8-use-pathlib/
+    "S",        # security testing; https://pypi.org/project/flake8-bandit/
+    "SIM",      # check for code that can be simplified; https://pypi.org/project/flake8_simplify/
+    "T20",      # do not use prints in production; https://pypi.org/project/flake8-print/
+    "TRY",      # prevent Exception handling anti-patterns; https://pypi.org/project/tryceratops/
+    "UP"        # upgrade syntax for newer versions; https://pypi.org/project/pyupgrade
+]
+ignore = [
+    "D100",     # allow undocumented public module definitions
+    "TRY003",   # allow exception messages outside the `Exception` class
+]
+
+[lint.per-file-ignores]
+"tests/*" = [
+    "S101",     # allow use of `assert` in test files
+]
