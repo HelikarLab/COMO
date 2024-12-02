@@ -469,33 +469,40 @@ async def _create_gene_info_file(
         conversion = await convert_gene_data(input_values, taxon_id)
         genes.update(conversion["entrez_gene_id"].astype(str).tolist())
 
-        coherced_format: pd.DataFrame = await _format_determination(
-            biodbnet, requested_output=Output.GENE_ID, input_values=input_values, taxon=taxon_id
-        )
-        genes.update(coherced_format["gene_id"].astype(str).tolist())
-
-    gene_info: pd.DataFrame = (
-        await biodbnet.async_db2db(
-            values=list(genes),
-            input_db=Input.GENE_ID,
-            output_db=[Output.ENSEMBL_GENE_ID, Output.GENE_SYMBOL, Output.CHROMOSOMAL_LOCATION],
-            taxon=taxon_id,
-        )
-    ).rename(
-        columns={
-            "Ensembl Gene ID": "ensembl_gene_id",
-            "Gene Symbol": "hgnc_symbol",
-            "Gene ID": "entrez_gene_id",
-            "Chromosomal Location": "chromosome_location",
-        }
+    mygene = MyGene(cache=cache)
+    gene_data = await mygene.query(
+        items=list(genes),
+        taxon=taxon_id,
+        scopes="entrezgene",
     )
+    gene_info: pd.DataFrame = pd.DataFrame(
+        data=None,
+        columns=pd.Index(data=["ensembl_gene_id", "hgnc_symbol", "entrez_gene_id", "start_position", "end_position"]),
+        index=pd.Index(data=range(len(gene_data))),
+    )
+    for i, data in enumerate(gene_data):
+        ensembl_ids = data.get("ensembl.gene", "-")
+        if isinstance(ensembl_ids, list):
+            ensembl_ids = ensembl_ids[0]
 
-    gene_info = gene_info[~((gene_info["entrez_gene_id"] == "-") & (gene_info["ensembl_gene_id"] == "-") & (gene_info["hgnc_symbol"] == "-"))]
-    gene_info["chromosome_location"].replace(to_replace="-", value=0, inplace=True)
-    gene_info["start_position"] = gene_info["chromosome_location"].apply(lambda x: extract_location(x, "chr_start"))
-    gene_info["end_position"] = gene_info["chromosome_location"].apply(lambda x: extract_location(x, "chr_end"))
+        start_pos = data.get("genomic_pos.start", 0)
+        end_pos = data.get("genomic_pos.end", 0)
+        if isinstance(start_pos, list):
+            start_pos = sum(start_pos) / len(start_pos)
+        if isinstance(end_pos, list):
+            end_pos = sum(end_pos) / len(end_pos)
+
+        gene_info.at[i, "hgnc_symbol"] = data.get("symbol", "-")
+        gene_info.at[i, "entrez_gene_id"] = data.get("entrezgene", "-")
+        gene_info.at[i, "ensembl_gene_id"] = ensembl_ids
+        gene_info.at[i, "start_position"] = start_pos
+        gene_info.at[i, "end_position"] = end_pos
+
+    gene_info = gene_info[
+        (gene_info["entrez_gene_id"] != "-") & (gene_info["ensembl_gene_id"] != "-") & (gene_info["hgnc_symbol"] != "-")
+    ]
     gene_info["size"] = gene_info["end_position"].astype(int) - gene_info["start_position"].astype(int)
-    gene_info.drop(columns=["chromosome_location", "start_position", "end_position"], inplace=True)
+    gene_info.drop(columns=["start_position", "end_position"], inplace=True)
     output_filepath = config.data_dir / "gene_info.csv"
     gene_info.to_csv(output_filepath, index=False)
     logger.success(f"Gene Info file written at '{output_filepath}'")
