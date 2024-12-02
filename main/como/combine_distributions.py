@@ -206,22 +206,22 @@ def _combine_omics_zdistros(
     names = []
     dfs = []
     counter = 0
-    if trna_weight > 0:
+    if comb_batches_z_trna is not None:
         counter += 1
         weights.append(trna_weight)
         names.append("total")
         dfs.append(comb_batches_z_trna)
-    if mrna_weight > 0:
+    if comb_batches_z_mrna is not None:
         counter += 1
         weights.append(mrna_weight)
         names.append("polyA")
         dfs.append(comb_batches_z_mrna)
-    if scrna_weight > 0:
+    if comb_batches_z_scrna is not None:
         counter += 1
         weights.append(scrna_weight)
         names.append("singleCell")
         dfs.append(comb_batches_z_scrna)
-    if proteomics_weight > 0:
+    if comb_batches_z_prot is not None:
         counter += 1
         weights.append(proteomics_weight)
         names.append("proteome")
@@ -329,6 +329,7 @@ def combine_zscores_main(
             context_use_proteins = False
             logger.warning(f"No proteomics z-score Matrix files found for {context}. Will not use for this context.")
 
+        comb_batches_z_trna = None
         if context_use_trna:
             logger.info("Will merge total RNA-seq distributions")
             trna_workdir = working_dir / context / "total"
@@ -355,14 +356,11 @@ def combine_zscores_main(
                 filename = trna_workdir / f"model_scores_{context}.csv"
                 comb_batches_z_trna.to_csv(filename, index=False)
 
-        else:
-            comb_batches_z_trna = None
-
+        comb_batches_z_mrna = None
         if context_use_mrna:
             logger.info("Will merge polyA enriched RNA-seq distributions")
             mrna_workdir = working_dir / context / "mrna"
             num_reps = []
-            count = 0
             merge_z_data = pd.DataFrame()
             for batch in context_mrna_batch:
                 res = _merge_batch(mrna_workdir, context, batch)
@@ -384,14 +382,11 @@ def combine_zscores_main(
                 filename = mrna_workdir / f"model_scores_{context}.csv"
                 comb_batches_z_mrna.to_csv(filename, index=False)
 
-        else:
-            comb_batches_z_mrna = None
-
+        comb_batches_z_scrna = None
         if context_use_scrna:
             logger.info(f"Will merge single-cell RNA-seq distributions for {context}")
             scrna_workdir = working_dir / context / "scrna"
             num_reps = []
-            count = 0
             merge_z_data = pd.DataFrame()
             for batch in context_scrna_batch:
                 res = _merge_batch(scrna_workdir, context, batch)
@@ -413,14 +408,11 @@ def combine_zscores_main(
                 filename = scrna_workdir / f"model_scores_{context}.csv"
                 comb_batches_z_scrna.to_csv(filename, index=False)
 
-        else:
-            comb_batches_z_scrna = None
-
+        comb_batches_z_prot = None
         if context_use_proteins:
             logger.info("Will merge protein abundance distributions")
             protein_workdir = working_dir / context / "proteomics"
             num_reps = []
-            count = 0
             merge_z_data = pd.DataFrame()
             for batch in context_protein_batch:
                 res = _merge_batch(protein_workdir, context, batch)
@@ -442,8 +434,16 @@ def combine_zscores_main(
                 filename = protein_workdir / f"model_scores_{context}.csv"
                 comb_batches_z_prot.to_csv(filename, index=False)
 
-        else:
-            comb_batches_z_prot = None
+        if (
+            comb_batches_z_mrna is None
+            and comb_batches_z_trna is None
+            and comb_batches_z_scrna is None
+            and comb_batches_z_prot is None
+        ):
+            logger.critical(
+                f"The context '{context}' was found in the configuration file but no data was found on disk!"
+            )
+            continue
 
         comb_omics_z = _combine_omics_zdistros(
             wd=working_dir,
