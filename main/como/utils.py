@@ -202,3 +202,15 @@ def is_notebook() -> bool:
         return get_ipython() is not None
     except ModuleNotFoundError:
         return False
+
+
+async def convert_gene_data(values: list[str], taxon_id: int | str | Taxon) -> pd.DataFrame:
+    gene_type = await determine_gene_type(values)
+    if all(v == "gene_symbol" for v in gene_type.values()):
+        return await gene_symbol_to_ensembl_and_gene_id(values, taxon=taxon_id)
+    elif all(v == "ensembl_gene_id" for v in gene_type.values()):
+        return await ensembl_to_gene_id_and_symbol(ids=values, taxon=taxon_id)
+    elif all(v == "entrez_gene_id" for v in gene_type.values()):
+        return await gene_id_to_ensembl_and_gene_symbol(ids=values, taxon=taxon_id)
+    else:
+        raise ValueError("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
