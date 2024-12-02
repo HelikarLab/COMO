@@ -72,7 +72,11 @@ class RAWtoMZML:
 
             information.mzml_base_path.mkdir(parents=True, exist_ok=True)
             subprocess.run(
-                ["thermorawfileparser", f"--input={str(information.raw_file_path)}", f"--output_file={str(information.mzml_file_path)}"],
+                [
+                    "thermorawfileparser",
+                    f"--input={str(information.raw_file_path)}",
+                    f"--output_file={str(information.mzml_file_path)}",
+                ],
                 stdout=subprocess.PIPE,
             )
 
@@ -134,7 +138,9 @@ class MZMLtoSQT:
             )
 
             # Replace all "comet.*" in output directory with the name of the file being processed
-            comet_files = [str(file) for file in os.listdir(file_information.sqt_base_path) if str(file).startswith("comet.")]
+            comet_files = [
+                str(file) for file in os.listdir(file_information.sqt_base_path) if str(file).startswith("comet.")
+            ]
             for file_name in comet_files:
                 # Determine the old file path
                 old_file_path: Path = Path(file_information.sqt_base_path, file_name)
@@ -251,7 +257,9 @@ class SQTtoCSV:
 
             # Assign the file_information intensity dataframe to the gathered values
             self._file_information[i].intensity_df = pd.DataFrame(average_intensities_dict)
-            self._file_information[i].intensity_df = self._file_information[i].intensity_df.groupby("uniprot", as_index=False).mean()
+            self._file_information[i].intensity_df = (
+                self._file_information[i].intensity_df.groupby("uniprot", as_index=False).mean()
+            )
 
     async def _convert_uniprot_wrapper(self) -> None:
         """
@@ -261,7 +269,9 @@ class SQTtoCSV:
 
         # Create a progress bar of results
         # From: https://stackoverflow.com/a/61041328/
-        progress_bar = tqdm.tqdm(desc="Starting UniProt to Gene Symbol conversion... ", total=len(self._file_information))
+        progress_bar = tqdm.tqdm(
+            desc="Starting UniProt to Gene Symbol conversion... ", total=len(self._file_information)
+        )
         for i, result in enumerate(asyncio.as_completed(values)):
             await result  # Get result from asyncio.as_completed
             progress_bar.set_description(f"Working on {i + 1} of {len(self._file_information)}")
@@ -387,7 +397,9 @@ class SQTtoCSV:
                 # Create a new dataframe to split the S# columns from
                 split_frame: pd.DataFrame = dataframe.copy()
                 # Get the current S{i} columns in
-                abundance_columns: list[str] = [column for column in split_frame.columns if re.match(rf"{cell_type}_S{i}R\d+", column)]
+                abundance_columns: list[str] = [
+                    column for column in split_frame.columns if re.match(rf"{cell_type}_S{i}R\d+", column)
+                ]
                 take_columns: list[str] = ["symbol"] + abundance_columns
                 average_intensity_name: str = f"{cell_type}_S{i}"
 

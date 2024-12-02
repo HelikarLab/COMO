@@ -280,7 +280,8 @@ def main(argv):
     parser = argparse.ArgumentParser(
         prog="knock_out_simulation.py",
         description="This script is responsible for mapping drug targets in metabolic models, performing knock out simulations, and comparing simulation results with disease genes. It also identified drug targets and repurposable drugs.",
-        epilog="For additional help, please post questions/issues in the MADRID GitHub repo at " "https://github.com/HelikarLab/COMO",
+        epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
+        "https://github.com/HelikarLab/COMO",
     )
     parser.add_argument(
         "-m",

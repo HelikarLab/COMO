@@ -171,7 +171,9 @@ class PopulateInformation:
                     flush=True,
                 )
 
-                ftp_data: FTPManager.Reader = FTPManager.Reader(root_link=url, file_extensions=self._preferred_extensions)
+                ftp_data: FTPManager.Reader = FTPManager.Reader(
+                    root_link=url, file_extensions=self._preferred_extensions
+                )
 
                 urls = [url for url in ftp_data.files]
                 sizes = [size for size in ftp_data.file_sizes]
@@ -179,7 +181,9 @@ class PopulateInformation:
 
                 # Iterate through all files and sizes found for url_##
                 for k, (file, size) in enumerate(zip(urls, sizes)):
-                    self.file_information.append(FileInformation(cell_type=cell_type, download_url=file, file_size=size, study=study))
+                    self.file_information.append(
+                        FileInformation(cell_type=cell_type, download_url=file, file_size=size, study=study)
+                    )
 
             # Print number of URLs found for each cell type
             # This is done after appending because some cell types may have more than 1 root URL, and it messes up the formatting
@@ -335,11 +339,15 @@ def parse_args() -> argparse.Namespace:
     if args.core_count == "all":
         args.core_count = os.cpu_count()
     elif not args.core_count.is_integer():
-        raise ValueError(f"Invalid option '{args.core_count}' for option '--cores'. Enter an integer or 'all' to use all cores")
+        raise ValueError(
+            f"Invalid option '{args.core_count}' for option '--cores'. Enter an integer or 'all' to use all cores"
+        )
     else:
         args.core_count = int(args.core_count)
         if args.core_count > os.cpu_count():
-            print(f"{args.core_count} cores not available, system only has {os.cpu_count()} cores. Setting '--cores' to {os.cpu_count()}")
+            print(
+                f"{args.core_count} cores not available, system only has {os.cpu_count()} cores. Setting '--cores' to {os.cpu_count()}"
+            )
             args.core_count = os.cpu_count()
 
     return args
@@ -375,7 +383,12 @@ def main():
         args.skip_download = True
 
     # Populate the file_information list
-    PopulateInformation(file_information=file_information, csv_data=csv_data, skip_download=args.skip_download, preferred_extensions=args.extensions)
+    PopulateInformation(
+        file_information=file_information,
+        csv_data=csv_data,
+        skip_download=args.skip_download,
+        preferred_extensions=args.extensions,
+    )
 
     # Download data if we should not skip anything
     if args.skip_download is False:
