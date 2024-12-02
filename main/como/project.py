@@ -7,8 +7,7 @@ class SingletonMeta(type):
     _instances = {}
 
     def __call__(cls, *args, **kwargs):
-        """
-        Possible changes to the value of the `__init__` argument do not affect
+        """Possible changes to the value of the `__init__` argument do not affect
         the returned instance.
         """
         if cls not in cls._instances:
@@ -44,9 +43,36 @@ class Config(metaclass=SingletonMeta):
             self.result_dir = self.data_dir / "results"
             self.result_dir.mkdir(parents=True, exist_ok=True)
 
+        # Additional directories
+        self.code_dir = current_dir / "main" / "como"
+        self.log_dir = self.data_dir / "logs"
+        self.matrix_dir = self.data_dir / "data_matrices"
+        self.figures_dir = self.result_dir / "figures"
+
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.matrix_dir.mkdir(parents=True, exist_ok=True)
+        self.figures_dir.mkdir(parents=True, exist_ok=True)
+
     def update(self, **kwargs):
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, Path(value) if value else getattr(self, key))
             else:
                 logger.warning(f"{key} is not a valid attribute of Config")
+
+    def get_context_path(self, context_name: str, create: bool = True) -> Path:
+        """Get path for a specific context, optionally creating it."""
+        path = self.result_dir / context_name
+        if create:
+            path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def get_r_path(self, path: Path) -> str:
+        """Convert a Path object to an R-compatible path string."""
+        return path.as_posix()
+
+    def get_matrix_path(self, context_name: str, filename: str) -> Path:
+        """Get path for a matrix file in a specific context."""
+        path = self.matrix_dir / context_name
+        path.mkdir(parents=True, exist_ok=True)
+        return path / filename
