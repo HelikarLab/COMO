@@ -40,13 +40,16 @@ class _FilteringOptions(NamedTuple):
 
 
 class FilteringTechnique(Enum):
+    """RNA sequencing filtering capabilities."""
+
     cpm = "cpm"
     zfpkm = "zfpkm"
     tpm = "quantile"
     umi = "umi"
 
     @staticmethod
-    def from_string(value: str) -> "FilteringTechnique":
+    def from_string(value: str) -> FilteringTechnique:
+        """Create a filtering technique object from a string."""
         match value.lower():
             case "cpm":
                 return FilteringTechnique.cpm
@@ -131,9 +134,9 @@ def k_over_a(k: int, A: float) -> Callable[[npt.NDArray], bool]:
     This code is based on the `kOverA` function found in R's `genefilter` package: https://www.rdocumentation.org/packages/genefilter/versions/1.54.2/topics/kOverA
 
     :param k: The minimum number of times the sum of elements must be greater than or equal to A.
-    :param A: The threshold value.
+    :param a: The value to compare the sum of elements to.
     :return: A function that accepts a NumPy array to perform the actual filtering
-    """
+    """  # noqa: E501
 
     def filter_func(row: npt.NDArray) -> bool:
         return np.sum(row >= A) >= k
@@ -142,8 +145,7 @@ def k_over_a(k: int, A: float) -> Callable[[npt.NDArray], bool]:
 
 
 def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDArray], bool]) -> npt.NDArray:
-    """
-    Apply a filter function to the rows of the data and return the filtered array.
+    """Apply a filter function to the rows of the data and return the filtered array.
 
     This code is based on the `genefilter` function found in R's `genefilter` package: https://www.rdocumentation.org/packages/genefilter/versions/1.54.2/topics/genefilter
 
@@ -168,11 +170,9 @@ async def _read_counts_matrix(
     config_filepath: Path,
     gene_info_filepath: Path,
     taxon_id: Taxon,
-) -> ReadMatrixResults:
-    """
-    Reads the counts matrix and returns the results.
+) -> _ReadMatrixResults:
+    """Read the counts matrix and returns the results.
 
-    :param biodbnet: The BioDBNet object to use for determining the input gene data type
     :param context_name: The context name being processed. Usually a cell type, but can be any string
     :param counts_matrix_filepath: The file path to the gene count matrix
     :param config_filepath: The file path to the Excel configuration file
@@ -248,6 +248,7 @@ async def _read_counts_matrix(
 
 def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
     for sample in metrics.keys():
+    """Calculate the Transcripts Per Million (TPM) for each sample in the metrics dictionary."""
         count_matrix = metrics[sample].count_matrix
 
         gene_sizes = metrics[sample].gene_sizes
@@ -265,6 +266,7 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
 
 
 def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
+    """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary."""  # noqa: E501
     matrix_values = []
     for study in metrics.keys():
         for sample in range(metrics[study].num_samples):
@@ -299,50 +301,57 @@ def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
     return metrics
 
 
-def zfpkm_transform(
-    fpkm_df: pd.DataFrame,
-    bandwidth: int = 0.5,
-    peak_parameters: tuple[float, float] = (0.02, 1.0),
-) -> tuple[dict[str, zFPKMresult], pd.DataFrame]:
-    def calc(col: npt.NDArray, name: str, bandwidth: int, peak_parameters: tuple[float, float]) -> zFPKMresult:
-        """
-        Log2 Transformations
-            - Stabilize the variance in the data to make the distribution more symmetric; this is helpful for Gaussian fitting
+def _zfpkm_calculation(
+    col: pd.Series,
+    kernel: KernelDensity,
+    peak_parameters: tuple[float, float],
+) -> _ZFPKMResult:
+    """Log2 Transformations.
 
-        Kernel Density Estimation (kde)
-            - Non-parametric method to estimate the probability density function (PDF) of a random variable
-            - Estimates the distribution of log2-transformed FPKM values
-            - Bandwidth parameter controls the smoothness of the density estimate
-            - KDE Explanation
-                - A way to smooth a histogram to get a better idea of the underlying distribution of the data
-                - Given a set of data points, we want to understand how they are distributed. Histograms can be useful, but are sensitive to bin size and number
-                - The KDE places a "kernel", which is a small symmetric function (i.e., Gaussian curve), at each data point
-                - The "kernel" acts as a weight, giving more weight to points closer to the center of the kernel and less weight to points farther away
-                - Kernel functions are summed along each point on the x-axis
-                - A smooth curve is created that represents the estimated density of the data
+    Stabilize the variance in the data to make the distribution more symmetric; this is helpful for Gaussian fitting
 
-        Peak Finding
-            - Identifies that are above a certain height and separated by a minimum distance
-            - Represent potential local maxima in the distribution
+    Kernel Density Estimation (kde)
+        - Non-parametric method to estimate the probability density function (PDF) of a random variable
+        - Estimates the distribution of log2-transformed FPKM values
+        - Bandwidth parameter controls the smoothness of the density estimate
+        - KDE Explanation
+            - A way to smooth a histogram to get a better idea of the underlying distribution of the data
+            - Given a set of data points, we want to understand how they are distributed.
+                Histograms can be useful, but are sensitive to bin size and number
+            - The KDE places a "kernel" - a small symmetric function (i.e., Gaussian curve) - at each data point
+            - The "kernel" acts as a weight, giving more weight to points closer to the center of the kernel,
+                and less weight to points farther away
+            - Kernel functions are summed along each point on the x-axis
+            - A smooth curve is created that represents the estimated density of the data
 
-        Peak Selection
-            - The peak with the highest x-value (from log2-FPKM) is chosen as the mean (mu) of the "inactive" gene distribution
-            - The peak representing unexpressed or inactive genes should be at a lower FPKM value compared to the peak representing expressed genes
+    Peak Finding
+        - Identifies that are above a certain height and separated by a minimum distance
+        - Represent potential local maxima in the distribution
 
-        Standard Deviation Estimation
-             - The mean of log2-FPKM values are greater than the calculated mu
-             - Standard deviation is estimated based on the assumption that the right tail of the distribution (which represents expressed genes) can be approximated by a half-normal distribution
+    Peak Selection
+        - The peak with the highest x-value (from log2-FPKM) is chosen as the mean (mu)
+            of the "inactive" gene distribution
+        - The peak representing unexpressed or inactive genes should be at a lower FPKM
+            value compared to the peak representing expressed genes
 
-         zFPKM Transformation
-            - Centers disbribution around 0 and scales it by the standard deviation, making it easier to compare gene expression across different samples
-            - Represents the number of standard deviations away from the mean of the "inactive" gene distribution
-            - Higher zFPKM values indicate higher expression levels relative to the "inactive" peak
-            - A zFPKM value of 0 represents the mean of the "inactive" distribution
-            - Research shows that a zFPKM value of -3 or greater can be used as a threshold for calling a gene as "expressed"
-                : https://doi.org/10.1186/1471-2164-14-778
-        """
-        col_log2: npt.NDArray = np.log2(col + 1)
-        col_log2 = np.nan_to_num(col_log2, nan=0)
+    Standard Deviation Estimation
+         - The mean of log2-FPKM values are greater than the calculated mu
+         - Standard deviation is estimated based on the assumption that the right tail of the distribution
+            This represents expressed genes) can be approximated by a half-normal distribution
+
+     zFPKM Transformation
+        - Centers disbribution around 0 and scales it by the standard deviation.
+            This makes it easier to compare gene expression across different samples
+        - Represents the number of standard deviations away from the mean of the "inactive" gene distribution
+        - Higher zFPKM values indicate higher expression levels relative to the "inactive" peak
+        - A zFPKM value of 0 represents the mean of the "inactive" distribution
+        - Research shows that a zFPKM value of -3 or greater can be used as
+            a threshold for calling a gene as "expressed"
+            : https://doi.org/10.1186/1471-2164-14-778
+    """
+    col_log2: npt.NDArray = np.log2(col + 1)
+    col_log2 = np.nan_to_num(col_log2, nan=0)
+    refit: KernelDensity = kernel.fit(col_log2.reshape(-1, 1))  # type: ignore
 
         kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(col_log2.reshape(-1, 1))  # type: ignore
         x_range = np.linspace(col_log2.min(), col_log2.max(), 1000)
@@ -365,6 +374,7 @@ def zfpkm_transform(
         return zFPKMresult(zfpkm=zfpkm, density=Density(x_range, density), mu=mu, std_dev=stddev, max_fpkm=max_fpkm)
 
     zfpkm_df = pd.DataFrame(data=0, index=fpkm_df.index, columns=fpkm_df.columns)
+    """Transform FPKM values to zFPKM values."""
     results = {}
     for col in fpkm_df.columns:
         results[col] = calc(fpkm_df[col], name=col, bandwidth=bandwidth, peak_parameters=peak_parameters)
@@ -374,13 +384,12 @@ def zfpkm_transform(
 
 
 def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
-    """
-    Plot the log2(FPKM) density and fitted Gaussian for each sample.
+    """Plot the log2(FPKM) density and fitted Gaussian for each sample.
 
-    Args:
-        results: A dictionary of intermediate results from zfpkm_transform.
-        subplot_titles: Whether to display facet titles (sample names).
-        plot_xfloor: Lower limit for the x-axis.
+    :param results: A dictionary of intermediate results from zfpkm_transform.
+    :param: subplot_titles: Whether to display facet titles (sample names).
+    :param plot_xfloor: Lower limit for the x-axis.
+    :param subplot_titles: Whether to display facet titles (sample names).
     """
 
     mega_df = pd.DataFrame()
@@ -421,7 +430,8 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
 
 
 def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
-    for sample in metrics.keys():
+    """Calculate the z-score for each sample in the metrics dictionary."""
+    for sample in metrics:
         log_matrix = np.log(metrics[sample].normalization_matrix)
         z_matrix = pd.DataFrame(data=sklearn.preprocessing.scale(log_matrix, axis=1), columns=metrics[sample].sample_names)
         metrics[sample].z_score_matrix = z_matrix
@@ -429,6 +439,14 @@ def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
 
 
 def cpm_filter(*, context_name: str, metrics: NamedMetrics, filtering_options: _FilteringOptions, prep: RNASeqPreparationMethod) -> NamedMetrics:
+def cpm_filter(
+    *,
+    context_name: str,
+    metrics: NamedMetrics,
+    filtering_options: _FilteringOptions,
+    prep: RNASeqPreparationMethod,
+) -> NamedMetrics:
+    """Apply Counts Per Million (CPM) filtering to the count matrix for a given sample."""
     config = Config()
     n_exp = filtering_options.replicate_ratio
     n_top = filtering_options.high_replicate_ratio
@@ -442,7 +460,8 @@ def cpm_filter(*, context_name: str, metrics: NamedMetrics, filtering_options: _
         library_size: pd.DataFrame = counts.sum(axis=1)
 
         # For library_sizes equal to 0, add 1 to prevent divide by 0
-        # This will not impact the final counts per million calculation because the original counts are still 0; thus, (0 / 1) * 1_000_000 = 0
+        # This will not impact the final counts per million calculation because the original counts are still 0
+        #   thus, (0 / 1) * 1_000_000 = 0
         library_size[library_size == 0] = 1
 
         output_filepath = config.result_dir / context_name / prep.value / f"CPM_Matrix_{prep.value}_{sample}.csv"
@@ -464,11 +483,8 @@ def cpm_filter(*, context_name: str, metrics: NamedMetrics, filtering_options: _
     return metrics
 
 
-def TPM_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions) -> NamedMetrics:
-    """
-    Apply quantile-based filtering to the TPM matrix for a given sample.
-    """
-
+def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions) -> NamedMetrics:
+    """Apply quantile-based filtering to the TPM matrix for a given sample."""
     # TODO: Write the TPM matrix to disk
 
     n_exp = filtering_options.replicate_ratio
@@ -510,7 +526,13 @@ def TPM_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
     return metrics
 
 
-def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions, prep: RNASeqPreparationMethod) -> NamedMetrics:
+def zfpkm_filter(
+    *,
+    metrics: NamedMetrics,
+    filtering_options: _FilteringOptions,
+    prep: RNASeqPreparationMethod,
+) -> NamedMetrics:
+    """Apply zFPKM filtering to the FPKM matrix for a given sample."""
     n_exp = filtering_options.replicate_ratio
     n_top = filtering_options.high_replicate_ratio
     cut_off = filtering_options.cut_off
@@ -547,6 +569,7 @@ def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions,
 
 def umi_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions) -> NamedMetrics:
     for study, metric in metrics.items():
+    """Apply Unique Molecular Identifier (UMI) filtering to the count matrix for a given sample."""
         entrez_ids = metric.entrez_gene_ids
         count_matrix = metric.count_matrix
 
@@ -581,6 +604,7 @@ def filter_counts(
     filtering_options: _FilteringOptions,
     prep: RNASeqPreparationMethod,
 ) -> NamedMetrics:
+    """Filter the count matrix based on the specified technique."""
     match technique:
         case FilteringTechnique.cpm:
             return cpm_filter(context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep)
@@ -609,7 +633,7 @@ async def save_rnaseq_tests(
     technique: FilteringTechnique,
     cut_off: int | float,
 ):
-    biodbnet: BioDBNet = BioDBNet()
+    """Save the results of the RNA-Seq tests to a CSV file."""
     filtering_options = _FilteringOptions(
         replicate_ratio=replicate_ratio,
         batch_ratio=batch_ratio,
@@ -620,7 +644,10 @@ async def save_rnaseq_tests(
 
     if prep == RNASeqPreparationMethod.SCRNA:
         technique = FilteringTechnique.umi
-        logger.warning("Single cell filtration does not normalize and assumes gene counts are counted with Unique Molecular Identifiers (UMIs)")
+        logger.warning(
+            "Single cell filtration does not normalize and assumes "
+            "gene counts are counted with Unique Molecular Identifiers (UMIs)"
+        )
 
     read_counts_results: ReadMatrixResults = await _read_counts_matrix(
         biodbnet=biodbnet,
