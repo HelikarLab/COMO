@@ -555,7 +555,8 @@ def cpm_filter(
         logger.debug(f"Writing CPM matrix to {output_filepath}")
         counts_per_million.to_csv(output_filepath, index=False)
 
-        # TODO: Counts per million is adding ~61,500 columns (equal to the number of genes) for some reason. Most likely due to multiplying by 1_000_000, not exactly sure why
+        # TODO: Counts per million is adding ~61,500 columns (equal to the number of genes) for some reason.
+        #  Most likely due to multiplying by 1_000_000, not exactly sure why
 
         min_samples = round(n_exp * len(counts.columns))
         top_samples = round(n_top * len(counts.columns))
