@@ -49,12 +49,16 @@ class _Solver(Enum):
 
 
 class _BoundaryReactions(NamedTuple):
+    """Boundary reactions to be used in the context specific model."""
+
     reactions: list[str]
     lower_bounds: list[float]
     upper_bounds: list[float]
 
 
-class BuildResults(NamedTuple):
+class _BuildResults(NamedTuple):
+    """Results of building a context specific model."""
+
     model: cobra.Model
     expression_index_list: list[int]
     infeasible_reactions: pd.DataFrame
@@ -62,6 +66,8 @@ class BuildResults(NamedTuple):
 
 @dataclass
 class _Arguments:
+    """Arguments for creating a context specific model."""
+
     context_name: str
     reference_model: Path
     active_genes_filepath: Path
@@ -70,7 +76,7 @@ class _Arguments:
     exclude_reactions_filepath: Path
     force_reactions_filepath: Path
     recon_algorithm: Algorithm
-    solver: Solver
+    solver: _Solver
     low_threshold: int
     high_threshold: int
     output_filetypes: list[str]
@@ -100,9 +106,7 @@ class _Arguments:
 
 
 def _correct_bracket(rule: str, name: str) -> str:
-    """
-    Correct GPR rules to format readable by
-    """
+    """Correct GPR rules to format readable by."""
     rule_match = re.search(r"or|and", rule)
     name_match = re.search(r"or|and", name)
     if rule_match is None or name_match is None:
@@ -131,25 +135,23 @@ def _correct_bracket(rule: str, name: str) -> str:
     return " ".join([new_left_rule, operator, final_right_rule])
 
 
-def _gene_rule_logical(expression_in: str, level: int = 0) -> str:
-    """
-    creates an expression from GPR rule which can be evaluated as true or false
-    """
+def _gene_rule_logical(gpr_expression: str, level: int = 0) -> str:
+    """Create an expression from GPR rule which can be evaluated as true or false."""
     try:
-        loc_r = expression_in.index(")")
-    except BaseException:
-        if "and" in expression_in:
-            expression_in = expression_in.replace("and", ",")
-            return "min{" + expression_in + "}"
-        elif "or" in expression_in:
-            expression_in = expression_in.replace("or", ",")
-            return "max{" + expression_in + "}"
+        loc_r = gpr_expression.index(")")
+    except ValueError:
+        if "and" in gpr_expression:
+            gpr_expression = gpr_expression.replace("and", ",")
+            return "min{" + gpr_expression + "}"
+        elif "or" in gpr_expression:
+            gpr_expression = gpr_expression.replace("or", ",")
+            return "max{" + gpr_expression + "}"
         else:
-            expression_in = expression_in.replace("[", "")
-            return expression_in.replace("]", "")
+            gpr_expression = gpr_expression.replace("[", "")
+            return gpr_expression.replace("]", "")
 
-    loc_l = expression_in[:loc_r].rindex("(")
-    inner_string = expression_in[loc_l : loc_r + 1]
+    loc_l = gpr_expression[:loc_r].rindex("(")
+    inner_string = gpr_expression[loc_l : loc_r + 1]
     inner_string = inner_string.replace("(", "[")
     inner_string = inner_string.replace(")", "]")
     if "and" in inner_string:
@@ -162,16 +164,14 @@ def _gene_rule_logical(expression_in: str, level: int = 0) -> str:
         inner_string = inner_string.replace("[", "")
         inner_string = inner_string.replace("]", "")
 
-    expression_out = f"{expression_in[:loc_l]}{inner_string}{expression_in[loc_r + 1 :]}"
+    expression_out = f"{gpr_expression[:loc_l]}{inner_string}{gpr_expression[loc_r + 1:]}"
     expression_out = _gene_rule_logical(expression_out, level + 1)
 
     return expression_out
 
 
 def _gene_rule_evaluable(expression_in: str) -> str:
-    """
-    Make expression rule evaluable
-    """
+    """Make expression rule evaluable."""
     gene_reaction_by_rule = _gene_rule_logical(expression_in)
     gene_reaction_by_rule = gene_reaction_by_rule.replace("{", "(")
     gene_reaction_by_rule = gene_reaction_by_rule.replace("}", ")")
@@ -228,9 +228,9 @@ def _feasibility_test(model_cobra: cobra.Model, step: str):
         logger.warning(
             f"Under given boundary assumptions, there are {incon_rxns_cnt} infeasible reactions in the reference model. "
             f"These reactions will not be considered active in context specific model construction. "
-            f"If any infeasible reactions are found to be active according to expression data, or, are found in the force reactions list, they can be found found in 'InfeasibleRxns.csv'. "
-            f"It is normal for this value to be quite large, however, if many of these reactions are active "
-            f"according to your expression data, it is likely that you are missing some critical exchange (media) reactions"
+            f"If any infeasible reactions are found to be active according to expression data, or are found in the force reactions list, they can be found found in 'InfeasibleRxns.csv'. "
+            f"It is normal for this value to be quite large; however, if many of these reactions are active "
+            f"according to your expression data, it is likely that you are missing some critical exchange (media) reactions."
         )
     elif step == "after_seeding":
         logger.warning(
@@ -395,9 +395,10 @@ def _build_model(
     solver: str,
     low_thresh: float,
     high_thresh: float,
-) -> BuildResults:
-    """
-    Seed a context specific model. Core reactions are determined from GPR associations with gene expression logicals.
+) -> _BuildResults:
+    """Seed a context specific model.
+
+    Core reactions are determined from GPR associations with gene expression logicals.
     Core reactions that do not necessarily meet GPR association requirements can be forced if in the force reaction
     file. Metabolite exchange (media), sinks, and demands are determined from exchanges file. Reactions can also be
     force excluded even if they meet GPR association requirements using the force exclude file.
