@@ -6,7 +6,6 @@ import sys
 from collections.abc import Iterator
 from enum import Enum
 from pathlib import Path
-from typing import Iterator
 
 import aiofiles
 import pandas as pd
