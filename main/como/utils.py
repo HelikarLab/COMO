@@ -147,14 +147,16 @@ def split_gene_expression_data(expression_data: pd.DataFrame, recon_algorithm: A
     :return:
     """
     expression_data.columns = [c.lower() for c in expression_data.columns]
-    if recon_algorithm in {"IMAT", "TINIT"}:
+    if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT}:
         expression_data.rename(columns={"combine_z": "active"}, inplace=True)
 
     expression_data = expression_data[["entrez_gene_id", "active"]]
-    expression_data["entrez_gene_id"] = expression_data["entrez_gene_id"].astype(str)
+    expression_data.loc[:, "entrez_gene_id"] = expression_data["entrez_gene_id"].astype(str)
     single_gene_names = expression_data[~expression_data["entrez_gene_id"].str.contains("//")]
     multiple_gene_names = expression_data[expression_data["entrez_gene_id"].str.contains("//")]
-    split_gene_names = multiple_gene_names.assign(entrez_gene_id=multiple_gene_names["entrez_gene_id"].str.split("///")).explode("entrez_gene_id")
+    split_gene_names = multiple_gene_names.assign(
+        entrez_gene_id=multiple_gene_names["entrez_gene_id"].str.split("///")
+    ).explode("entrez_gene_id")
 
     gene_expressions = pd.concat([single_gene_names, split_gene_names], axis=0, ignore_index=True)
     gene_expressions.set_index("entrez_gene_id", inplace=True)
@@ -187,7 +189,9 @@ async def _format_determination(
     :return: A pandas DataFrame
     """
     requested_output = [requested_output] if isinstance(requested_output, Output) else requested_output
-    cohersion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(columns=["Input Type"])
+    cohersion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(
+        columns=["Input Type"]
+    )
     cohersion.columns = pd.Index(["input_value", *[o.value.replace(" ", "_").lower() for o in requested_output]])
     return cohersion
 
@@ -205,7 +209,7 @@ async def _async_read_csv(path: Path, **kwargs) -> pd.DataFrame:
         raise ValueError(f"File {path} is not a CSV file")
 
     kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")
-    async with aiofiles.open(path, "r") as f:
+    async with aiofiles.open(path) as f:
         content = await f.read()
         return pd.read_csv(io.StringIO(content), **kwargs)
 
