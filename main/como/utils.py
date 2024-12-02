@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import io
 import sys
+from enum import Enum
 from pathlib import Path
 from typing import Iterator
 
@@ -10,7 +11,26 @@ import aiofiles
 import pandas as pd
 from fast_bioservices import BioDBNet, Output, Taxon
 
-__all__ = ["Compartments", "stringlist_to_list", "split_gene_expression_data", "suppress_stdout"]
+
+class Algorithm(Enum):
+    GIMME = "GIMME"
+    FASTCORE = "FASTCORE"
+    IMAT = "IMAT"
+    TINIT = "TINIT"
+
+    @staticmethod
+    def from_string(value: str) -> Algorithm:
+        match value.lower():
+            case "gimme":
+                return Algorithm.GIMME
+            case "fastcore":
+                return Algorithm.FASTCORE
+            case "imat":
+                return Algorithm.IMAT
+            case "tinit":
+                return Algorithm.TINIT
+            case _:
+                raise ValueError(f"Unknown solver: {value}")
 
 
 class Compartments:
