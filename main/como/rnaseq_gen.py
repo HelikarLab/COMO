@@ -50,8 +50,7 @@ async def _handle_context_batch(
     prep: RNASeqPreparationMethod,
     taxon: Taxon,
 ) -> None:
-    """
-    Handle iteration through each context type and create rnaseq expression file
+    """Iterate through each context type and create rnaseq expression file.
 
     :param config_filename: The configuration filename to read
     :param replicate_ratio: The percentage of replicates that a gene must appear in for a gene to be marked as "active" in a batch/study
@@ -77,7 +76,9 @@ async def _handle_context_batch(
     for context_name in sheet_names:
         logger.debug(f"Starting '{context_name}'")
 
-        rnaseq_input_filepath = config.data_dir / "data_matrices" / context_name / f"gene_counts_matrix_{prep.value}_{context_name}"
+        rnaseq_input_filepath = (
+            config.data_dir / "data_matrices" / context_name / f"gene_counts_matrix_{prep.value}_{context_name}"
+        )
         if prep == RNASeqPreparationMethod.SCRNA:
             rnaseq_input_filepath = rnaseq_input_filepath.with_suffix(".h5ad")
         elif prep in {RNASeqPreparationMethod.TOTAL, RNASeqPreparationMethod.MRNA}:
@@ -88,7 +89,9 @@ async def _handle_context_batch(
             continue
 
         gene_info_filepath = config.data_dir / "gene_info.csv"
-        rnaseq_output_filepath = config.result_dir / context_name / prep.value / f"rnaseq_{prep.value}_{context_name}.csv"
+        rnaseq_output_filepath = (
+            config.result_dir / context_name / prep.value / f"rnaseq_{prep.value}_{context_name}.csv"
+        )
         rnaseq_output_filepath.parent.mkdir(parents=True, exist_ok=True)
 
         await save_rnaseq_tests(
@@ -120,9 +123,8 @@ async def rnaseq_gen(
     technique: FilteringTechnique | str = FilteringTechnique.tpm,
     cut_off: Optional[int | float] = None,
 ) -> None:
-    """
-    The main entrypoint for processing bulk total, bulk mRNA, and single-cell RNA sequencing data.
-    Generate a list of active and high-confidence genes from a gene count matrix.
+    """Generate a list of active and high-confidence genes from a gene count matrix.
+
     Replicates are compared for consensus within the study/batch number according to replicate ratios, then study/batch numbers are checked for consensus according to batch ratios.
     The zFPKM method is outlined here: https://pubmed.ncbi.nlm.nih.gov/24215113/
 
@@ -175,10 +177,6 @@ async def rnaseq_gen(
 
 
 def _parse_args() -> _Arguments:
-    """
-    Parse the command line arguments
-    :return: The parsed arguments
-    """
     parser = argparse.ArgumentParser(
         prog="rnaseq_gen.py",
         description="Generate a list of active and high-confidence genes from a counts matrix using a user defined "
@@ -263,7 +261,11 @@ def _parse_args() -> _Arguments:
         required=False,
         default=None,
         dest="minimum_cutoff",
-        help="The minimum cutoff used for the filtration technique. If the filtering technique is zFPKM, the default is -3. If the filtering technique is quantile-tpm, the default is 25. If the filtering technique is flat-cpm, the default is determined dynamically. If the filtering technique is quantile, the default is 25.",
+        help="The minimum cutoff used for the filtration technique. "
+        "If the filtering technique is zFPKM, the default is -3. "
+        "If the filtering technique is quantile-tpm, the default is 25. "
+        "If the filtering technique is flat-cpm, the default is determined dynamically. "
+        "If the filtering technique is quantile, the default is 25.",
     )
     parser.add_argument(
         "-p",
@@ -275,6 +277,7 @@ def _parse_args() -> _Arguments:
     )
     args = parser.parse_args()
     args.filtering_technique = args.filtering_technique.lower()
+    args.taxon = Taxon.from_int(int(args.taxon)) if str(args.taxon).isdigit() else Taxon.from_string(str(args.taxon))  # type: ignore
     return _Arguments(**vars(args))
 
 
