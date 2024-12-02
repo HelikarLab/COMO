@@ -30,10 +30,6 @@ class _Arguments:
         self.library_prep = RNASeqPreparationMethod.from_string(str(self.library_prep))
         self.filtering_technique = FilteringTechnique.from_string(str(self.filtering_technique))
 
-        if not str(self.taxon).isdigit():
-            raise ValueError(f"Expected '--taxon-id' to be an integer; got: {self.taxon}")
-        self.taxon = Taxon.from_int(int(self.taxon))
-
         if self.minimum_cutoff is None:
             if self.filtering_technique == FilteringTechnique.tpm:
                 self.minimum_cutoff = 25
