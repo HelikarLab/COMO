@@ -43,7 +43,7 @@ def _merge_batch(wd, context, batch):
     for f in files:
         zmat = pd.read_csv(f)
         zmat.columns = pd.Index([c.lower() for c in zmat.columns])
-        zmat["entrez_gene_id"] = zmat["entrez_gene_id"].str.split("//").str[0]
+        zmat["entrez_gene_id"] = zmat["entrez_gene_id"].astype(str).str.split("//").str[0]
 
         zmat = zmat.astype({col: float for col in zmat.columns if col != "entrez_gene_id"})
         zmat = zmat.astype({"entrez_gene_id": str})
