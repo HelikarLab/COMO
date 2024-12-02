@@ -35,6 +35,7 @@ select = [
 ignore = [
     "D100",     # allow undocumented public module definitions
     "TRY003",   # allow exception messages outside the `Exception` class
+    "F401",     # allow unused imports
 ]
 
 [lint.per-file-ignores]
