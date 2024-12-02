@@ -84,9 +84,15 @@ class _Arguments:
     def __post_init__(self):
         self.reference_model = Path(self.reference_model)
         self.active_genes_filepath = Path(self.active_genes_filepath)
-        self.boundary_reactions_filepath = Path(self.boundary_reactions_filepath) if self.boundary_reactions_filepath is not None else None
-        self.exclude_reactions_filepath = Path(self.exclude_reactions_filepath) if self.exclude_reactions_filepath is not None else None
-        self.force_reactions_filepath = Path(self.force_reactions_filepath) if self.force_reactions_filepath is not None else None
+        self.boundary_reactions_filepath = (
+            Path(self.boundary_reactions_filepath) if self.boundary_reactions_filepath is not None else None
+        )
+        self.exclude_reactions_filepath = (
+            Path(self.exclude_reactions_filepath) if self.exclude_reactions_filepath is not None else None
+        )
+        self.force_reactions_filepath = (
+            Path(self.force_reactions_filepath) if self.force_reactions_filepath is not None else None
+        )
 
         if not self.reference_model.exists():
             raise FileNotFoundError(f"Reference model not found at {self.reference_model}")
@@ -101,7 +107,8 @@ class _Arguments:
 
         if self.high_threshold < self.low_threshold:
             raise ValueError(
-                f"Low threshold must be less than high threshold. Received low threshold: {self.low_threshold}, high threshold: {self.high_threshold}"
+                f"Low threshold must be less than high threshold. "
+                f"Received low threshold: {self.low_threshold}, high threshold: {self.high_threshold}"
             )
 
 
@@ -126,10 +133,9 @@ def _correct_bracket(rule: str, name: str) -> str:
     for char in list(left_rule):
         if char.isspace() or char.isdigit():
             new_right_rule.append(char)
-        elif len(left_name) > 0:
-            if char == left_name[0]:
-                new_right_rule.append(char)
-                left_name = left_name[1:]
+        elif len(left_name) > 0 and char == left_name[0]:
+            new_right_rule.append(char)
+            left_name = left_name[1:]
     new_left_rule = "".join(new_right_rule)
     final_right_rule = "" if rule_match is None else _correct_bracket(right_rule, right_name)
     return " ".join([new_left_rule, operator, final_right_rule])
@@ -272,7 +278,10 @@ def _seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
     # 'Vlassis, Pacheco, Sauter (2014). Fast reconstruction of compact
     # context-specific metabolic network models. PLoS Comput. Biol. 10,
     # e1003424.'
-    warn("Fastcore requires a flux consistant model is used as refererence, " "to achieve this fastcc is required which is NOT reproducible.")
+    logger.warning(
+        "Fastcore requires a flux consistant model is used as refererence, "
+        "to achieve this fastcc is required which is NOT reproducible."
+    )
     logger.debug("Creating feasible model")
     incon_rxns, cobra_model = _feasibility_test(cobra_model, "other")
     properties = FastcoreProperties(core=exp_idx_list, solver=solver)
@@ -286,20 +295,13 @@ def _seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
     return context_cobra_model
 
 
-def _seed_imat(cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force, context_name):
+def _seed_imat(cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force):
     config = Config()
     expr_vector = np.array(expr_vector)
     properties = IMATProperties(exp_vector=expr_vector, exp_thresholds=expr_thesh, core=idx_force, epsilon=0.01)
-    logger.debug("Setting properties")
     algorithm = IMAT(s_matrix, lb, ub, properties)
-
-    logger.debug("Setting algorithm")
     context_rxns = algorithm.run()
-
-    logger.debug("Running")
     fluxes = algorithm.sol.to_series()
-
-    logger.debug("Obtained flux values")
     context_cobra_model = cobra_model.copy()
     r_ids = [r.id for r in context_cobra_model.reactions]
     pd.DataFrame({"rxns": r_ids}).to_csv(config.data_dir / "rxns_test.csv")
@@ -332,29 +334,31 @@ def _seed_tinit(cobra_model: cobra.Model, s_matrix, lb, ub, expr_vector, solver,
     return Model()
 
 
-def _map_expression_to_reaction(model_cobra, gene_expression_file, recon_algorithm, low_thresh=None, high_thresh=None):
-    """
-    Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules
-    which are defined in general genome-scale metabolic model
+def _map_expression_to_reaction(
+    model_cobra,
+    gene_expression_file,
+    recon_algorithm: Algorithm,
+    low_thresh=None,
+    high_thresh=None,
+):
+    """Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules.
+
+    These rules should be defined in the general genome-scale metabolic model
     """
     expression_data = pd.read_csv(gene_expression_file)
     gene_expressions = split_gene_expression_data(expression_data, recon_algorithm=recon_algorithm)
     expression_rxns = collections.OrderedDict()
 
-    cnt = 0
-    if recon_algorithm in ["IMAT", "TINIT"]:
-        # unknown_val = min(gene_expressions["Data"].tolist())
+    unknown_val = 1
+    if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT}:
         unknown_val = np.mean([low_thresh, high_thresh])  # put unknowns in mid bin
-    elif recon_algorithm == "GIMME":
+    elif recon_algorithm == Algorithm.GIMME:
         unknown_val = -1
-    elif recon_algorithm == "FASTCORE":
+    elif recon_algorithm == Algorithm.FASTCORE:
         unknown_val = 0
-    else:
-        unknown_val = 1
 
-    test_counter = 0
+    error_count = 0
     for rxn in model_cobra.reactions:
-        test_counter += 1
         gene_reaction_rule = _correct_bracket(rxn.gene_reaction_rule, rxn.gene_name_reaction_rule)
         gene_ids = re.findall(r"\d+", gene_reaction_rule)
         expression_rxns[rxn.id] = unknown_val
@@ -364,18 +368,18 @@ def _map_expression_to_reaction(model_cobra, gene_expression_file, recon_algorit
             if gid in gene_expressions.index:
                 rep_val = f' {gene_expressions.at[gid, "active"]} '
             else:
-                rep_val = f" {str(unknown_val)} "
-            gene_reaction_rule = " " + gene_reaction_rule + " "  # pad white space to prevent gene matches inside floats
+                rep_val = f" {unknown_val!s} "
+            gene_reaction_rule = f" {gene_reaction_rule} "  # pad white space to prevent gene matches inside floats
             gene_reaction_rule = gene_reaction_rule.replace(f" {gid} ", rep_val, 1)
         try:
             gene_reaction_by_rule = _gene_rule_evaluable(gene_reaction_rule)
             gene_reaction_by_rule = gene_reaction_by_rule.strip()
-            expression_rxns[rxn.id] = eval(gene_reaction_by_rule)
+            expression_rxns[rxn.id] = ast.literal_eval(gene_reaction_by_rule)
 
         except BaseException:
-            cnt += 1
+            error_count += 1
 
-    logger.info(f"Map gene expression to reactions, {cnt} errors.")
+    logger.info(f"Mapped gene expression to reactions, found {error_count} error(s).")
     expr_vector = np.array(list(expression_rxns.values()), dtype=float)
 
     return expression_rxns, expr_vector
