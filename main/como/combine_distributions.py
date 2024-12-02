@@ -253,6 +253,7 @@ def _combine_omics_zdistros(
     else:
         combine_z = zmat.iloc[:, 1:].values
 
+    combine_z = combine_z.ravel()
     merge_df = pd.concat([zmat, pd.Series(combine_z, name="combined")], axis=1)
     combine_z = pd.DataFrame({"entrez_gene_id": zmat["entrez_gene_id"].astype(str), "combine_z": combine_z})
 
