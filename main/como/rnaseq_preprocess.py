@@ -1,22 +1,21 @@
-import sys
-from pathlib import Path
-
-sys.path.insert(0, Path(__file__).parent.parent.as_posix())
+from __future__ import annotations
 
 import argparse
 import asyncio
 import re
 from dataclasses import dataclass, field
-from typing import Literal, Optional, Union
+from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import pandas as pd
 import scanpy as sc
-from fast_bioservices import BioDBNet, Input, Output, Taxon
+from fast_bioservices import BioDBNet, Input, Taxon
+from fast_bioservices.biothings.mygene import MyGene
 from loguru import logger
 
 from como import Config, stringlist_to_list
-from como.utils import _format_determination
+from como.utils import convert_gene_data
 
 
 @dataclass
