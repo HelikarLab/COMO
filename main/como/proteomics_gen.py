@@ -62,7 +62,9 @@ def load_gene_symbol_map(gene_symbols: list[str]):
         df = pd.read_csv(filepath, index_col="gene_symbol")
     else:
         biodbnet = BioDBNet()
-        df = biodbnet.db2db(input_values=gene_symbols, input_db=Input.GENE_SYMBOL, output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID])
+        df = biodbnet.db2db(
+            input_values=gene_symbols, input_db=Input.GENE_SYMBOL, output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID]
+        )
         df.loc[df["gene_id"] == "-", ["gene_id"]] = np.nan
         df.to_csv(filepath, index_label="gene_symbol")
 
@@ -78,7 +80,9 @@ def abundance_to_bool_group(context_name, group_name, abundance_matrix, rep_rati
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # write group abundances to individual files
-    abundance_filepath = config.result_dir / context_name / "proteomics" / "".join(["protein_abundance_", group_name, ".csv"])
+    abundance_filepath = (
+        config.result_dir / context_name / "proteomics" / "".join(["protein_abundance_", group_name, ".csv"])
+    )
     abundance_matrix.to_csv(abundance_filepath, index_label="entrez_gene_id")
 
     # Z-tranform
@@ -158,12 +162,19 @@ def load_proteomics_tests(filename, context_name):
         return context_name, data
 
     else:
-        logger.warning(f"Proteomics gene expression file for {context_name} was not found at {full_save_filepath}. Is this intentional?")
+        logger.warning(
+            f"Proteomics gene expression file for {context_name} was not found at {full_save_filepath}. Is this intentional?"
+        )
         return load_empty_dict()
 
 
 def proteomics_gen(
-    config_file: str, rep_ratio: float = 0.5, group_ratio: float = 0.5, hi_rep_ratio: float = 0.5, hi_group_ratio: float = 0.5, quantile: int = 25
+    config_file: str,
+    rep_ratio: float = 0.5,
+    group_ratio: float = 0.5,
+    hi_rep_ratio: float = 0.5,
+    hi_group_ratio: float = 0.5,
+    quantile: int = 25,
 ):
     config = Config()
     if not config_file:
@@ -265,10 +276,13 @@ def main():
         required=False,
         default=25,
         dest="quantile",
-        help="The quantile of genes to accept. This should be an integer from 0% (no proteins pass) " "to 100% (all proteins pass).",
+        help="The quantile of genes to accept. This should be an integer from 0% (no proteins pass) "
+        "to 100% (all proteins pass).",
     )
     args = parser.parse_args()
-    proteomics_gen(args.config_file, args.rep_ratio, args.group_ratio, args.hi_rep_ratio, args.hi_group_ratio, args.quantile)
+    proteomics_gen(
+        args.config_file, args.rep_ratio, args.group_ratio, args.hi_rep_ratio, args.hi_group_ratio, args.quantile
+    )
 
 
 if __name__ == "__main__":
