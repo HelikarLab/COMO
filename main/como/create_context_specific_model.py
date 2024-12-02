@@ -23,44 +23,27 @@ from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
 from como.project import Config
 from como.utils import Algorithm, Compartments, split_gene_expression_data, stringlist_to_list
 
-class Algorithm(Enum):
-    GIMME = "GIMME"
-    FASTCORE = "FASTCORE"
-    IMAT = "IMAT"
-    TINIT = "TINIT"
 
-    @staticmethod
-    def from_string(value: str) -> "Algorithm":
-        match value.lower():
-            case "gimme":
-                return Algorithm.GIMME
-            case "fastcore":
-                return Algorithm.FASTCORE
-            case "imat":
-                return Algorithm.IMAT
-            case "tinit":
-                return Algorithm.TINIT
-            case _:
-                raise ValueError(f"Unknown solver: {value}")
+class _Solver(Enum):
+    """Solver used to seed context specific model."""
 
-
-class Solver(Enum):
     GLPK = "GLPK"
     GUROBI = "GUROBI"
     SCIPY = "SCIPY"
     GLPK_EXACT = "GLPK_EXACT"
 
     @staticmethod
-    def from_string(value: str) -> "Solver":
+    def from_string(value: str) -> _Solver:
+        """Convert string to Solver enum."""
         match value.lower():
             case "glpk":
-                return Solver.GLPK
+                return _Solver.GLPK
             case "gurobi":
-                return Solver.GUROBI
+                return _Solver.GUROBI
             case "scipy":
-                return Solver.SCIPY
+                return _Solver.SCIPY
             case "glpk_exact":
-                return Solver.GLPK_EXACT
+                return _Solver.GLPK_EXACT
             case _:
                 raise ValueError(f"Unknown solver: {value}")
 
