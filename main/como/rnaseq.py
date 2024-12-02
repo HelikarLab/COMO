@@ -188,40 +188,51 @@ async def _read_counts_matrix(
         case ".csv":
             logger.debug(f"Reading CSV file at '{counts_matrix_filepath}'")
             counts_matrix: pd.DataFrame = pd.read_csv(counts_matrix_filepath, header=0)
+            conversion = await ensembl_to_gene_id_and_symbol(
+                ids=counts_matrix["ensembl_gene_id"].tolist(), taxon=taxon_id
+            )
+            counts_matrix = counts_matrix.merge(conversion, on="ensembl_gene_id", how="left")
+
         case ".h5ad":
             logger.debug(f"Reading h5ad file at '{counts_matrix_filepath}'")
             adata: sc.AnnData = sc.read_h5ad(counts_matrix_filepath)
             counts_matrix: pd.DataFrame = adata.to_df().T  # Make sample names the columns and gene data the index
+            del adata  # explicit garbage collection because this function runs for a little while
 
             # Coherce the incoming gene data (i.e., Gene Symbols) into Entrez and Ensembl Gene IDs
-            cohersion = await biodbnet.db_find(
-                values=counts_matrix.index.tolist(), output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID], taxon=taxon_id
-            )
-            cohersion.rename(columns={"Gene ID": "entrez_gene_id", "Ensembl Gene ID": "ensembl_gene_id"}, inplace=True)
-
-            # Set proper column names
-            input_type = cohersion["Input Type"][0].replace(" ", "_").lower()
-            cohersion.drop(columns=["Input Type"], inplace=True)
-            cohersion.columns = pd.Index([input_type] + cohersion.columns.tolist()[1:])
-
-            # Merge new gene data with counts_matrix
-            counts_matrix.index.name = input_type
-            counts_matrix.reset_index(inplace=True)
-            counts_matrix = counts_matrix.merge(cohersion, on=input_type)
+            conversion = await convert_gene_data(counts_matrix.index.tolist(), taxon_id)
+            counts_matrix.index.name = conversion.index.name
+            counts_matrix = counts_matrix.merge(conversion, left_index=True, right_index=True)
             counts_matrix = counts_matrix[counts_matrix["entrez_gene_id"] != "-"]
+            counts_matrix.reset_index(inplace=True)
 
         case _:
-            raise ValueError(f"Unknown file extension '{counts_matrix_filepath.suffix}' for file '{counts_matrix_filepath}'")
+            raise ValueError(
+                f"Unknown file extension '{counts_matrix_filepath.suffix}'. Valid options are '.csv' or '.h5ad'."
+            )
+
+    if counts_matrix.empty:
+        raise ValueError("Counts matrix is empty. Ensure the file is not empty and contains data.")
 
     # Only include Entrez and Ensembl Gene IDs that are present in `gene_info`
     counts_matrix["entrez_gene_id"] = counts_matrix["entrez_gene_id"].str.split("//")
     counts_matrix = counts_matrix.explode("entrez_gene_id")
+    counts_matrix = counts_matrix[(counts_matrix["entrez_gene_id"] != "-") & (counts_matrix["entrez_gene_id"].notna())]
+    gene_info = gene_info[gene_info["entrez_gene_id"] != "-"]
 
     counts_matrix["entrez_gene_id"] = counts_matrix["entrez_gene_id"].astype(int)
     gene_info["entrez_gene_id"] = gene_info["entrez_gene_id"].astype(int)
 
-    counts_matrix = counts_matrix.merge(gene_info[["entrez_gene_id", "ensembl_gene_id"]], on=["entrez_gene_id", "ensembl_gene_id"], how="inner")
-    gene_info = gene_info.merge(counts_matrix[["entrez_gene_id", "ensembl_gene_id"]], on=["entrez_gene_id", "ensembl_gene_id"], how="inner")
+    counts_matrix = counts_matrix.merge(
+        gene_info[["entrez_gene_id", "ensembl_gene_id"]],
+        on=["entrez_gene_id", "ensembl_gene_id"],
+        how="inner",
+    )
+    gene_info = gene_info.merge(
+        counts_matrix[["entrez_gene_id", "ensembl_gene_id"]],
+        on=["entrez_gene_id", "ensembl_gene_id"],
+        how="inner",
+    )
     entrez_gene_ids: list[str] = gene_info["entrez_gene_id"].tolist()
 
     metrics: NamedMetrics = {}
@@ -241,7 +252,7 @@ async def _read_counts_matrix(
         metrics[study].fragment_lengths[np.isnan(metrics[study].fragment_lengths)] = 0
         metrics[study].count_matrix.index = pd.Index(entrez_gene_ids, name="entrez_gene_id")
 
-    return ReadMatrixResults(metrics=metrics, entrez_gene_ids=gene_info["entrez_gene_id"].tolist())
+    return _ReadMatrixResults(metrics=metrics, entrez_gene_ids=gene_info["entrez_gene_id"].tolist())
 
 
 def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
