@@ -21,7 +21,7 @@ def _parse_contexts_zfpkm(wd, contexts, prep):
 def _parse_contexts_zumi(wd, contexts, prep):
     batches = {}
     for context in contexts:
-        files = (wd / context / prep).glob(f"zUMI_Matrix_{prep}_*.csv")
+        files = (wd / context / prep).glob(f"*{prep}*.csv")
         batches[context] = [_get_batch_name(f) for f in files]
     return batches
 
