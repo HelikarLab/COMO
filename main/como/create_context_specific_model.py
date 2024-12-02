@@ -389,7 +389,7 @@ def _build_model(
     context_name: str,
     general_model_file: Path,
     gene_expression_file: Path,
-    recon_algorithm: str,
+    recon_algorithm: Algorithm,
     objective: str,
     bound_rxns: list[str],
     exclude_rxns: list[str],
@@ -472,22 +472,20 @@ def _build_model(
         # TODO: if not using bound reactions file, add two sets of exchange reactoins to be put in either low or mid bin
 
         if rxn in force_rxns:
-            expr_vector[idx] = high_thresh + 0.1 if recon_algorithm in ["TINIT", "IMAT"] else 1
+            expr_vector[idx] = high_thresh + 0.1 if recon_algorithm.value in {"TINIT", "IMAT"} else 1
         if rxn in incon_rxns or rxn in exclude_rxns:
-            expr_vector[idx] = low_thresh - 0.1 if recon_algorithm in ["TINIT", "IMAT"] else 0
+            expr_vector[idx] = low_thresh - 0.1 if recon_algorithm.value in {"TINIT", "IMAT"} else 0
 
     idx_obj = rx_names.index(objective)
     idx_force = [rx_names.index(rxn) for rxn in force_rxns if rxn in rx_names]
     exp_idx_list = [i for (i, val) in enumerate(expr_vector) if val > 0]
     exp_thresh = (low_thresh, high_thresh)
 
-    # switch case dictionary runs the functions making it too slow, better solution then elif ladder?
-    if recon_algorithm == "GIMME":
+    if recon_algorithm == Algorithm.GIMME:
         context_model_cobra = _seed_gimme(model, s_matrix, lb, ub, idx_obj, expr_vector)
-    elif recon_algorithm == "FASTCORE":
+    elif recon_algorithm == Algorithm.FASTCORE:
         context_model_cobra = _seed_fastcore(model, s_matrix, lb, ub, exp_idx_list, solver)
-    elif recon_algorithm == "IMAT":
-        flux_df: pd.DataFrame
+    elif recon_algorithm == Algorithm.IMAT:
         context_model_cobra: cobra.Model
         context_model_cobra, flux_df = _seed_imat(
             model,
@@ -656,7 +654,7 @@ def create_context_specific_model(
         context_name=context_name,
         general_model_file=reference_model,
         gene_expression_file=genes_file,
-        recon_algorithm=algorithm.value,
+        recon_algorithm=algorithm,
         objective=objective,
         bound_rxns=boundary_reactions.reactions,
         bound_lb=boundary_reactions.lower_bounds,
