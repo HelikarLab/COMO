@@ -277,7 +277,7 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
 def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
     """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary."""  # noqa: E501
     matrix_values = []
-    for study in metrics.keys():
+    for study in metrics:
         for sample in range(metrics[study].num_samples):
             layout = metrics[study].layout[sample]
 
@@ -290,12 +290,16 @@ def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
             match layout:
                 case "paired-end":  # FPKM
                     mean_fragment_lengths = metrics[study].fragment_lengths[sample]
-                    effective_length = [max(0, size - mean_fragment_lengths + 1) for size in gene_size]  # Ensure non-negative value
-                    N = count_matrix.sum()
-                    fpkm = (count_matrix + 1) * 1e9 / (np.array(effective_length) * N)
+                    effective_length = [
+                        max(0, size - mean_fragment_lengths + 1) for size in gene_size
+                    ]  # Ensure non-negative value
+                    n = count_matrix.sum()
+                    fpkm = (count_matrix + 1) * 1e9 / (np.array(effective_length) * n)
                     matrix_values.append(fpkm)
                 case "single-end":  # RPKM
-                    rate = np.log(count_matrix + 1) - np.log(gene_size)  # Add a pseudocount before log to ensure log(0) does not happen
+                    rate = np.log(count_matrix + 1) - np.log(
+                        gene_size
+                    )  # Add a pseudocount before log to ensure log(0) does not happen
                     exp_rate = np.exp(rate - np.log(np.sum(count_matrix)) + np.log(1e9))
                     matrix_values.append(exp_rate)
                 case _:
@@ -362,23 +366,22 @@ def _zfpkm_calculation(
     col_log2 = np.nan_to_num(col_log2, nan=0)
     refit: KernelDensity = kernel.fit(col_log2.reshape(-1, 1))  # type: ignore
 
-        kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(col_log2.reshape(-1, 1))  # type: ignore
-        x_range = np.linspace(col_log2.min(), col_log2.max(), 1000)
-        density = np.exp(kde.score_samples(x_range.reshape(-1, 1)))
-        peaks, _ = find_peaks(density, height=peak_parameters[0], distance=peak_parameters[1])
-        peak_positions = x_range[peaks]
+    # kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(col_log2.reshape(-1, 1))
+    x_range = np.linspace(col_log2.min(), col_log2.max(), 1000)
+    density = np.exp(refit.score_samples(x_range.reshape(-1, 1)))
+    peaks, _ = find_peaks(density, height=peak_parameters[0], distance=peak_parameters[1])
+    peak_positions = x_range[peaks]
 
-        mu = 0
-        max_fpkm = 0
-        u = 0
-        stddev = 1
+    mu = 0
+    max_fpkm = 0
+    stddev = 1
 
-        if len(peaks) != 0:
-            mu = peak_positions.max()
-            max_fpkm = density[peaks[np.argmax(peak_positions)]]
-            u = col_log2[col_log2 > mu].mean()
-            stddev = (u - mu) * np.sqrt(np.pi / 2)
-        zfpkm = pd.Series((col_log2 - mu) / stddev, dtype=np.float32, name=name)
+    if len(peaks) != 0:
+        mu = peak_positions.max()
+        max_fpkm = density[peaks[np.argmax(peak_positions)]]
+        u = col_log2[col_log2 > mu].mean()
+        stddev = (u - mu) * np.sqrt(np.pi / 2)
+    zfpkm = pd.Series((col_log2 - mu) / stddev, dtype=np.float32, name=col.name)
 
     return _ZFPKMResult(zfpkm=zfpkm, density=Density(x_range, density), mu=mu, std_dev=stddev, max_fpkm=max_fpkm)
 
@@ -418,9 +421,12 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
     :param plot_xfloor: Lower limit for the x-axis.
     :param subplot_titles: Whether to display facet titles (sample names).
     """
-
-    mega_df = pd.DataFrame()
-    for name, result in results.items():
+    mega_df = pd.DataFrame(
+        data=pd.NA,
+        index=pd.Series(data=range(len(results))),
+        columns=pd.Series(data=("sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled")),
+    )
+    for i, (name, result) in enumerate(results.items()):
         d = result.density
         mu = result.mu
         stdev = result.std_dev
@@ -429,8 +435,10 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
         fitted = norm.pdf(d.x, loc=mu, scale=stdev)
         scale_fitted = fitted * (max_fpkm / fitted.max())
 
-        df = pd.DataFrame({"sample_name": name, "log2fpkm": d.x, "fpkm_density": d.y, "fitted_density_scaled": scale_fitted})
-        mega_df = pd.concat([mega_df, df], ignore_index=True)
+        mega_df.at[i, "sample_name"] = name
+        mega_df.at[i, "log2fpkm"] = d.x
+        mega_df.at[i, "fpkm_density"] = d.y
+        mega_df.at[i, "fitted_density_scaled"] = scale_fitted
 
     mega_df = mega_df.melt(
         id_vars=["log2fpkm", "sample_name"],
@@ -440,7 +448,9 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
     )
 
     subplot_titles = list(results.keys()) if subplot_titles else None
-    fig = make_subplots(rows=len(results), cols=1, subplot_titles=subplot_titles, vertical_spacing=min(0.05, (1 / (len(results) - 1))))
+    fig = make_subplots(
+        rows=len(results), cols=1, subplot_titles=subplot_titles, vertical_spacing=min(0.05, (1 / (len(results) - 1)))
+    )
 
     for i, (name, group) in enumerate(mega_df.groupby("sample_name"), start=1):
         fig.add_trace(
@@ -448,7 +458,7 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
             row=i,
             col=1,
         )
-        fig.update_xaxes(title_text="log2(FPKM)", range=[plot_xfloor, group["log2fpkm"].max()], row=i, col=1)
+        fig.update_xaxes(title_text="log2(FPKM)", range=[plot_xfloor, max(group["log2fpkm"].tolist())], row=i, col=1)
         fig.update_yaxes(title_text="[scaled] density", row=i, col=1)
         fig.update_layout(legend_tracegroupgap=0)
 
@@ -460,7 +470,9 @@ def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
     """Calculate the z-score for each sample in the metrics dictionary."""
     for sample in metrics:
         log_matrix = np.log(metrics[sample].normalization_matrix)
-        z_matrix = pd.DataFrame(data=sklearn.preprocessing.scale(log_matrix, axis=1), columns=metrics[sample].sample_names)
+        z_matrix = pd.DataFrame(
+            data=sklearn.preprocessing.scale(log_matrix, axis=1), columns=metrics[sample].sample_names
+        )
         metrics[sample].z_score_matrix = z_matrix
     return metrics
 
@@ -503,7 +515,11 @@ def cpm_filter(
         top_samples = round(n_top * len(counts.columns))
         test_bools = pd.DataFrame({"entrez_gene_ids": entrez_ids})
         for i in range(len(counts_per_million.columns)):
-            cutoff = 10e6 / (np.median(np.sum(counts[:, i]))) if cut_off == "default" else 1e6 * cut_off / np.median(np.sum(counts[:, i]))
+            cutoff = (
+                10e6 / (np.median(np.sum(counts[:, i])))
+                if cut_off == "default"
+                else 1e6 * cut_off / np.median(np.sum(counts[:, i]))
+            )
             test_bools = test_bools.merge(counts_per_million[counts_per_million.iloc[:, i] > cutoff])
 
     return metrics
@@ -529,8 +545,12 @@ def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
         top_samples = round(n_top * len(tpm_matrix.columns))
 
         tpm_quantile = tpm_matrix[tpm_matrix > 0]
-        quantile_cutoff = np.quantile(a=tpm_quantile.values, q=1 - (cut_off / 100), axis=0)  # Compute quantile across columns
-        boolean_expression = pd.DataFrame(data=tpm_matrix > quantile_cutoff, index=tpm_matrix.index, columns=tpm_matrix.columns).astype(int)
+        quantile_cutoff = np.quantile(
+            a=tpm_quantile.values, q=1 - (cut_off / 100), axis=0
+        )  # Compute quantile across columns
+        boolean_expression = pd.DataFrame(
+            data=tpm_matrix > quantile_cutoff, index=tpm_matrix.index, columns=tpm_matrix.columns
+        ).astype(int)
 
         min_func = k_over_a(min_samples, 0.9)
         top_func = k_over_a(top_samples, 0.9)
@@ -562,12 +582,10 @@ def zfpkm_filter(
     n_exp = filtering_options.replicate_ratio
     n_top = filtering_options.high_replicate_ratio
     cut_off = filtering_options.cut_off
-
     metrics = calculate_fpkm(metrics)
 
-    sample: str
     metric: _StudyMetrics
-    for sample, metric in metrics.items():
+    for metric in metrics.values():
         fpkm_df = metric.normalization_matrix
         fpkm_df = fpkm_df[fpkm_df.sum(axis=1) > 0]
 
@@ -633,9 +651,11 @@ def filter_counts(
     """Filter the count matrix based on the specified technique."""
     match technique:
         case FilteringTechnique.cpm:
-            return cpm_filter(context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep)
+            return cpm_filter(
+                context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep
+            )
         case FilteringTechnique.tpm:
-            return TPM_quantile_filter(metrics=metrics, filtering_options=filtering_options)
+            return tpm_quantile_filter(metrics=metrics, filtering_options=filtering_options)
         case FilteringTechnique.zfpkm:
             return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, prep=prep)
         case FilteringTechnique.umi:
@@ -700,7 +720,9 @@ async def save_rnaseq_tests(
         top_genes.extend(metric.high_confidence_entrez_gene_ids)
 
     expression_frequency = pd.Series(expressed_genes).value_counts()
-    expression_df = pd.DataFrame({"entrez_gene_id": expression_frequency.index, "frequency": expression_frequency.values})
+    expression_df = pd.DataFrame(
+        {"entrez_gene_id": expression_frequency.index, "frequency": expression_frequency.values}
+    )
     expression_df["prop"] = expression_df["frequency"] / len(metrics)
     expression_df = expression_df[expression_df["prop"] >= filtering_options.batch_ratio]
 
