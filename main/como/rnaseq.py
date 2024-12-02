@@ -163,7 +163,6 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
 
 async def _read_counts_matrix(
     *,
-    biodbnet: BioDBNet,
     context_name: str,
     counts_matrix_filepath: Path,
     config_filepath: Path,
