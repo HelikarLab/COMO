@@ -1,16 +1,13 @@
-import sys
-from pathlib import Path
-
-sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-
+from __future__ import annotations
 
 import argparse
+import ast
 import collections
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import NamedTuple, Optional
-from warnings import warn
+from pathlib import Path
+from typing import NamedTuple
 
 import cobra
 import numpy as np
@@ -24,8 +21,7 @@ from troppo.methods.reconstruction.imat import IMAT, IMATProperties
 from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
 
 from como.project import Config
-from como.utils import Compartments, split_gene_expression_data, stringlist_to_list
-
+from como.utils import Algorithm, Compartments, split_gene_expression_data, stringlist_to_list
 
 class Algorithm(Enum):
     GIMME = "GIMME"
