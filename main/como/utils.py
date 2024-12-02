@@ -12,8 +12,7 @@ __all__ = ["Compartments", "stringlist_to_list", "split_gene_expression_data", "
 
 
 class Compartments:
-    """
-    This enum will be used to convert from compartment "long-hand" to "short-hand"
+    """Convert from compartment "long-hand" to "short-hand".
 
     Shorthand from: https://cobrapy.readthedocs.io/en/latest/_modules/cobra/medium/annotations.html
 
@@ -72,11 +71,12 @@ class Compartments:
 
 
 def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
-    """
-    We are attempting to move to a new method of gathering a list of items from the command line
+    """Convert a string from the command line into a Python list.
+
     In doing so, we must deprecate the use of the current method
 
-    If '[' and ']' are present in the first and last items of the list, assume we are using the "old" method of providing context names
+    If '[' and ']' are present in the first and last items of the list,
+        assume we are using the "old" method of providing context names
 
     :param stringlist: The "string list" gathered from the command line. Example input: "['mat', 'xml', 'json']"
     """
@@ -101,9 +101,8 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
     return stringlist
 
 
-def split_gene_expression_data(expression_data: pd.DataFrame, recon_algorithm: str = "GIMME"):
-    """
-    Split the gene expression data into single-gene and multiple-gene names.
+def split_gene_expression_data(expression_data: pd.DataFrame, recon_algorithm: Algorithm):
+    """Split the gene expression data into single-gene and multiple-gene names.
 
     :param expression_data: The gene expression data to map
     :param recon_algorithm: The recon algorithm used to generate the gene expression data
@@ -126,8 +125,7 @@ def split_gene_expression_data(expression_data: pd.DataFrame, recon_algorithm: s
 
 @contextlib.contextmanager
 def suppress_stdout() -> Iterator[None]:
-    """
-    Suppresses stdout output from the current context
+    """Suppress stdout output from the current context.
 
     :return: The context manager
     """
@@ -142,8 +140,7 @@ def suppress_stdout() -> Iterator[None]:
 async def _format_determination(
     biodbnet: BioDBNet, *, requested_output: Output | list[Output], input_values: list[str], taxon: Taxon
 ) -> pd.DataFrame:
-    """
-    Determine the data type of the given input values (i.e., Entrez Gene ID, Gene Symbol, etc.)
+    """Determine the data type of the given input values (i.e., Entrez Gene ID, Gene Symbol, etc.)
 
     :param biodbnet: The BioDBNet to use for deter
     :param requested_output: The data type to generate (of type `Output`)
@@ -158,8 +155,7 @@ async def _format_determination(
 
 
 async def _async_read_csv(path: Path, **kwargs) -> pd.DataFrame:
-    """
-    Asynchronously reads a CSV file and returns a pandas DataFrame.
+    """Asynchronously reads a CSV file and returns a pandas DataFrame.
 
     :param path: The path to read from
     :param kwargs: Additional arguments to pass to pandas.read_csv
@@ -177,8 +173,7 @@ async def _async_read_csv(path: Path, **kwargs) -> pd.DataFrame:
 
 
 async def _async_read_excel(path: Path, **kwargs) -> pd.DataFrame:
-    """
-    Asynchronously reads an Excel file and returns a pandas DataFrame.
+    """Asynchronously reads an Excel file and returns a pandas DataFrame.
 
     :param path: The path to read from
     :param kwargs: Additional arguments to pass to pandas.read_excel
@@ -195,8 +190,7 @@ async def _async_read_excel(path: Path, **kwargs) -> pd.DataFrame:
 
 
 def is_notebook() -> bool:
-    """
-    Checks if the current environment is a Jupyter Notebook.
+    """Check if the current environment is a Jupyter Notebook.
 
     :returns: True if the current environment is a Jupyter Notebook, False otherwise.
     """
