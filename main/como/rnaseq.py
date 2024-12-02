@@ -111,7 +111,7 @@ class _StudyMetrics:
 Density = namedtuple("Density", ["x", "y"])
 
 
-class zFPKMresult(NamedTuple):
+class _ZFPKMResult(NamedTuple):
     zfpkm: pd.Series
     density: Density
     mu: float
@@ -119,7 +119,7 @@ class zFPKMresult(NamedTuple):
     max_fpkm: float
 
 
-class ReadMatrixResults(NamedTuple):
+class _ReadMatrixResults(NamedTuple):
     metrics: dict[str, _StudyMetrics]
     entrez_gene_ids: list[str]
 
@@ -127,9 +127,8 @@ class ReadMatrixResults(NamedTuple):
 NamedMetrics = dict[str, _StudyMetrics]
 
 
-def k_over_a(k: int, A: float) -> Callable[[npt.NDArray], bool]:
-    """
-    Return a function that filters rows of an array based on the sum of elements being greater than or equal to A at least k times.
+def k_over_a(k: int, a: float) -> Callable[[npt.NDArray], bool]:
+    """Return a function that filters rows of an array based on the sum of elements being greater than or equal to A at least k times.
 
     This code is based on the `kOverA` function found in R's `genefilter` package: https://www.rdocumentation.org/packages/genefilter/versions/1.54.2/topics/kOverA
 
@@ -139,7 +138,7 @@ def k_over_a(k: int, A: float) -> Callable[[npt.NDArray], bool]:
     """  # noqa: E501
 
     def filter_func(row: npt.NDArray) -> bool:
-        return np.sum(row >= A) >= k
+        return np.sum(row >= a) >= k
 
     return filter_func
 
@@ -247,8 +246,8 @@ async def _read_counts_matrix(
 
 
 def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
-    for sample in metrics.keys():
     """Calculate the Transcripts Per Million (TPM) for each sample in the metrics dictionary."""
+    for sample in metrics:
         count_matrix = metrics[sample].count_matrix
 
         gene_sizes = metrics[sample].gene_sizes
@@ -371,10 +370,28 @@ def _zfpkm_calculation(
             stddev = (u - mu) * np.sqrt(np.pi / 2)
         zfpkm = pd.Series((col_log2 - mu) / stddev, dtype=np.float32, name=name)
 
-        return zFPKMresult(zfpkm=zfpkm, density=Density(x_range, density), mu=mu, std_dev=stddev, max_fpkm=max_fpkm)
+    return _ZFPKMResult(zfpkm=zfpkm, density=Density(x_range, density), mu=mu, std_dev=stddev, max_fpkm=max_fpkm)
 
-    zfpkm_df = pd.DataFrame(data=0, index=fpkm_df.index, columns=fpkm_df.columns)
+
+def zfpkm_transform(
+    fpkm_df: pd.DataFrame,
+    bandwidth: int = 0.5,
+    peak_parameters: tuple[float, float] = (0.02, 1.0),
+    update_every_percent: float = 0.1,
+) -> tuple[dict[str, _ZFPKMResult], pd.DataFrame]:
     """Transform FPKM values to zFPKM values."""
+    # dynamic multi-processing: if more than 100 columns exist, split the work up between 4 processors
+    #   CPU bound work means we should use ProcessPoolExecutor
+    total = len(fpkm_df.columns)
+
+    if update_every_percent > 1:
+        logger.warning(
+            f"update_every_percent should be a decimal value between 0 and 1; got: {update_every_percent} - "
+            f"will convert to percentage"
+        )
+        update_every_percent /= 100
+    update_per_step: int = int(total * update_every_percent)
+    kernel = KernelDensity(kernel="gaussian", bandwidth=bandwidth)
     results = {}
     for col in fpkm_df.columns:
         results[col] = calc(fpkm_df[col], name=col, bandwidth=bandwidth, peak_parameters=peak_parameters)
@@ -438,7 +455,6 @@ def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
     return metrics
 
 
-def cpm_filter(*, context_name: str, metrics: NamedMetrics, filtering_options: _FilteringOptions, prep: RNASeqPreparationMethod) -> NamedMetrics:
 def cpm_filter(
     *,
     context_name: str,
@@ -568,8 +584,8 @@ def zfpkm_filter(
 
 
 def umi_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions) -> NamedMetrics:
-    for study, metric in metrics.items():
     """Apply Unique Molecular Identifier (UMI) filtering to the count matrix for a given sample."""
+    for metric in metrics.values():
         entrez_ids = metric.entrez_gene_ids
         count_matrix = metric.count_matrix
 
@@ -649,8 +665,7 @@ async def save_rnaseq_tests(
             "gene counts are counted with Unique Molecular Identifiers (UMIs)"
         )
 
-    read_counts_results: ReadMatrixResults = await _read_counts_matrix(
-        biodbnet=biodbnet,
+    read_counts_results: _ReadMatrixResults = await _read_counts_matrix(
         context_name=context_name,
         counts_matrix_filepath=counts_matrix_filepath,
         config_filepath=config_filepath,
@@ -692,25 +707,4 @@ async def save_rnaseq_tests(
             boolean_matrix.loc[gene, "high"] = 1
 
     boolean_matrix.to_csv(output_filepath, index=False)
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(
-        save_rnaseq_tests(
-            context_name="naiveCD4",
-            counts_matrix_filepath=Path("/Users/joshl/Projects/COMO/main/data/data_matrices/naiveCD4/gene_counts_matrix_scrna_naiveCD4.h5ad"),
-            config_filepath=Path("/Users/joshl/Projects/COMO/main/data/config_sheets/scrnaseq_data_inputs_auto.xlsx"),
-            gene_info_filepath=Path("/Users/joshl/Projects/COMO/main/data/gene_info.csv"),
-            output_filepath=Path("/Users/joshl/Projects/COMO/main/data/results/naiveCD4/scrna/rnaseq_scrna_naiveCD4.csv"),
-            prep=RNASeqPreparationMethod.SCRNA,
-            taxon_id=Taxon.HOMO_SAPIENS,
-            replicate_ratio=0.5,
-            high_replicate_ratio=1.0,
-            batch_ratio=0.5,
-            high_batch_ratio=1.0,
-            technique=FilteringTechnique.umi,
-            cut_off=-3,
-        )
-    )
+    logger.info(f"Wrote boolean matrix to {output_filepath}")
