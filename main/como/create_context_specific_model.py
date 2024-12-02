@@ -331,7 +331,7 @@ def _seed_tinit(cobra_model: cobra.Model, s_matrix, lb, ub, expr_vector, solver,
     algorithm = tINIT(s_matrix, lb, ub, properties)
     algorithm.preprocessing()
     algorithm.build_problem()
-    return Model()
+    raise NotImplementedError("tINIT is not yet implemented")
 
 
 def _map_expression_to_reaction(
