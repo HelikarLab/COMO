@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import io
 import sys
+from collections.abc import Iterator
 from enum import Enum
 from pathlib import Path
 from typing import Iterator
@@ -108,13 +109,20 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
             new_list: list[str] = stringlist.strip("[]").replace("'", "").replace(" ", "").split(",")
 
             # Show a warning if more than one item is present in the list (this means we are using the old method)
-            print("DeprecationWarning: Please use the new method of providing context names, i.e. --output-filetypes 'type1 type2 type3'.")
-            print(
-                "If you are using COMO, this can be done by setting the 'context_names' variable to a simple string separated by spaces. Here are a few examples!"
+            logger.critical(
+                "DeprecationWarning: Please use the new method of providing context names, "
+                "i.e. --output-filetypes 'type1 type2 type3'."
             )
-            print("context_names = 'cellType1 cellType2 cellType3'")
-            print("output_filetypes = 'output1 output2 output3'")
-            print("\nYour current method of passing context names will be removed in the future. Please update your variables above accordingly!\n\n")
+            logger.critical(
+                "If you are using COMO, this can be done by setting the 'context_names' variable to a "
+                "simple string separated by spaces. Here are a few examples!"
+            )
+            logger.critical("context_names = 'cellType1 cellType2 cellType3'")
+            logger.critical("output_filetypes = 'output1 output2 output3'")
+            logger.critical(
+                "\nYour current method of passing context names will be removed in the future. "
+                "Update your variables above accordingly!\n\n"
+            )
 
         else:
             new_list: list[str] = stringlist.split(" ")
