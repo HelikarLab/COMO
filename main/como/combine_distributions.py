@@ -84,6 +84,7 @@ def _merge_batch(wd, context, batch):
         if len(stack_df["source"].unique()) > 10:
             fig.update_layout(showlegend=False)
 
+        plot_name_png.parent.mkdir(parents=True, exist_ok=True)
         fig.write_image(plot_name_png)
 
     return zmat, nrep
