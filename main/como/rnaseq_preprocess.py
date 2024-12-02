@@ -441,8 +441,6 @@ def _split_counts_matrices(
     """Split a counts-matrix dataframe into two seperate ones. One for Total RNA library prep, one for mRNA"""
     logger.info(f"Reading gene count matrix file at '{count_matrix_all}'")
     matrix_all = pd.read_csv(count_matrix_all)
-    matrix_total = matrix_all[["ensembl_gene_id"] + [n for n in matrix_all.columns if n in df_total["sample_name"].tolist()]]
-    matrix_mrna = matrix_all[["ensembl_gene_id"] + [n for n in matrix_all.columns if n in df_mrna["sample_name"].tolist()]]
     matrix_total = matrix_all[
         ["ensembl_gene_id"] + [n for n in matrix_all.columns if n in df_total["sample_name"].tolist()]
     ]
