@@ -445,13 +445,19 @@ def _build_model(
 
     # get expressed reactions
     expression_rxns, expr_vector = _map_expression_to_reaction(
-        model, gene_expression_file, recon_algorithm, high_thresh=high_thresh, low_thresh=low_thresh
+        model,
+        gene_expression_file,
+        recon_algorithm,
+        high_thresh=high_thresh,
+        low_thresh=low_thresh,
     )
 
-    # find reactions in the force reactions file that are not in general model and warn user
     for rxn in force_rxns:
         if rxn not in rx_names:
-            warn(f"{rxn} from force reactions not in general model, check BiGG (or relevant database used in your " "general model) for synonyms")
+            logger.warning(
+                f"The force reaction '{rxn}' was not found in the general model. "
+                f"Check BiGG, or the relevant database for your general model, for synonyms."
+            )
 
     # collect list of reactions that are infeasible but active in expression data or user defined
     infeas_exp_rxns = []
@@ -459,7 +465,7 @@ def _build_model(
     infeas_exp_cnt = 0
     infeas_force_cnt = 0
 
-    for idx, (rxn, exp) in enumerate(expression_rxns.items()):
+    for idx, rxn in enumerate(expression_rxns):
         # log reactions in expressed and force lists that are infeasible that the user may wish to review
         if rxn in incon_rxns and expr_vector[idx] == 1:
             infeas_exp_cnt += 1
@@ -469,7 +475,7 @@ def _build_model(
             infeas_force_rxns.append(rxn)
 
         # make changes to expressed reactions base on user defined force/exclude reactions
-        # TODO: if not using bound reactions file, add two sets of exchange reactoins to be put in either low or mid bin
+        # TODO: if not using bound reactions file, add two sets of exchange reactions to be put in either low or mid bin
 
         if rxn in force_rxns:
             expr_vector[idx] = high_thresh + 0.1 if recon_algorithm.value in {"TINIT", "IMAT"} else 1
@@ -487,56 +493,29 @@ def _build_model(
         context_model_cobra = _seed_fastcore(model, s_matrix, lb, ub, exp_idx_list, solver)
     elif recon_algorithm == Algorithm.IMAT:
         context_model_cobra: cobra.Model
-        context_model_cobra, flux_df = _seed_imat(
-            model,
-            s_matrix,
-            lb,
-            ub,
-            expr_vector,
-            exp_thresh,
-            idx_force,
-            context_name,
-        )
+        flux_df: pd.DataFrame
+        context_model_cobra, flux_df = _seed_imat(model, s_matrix, lb, ub, expr_vector, exp_thresh, idx_force)
         imat_reactions = flux_df.rxn
         model_reactions = [reaction.id for reaction in context_model_cobra.reactions]
         reaction_intersections = set(imat_reactions).intersection(model_reactions)
         flux_df = flux_df[~flux_df["rxn"].isin(reaction_intersections)]
-        flux_df.to_csv(config.data_dir / "results" / context_name / f"{recon_algorithm}_flux.csv")
-
-    elif recon_algorithm == "TINIT":
+        flux_df.to_csv(config.data_dir / "results" / context_name / f"{recon_algorithm.value}_flux.csv")
+    elif recon_algorithm == Algorithm.TINIT:
         context_model_cobra = _seed_tinit(model, s_matrix, lb, ub, expr_vector, solver, idx_force)
-    else:
-        raise ValueError(f"Unsupported reconstruction algorithm: {recon_algorithm}. Must be 'IMAT', 'GIMME', or 'FASTCORE'")
 
-    # check number of unsolvable reactions for seeded model under media assumptions
-    # incon_rxns_cs, context_model_cobra = _feasibility_test(context_model_cobra, "after_seeding")
     incon_rxns_cs = []
-
-    # if recon_algorithm in ["IMAT"]:
-    #     final_rxns = [rxn.id for rxn in context_model_cobra.reactions]
-    #     imat_rxns = flux_df.rxn
-    #     for rxn in imat_rxns:
-    #         if rxn not in final_rxns:
-    #             flux_df = flux_df[flux_df.rxn != rxn]
-    #
-
     incon_df = pd.DataFrame({"general_infeasible_rxns": list(incon_rxns)})
     infeas_exp_df = pd.DataFrame({"expressed_infeasible_rxns": infeas_exp_rxns})
     infeas_force_df = pd.DataFrame({"infeasible_rxns_in_force_list": infeas_exp_rxns})
     incon_df_cs = pd.DataFrame({"infeasible_rxns_from_seeding": list(incon_rxns_cs)})
-    infeasible_df = pd.concat(
-        [incon_df, infeas_exp_df, infeas_force_df, incon_df_cs],
-        ignore_index=True,
-        axis=1,
-    )
-    infeasible_df.columns = [
-        "InfeasRxns",
-        "ExpressedInfeasRxns",
-        "ForceInfeasRxns",
-        "ContextInfeasRxns",
-    ]
+    infeasible_df = pd.concat([incon_df, infeas_exp_df, infeas_force_df, incon_df_cs], ignore_index=True, axis=1)
+    infeasible_df.columns = ["InfeasRxns", "ExpressedInfeasRxns", "ForceInfeasRxns", "ContextInfeasRxns"]
 
-    return BuildResults(model=context_model_cobra, expression_index_list=exp_idx_list, infeasible_reactions=infeasible_df)
+    return _BuildResults(
+        model=context_model_cobra,
+        expression_index_list=exp_idx_list,
+        infeasible_reactions=infeasible_df,
+    )
 
 
 def _create_df(path: Path) -> pd.DataFrame:
@@ -549,21 +528,26 @@ def _create_df(path: Path) -> pd.DataFrame:
             df = pd.read_excel(path, header=0)
         case _:
             raise FileNotFoundError(f"File not found! Must be a csv, tsv, or Excel file. Searching for: {path}")
-
-    df.columns = [column.lower() for column in df.columns]
+    df.columns = [c.lower() for c in df.columns]
     return df
 
 
 def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
     df = _create_df(path)
     for column in df.columns:
-        if column not in ["boundary", "abbreviation", "compartment", "minimum reaction rate", "maximum reaction rate"]:
+        if column not in [
+            "reaction",
+            "abbreviation",
+            "compartment",
+            "minimum reaction rate",
+            "maximum reaction rate",
+        ]:
             raise ValueError(
                 f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', 'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}"
             )
 
     reactions: list[str] = []
-    boundary_type: list[str] = df["boundary"].tolist()
+    boundary_type: list[str] = df["reaction"].tolist()
     reaction_abbreviation: list[str] = df["abbreviation"].tolist()
     reaction_compartment: list[str] = df["compartment"].tolist()
     lower_bounds = df["minimum reaction rate"].tolist()
@@ -590,7 +574,13 @@ def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
     )
 
 
-def _write_model_to_disk(model: cobra.Model, output_directory: Path, context_name: str, output_filetypes: list[str], algorithm: Algorithm) -> None:
+def _write_model_to_disk(
+    model: cobra.Model,
+    output_directory: Path,
+    context_name: str,
+    output_filetypes: list[str],
+    algorithm: Algorithm,
+) -> None:
     if "mat" in output_filetypes:
         cobra.io.save_matlab_model(model, output_directory / f"{context_name}_SpecificModel_{algorithm.value}.mat")
     if "xml" in output_filetypes:
@@ -604,14 +594,14 @@ def create_context_specific_model(
     reference_model: Path,
     genes_file: Path,
     objective: str = "biomass_reaction",
-    boundary_rxns_filepath: Optional[str | Path] = None,
-    exclude_rxns_filepath: Optional[str | Path] = None,
-    force_rxns_filepath: Optional[str | Path] = None,
+    boundary_rxns_filepath: str | Path | None = None,
+    exclude_rxns_filepath: str | Path | None = None,
+    force_rxns_filepath: str | Path | None = None,
     algorithm: Algorithm = Algorithm.GIMME,
     low_threshold: float = -5,
     high_threshold: float = -3,
-    solver: Solver = Solver.GLPK,
-    output_filetypes: list[str] = None,
+    solver: _Solver = _Solver.GLPK,
+    output_filetypes: list[str] | None = None,
 ):
     if not reference_model.exists():
         raise FileNotFoundError(f"Reference model not found at {reference_model}")
@@ -627,7 +617,7 @@ def create_context_specific_model(
     if algorithm not in Algorithm:
         raise ValueError(f"Algorithm {algorithm} not supported. Please use one of: GIMME, FASTCORE, or IMAT")
 
-    if solver not in Solver:
+    if solver not in _Solver:
         raise ValueError(f"Solver '{solver}' not supported. Use 'GLPK' or 'GUROBI'")
 
     if boundary_rxns_filepath:
@@ -650,7 +640,7 @@ def create_context_specific_model(
         force_rxns = df["abbreviation"].tolist()
 
     logger.info(f"Creating '{context_name}' model using '{algorithm.value}' reconstruction and '{solver.value}' solver")
-    build_results: BuildResults = _build_model(
+    build_results: _BuildResults = _build_model(
         context_name=context_name,
         general_model_file=reference_model,
         gene_expression_file=genes_file,
@@ -667,10 +657,14 @@ def create_context_specific_model(
     )
 
     config = Config()
-    build_results.infeasible_reactions.to_csv(config.result_dir / context_name / f"{context_name}_infeasible_rxns.csv", index=False)
+    build_results.infeasible_reactions.to_csv(
+        config.result_dir / context_name / f"{context_name}_infeasible_rxns.csv", index=False
+    )
 
     if algorithm == Algorithm.FASTCORE:
-        pd.DataFrame(build_results.expression_index_list).to_csv(config.result_dir / context_name / f"{context_name}_core_rxns.csv", index=False)
+        pd.DataFrame(build_results.expression_index_list).to_csv(
+            config.result_dir / context_name / f"{context_name}_core_rxns.csv", index=False
+        )
 
     output_directory = config.result_dir / context_name
     _write_model_to_disk(
@@ -685,10 +679,9 @@ def create_context_specific_model(
     logger.info(f"Number of Genes: {len(build_results.model.genes):,}")
     logger.info(f"Number of Metabolites: {len(build_results.model.metabolites):,}")
     logger.info(f"Number of Reactions: {len(build_results.model.reactions):,}")
-    logger.info("\nModel successfully created!")
 
 
-def parse_args():
+def _parse_args():
     parser = argparse.ArgumentParser(
         prog="create_context_specific_model.py",
         description="Seed a context-specific model from a list of expressed genes, a reference",
@@ -815,13 +808,13 @@ def parse_args():
     )
     args = parser.parse_args()
     args.output_filetypes = stringlist_to_list(args.output_filetypes)
-    args.solver = Solver.from_string(args.solver)  # type: ignore
+    args.solver = _Solver.from_string(args.solver)  # type: ignore
     args.recon_algorithm = Algorithm.from_string(args.recon_algorithm)  # type: ignore
     return _Arguments(**vars(args))
 
 
 if __name__ == "__main__":
-    args = parse_args()
+    args = _parse_args()
     create_context_specific_model(
         context_name=args.context_name,
         reference_model=args.reference_model,
