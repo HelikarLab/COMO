@@ -120,7 +120,7 @@ def _load_rnaseq_tests(filename, context_name, prep_method: RNASeqPreparationMet
                 f"Unsupported RNA-seq library type: {prep_method.value}. Must be an option defined in 'RNASeqPreparationMethod'."
             )
 
-    save_filepath = config.result_dir / context_name / prep_method / filename
+    save_filepath = config.result_dir / context_name / prep_method.value / filename
     if save_filepath.exists():
         data = pd.read_csv(save_filepath, index_col="entrez_gene_id")
         return context_name, data
@@ -266,7 +266,7 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
         transcriptomic_df: pd.DataFrame = merged_df.copy()
 
     biodbnet = BioDBNet()
-    gene_details: pd.DataFrame = await biodbnet.db2db(
+    gene_details: pd.DataFrame = await biodbnet.async_db2db(
         values=transcriptomic_df.index.astype(str).values.tolist(),
         input_db=Input.GENE_ID,
         output_db=[
