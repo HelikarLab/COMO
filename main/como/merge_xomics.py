@@ -80,19 +80,21 @@ class _Arguments:
         if self.expression_requirement.isdigit():
             self.expression_requirement = int(self.expression_requirement)
             if self.expression_requirement < 1:
-                logger.warning(f"Expression requirement should be at least 1, setting to 1 now. Got {self.expression_requirement}")
+                logger.warning(
+                    f"Expression requirement should be at least 1, setting to 1 now. Got {self.expression_requirement}"
+                )
                 self.expression_requirement = 1
         elif self.expression_requirement != "default":
-            raise ValueError(f"Expression requirement should be an integer or 'default', got {self.expression_requirement}")
+            raise ValueError(
+                f"Expression requirement should be an integer or 'default', got {self.expression_requirement}"
+            )
 
         if self.adjustment_method.value.lower() not in ["progressive", "regressive", "flat", "custom"]:
             raise ValueError("Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'")
 
 
 def _load_rnaseq_tests(filename, context_name, prep_method: RNASeqPreparationMethod) -> tuple[str, pd.DataFrame]:
-    """
-    Load rnaseq results returning a dictionary of test (context, context, cell, etc ) names and rnaseq expression data
-    """
+    """Load rnaseq results returning a dictionary of test (context, context, cell, etc ) names and rnaseq expression data"""
     config = Config()
 
     def load_dummy_dict():
@@ -114,7 +116,9 @@ def _load_rnaseq_tests(filename, context_name, prep_method: RNASeqPreparationMet
         case RNASeqPreparationMethod.SCRNA:
             filename = f"rnaseq_scrna_{context_name}.csv"
         case _:
-            raise ValueError(f"Unsupported RNA-seq library type: {prep_method.value}. Must be an option defined in 'RNASeqPreparationMethod'.")
+            raise ValueError(
+                f"Unsupported RNA-seq library type: {prep_method.value}. Must be an option defined in 'RNASeqPreparationMethod'."
+            )
 
     save_filepath = config.result_dir / context_name / prep_method / filename
     if save_filepath.exists():
@@ -130,8 +134,7 @@ def _load_rnaseq_tests(filename, context_name, prep_method: RNASeqPreparationMet
 
 # Merge Output
 def _merge_logical_table(df: pd.DataFrame):
-    """
-    Merge the Rows of Logical Table belongs to the same entrez_gene_id
+    """Merge the Rows of Logical Table belongs to the same entrez_gene_id
     :param df:
     :return: pandas dataframe of merged table
     """
@@ -141,9 +144,13 @@ def _merge_logical_table(df: pd.DataFrame):
     df.dropna(axis=0, subset=["entrez_gene_id"], inplace=True)
     df["entrez_gene_id"] = df["entrez_gene_id"].astype(str).str.replace(" /// ", "//").astype(str)
 
-    single_entrez_ids: list[str] = df[~df["entrez_gene_id"].str.contains("//")]["entrez_gene_id"].tolist()
-    multiple_entrez_ids: list[str] = df[df["entrez_gene_id"].str.contains("//")]["entrez_gene_id"].tolist()
-    id_list: list[str] = []
+    id_list: list[str] = df.loc[
+        ~df["entrez_gene_id"].str.contains("//"), "entrez_gene_id"
+    ].tolist()  # Collect "single" ids, like "123"
+    multiple_entrez_ids: list[str] = df.loc[
+        df["entrez_gene_id"].str.contains("//"), "entrez_gene_id"
+    ].tolist()  # Collect "double" ids, like "123//456"
+
     for i in multiple_entrez_ids:
         ids = i.split("//")
         id_list.extend(ids)
@@ -205,8 +212,7 @@ def _merge_logical_table(df: pd.DataFrame):
 
 
 async def _get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    This function will get the following details of transcriptomic data:
+    """This function will get the following details of transcriptomic data:
     - Gene Symbol
     - Gene Name
     - entrez_gene_id
@@ -281,7 +287,8 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
     ]
 
     gene_details["gene_info_type"] = [
-        i.group(1) if isinstance(i, re.Match) else "None" for i in gene_details["Gene Info"].apply(lambda x: re.search(r"\[Gene Type: (.*)\]", x))
+        i.group(1) if isinstance(i, re.Match) else "None"
+        for i in gene_details["Gene Info"].apply(lambda x: re.search(r"\[Gene Type: (.*)\]", x))
     ]
     gene_details["ensembl_info_type"] = [
         i.group(1) if isinstance(i, re.Match) else "None"
@@ -324,9 +331,7 @@ async def _merge_xomics(
     no_hc=False,
     no_na=False,
 ):
-    """
-    Merges rnaseq and/or proteomics active gene logicals from outputs of their respective "_gen.py"
-    scripts.
+    """Merge rnaseq and/or proteomics active genes.
 
     :param proteomics_file: filename of proteomics config file in /main/data/config_sheets/
     :param trnaseq_file: filename of Total RNA-seq config file in /main/data/config_sheets/
@@ -341,9 +346,15 @@ async def _merge_xomics(
     config = Config()
     logger.info(f"Merging data for {context_name}")
     # load data for each source if it exists. IF not load an empty dummy dataset
-    trnaseq = _load_rnaseq_tests(filename=trnaseq_file, context_name=context_name, prep_method=RNASeqPreparationMethod.TOTAL)
-    mrnaseq = _load_rnaseq_tests(filename=mrnaseq_file, context_name=context_name, prep_method=RNASeqPreparationMethod.MRNA)
-    scrnaseq = _load_rnaseq_tests(filename=scrnaseq_file, context_name=context_name, prep_method=RNASeqPreparationMethod.SCRNA)
+    trnaseq = _load_rnaseq_tests(
+        filename=trnaseq_file, context_name=context_name, prep_method=RNASeqPreparationMethod.TOTAL
+    )
+    mrnaseq = _load_rnaseq_tests(
+        filename=mrnaseq_file, context_name=context_name, prep_method=RNASeqPreparationMethod.MRNA
+    )
+    scrnaseq = _load_rnaseq_tests(
+        filename=scrnaseq_file, context_name=context_name, prep_method=RNASeqPreparationMethod.SCRNA
+    )
     proteomics = proteomics_gen.load_proteomics_tests(filename=proteomics_file, context_name=context_name)
 
     expression_list = []
@@ -403,7 +414,10 @@ async def _merge_xomics(
         merge_data = prote_data if merge_data is None else merge_data.join(prote_data, how="outer")
 
     if merge_data is None:
-        raise ValueError(f"No data is available to be merged")
+        logger.critical(
+            f"No data is available for the '{context_name}' context. If this is intentional, ignore this error."
+        )
+        return {}
     merge_data = _merge_logical_table(merge_data)
 
     num_sources = len(expression_list)
@@ -417,7 +431,9 @@ async def _merge_xomics(
         )
     else:  # subtract one from requirement per NA
         merge_data.loc[:, "Required"] = merge_data[expression_list].apply(
-            lambda x: expression_requirement - (num_sources - x.count()) if (expression_requirement - (num_sources - x.count()) > 0) else 1,
+            lambda x: expression_requirement - (num_sources - x.count())
+            if (expression_requirement - (num_sources - x.count()) > 0)
+            else 1,
             axis=1,
         )
 
@@ -467,9 +483,7 @@ async def _handle_context_batch(
     merge_distro,
     keep_gene_score,
 ):
-    """
-    Handle merging of different data sources for each context type
-    """
+    """Handle merging of different data sources for each context type"""
     if all(file is None for file in [trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file]):
         raise ValueError("No configuration file was passed!")
 
@@ -530,7 +544,7 @@ async def _handle_context_batch(
 
         if exp_req > num_sources:
             logger.warning(
-                f"Expression requirement for {context_name} was calculated to be greater than max number of input data sources."
+                f"Expression requirement for {context_name} was calculated to be greater than max number of input data sources. "
                 f"Will be force changed to {num_sources} to prevent output from having 0 active genes. "
                 f"Consider lowering the expression requirement or changing the adjustment method."
             )
@@ -559,7 +573,7 @@ async def _handle_context_batch(
     files_json = config.result_dir / "step1_results_files.json"
     files_json.parent.mkdir(parents=True, exist_ok=True)
     with open(files_json.as_posix(), "w") as fp:
-        json.dump(dict_list, fp)
+        json.dump(dict_list, fp)  # type: ignore
 
     return
 
@@ -623,8 +637,8 @@ async def merge_xomics(
 
 
 def _parse_args() -> _Arguments:
-    """
-    Merge expression tables of multiple sources, (RNA-seq, proteomics) into one list
+    """Merge expression tables of multiple sources, (RNA-seq, proteomics) into one list.
+
     User can specify the number of sources with an active gene in order for it to be considered active in the model.
     Otherwise, it defaults to the number of sources provided. High-confidence genes from any source will be considered
     active in the model, regardless of agreement with other sources.
@@ -708,7 +722,7 @@ def _parse_args() -> _Arguments:
         required=False,
         default=None,
         dest="expression_requirement",
-        help="Number of sources with active gene for it to be considered active even if it is not a " "high confidence-gene",
+        help="Number of sources with active gene for it to be considered active even if it is not a high confidence-gene",
     )
 
     parser.add_argument(
@@ -718,7 +732,7 @@ def _parse_args() -> _Arguments:
         required=False,
         default="flat",
         dest="adjustment_method",
-        help="Technique to adjust expression requirement based on differences in number of provided " "data source types.",
+        help="Technique to adjust expression requirement based on differences in number of provided data source types.",
     )
 
     parser.add_argument(
@@ -737,7 +751,7 @@ def _parse_args() -> _Arguments:
         required=False,
         default=False,
         dest="no_high_confidence",
-        help="Flag to prevent high-confidence genes forcing a gene to be used in final model " "irrespective of other other data sources",
+        help="Flag to prevent high-confidence genes forcing a gene to be used in final model irrespective of other other data sources",
     )
 
     parser.add_argument(
@@ -791,7 +805,7 @@ def _parse_args() -> _Arguments:
         help="Proteomics weight for merging z-score distribution",
     )
     args = parser.parse_args()
-    args.adjustment_method = AdjustmentMethod.from_string(args.adjustment_method)
+    args.adjustment_method = AdjustmentMethod.from_string(str(args.adjustment_method))
     return _Arguments(**vars(args))
 
 
