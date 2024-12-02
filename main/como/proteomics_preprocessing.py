@@ -2,12 +2,14 @@ import colorsys
 import random
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Union
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
+from project import Config
 from scipy import stats
 from scipy.signal import find_peaks
 from sklearn.neighbors import KernelDensity
@@ -30,16 +32,24 @@ def z_score_calc(abundance: pd.DataFrame, min_thresh: int) -> ZResult:
 
     # np.zeros((1000, len(abundance.columns)), dtype=np.float64),
     z_result = ZResult(
-        zfpkm=pd.DataFrame(data=np.nan * np.ones_like(values), index=abundance.index, columns=abundance.columns, dtype=np.float64),
-        x_range=pd.DataFrame(data=np.zeros((1000, len(abundance.columns))), columns=abundance.columns, dtype=np.float64),
-        density=pd.DataFrame(data=np.zeros((1000, len(abundance.columns))), columns=abundance.columns, dtype=np.float64),
+        zfpkm=pd.DataFrame(
+            data=np.nan * np.ones_like(values), index=abundance.index, columns=abundance.columns, dtype=np.float64
+        ),
+        x_range=pd.DataFrame(
+            data=np.zeros((1000, len(abundance.columns))), columns=abundance.columns, dtype=np.float64
+        ),
+        density=pd.DataFrame(
+            data=np.zeros((1000, len(abundance.columns))), columns=abundance.columns, dtype=np.float64
+        ),
         mu=np.zeros(len(abundance.columns)),
         std_dev=np.zeros(len(abundance.columns)),
         max_fpkm_peak=np.zeros(len(abundance.columns)),
     )
 
     for i, col in enumerate(abundance.columns):
-        kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=0.5).fit(log_abundance_filt[:, i].reshape(-1, 1))  # type: ignore
+        kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=0.5).fit(
+            log_abundance_filt[:, i].reshape(-1, 1)
+        )  # type: ignore
         x_range = np.linspace(log_abundance[:, i].min(), log_abundance[:, i].max(), 1000)
         density = np.exp(kde.score_samples(x_range.reshape(-1, 1)))
         peaks, _ = find_peaks(density, height=0.02, distance=1.0)
@@ -84,7 +94,9 @@ def plot_gaussian_fit(z_results: ZResult, facet_titles: bool = True, x_min: int 
     std_dev = z_results.std_dev
     max_fpkm = z_results.max_fpkm_peak
 
-    fig = make_subplots(rows=len(zfpkm.columns), cols=1, subplot_titles=zfpkm.columns if facet_titles else [None] * len(zfpkm.columns))
+    fig = make_subplots(
+        rows=len(zfpkm.columns), cols=1, subplot_titles=zfpkm.columns if facet_titles else [None] * len(zfpkm.columns)
+    )
     for i, col in enumerate(zfpkm.columns):
         fitted = stats.norm.pdf(x_range[col], loc=mu[i], scale=std_dev[i])
         scale_fit = fitted * (max_fpkm[i] / fitted.max())
@@ -94,8 +106,16 @@ def plot_gaussian_fit(z_results: ZResult, facet_titles: bool = True, x_min: int 
         g = random.randint(0, 255)
         b = random.randint(0, 255)
         color, lighten = f"rgb({r},{g},{b})", lighten_color(r, g, b)
-        fig.add_trace(go.Scatter(x=x_range[col], y=density[col], name="Abundance Density", line=dict(color=color)), row=i + 1, col=1)
-        fig.add_trace(go.Scatter(x=x_range[col], y=scale_fit, name="Fitted Gaussian", line=dict(dash="dash", color=lighten)), row=i + 1, col=1)
+        fig.add_trace(
+            go.Scatter(x=x_range[col], y=density[col], name="Abundance Density", line=dict(color=color)),
+            row=i + 1,
+            col=1,
+        )
+        fig.add_trace(
+            go.Scatter(x=x_range[col], y=scale_fit, name="Fitted Gaussian", line=dict(dash="dash", color=lighten)),
+            row=i + 1,
+            col=1,
+        )
 
         fig.update_xaxes(title_text="log2(abundance)", range=[x_min, x_range[col].max()], row=i + 1, col=1)
         fig.update_yaxes(title_text="[scaled] density", row=i + 1, col=1)
@@ -105,19 +125,48 @@ def plot_gaussian_fit(z_results: ZResult, facet_titles: bool = True, x_min: int 
 
 
 # Main function for protein abundance transformation
-def protein_transform_main(abundance_df: pd.DataFrame | str | Path, out_dir: str | Path, group_name: str):
-    output_figure_directory = Path(out_dir / "figures")
+def protein_transform_main(
+    abundance_df: Union[pd.DataFrame, str, Path], out_dir: Union[str, Path], group_name: str, config: Config
+) -> None:
+    output_figure_directory = config.get_output_path(out_dir) / "figures"
     output_figure_directory.mkdir(parents=True, exist_ok=True)
 
-    abundance_df: pd.DataFrame = pd.read_csv(abundance_df) if isinstance(abundance_df, (str, Path)) else abundance_df.fillna(0)
+    abundance_df: pd.DataFrame = (
+        pd.read_csv(abundance_df) if isinstance(abundance_df, (str, Path)) else abundance_df.fillna(0)
+    )
     abundance_df = abundance_df[np.isfinite(abundance_df).all(axis=1)]  # Remove +/- infinity values
     z_transform: ZResult = z_score_calc(abundance_df, min_thresh=0)
 
     fig = plot_gaussian_fit(z_results=z_transform, facet_titles=True, x_min=-4)
-    fig.write_image(out_dir / "gaussian_fit.png")
-    fig.write_html(out_dir / "gaussian_fit.html")
-    print(f"Wrote iamge to {out_dir / 'gaussian_fit.png'}")
+    fig.write_image(config.get_output_path(out_dir) / "gaussian_fit.png")
+    fig.write_html(config.get_output_path(out_dir) / "gaussian_fit.html")
+    print(f"Wrote image to {config.get_output_path(out_dir) / 'gaussian_fit.png'}")
 
     z_transformed_abundances = z_transform.zfpkm
     z_transformed_abundances[abundance_df == 0] = -4
-    z_transformed_abundances.to_csv(out_dir / f"protein_zscore_Matrix_{group_name}.csv", index=False)
+    z_transformed_abundances.to_csv(
+        config.get_output_path(out_dir) / f"protein_zscore_Matrix_{group_name}.csv", index=False
+    )
+
+
+def process_proteomics_data(context_name: str, config: Config) -> None:
+    """Process proteomics data for a given context"""
+    # Get paths using Config methods
+    context_path = config.get_context_path(context_name)
+    proteomics_path = context_path / "proteomics"
+    proteomics_path.mkdir(parents=True, exist_ok=True)
+
+    # Initialize R interface with config
+    r_script = config.code_dir / "rscripts" / "protein_transform.R"
+    protein_transform = rpy2_api.Rpy2(r_file_path=r_script, config=config)
+
+    # Process abundance matrix
+    abundance_matrix = config.get_matrix_path(context_name, f"protein_abundance_matrix_{context_name}.csv")
+    if not abundance_matrix.exists():
+        logger.error(f"Abundance matrix not found at {abundance_matrix}")
+        return
+
+    # Call R function with proper paths
+    protein_transform.call_function("protein_transform_main", str(abundance_matrix), str(proteomics_path), context_name)
+
+    logger.success(f"Proteomics data processed for {context_name}")
