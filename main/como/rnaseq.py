@@ -406,9 +406,55 @@ def zfpkm_transform(
     update_per_step: int = int(total * update_every_percent)
     kernel = KernelDensity(kernel="gaussian", bandwidth=bandwidth)
     results = {}
-    for col in fpkm_df.columns:
-        results[col] = calc(fpkm_df[col], name=col, bandwidth=bandwidth, peak_parameters=peak_parameters)
-        zfpkm_df[col] = results[col].zfpkm
+    zfpkm_df = pd.DataFrame(data=0, index=fpkm_df.index, columns=fpkm_df.columns)
+    if len(fpkm_df.columns) < 100:
+        logger.debug(f"Processing {total} through zFPKM transform sequentially")
+        for col in fpkm_df.columns:
+            results[col] = _zfpkm_calculation(
+                fpkm_df[col],
+                kernel=kernel,
+                peak_parameters=peak_parameters,
+            )
+
+            zfpkm_df[col] = results[col].zfpkm
+    else:
+        cores = multiprocessing.cpu_count() - 2
+        log_padding = len(str(f"{total:,}"))
+        logger.debug(f"Processing {total:,} samples through zFPKM transform using {cores} cores")
+        logger.debug(
+            f"Will update every {update_per_step:,} steps as this is approximately "
+            f"{update_every_percent:.1%} of {total:,}"
+        )
+
+        with Pool(processes=cores) as pool:
+            chunksize = int(math.ceil(len(fpkm_df.columns) / (4 * cores)))
+            partial_func = partial(_zfpkm_calculation, kernel=kernel, peak_parameters=peak_parameters)
+            chunk_time = time.time()
+            start_time = time.time()
+
+            result: _ZFPKMResult
+            for i, result in enumerate(
+                pool.imap(
+                    partial_func,
+                    (fpkm_df[col] for col in fpkm_df.columns),
+                    chunksize=chunksize,
+                )
+            ):
+                results[result.zfpkm.name] = result
+                zfpkm_df[result.zfpkm.name] = result.zfpkm
+
+                # show updates every X% and at the end, but skip on first iteration
+                if (i % update_per_step == 0 or i == total) and i != 0:
+                    current_time = time.time()
+                    chunk = current_time - chunk_time
+                    total_time = current_time - start_time
+                    formatted = f"{i:,}"
+                    logger.debug(
+                        f"Processed {formatted:>{log_padding}} of {total:,} - "
+                        f"chunk took {chunk:.1f} seconds - "
+                        f"running for {total_time:.1f} seconds"
+                    )
+                    chunk_time = current_time
 
     return results, zfpkm_df
 
