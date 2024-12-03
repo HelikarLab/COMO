@@ -34,11 +34,16 @@ select = [
 ]
 ignore = [
     "D100",     # allow undocumented public module definitions
+    "D203",     # do not require one blank line before class docstring
+    "D213",     # first docstring line should be on the second line
     "TRY003",   # allow exception messages outside the `Exception` class
     "F401",     # allow unused imports
 ]
 
 [lint.per-file-ignores]
 "tests/*" = [
+    "D101",     # allow undocumented public class
+    "D102",     # allow undocumented class method
+    "D103",     # allow undocumented public method definitions
     "S101",     # allow use of `assert` in test files
 ]

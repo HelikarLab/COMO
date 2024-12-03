@@ -1,6 +1,7 @@
 import sys
 
 import pytest
+from como import rnaseq_preprocess
 
 
 # Define a list of arguments to test
@@ -24,16 +25,13 @@ import pytest
     ],
 )
 def test_arg_input(args: list[str]):
-    """
-    This function asserts that the arguments passed into the function are correct
-    """
+    """Asserts that the arguments passed into the function are correct."""
     context_names = args[1]
     gene_format = args[3]
     taxon_id = args[5]
     matrix_mode = args[6]
 
     sys.argv = args
-    print(sys.argv)
     parsed = rnaseq_preprocess._parse_args()
 
     assert [context_name in parsed.context_names for context_name in context_names.split()]
