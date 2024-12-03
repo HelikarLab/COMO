@@ -72,7 +72,9 @@ class FileInformation:
             self.sqt_base_path: Path = sqt_path.parent
 
         if intensity_csv is None:
-            self.intensity_csv: Path = Path(project.configs.data_dir, "data_matrices", cell_type, f"protein_abundance_matrix_{cell_type}.csv")
+            self.intensity_csv: Path = Path(
+                project.configs.data_dir, "data_matrices", cell_type, f"protein_abundance_matrix_{cell_type}.csv"
+            )
         else:
             self.intensity_csv: Path = intensity_csv
 

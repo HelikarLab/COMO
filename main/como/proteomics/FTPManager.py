@@ -17,7 +17,9 @@ import aioftp
 from .FileInformation import FileInformation, clear_print
 
 
-async def aioftp_client(host: str, username: str = "anonymous", password: str = "guest", port: int = 21, max_attempts: int = 3) -> aioftp.Client:
+async def aioftp_client(
+    host: str, username: str = "anonymous", password: str = "guest", port: int = 21, max_attempts: int = 3
+) -> aioftp.Client:
     """
     This class is responsible for creating a "client" connection
     """
@@ -49,7 +51,13 @@ async def aioftp_client(host: str, username: str = "anonymous", password: str = 
 
 class Reader:
     def __init__(
-        self, root_link: str, file_extensions: list[str], max_attempts: int = 3, port: int = 21, user: str = "anonymous", passwd: str = "guest"
+        self,
+        root_link: str,
+        file_extensions: list[str],
+        max_attempts: int = 3,
+        port: int = 21,
+        user: str = "anonymous",
+        passwd: str = "guest",
     ) -> None:
         """
         This class is responsible for reading data about root FTP links
