@@ -1,7 +1,7 @@
 [project]
 name = "COMO"
 dynamic = ["version"]
-requires-python = ">=3.10,<3.11"
+requires-python = ">=3.9,<4"
 dependencies = [
     #    "cobamp>=0.2.1",
     "cobra>=0.28.0",
