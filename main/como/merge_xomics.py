@@ -19,7 +19,8 @@ from fast_bioservices import BioDBNet, Input, Output
 from loguru import logger
 
 from como import proteomics_gen, return_placeholder_data
-from como.combine_distributions import combine_zscores_main
+from como.combine_distributions import _combine_zscores
+from como.custom_types import RNASeqPreparationMethod
 from como.project import Config
 from como.utils import split_gene_expression_data
 
@@ -511,9 +512,9 @@ async def _handle_context_batch(
     max_inputs = max(counts.values())
     min_inputs = min(counts.values())
 
-    if merge_distro:
-        logger.debug(f"Using {merge_distro} distribution for merging")
-        combine_zscores_main(
+    if merge_zfpkm_distribution:
+        logger.debug("Using zFPKM distribution for merging")
+        _combine_zscores(
             working_dir=config.result_dir.as_posix(),
             context_names=sheet_names,
             global_use_mrna=use_mrna,
