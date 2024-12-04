@@ -78,7 +78,7 @@ def _merge_batch(wd, context, batch):
             title=f"Z-score Distribution for {context} - {Path(f).stem}",
         )
 
-        fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font=dict(family="sans-serif", size=12))
+        fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font={"family": "sans-serif", "size": 12})
 
         # Simplified plot for many sources (optional)
         if len(stack_df["source"].unique()) > 10:
@@ -127,7 +127,7 @@ def _combine_batch_zdistro(wd, context, batch, zmat):
             marginal="rug",
             title=f"Combined Z-score Distribution for {context} - {batch}",
         )
-        fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font=dict(family="sans-serif", size=12))
+        fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font={"family": "sans-serif", "size": 12})
         fig.write_image(plot_name_png)
 
     return combine_z
@@ -173,7 +173,7 @@ def _combine_context_zdistro(wd, context, n_reps, zmat):
             title=f"Combined Batches Z-score Distribution for {context}",
         )
 
-        fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font=dict(family="sans-serif", size=12))
+        fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font=dict(family="sans-serif", size=12))  # noqa: C408
 
         fig.write_image(plot_name_png)
 
@@ -275,14 +275,14 @@ def _combine_omics_zdistros(
         title=f"Combined Omics Z-score Distribution for {context}",
     )
 
-    fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font=dict(family="sans-serif", size=12))
+    fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font={"family": "sans-serif", "size": 12})
 
     fig.write_image(plot_name_png)
 
     return combine_z
 
 
-def _combine_zscores(
+def _combine_zscores(  # noqa: C901
     working_dir,
     context_names,
     global_use_mrna,

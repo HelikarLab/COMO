@@ -464,7 +464,7 @@ async def _merge_xomics(
     return files_dict
 
 
-async def _handle_context_batch(
+async def _handle_context_batch(  # noqa: C901
     trnaseq_file: Path | None,
     mrnaseq_file: Path | None,
     scrnaseq_file: Path | None,
@@ -540,8 +540,9 @@ async def _handle_context_batch(
 
         if adjusted_expression_requirement != expression_requirement:
             logger.debug(
-                f"Expression requirement of '{expression_requirement}' adjusted to '{adjusted_expression_requirement}' using "
-                f"'{adjust_method.value}' adjustment method for '{context_name}'."
+                f"Expression requirement of '{expression_requirement}' adjusted to "
+                f"'{adjusted_expression_requirement}' using '{adjust_method.value}' adjustment method "
+                f"for '{context_name}'."
             )
 
         if adjusted_expression_requirement > num_sources:

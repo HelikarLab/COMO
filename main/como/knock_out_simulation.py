@@ -1,3 +1,5 @@
+# ruff: noqa
+
 import argparse
 import os
 import re
@@ -31,9 +33,7 @@ def _perform_knockout(
     gene_id: str,
     reference_solution,
 ) -> tuple[str, pd.Series]:
-    """
-    This function will perform a single gene knockout. It will be used in multiprocessing
-    """
+    """This function will perform a single gene knockout. It will be used in multiprocessing"""
     with model:
         gene: cobra.Gene = model.genes.get_by_id(gene_id)
         gene.knock_out()
