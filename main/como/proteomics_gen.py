@@ -206,7 +206,6 @@ async def proteomics_gen(
 
 
 def _main():
-
     parser = argparse.ArgumentParser(
         prog="proteomics_gen.py",
         description="Description goes here",
