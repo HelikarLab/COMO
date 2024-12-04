@@ -139,7 +139,7 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
     return stringlist
 
 
-def split_gene_expression_data(expression_data: pd.DataFrame, recon_algorithm: Algorithm):
+def split_gene_expression_data(expression_data: pd.DataFrame, recon_algorithm: Algorithm | None = None):
     """Split the gene expression data into single-gene and multiple-gene names.
 
     :param expression_data: The gene expression data to map
