@@ -476,11 +476,9 @@ async def _create_gene_info_file(
     matrix_files: list[Path],
     taxon_id,
     config: Config,
-    input_format: Input | str,
     cache: bool,
 ):
     """Create gene info file for specified context by reading first column in its count matrix file."""
-    biodbnet = BioDBNet(cache=True)
     logger.info("Fetching gene info")
     genes = set()
     for file in matrix_files:
@@ -497,7 +495,7 @@ async def _create_gene_info_file(
     )
     gene_info: pd.DataFrame = pd.DataFrame(
         data=None,
-        columns=pd.Index(data=["ensembl_gene_id", "hgnc_symbol", "entrez_gene_id", "start_position", "end_position"]),
+        columns=pd.Index(data=["ensembl_gene_id", "gene_symbol", "entrez_gene_id", "start_position", "end_position"]),
         index=pd.Index(data=range(len(gene_data))),
     )
     for i, data in enumerate(gene_data):
@@ -512,14 +510,14 @@ async def _create_gene_info_file(
         if isinstance(end_pos, list):
             end_pos = sum(end_pos) / len(end_pos)
 
-        gene_info.at[i, "hgnc_symbol"] = data.get("symbol", "-")
+        gene_info.at[i, "gene_symbol"] = data.get("symbol", "-")
         gene_info.at[i, "entrez_gene_id"] = data.get("entrezgene", "-")
         gene_info.at[i, "ensembl_gene_id"] = ensembl_ids
         gene_info.at[i, "start_position"] = start_pos
         gene_info.at[i, "end_position"] = end_pos
 
     gene_info = gene_info[
-        (gene_info["entrez_gene_id"] != "-") & (gene_info["ensembl_gene_id"] != "-") & (gene_info["hgnc_symbol"] != "-")
+        (gene_info["entrez_gene_id"] != "-") & (gene_info["ensembl_gene_id"] != "-") & (gene_info["gene_symbol"] != "-")
     ]
     gene_info["size"] = gene_info["end_position"].astype(int) - gene_info["start_position"].astype(int)
     gene_info.drop(columns=["start_position", "end_position"], inplace=True)
@@ -534,7 +532,6 @@ async def _handle_context_batch(
     taxon_id,
     provided_matrix_file,
     config: Config,
-    input_format: Input | str,
     cache: bool,
 ):
     """Handle iteration through each context type and create appropriate files."""
@@ -600,7 +597,6 @@ async def _handle_context_batch(
                 matrix_files=tmatrix_files + mmatrix_files,
                 taxon_id=taxon_id,
                 config=config,
-                input_format=input_format,
                 cache=cache,
             )
         case "provide":
@@ -609,7 +605,6 @@ async def _handle_context_batch(
                 matrix_files=matrix_files,
                 taxon_id=taxon_id,
                 config=config,
-                input_format=input_format,
                 cache=cache,
             )
         case _:
@@ -637,16 +632,12 @@ async def rnaseq_preprocess(
     if not isinstance(taxon_id, int) and taxon_id not in ["human", "mouse"]:
         raise ValueError("taxon_id must be either an integer, or accepted string ('mouse', 'human')")
 
-    if isinstance(input_format, str):
-        input_format = Input.from_string(input_format)
-
     await _handle_context_batch(
         context_names=context_names,
         mode=mode,
         taxon_id=taxon_id,
         provided_matrix_file=Path(matrix_file if matrix_file is not None else "").as_posix(),
         config=config,
-        input_format=input_format,
         cache=cache,
     )
 
