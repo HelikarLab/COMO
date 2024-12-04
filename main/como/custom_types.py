@@ -8,6 +8,7 @@ class RNASeqPreparationMethod(Enum):
 
     @staticmethod
     def from_string(value: str) -> "RNASeqPreparationMethod":
+        """Build a preparation method object from a string."""
         match_value = "".join(c for c in value if c.isascii()).lower()
 
         match match_value:

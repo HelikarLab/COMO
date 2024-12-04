@@ -10,7 +10,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 import scanpy as sc
-from fast_bioservices import BioDBNet, Input, Taxon
+from fast_bioservices import Input, Taxon
 from fast_bioservices.biothings.mygene import MyGene
 from loguru import logger
 
@@ -280,7 +280,7 @@ async def _create_counts_matrix(context_name: str, config: Config):
     logger.success(f"Wrote gene count matrix for '{data_dir.stem}' at '{output_filename}'")
 
 
-async def _create_config_df(context_name: str) -> pd.DataFrame:
+async def _create_config_df(context_name: str) -> pd.DataFrame:  # noqa: C901
     """Create configuration sheet.
 
     The configuration file created is based on the gene counts matrix.
@@ -327,7 +327,7 @@ async def _create_config_df(context_name: str) -> pd.DataFrame:
 
                 for r in runs:
                     r_label = re.findall(r"r\d{1,3}", r.as_posix())[0]
-                    R_label = re.findall(r"R\d{1,3}", r.as_posix())[0]
+                    R_label = re.findall(r"R\d{1,3}", r.as_posix())[0]  # noqa: N806
                     frag_filename = "".join([context_name, "_", study_number, R_label, r_label, "_fragment_size.txt"])
                     frag_files.append(
                         config.data_dir / "COMO_input" / context_name / "fragmentSizes" / study_number / frag_filename
@@ -526,7 +526,7 @@ async def _create_gene_info_file(
     logger.success(f"Gene Info file written at '{output_filepath}'")
 
 
-async def _handle_context_batch(
+async def _handle_context_batch(  # noqa: C901
     context_names: list[str],
     mode: Literal["create", "provide"],
     taxon_id,

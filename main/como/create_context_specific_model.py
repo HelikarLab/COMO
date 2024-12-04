@@ -234,15 +234,18 @@ def _feasibility_test(model_cobra: cobra.Model, step: str):
 
     if step == "before_seeding":
         logger.warning(
-            f"Under given boundary assumptions, there are {incon_rxns_cnt} infeasible reactions in the reference model. "
-            f"These reactions will not be considered active in context specific model construction. "
-            f"If any infeasible reactions are found to be active according to expression data, or are found in the force reactions list, they can be found found in 'InfeasibleRxns.csv'. "
-            f"It is normal for this value to be quite large; however, if many of these reactions are active "
-            f"according to your expression data, it is likely that you are missing some critical exchange (media) reactions."
+            f"Under given boundary assumptions, there are {incon_rxns_cnt} infeasible reactions in"
+            f" the reference model. These reactions will not be considered active in "
+            f"context specific model construction. If any infeasible reactions are found to be "
+            f"active according to expression data, or are found in the force reactions list, "
+            f"they can be found found in 'InfeasibleRxns.csv'. It is normal for this value to be quite large; "
+            f"however, if many of these reactions are active according to your expression data, "
+            f"it is likely that you are missing some critical exchange (media) reactions."
         )
     elif step == "after_seeding":
         logger.warning(
-            f"Under given boundary assumptions, with infeasible reactions from the general model not considered there are {incon_rxns_cnt} new infeasible reactions in the context-specific model. "
+            f"Under given boundary assumptions, with infeasible reactions from the general model not "
+            f"considered there are {incon_rxns_cnt} new infeasible reactions in the context-specific model. "
             f"These reactions will be removed from the output model to ensure the model is solvable. "
             f"Note that this value should be very low compared to the reference model."
         )
@@ -268,7 +271,7 @@ def _build_with_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector)
 
     context_cobra_model.remove_reactions(to_remove_ids, True)
     r_ids = [r.id for r in context_cobra_model.reactions]
-    psol = pfba(context_cobra_model)
+    psol = pfba(context_cobra_model)  # noqa: F841
     # psol = context_cobra_model.optimize()
     # to_remove_ids = [r_ids[r] for r in np.where(abs(psol.fluxes) < 1e-8)[0]]
     # context_cobra_model.remove_reactions(to_remove_ids, True)
@@ -308,7 +311,7 @@ def _build_with_imat(
 ) -> (cobra.Model, pd.DataFrame):
     expr_vector = np.array(expr_vector)
     properties = IMATProperties(exp_vector=expr_vector, exp_thresholds=expr_thesh, core=force_gene_ids, epsilon=0.01)
-    algorithm = IMAT(s_matrix, lb, ub, properties)
+    algorithm = IMAT(s_matrix, np.array(lb), np.array(ub), properties)
     context_rxns: npt.NDArray = algorithm.run()
     fluxes: pd.Series = algorithm.sol.to_series()
     context_cobra_model = cobra_model.copy()
@@ -328,7 +331,6 @@ def _build_with_imat(
 
 
 def _build_with_tinit(cobra_model: cobra.Model, s_matrix, lb, ub, expr_vector, solver, idx_force) -> Model:
-    expr_vector = np.array(expr_vector)
     properties = tINITProperties(
         reactions_scores=expr_vector,
         solver=solver,
@@ -394,7 +396,7 @@ def _map_expression_to_reaction(
     return expression_rxns, expr_vector
 
 
-def _build_model(
+def _build_model(  # noqa: C901
     context_name: str,
     general_model_file: Path,
     gene_expression_file: Path,
@@ -495,7 +497,7 @@ def _build_model(
 
     idx_obj = rx_names.index(objective)
     idx_force = [rx_names.index(rxn) for rxn in force_rxns if rxn in rx_names]
-    exp_idx_list = [i for (i, val) in enumerate(expr_vector) if val > 0]
+    exp_idx_list = [i for (i, val) in enumerate(expr_vector) if val > 0]  # type: ignore
     exp_thresh = (low_thresh, high_thresh)
 
     if recon_algorithm == Algorithm.GIMME:
@@ -555,7 +557,8 @@ def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
             "maximum reaction rate",
         ]:
             raise ValueError(
-                f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', 'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}"
+                f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', "
+                f"'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}"
             )
 
     reactions: list[str] = []
@@ -601,7 +604,7 @@ def _write_model_to_disk(
         cobra.io.save_json_model(model, output_directory / f"{context_name}_SpecificModel_{algorithm.value}.json")
 
 
-def create_context_specific_model(
+def create_context_specific_model(  # noqa: C901
     context_name: str,
     reference_model: Path,
     genes_file: Path,
@@ -615,6 +618,7 @@ def create_context_specific_model(
     solver: _Solver = _Solver.GLPK,
     output_filetypes: list[str] | None = None,
 ):
+    """Create a context-specific model using the provided data."""
     if not reference_model.exists():
         raise FileNotFoundError(f"Reference model not found at {reference_model}")
     if not genes_file.exists():
@@ -777,7 +781,8 @@ def _parse_args():
         type=str,
         default="GIMME",
         dest="recon_algorithm",
-        help="Algorithm used to seed context specific model to the Genome-scale model. Can be either GIMME, FASTCORE, iMAT, or tINIT.",
+        help="Algorithm used to seed context specific model to the Genome-scale model. "
+        "Can be either GIMME, FASTCORE, iMAT, or tINIT.",
     )
     parser.add_argument(
         "-lt",

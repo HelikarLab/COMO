@@ -1,5 +1,6 @@
-"""
-This will hold all relevant information about a single file to download
+# ruff: noqa
+
+"""This will hold all relevant information about a single file to download
 
 This should be implemented as a list of objects
 """
@@ -10,16 +11,11 @@ from pathlib import Path
 
 import pandas as pd
 
-# Add parent directory to path, allows us to import the "project.py" file from the parent directory
-# From: https://stackoverflow.com/a/30536516/13885200
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import project
+from como import project
 
 
 def clear_print(message: str, end: str = "\033[K\r", flush: bool = True) -> None:
-    """
-    Pass in your message exactly as you would like it printed, and this function will clear the screen and print it.
-    """
+    """Pass in your message exactly as you would like it printed, and this function will clear the screen and print it."""
     print(message, end=end, flush=flush)
 
 
@@ -99,9 +95,7 @@ class FileInformation:
         FileInformation.instances.append(self)
 
     def set_replicate(self, replicate: str | int):
-        """
-        This function sets self.replicate, and also resets values that use the "replicate" value before it is used
-        """
+        """This function sets self.replicate, and also resets values that use the "replicate" value before it is used"""
         # Set the initial replicate value
         if isinstance(replicate, str):
             self.replicate: str = replicate
@@ -128,16 +122,13 @@ class FileInformation:
 
     @classmethod
     def filter_instances(cls, cell_type: str):
-        """
-        This function finds all FileInformation objects that have the given cell type
-        """
+        """This function finds all FileInformation objects that have the given cell type"""
         sorted_instances: list = sorted(cls.instances, key=lambda x: x.study)
         return [instance for instance in sorted_instances if instance.cell_type == cell_type]
 
     @staticmethod
     def intensity_file_path(cell_type: str) -> Path:
-        """
-        This function creates a single instance of the FileInformation class and returns the intensity_csv file location
+        """This function creates a single instance of the FileInformation class and returns the intensity_csv file location
         This is useful because each cell type has a specific location all data gets written to
         If all unique cell types are known, it is then possible to get their intensity csv file location
         """

@@ -14,7 +14,6 @@ def fixture_ftp_server(ftpserver, ftp_file_names):
     # This will not upload real files, it will only create files that we can collect with the Reader class
     # From: https://github.com/oz123/pytest-localftpserver/blob/c1ebb0068f4197fad5e14e9c1ef3488de5cf877f/tests/test_pytest_localftpserver.py#L362
 
-    # Reset temporary directories
     ftpserver.reset_tmp_dirs()
 
     # Get the base file path to "upload" files

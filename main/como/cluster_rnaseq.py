@@ -3,10 +3,9 @@ from __future__ import annotations
 import argparse
 from curses.ascii import isdigit
 from dataclasses import dataclass
-from typing import Annotated, Any
+from typing import Any
 
 import numpy as np
-from pydantic import BaseModel
 
 from como.utils import stringlist_to_list
 
@@ -27,7 +26,7 @@ class _Arguments:
     quantile: Any
     seed: int
 
-    def __post_init__(self):
+    def __post_init__(self):  # noqa: C901, ignore too complex
         self.filtering_technique = self.filtering_technique.lower()
         self.cluster_algorithm = self.cluster_algorithm.lower()
 
@@ -190,16 +189,3 @@ def _parse_args() -> _Arguments:
     args = parser.parse_args()
     args.context_names = stringlist_to_list(args.context_names)
     return _Arguments(**vars(args))
-
-
-def main():
-    """Cluster RNA-seq Data.
-
-    This will need to be onverted from rscripts/cluster_samples.R
-    """
-    args: _Arguments = _parse_args()
-    raise NotImplementedError("This function is not yet implemented.")
-
-
-if __name__ == "__main__":
-    main()

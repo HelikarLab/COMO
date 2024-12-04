@@ -1,6 +1,4 @@
-"""
-TODO: Integrate crux percolator into this workflow
-"""
+# ruff: noqa
 
 import asyncio
 import multiprocessing
@@ -13,16 +11,16 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import tqdm
-from fast_bioservices import BioDBNet, Input, Output, Taxon
+from fast_bioservices import BioDBNet
 
-from .FileInformation import FileInformation, clear_print
+from como.proteomics.FileInformation import FileInformation, clear_print
+
+# TODO: Integrate crux percolator into this workflow
 
 
 class RAWtoMZML:
     def __init__(self, file_information: list[FileInformation], core_count: int) -> None:
-        """
-        This class is responsible for converting RAW files to mzML format
-        """
+        """Convert RAW files to mzML format."""
         self.file_information: list[FileInformation] = file_information
         self._core_count: int = core_count
 
@@ -33,11 +31,7 @@ class RAWtoMZML:
         self.raw_to_mzml_wrapper()  # Convert from raw files to mzML
 
     def raw_to_mzml_wrapper(self) -> None:
-        """
-        This is a wrapper function to multiprocess converting raw files to mzML using ThermoRawFileParser
-        """
-        print("")  # Get a new line to print on
-
+        """Multiprocess conversion of raw files to mzML using ThermoRawFileParser."""
         # split self.file_information into self._core_count chunks
         # Always round this division up to ensure all files are processed
         num_chunks: int = int(np.ceil(len(self.file_information) / self._core_count))
@@ -46,7 +40,7 @@ class RAWtoMZML:
         ]
 
         jobs: list[multiprocessing.Process] = []
-        for i, information in enumerate(file_chunks):
+        for information in file_chunks:
             # Parenthesis + comma needed to make tuple in "args"
             job = multiprocessing.Process(target=self.raw_to_mzml, args=(information,))
             jobs.append(job)
@@ -59,9 +53,7 @@ class RAWtoMZML:
             job.terminate()
 
     def raw_to_mzml(self, file_information: list[FileInformation]) -> None:
-        """
-        This function is responsible or converting the list of raw files to mzML format
-        """
+        """Convert a list of raw files to mzML format."""
         for information in file_information:
             self._conversion_counter.acquire()
             self._conversion_counter.value += 1
@@ -71,11 +63,11 @@ class RAWtoMZML:
             self._conversion_counter.release()
 
             information.mzml_base_path.mkdir(parents=True, exist_ok=True)
-            subprocess.run(
-                [
+            subprocess.run(  # noqa: S603
+                [  # noqa: S607
                     "thermorawfileparser",
-                    f"--input={str(information.raw_file_path)}",
-                    f"--output_file={str(information.mzml_file_path)}",
+                    f"--input={information.raw_file_path!s}",
+                    f"--output_file={information.mzml_file_path!s}",
                 ],
                 stdout=subprocess.PIPE,
             )
@@ -88,8 +80,7 @@ class MZMLtoSQT:
         fasta_database: Path,
         core_count: int,
     ) -> None:
-        """
-        This file is responsible for calling the crux-toolkit utilities to process raw proteomics data
+        """This file is responsible for calling the crux-toolkit utilities to process raw proteomics data
         The tools here are called through the command line
 
         The following steps must be performed:
@@ -106,8 +97,7 @@ class MZMLtoSQT:
         self.mzml_to_sqt()  # Analyze mzML files, creating SQT files
 
     def mzml_to_sqt(self) -> None:
-        """
-        This function analyzes the converted mzML files and creates SQT files
+        """This function analyzes the converted mzML files and creates SQT files
         This function does not use multiprocessing, as Crux Comet incorporates its own multiprocessing
         """
         for i, file_information in enumerate(self._file_information):
@@ -153,14 +143,12 @@ class MZMLtoSQT:
                 os.rename(old_file_path, new_file_path)
 
         clear_print("SQT creation finished")
-        print("")
+        print()
 
 
 class SQTtoCSV:
     def __init__(self, file_information: list[FileInformation], core_count: int) -> None:
-        """
-        This class is meant to convert UniProt IDs to Entrez IDs using BioDBNet
-        """
+        """This class is meant to convert UniProt IDs to Entrez IDs using BioDBNet"""
         self._biodbnet: BioDBNet = BioDBNet()
         self._file_information: list[FileInformation] = file_information
         self._core_count: int = min(core_count, 4)  # Maximum of 4 cores
@@ -180,14 +168,11 @@ class SQTtoCSV:
         self.new_write_data()
 
     def _uniprot_from_fasta_header(self, fasta_header: str, separator: str = "|") -> str:
-        """
-        This function is responsible for collecting the first-index field from a pipe-separated string
-        """
+        """This function is responsible for collecting the first-index field from a pipe-separated string"""
         return fasta_header.split(separator)[1]
 
     def collect_uniprot_ids_and_ion_intensity(self) -> None:
-        """
-        This function is responsible for collecting the UniProt IDs from the input sqt files
+        """This function is responsible for collecting the UniProt IDs from the input sqt files
 
         Documentation: https://crux.ms/file-formats/sqt-format.html
 
@@ -209,7 +194,7 @@ class SQTtoCSV:
             average_intensities_dict: dict = {key: [] for key in list(file_information.intensity_df.columns)}
             # average_intensities: pd.DataFrame = pd.DataFrame(columns=["uniprot", replicate_name])  # fmt: skip
 
-            with open(file_information.sqt_file_path, "r") as i_stream:
+            with open(file_information.sqt_file_path) as i_stream:
                 """
                 We are going to use spectra_line_nums if the list starts with "S"
                 Beneath this, we are going to collect every locus ("L") that does not have a "decoy_" in a nested list
@@ -262,9 +247,7 @@ class SQTtoCSV:
             )
 
     async def _convert_uniprot_wrapper(self) -> None:
-        """
-        This function is a multiprocessing wrapper around the convert_ids function
-        """
+        """This function is a multiprocessing wrapper around the convert_ids function"""
         values = [self.async_convert_uniprot(self._file_information[i]) for i in range(len(self._file_information))]
 
         # Create a progress bar of results
@@ -315,8 +298,7 @@ class SQTtoCSV:
             file_information.intensity_df.update(gene_symbols)
 
     def create_merged_frame(self) -> None:
-        """
-        This function is responsible for merging all dataframes of a specific cell type into a single master frame
+        """This function is responsible for merging all dataframes of a specific cell type into a single master frame
         This will allow for aggregating S1R1/S1R2/etc. dataframes into a single S1 dataframe
         """
         for file in self._file_information:
@@ -340,8 +322,7 @@ class SQTtoCSV:
             self._merged_frames[cell_type].fillna(0, inplace=True)
 
     def split_abundance_values(self) -> None:
-        """
-        This function is responsible for splitting abundance values into separate columns based on their S#R# identifier
+        """This function is responsible for splitting abundance values into separate columns based on their S#R# identifier
 
         It will start by finding all S1R*, S2R*, etc. columns in each cell type under self._master_frames
         From here, it will merge these dataframes into a new dataframe under self._split_frames, corresponding to the cell type
@@ -363,7 +344,7 @@ class SQTtoCSV:
             C     ,125      ,175
         """
         # Get a new line to print output on
-        print("")
+        print()
 
         # Copy the dictionary keys from merged_frames into the split_frames
         for key in self._merged_frames.keys():
@@ -424,9 +405,7 @@ class SQTtoCSV:
                 self._split_frames[cell_type].append(split_frame)
 
     def new_write_data(self) -> None:
-        """
-        This function is responsible for writing the dataframes found in self._merge_frames to the respective cell type file
-        """
+        """This function is responsible for writing the dataframes found in self._merge_frames to the respective cell type file"""
         # Get a list of CSV file locations
         csv_file_location: dict[str, Path] = {}
         for information in self._file_information:
@@ -449,8 +428,7 @@ class SQTtoCSV:
             self._merged_frames[key].to_csv(csv_file_location[key], index=False)
 
     def write_data(self) -> None:
-        """
-        This function creates a unique dataframe for each cell type found in the intensity dataframes
+        """This function creates a unique dataframe for each cell type found in the intensity dataframes
             from the self._file_information list
         It merges these intensity dataframes, creating a new column for each dataframe within each cell type
 
@@ -496,9 +474,8 @@ class SQTtoCSV:
 
     @property
     def file_information(self) -> list[FileInformation]:
-        """
-        Reassigning the values from the incoming file_manager into a shared-memory variable means
-            we must provide an option to return the file_information list
+        """Reassigning the values from the incoming file_manager into a shared-memory variable means
+        we must provide an option to return the file_information list
         """
         return self._file_information
 

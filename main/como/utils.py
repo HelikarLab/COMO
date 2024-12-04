@@ -6,6 +6,7 @@ import sys
 from collections.abc import Iterator
 from enum import Enum
 from pathlib import Path
+from typing import ClassVar
 
 import aiofiles
 import pandas as pd
@@ -51,7 +52,7 @@ class Compartments:
     "golgi" -> "g"
     """
 
-    SHORTHAND = {
+    SHORTHAND: ClassVar[dict[str, list[str]]] = {
         "ce": ["cell envelope"],
         "c": [
             "cytoplasm",
@@ -94,10 +95,13 @@ class Compartments:
         "s": ["eyespot", "eyespot apparatus", "stigma"],
     }
 
-    _REVERSE_LOOKUP = {value.lower(): key for key, values in SHORTHAND.items() for value in values}
+    _REVERSE_LOOKUP: ClassVar[dict[str, list[str]]] = {
+        value.lower(): key for key, values in SHORTHAND.items() for value in values
+    }
 
     @classmethod
-    def get(cls, longhand: str) -> str:
+    def get(cls, longhand: str) -> str | None:
+        """Get the short-hand compartment name from the long-hand name."""
         return cls._REVERSE_LOOKUP.get(longhand.lower(), None)
 
 
@@ -180,7 +184,7 @@ def suppress_stdout() -> Iterator[None]:
 async def _format_determination(
     biodbnet: BioDBNet, *, requested_output: Output | list[Output], input_values: list[str], taxon: Taxon
 ) -> pd.DataFrame:
-    """Determine the data type of the given input values (i.e., Entrez Gene ID, Gene Symbol, etc.)
+    """Determine the data type of the given input values (i.e., Entrez Gene ID, Gene Symbol, etc.).
 
     :param biodbnet: The BioDBNet to use for deter
     :param requested_output: The data type to generate (of type `Output`)

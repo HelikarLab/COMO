@@ -1,15 +1,16 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import ClassVar
 
 from loguru import logger
 
 
 class SingletonMeta(type):
-    _instances = {}
+    _instances: ClassVar[dict] = {}
 
     def __call__(cls, *args, **kwargs):
-        """Possible changes to the value of the `__init__` argument do not affect
-        the returned instance.
-        """
+        """Validate that changes to the `__init__` argument do not affect the returned instance."""
         if cls not in cls._instances:
             instance = super().__call__(*args, **kwargs)
             cls._instances[cls] = instance
@@ -19,10 +20,11 @@ class SingletonMeta(type):
 class Config(metaclass=SingletonMeta):
     def __init__(
         self,
-        data_dir: Path = None,
-        config_dir: Path = None,
-        result_dir: Path = None,
+        data_dir: Path | None = None,
+        config_dir: Path | None = None,
+        result_dir: Path | None = None,
     ) -> None:
+        """Initialize the Config object."""
         current_dir = Path.cwd()
 
         self.data_dir = Path(data_dir) if data_dir else None
@@ -54,6 +56,7 @@ class Config(metaclass=SingletonMeta):
         self.figures_dir.mkdir(parents=True, exist_ok=True)
 
     def update(self, **kwargs):
+        """Update a key in the config object."""
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, Path(value) if value else getattr(self, key))

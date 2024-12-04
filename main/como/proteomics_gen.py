@@ -1,7 +1,5 @@
 import argparse
 import asyncio
-import sys
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -15,7 +13,7 @@ from como.proteomics_preprocessing import protein_transform_main
 
 # Load Proteomics
 def load_proteomics_data(datafilename, context_name):
-    """Add description......"""
+    """Load proteomics data from a given context and filename."""
     config = Config()
     data_path = config.data_dir / "data_matrices" / context_name / datafilename
     logger.info(f"Data Matrix Path: {data_path}")
@@ -30,7 +28,7 @@ def load_proteomics_data(datafilename, context_name):
     # Preprocess data, drop na, duplicate ';' in symbol,
     proteomics_data["gene_symbol"] = proteomics_data["gene_symbol"].astype(str)
     proteomics_data.dropna(subset=["gene_symbol"], inplace=True)
-    pluralnames = proteomics_data[proteomics_data["gene_symbol"].str.contains(";") == True]
+    pluralnames = proteomics_data[proteomics_data["gene_symbol"].str.contains(";") == True]  # noqa: E712
 
     for idx, row in pluralnames.iterrows():
         names = row["gene_symbol"].split(";")
@@ -96,6 +94,7 @@ def abundance_to_bool_group(context_name, group_name, abundance_matrix, rep_rati
 
 
 def to_bool_context(context_name, group_ratio, hi_group_ratio, group_names):
+    """Convert proteomic data to boolean expression."""
     config = Config()
     output_dir = config.result_dir / context_name / "proteomics"
     merged_df = pd.DataFrame(columns=["entrez_gene_id", "expressed", "high"])
@@ -128,6 +127,7 @@ def to_bool_context(context_name, group_ratio, hi_group_ratio, group_names):
 
 # read data from csv files
 def load_proteomics_tests(filename, context_name):
+    """Load statistical test results."""
     config = Config()
 
     def load_empty_dict():
@@ -163,6 +163,7 @@ async def proteomics_gen(
     hi_group_ratio: float = 0.5,
     quantile: int = 25,
 ):
+    """Generate proteomics data."""
     config = Config()
     if not config_file:
         raise ValueError("Config file must be provided")
@@ -204,7 +205,8 @@ async def proteomics_gen(
         to_bool_context(context_name, group_ratio, hi_group_ratio, groups)
 
 
-def main():
+def _main():
+
     parser = argparse.ArgumentParser(
         prog="proteomics_gen.py",
         description="Description goes here",
@@ -280,4 +282,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    _main()

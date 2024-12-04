@@ -558,8 +558,8 @@ def cpm_filter(
         # TODO: Counts per million is adding ~61,500 columns (equal to the number of genes) for some reason.
         #  Most likely due to multiplying by 1_000_000, not exactly sure why
 
-        min_samples = round(n_exp * len(counts.columns))
-        top_samples = round(n_top * len(counts.columns))
+        min_samples = round(n_exp * len(counts.columns))  # noqa: F841
+        top_samples = round(n_top * len(counts.columns))  # noqa: F841
         test_bools = pd.DataFrame({"entrez_gene_ids": entrez_ids})
         for i in range(len(counts_per_million.columns)):
             cutoff = (
