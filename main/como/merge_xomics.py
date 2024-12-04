@@ -1,17 +1,13 @@
-import sys
-from dataclasses import dataclass
-from pathlib import Path
-
-from como.custom_types import RNASeqPreparationMethod
-
-sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-
+from __future__ import annotations
 
 import argparse
 import json
 import re
+import sys
 from collections import Counter
+from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -530,38 +526,43 @@ async def _handle_context_batch(
 
     for context_name in sheet_names:
         num_sources = counts[context_name]
-        if adjust_method == "progressive":
-            exp_req = (num_sources - min_inputs) + expression_requirement
-        elif adjust_method == "regressive":
-            exp_req = expression_requirement - (max_inputs - num_sources)
-        elif adjust_method == "flat":
-            exp_req = expression_requirement
-        else:
-            exp_req = int(custom_df.iloc[custom_df["context"] == context_name, "req"].iloc[0])
+        match adjust_method:
+            case AdjustmentMethod.PROGRESSIVE:
+                adjusted_expression_requirement = (num_sources - min_inputs) + expression_requirement
+            case AdjustmentMethod.REGRESSIVE:
+                adjusted_expression_requirement = expression_requirement - (max_inputs - num_sources)
+            case AdjustmentMethod.FLAT:
+                adjusted_expression_requirement = expression_requirement
+            case _:
+                adjusted_expression_requirement = int(
+                    custom_df.iloc[custom_df["context"] == context_name, "req"].iloc[0]
+                )
 
-        logger.debug(
-            f"Expression requirement of {expression_requirement} adjusted to {exp_req} using {adjust_method} adjustment method for {context_name}."
-        )
+        if adjusted_expression_requirement != expression_requirement:
+            logger.debug(
+                f"Expression requirement of '{expression_requirement}' adjusted to '{adjusted_expression_requirement}' using "
+                f"'{adjust_method.value}' adjustment method for '{context_name}'."
+            )
 
-        if exp_req > num_sources:
+        if adjusted_expression_requirement > num_sources:
             logger.warning(
                 f"Expression requirement for {context_name} was calculated to be greater "
                 f"than max number of input data sources. "
                 f"Will be force changed to {num_sources} to prevent output from having 0 active genes. "
                 f"Consider lowering the expression requirement or changing the adjustment method."
             )
-            exp_req = num_sources
+            adjusted_expression_requirement = num_sources
 
-        if exp_req < 1:  # never allow expression requirement to be less than one
+        if adjusted_expression_requirement < 1:  # never allow expression requirement to be less than one
             logger.warning(
                 f"Expression requirement for {context_name} was calculated to be less than 1. "
                 "Will be changed to 1 to prevent output from having 0 active genes. "
             )
-            exp_req = 1
+            adjusted_expression_requirement = 1
 
         files_dict = await _merge_xomics(
             context_name,
-            expression_requirement=exp_req,
+            expression_requirement=adjusted_expression_requirement,
             proteomics_file=proteomics_file,
             trnaseq_file=trnaseq_file,
             mrnaseq_file=mrnaseq_file,
@@ -593,7 +594,6 @@ async def merge_xomics(
     adjust_method: AdjustmentMethod = AdjustmentMethod.FLAT,
     no_high_confidence: bool = False,
     no_na: bool = False,
-    custom_expression_file: str = None,
     merge_zfpkm_distribution: bool = False,
     keep_transcriptomics_score: bool = True,
 ):
@@ -611,6 +611,11 @@ async def merge_xomics(
     elif expression_requirement < 1:
         raise ValueError("Expression requirement must be at least 1!")
 
+    trnaseq_filepath = Path(trnaseq_filepath) if trnaseq_filepath else None
+    mrnaseq_filepath = Path(mrnaseq_filepath) if mrnaseq_filepath else None
+    scrnaseq_filepath = Path(scrnaseq_filepath) if scrnaseq_filepath else None
+    proteomics_filepath = Path(proteomics_filepath) if proteomics_filepath else None
+
     await _handle_context_batch(
         trnaseq_filepath,
         mrnaseq_filepath,
@@ -624,7 +629,6 @@ async def merge_xomics(
         adjust_method,
         no_high_confidence,
         no_na,
-        custom_df,
         merge_zfpkm_distribution,
         keep_transcriptomics_score,
     )
