@@ -12,6 +12,7 @@ docs/_site
 docs/Gemfile.lock
 
 # COMO-specific files
+.hypothesis
 **/*.Rout
 main/logs/
 main/data/gene_info.csv
@@ -21,5 +22,3 @@ main/data/config_sheets
 
 # COMO data
 main/data/data_matrices
-
-
