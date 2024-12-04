@@ -53,10 +53,13 @@ async def _handle_context_batch(
     """Iterate through each context type and create rnaseq expression file.
 
     :param config_filename: The configuration filename to read
-    :param replicate_ratio: The percentage of replicates that a gene must appear in for a gene to be marked as "active" in a batch/study
+    :param replicate_ratio: The percentage of replicates that a gene must
+        appear in for a gene to be marked as "active" in a batch/study
     :param batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked as 'active"
-    :param replicate_ratio_high: The percentage of replicates that a gene must appear in for a gene to be marked "highly confident" in its expression in a batch/study
-    :param batch_ratio_high: The percentage of batches that a gene must appear in for a gene to be marked "highly confident" in its expression
+    :param replicate_ratio_high: The percentage of replicates that a gene must
+        appear in for a gene to be marked "highly confident" in its expression in a batch/study
+    :param batch_ratio_high: The percentage of batches that a gene must
+        appear in for a gene to be marked "highly confident" in its expression
     :param technique: The filtering technique to use
     :param cut_off: The cutoff value to use for the provided filtering technique
     :param prep: The library preparation method
@@ -121,20 +124,24 @@ async def rnaseq_gen(
     batch_ratio: float = 0.5,
     high_batch_ratio: float = 1.0,
     technique: FilteringTechnique | str = FilteringTechnique.tpm,
-    cut_off: Optional[int | float] = None,
+    cut_off: int | float | None = None,
 ) -> None:
     """Generate a list of active and high-confidence genes from a gene count matrix.
 
-    Replicates are compared for consensus within the study/batch number according to replicate ratios, then study/batch numbers are checked for consensus according to batch ratios.
+    Replicates are compared for consensus within the study/batch number according to replicate ratios,
+        then study/batch numbers are checked for consensus according to batch ratios.
     The zFPKM method is outlined here: https://pubmed.ncbi.nlm.nih.gov/24215113/
 
     :param config_filename: The configuration filename to read
     :param prep: The preparation method
     :param taxon_id: The NCBI Taxon ID
-    :param replicate_ratio: The percentage of replicates that a gene must appear in for a gene to be marked as "active" in a batch/study
+    :param replicate_ratio: The percentage of replicates that a gene must
+        appear in for a gene to be marked as "active" in a batch/study
     :param batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked as 'active"
-    :param high_replicate_ratio: The percentage of replicates that a gene must appear in for a gene to be marked "highly confident" in its expression in a batch/study
-    :param high_batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked "highly confident" in its expression
+    :param high_replicate_ratio: The percentage of replicates that a gene must
+        appear in for a gene to be marked "highly confident" in its expression in a batch/study
+    :param high_batch_ratio: The percentage of batches that a gene must
+        appear in for a gene to be marked "highly confident" in its expression
     :param technique: The filtering technique to use
     :param cut_off: The cutoff value to use for the provided filtering technique
     :return: None
@@ -225,7 +232,8 @@ def _parse_args() -> _Arguments:
         dest="high_replicate_ratio",
         help="Ratio of replicates required for a gene to be considered high-confidence. "
         "High-confidence genes ignore consensus with other data-sources, such as proteomics. "
-        "Example: 0.9 means that for a gene to be high-confidence, at least 90% of replicates in a group must pass the cutoff after normalization",
+        "Example: 0.9 means that for a gene to be high-confidence, "
+        "at least 90% of replicates in a group must pass the cutoff after normalization",
     )
     parser.add_argument(
         "-gh",
@@ -234,9 +242,10 @@ def _parse_args() -> _Arguments:
         required=False,
         default=1.0,
         dest="high_batch_ratio",
-        help="Ratio of groups (studies/batches) required for a gene to be considered high-confidence within that group. "
+        help="Ratio of studies/batches required for a gene to be considered high-confidence within that group. "
         "High-confidence genes ignore consensus with other data-sources, like proteomics. "
-        "Example: 0.9 means that for a gene to be high-confidence, at least 90% of groups in a study must have passed the replicate ratio test",
+        "Example: 0.9 means that for a gene to be high-confidence, "
+        "at least 90% of groups in a study must have passed the replicate ratio test",
     )
     parser.add_argument(
         "--taxon",
@@ -253,7 +262,8 @@ def _parse_args() -> _Arguments:
         required=False,
         default="quantile",
         dest="filtering_technique",
-        help="Technique to normalize and filter counts with. Either 'zfpkm', 'quantile', or 'cpm'. More info about each method is discussed in pipeline.ipynb.",
+        help="Technique to normalize and filter counts with. "
+        "Either 'zfpkm', 'quantile', or 'cpm'. More info about each method is discussed in pipeline.ipynb.",
     )
     parser.add_argument(
         "--minimum-cutoff",
@@ -273,7 +283,9 @@ def _parse_args() -> _Arguments:
         required=True,
         choices=["total", "mrna", "scrna"],
         dest="library_prep",
-        help="Library preparation used, will separate samples into groups to only compare similarly prepared libraries. For example, mRNA, total-rna, scRNA, etc",
+        help="Library preparation method. "
+        "Will separate samples into groups to only compare similarly prepared libraries. "
+        "For example, mRNA, total-rna, scRNA, etc",
     )
     args = parser.parse_args()
     args.filtering_technique = args.filtering_technique.lower()

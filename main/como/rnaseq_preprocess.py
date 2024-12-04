@@ -281,9 +281,10 @@ async def _create_counts_matrix(context_name: str, config: Config):
 
 
 async def _create_config_df(context_name: str) -> pd.DataFrame:
-    """Create configuration sheet at /main/data/config_sheets/rnaseq_data_inputs_auto.xlsx
-    based on the gene counts matrix. If using zFPKM normalization technique, fetch mean fragment lengths from
-    /work/data/COMO_input/<context name>/<study number>/fragmentSizes/
+    """Create configuration sheet.
+
+    The configuration file created is based on the gene counts matrix.
+     If using zFPKM normalization technique, mean fragment lengths will be fetched
     """
     config = Config()
     gene_counts_files = list(Path(config.data_dir, "COMO_input", context_name, "geneCounts").rglob("*.tab"))
@@ -304,8 +305,9 @@ async def _create_config_df(context_name: str) -> pd.DataFrame:
 
         except IndexError as e:
             raise IndexError(
-                f"\n\nFilename of '{gene_count_filename}' is not valid. Should be 'contextName_SXRYrZ.tab', where X is the "
-                "study/batch number, Y is the replicate number, and Z is the run number."
+                f"\n\nFilename of '{gene_count_filename}' is not valid. "
+                f"Should be 'contextName_SXRYrZ.tab', where X is the study/batch number, Y is the replicate number, "
+                f"and Z is the run number."
                 "\n\nIf not a multi-run sample, exclude 'rZ' from the filename."
             ) from e
 
@@ -333,54 +335,65 @@ async def _create_config_df(context_name: str) -> pd.DataFrame:
 
         context_path = config.data_dir / "COMO_input" / context_name
 
-        layout_files = list((context_path / "layouts").rglob(f"{context_name}_{label}_layout.txt"))
-        strand_files = list((context_path / "strandedness").rglob(f"{context_name}_{label}_strandedness.txt"))
-        frag_files = list((context_path / "fragmentSizes").rglob(f"{context_name}_{label}_fragment_size.txt"))
-        prep_files = list((context_path / "prepMethods").rglob(f"{context_name}_{label}_prep_method.txt"))
+        layout_files: list[Path] = list((context_path / "layouts").rglob(f"{context_name}_{label}_layout.txt"))
+        strand_files: list[Path] = list(
+            (context_path / "strandedness").rglob(f"{context_name}_{label}_strandedness.txt")
+        )
+        frag_files: list[Path] = list(
+            (context_path / "fragmentSizes").rglob(f"{context_name}_{label}_fragment_size.txt")
+        )
+        prep_files: list[Path] = list((context_path / "prepMethods").rglob(f"{context_name}_{label}_prep_method.txt"))
 
         layout = "UNKNOWN"
         if len(layout_files) == 0:
             logger.warning(
-                f"No layout file found for {label}, writing as 'UNKNOWN', this should be defined by user if using zFPKM or rnaseq_gen.py will not run"
+                f"No layout file found for {label}, writing as 'UNKNOWN', "
+                f"this should be defined by user if using zFPKM or rnaseq_gen.py will not run"
             )
         elif len(layout_files) == 1:
-            with open(layout_files[0]) as file:
+            with layout_files[0].open("w") as file:
                 layout = file.read().strip()
         elif len(layout_files) > 1:
             raise ValueError(
-                f"Multiple matching layout files for {label}, make sure there is only one copy for each replicate in COMO_input"
+                f"Multiple matching layout files for {label}, "
+                f"make sure there is only one copy for each replicate in COMO_input"
             )
 
         strand = "UNKNOWN"
         if len(strand_files) == 0:
             logger.warning(
-                f"No strandedness file found for {label}, writing as 'UNKNOWN'. This will not interfere with the analysis since you have already set rnaseq_preprocess.py to infer the strandedness when writing the counts matrix"
+                f"No strandedness file found for {label}, writing as 'UNKNOWN'. "
+                f"This will not interfere with the analysis since you have already set rnaseq_preprocess.py to "
+                f"infer the strandedness when writing the counts matrix"
             )
         elif len(strand_files) == 1:
-            with open(strand_files[0]) as file:
+            with strand_files[0].open("w") as file:
                 strand = file.read().strip()
         elif len(strand_files) > 1:
             raise ValueError(
-                f"Multiple matching strandedness files for {label}, make sure there is only one copy for each replicate in COMO_input"
+                f"Multiple matching strandedness files for {label}, "
+                f"make sure there is only one copy for each replicate in COMO_input"
             )
 
         prep = "total"
         if len(prep_files) == 0:
             logger.warning(f"No prep file found for {label}, assuming 'total' as in Total RNA library preparation")
         elif len(prep_files) == 1:
-            with open(prep_files[0]) as file:
+            with prep_files[0].open("w") as file:
                 prep = file.read().strip().lower()
                 if prep not in ["total", "mrna"]:
                     raise ValueError(f"Prep method must be either 'total' or 'mrna' for {label}")
         elif len(prep_files) > 1:
             raise ValueError(
-                f"Multiple matching prep files for {label}, make sure there is only one copy for each replicate in COMO_input"
+                f"Multiple matching prep files for {label}, "
+                f"make sure there is only one copy for each replicate in COMO_input"
             )
 
         mean_fragment_size = 100
         if len(frag_files) == 0:
             logger.warning(
-                f"\nNo fragment file found for {label}, using '100'. This must be defined by the user in order to use zFPKM normalization"
+                f"No fragment file found for {label}, using '100'. "
+                f"This must be defined by the user in order to use zFPKM normalization"
             )
         elif len(frag_files) == 1:
             if layout == "single-end":
@@ -404,7 +417,8 @@ async def _create_config_df(context_name: str) -> pd.DataFrame:
                     mean_fragment_size = sum(mean_fragment_sizes * library_sizes) / sum(library_sizes)
         elif len(frag_files) > 1:
             raise ValueError(
-                f"Multiple matching fragment files for {label}, make sure there is only one copy for each replicate in COMO_input"
+                f"Multiple matching fragment files for {label}, "
+                f"make sure there is only one copy for each replicate in COMO_input"
             )
 
         sample_names.append(f"{context_name}_{study_number}{rep_number}")
@@ -428,7 +442,10 @@ async def _create_config_df(context_name: str) -> pd.DataFrame:
 
 
 def _split_config_df(df):
-    """Split a config dataframe into two seperate ones. One for Total RNA library prep, one for mRNA"""
+    """Split a config dataframe to two.
+
+    One for Total RNA library prep, one for mRNA
+    """
     df_t = df[df["library_prep"] == "total"]
     df_m = df[df["library_prep"] == "mrna"]
 
@@ -438,7 +455,10 @@ def _split_config_df(df):
 def _split_counts_matrices(
     count_matrix_all: Path, df_total: pd.DataFrame, df_mrna: pd.DataFrame
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Split a counts-matrix dataframe into two seperate ones. One for Total RNA library prep, one for mRNA"""
+    """Split a counts-matrix dataframe to two.
+
+    One for Total RNA library prep, one for mRNA
+    """
     logger.info(f"Reading gene count matrix file at '{count_matrix_all}'")
     matrix_all = pd.read_csv(count_matrix_all)
     matrix_total = matrix_all[
@@ -605,6 +625,11 @@ async def rnaseq_preprocess(
     config: Config = None,
     cache: bool = True,
 ) -> None:
+    """Preprocesses RNA-seq data for downstream analysis.
+
+    Fetches additional gene information from a provided matrix or gene counts,
+        or optionally creates this matrix using gene count files obtained using STAR aligner
+    """
     config = Config() if config is None else config
     if mode not in {"create", "provide"}:
         raise ValueError("mode must be either 'create' or 'provide'")
@@ -627,15 +652,6 @@ async def rnaseq_preprocess(
 
 
 def _parse_args():
-    """Parse arguments to rnaseq_preprocess.py, create a gene info files for each provided context at:
-    /work/data/results/<context name>/gene_info_<context name>.csv.
-
-     If using --info-matrix or --info-matrix-config:
-    create gene count matrix file at /work/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv,
-
-    If using --info-matrix-config:
-    create config file at /work/data/config_sheets/rnaseq_data_inputs_auto.xlsx
-    """
     parser = argparse.ArgumentParser(
         prog="rnaseq_preprocess.py",
         description="""
