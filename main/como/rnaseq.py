@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import math
 import multiprocessing
 import time
@@ -21,12 +22,13 @@ import sklearn.neighbors
 from fast_bioservices import Taxon
 from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol
 from loguru import logger
+from pandas import DataFrame
 from plotly.subplots import make_subplots
 from scipy.signal import find_peaks
-from scipy.stats import norm
 from sklearn.neighbors import KernelDensity
 
 from como.custom_types import RNASeqPreparationMethod
+from como.migrations import gene_info_migrations
 from como.project import Config
 from como.utils import convert_gene_data
 
@@ -189,12 +191,17 @@ async def _read_counts_matrix(
     config_df: pd.DataFrame = pd.read_excel(config_filepath, sheet_name=context_name, header=0)
     gene_info: pd.DataFrame = pd.read_csv(gene_info_filepath)
     gene_info = gene_info[gene_info["ensembl_gene_id"] != "-"].reset_index(drop=True)
-    gene_sizes: npt.NDArray[np.float32] = np.array(gene_info["size"].values).astype(np.float32)
+    gene_info = gene_info_migrations(gene_info)
 
     match counts_matrix_filepath.suffix:
         case ".csv":
             logger.debug(f"Reading CSV file at '{counts_matrix_filepath}'")
             counts_matrix: pd.DataFrame = pd.read_csv(counts_matrix_filepath, header=0)
+            if "ensembl_gene_id" not in counts_matrix.columns:
+                raise ValueError(
+                    f"Counts matrix must contain a column named 'ensembl_gene_id'. "
+                    f"Ensure the file '{counts_matrix_filepath}' contains this column."
+                )
             conversion = await ensembl_to_gene_id_and_symbol(
                 ids=counts_matrix["ensembl_gene_id"].tolist(), taxon=taxon_id
             )
@@ -204,7 +211,6 @@ async def _read_counts_matrix(
             logger.debug(f"Reading h5ad file at '{counts_matrix_filepath}'")
             adata: sc.AnnData = sc.read_h5ad(counts_matrix_filepath)
             counts_matrix: pd.DataFrame = adata.to_df().T  # Make sample names the columns and gene data the index
-            del adata  # explicit garbage collection because this function runs for a little while
 
             # Coherce the incoming gene data (i.e., Gene Symbols) into Entrez and Ensembl Gene IDs
             conversion = await convert_gene_data(counts_matrix.index.tolist(), taxon_id)
@@ -212,6 +218,11 @@ async def _read_counts_matrix(
             counts_matrix = counts_matrix.merge(conversion, left_index=True, right_index=True)
             counts_matrix = counts_matrix[counts_matrix["entrez_gene_id"] != "-"]
             counts_matrix.reset_index(inplace=True)
+
+            # explicit garbage collection because this function runs for a little while
+            del adata
+            del conversion
+            gc.collect()
 
         case _:
             raise ValueError(
@@ -227,10 +238,10 @@ async def _read_counts_matrix(
     # Only include Entrez and Ensembl Gene IDs that are present in `gene_info`
     counts_matrix["entrez_gene_id"] = counts_matrix["entrez_gene_id"].str.split("//")
     counts_matrix = counts_matrix.explode("entrez_gene_id")
-    counts_matrix = counts_matrix[(counts_matrix["entrez_gene_id"] != "-") & (counts_matrix["entrez_gene_id"].notna())]
-    gene_info = gene_info[gene_info["entrez_gene_id"] != "-"]
-
+    counts_matrix = counts_matrix.replace(to_replace="-", value=pd.NA).dropna()
     counts_matrix["entrez_gene_id"] = counts_matrix["entrez_gene_id"].astype(int)
+
+    gene_info = gene_info.replace(to_replace="-", value=pd.NA).dropna()
     gene_info["entrez_gene_id"] = gene_info["entrez_gene_id"].astype(int)
 
     counts_matrix = counts_matrix.merge(
@@ -245,19 +256,18 @@ async def _read_counts_matrix(
     )
 
     entrez_gene_ids: list[str] = gene_info["entrez_gene_id"].tolist()
-
     metrics: NamedMetrics = {}
-    studies: list[str] = config_df["study"].unique().tolist()
-    for study in studies:
+    for study in config_df["study"].unique().tolist():
         study_sample_names = config_df[config_df["study"] == study]["sample_name"].tolist()
+        layouts = config_df[config_df["study"] == study]["layout"].tolist()
         metrics[study] = _StudyMetrics(
             count_matrix=counts_matrix[counts_matrix.columns.intersection(study_sample_names)],
             fragment_lengths=config_df[config_df["study"] == study]["fragment_length"].values,
             sample_names=study_sample_names,
-            layout=config_df[config_df["study"] == study]["layout"].tolist(),
+            layout=[LayoutMethod(layout) for layout in layouts],
             num_samples=len(study_sample_names),
             entrez_gene_ids=entrez_gene_ids,
-            gene_sizes=gene_sizes,
+            gene_sizes=np.array(gene_info["size"].values).astype(np.float32),
             study=study,
         )
         metrics[study].fragment_lengths[np.isnan(metrics[study].fragment_lengths)] = 0
@@ -403,59 +413,50 @@ def zfpkm_transform(
             f"will convert to percentage"
         )
         update_every_percent /= 100
-    update_per_step: int = int(total * update_every_percent)
-    kernel = KernelDensity(kernel="gaussian", bandwidth=bandwidth)
-    results = {}
-    zfpkm_df = pd.DataFrame(data=0, index=fpkm_df.index, columns=fpkm_df.columns)
-    if len(fpkm_df.columns) < 100:
-        logger.debug(f"Processing {total} through zFPKM transform sequentially")
-        for col in fpkm_df.columns:
-            results[col] = _zfpkm_calculation(
-                fpkm_df[col],
-                kernel=kernel,
-                peak_parameters=peak_parameters,
-            )
 
-            zfpkm_df[col] = results[col].zfpkm
-    else:
-        cores = multiprocessing.cpu_count() - 2
+    total = len(fpkm_df.columns)
+    update_per_step: int = int(np.ceil(total * update_every_percent))
+    cores = multiprocessing.cpu_count() - 2
+    logger.debug(f"Processing {total:,} samples through zFPKM transform using {cores} cores")
+    logger.debug(
+        f"Will update every {update_per_step:,} steps as this is approximately "
+        f"{update_every_percent:.1%} of {total:,}"
+    )
+
+    with Pool(processes=cores) as pool:
+        kernel = KernelDensity(kernel="gaussian", bandwidth=bandwidth)
+        chunksize = int(math.ceil(len(fpkm_df.columns) / (4 * cores)))
+        partial_func = partial(_zfpkm_calculation, kernel=kernel, peak_parameters=peak_parameters)
+        chunk_time = time.time()
+        start_time = time.time()
+
         log_padding = len(str(f"{total:,}"))
-        logger.debug(f"Processing {total:,} samples through zFPKM transform using {cores} cores")
-        logger.debug(
-            f"Will update every {update_per_step:,} steps as this is approximately "
-            f"{update_every_percent:.1%} of {total:,}"
-        )
+        zfpkm_df = pd.DataFrame(data=0, index=fpkm_df.index, columns=fpkm_df.columns)
+        results: dict[str, _ZFPKMResult] = {}
+        result: _ZFPKMResult
+        for i, result in enumerate(
+            pool.imap(
+                partial_func,
+                (fpkm_df[col] for col in fpkm_df.columns),
+                chunksize=chunksize,
+            )
+        ):
+            key = str(result.zfpkm.name)
+            results[key] = result
+            zfpkm_df[key] = result.zfpkm
 
-        with Pool(processes=cores) as pool:
-            chunksize = int(math.ceil(len(fpkm_df.columns) / (4 * cores)))
-            partial_func = partial(_zfpkm_calculation, kernel=kernel, peak_parameters=peak_parameters)
-            chunk_time = time.time()
-            start_time = time.time()
-
-            result: _ZFPKMResult
-            for i, result in enumerate(
-                pool.imap(
-                    partial_func,
-                    (fpkm_df[col] for col in fpkm_df.columns),
-                    chunksize=chunksize,
+            # show updates every X% and at the end, but skip on first iteration
+            if i != 0 and (i % update_per_step == 0 or i == total):
+                current_time = time.time()
+                chunk = current_time - chunk_time
+                total_time = current_time - start_time
+                formatted = f"{i:,}"
+                logger.debug(
+                    f"Processed {formatted:>{log_padding}} of {total:,} - "
+                    f"chunk took {chunk:.1f} seconds - "
+                    f"running for {total_time:.1f} seconds"
                 )
-            ):
-                results[result.zfpkm.name] = result
-                zfpkm_df[result.zfpkm.name] = result.zfpkm
-
-                # show updates every X% and at the end, but skip on first iteration
-                if (i % update_per_step == 0 or i == total) and i != 0:
-                    current_time = time.time()
-                    chunk = current_time - chunk_time
-                    total_time = current_time - start_time
-                    formatted = f"{i:,}"
-                    logger.debug(
-                        f"Processed {formatted:>{log_padding}} of {total:,} - "
-                        f"chunk took {chunk:.1f} seconds - "
-                        f"running for {total_time:.1f} seconds"
-                    )
-                    chunk_time = current_time
-
+                chunk_time = current_time
     return results, zfpkm_df
 
 
@@ -467,35 +468,34 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
     :param plot_xfloor: Lower limit for the x-axis.
     :param subplot_titles: Whether to display facet titles (sample names).
     """
-    mega_df = pd.DataFrame(
-        data=pd.NA,
-        index=pd.Series(data=range(len(results))),
-        columns=pd.Series(data=("sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled")),
-    )
-    for i, (name, result) in enumerate(results.items()):
-        d = result.density
-        mu = result.mu
-        stdev = result.std_dev
-        max_fpkm = result.max_fpkm
+    mega_df = pd.DataFrame(columns=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
+    for name, result in results.items():
+        stddev = result.std_dev
+        x = np.array(result.density.x)
+        y = np.array(result.density.y)
 
-        fitted = norm.pdf(d.x, loc=mu, scale=stdev)
-        scale_fitted = fitted * (max_fpkm / fitted.max())
+        fitted = np.exp(-0.5 * ((x - result.mu) / stddev) ** 2) / (stddev * np.sqrt(2 * np.pi))
+        max_fpkm = y.max()
+        max_fitted = fitted.max()
+        scale_fitted = fitted * (max_fpkm / max_fitted)
 
-        mega_df.at[i, "sample_name"] = name
-        mega_df.at[i, "log2fpkm"] = d.x
-        mega_df.at[i, "fpkm_density"] = d.y
-        mega_df.at[i, "fitted_density_scaled"] = scale_fitted
+        df = pd.DataFrame(
+            {
+                "sample_name": [name] * len(x),
+                "log2fpkm": x,
+                "fpkm_density": y,
+                "fitted_density_scaled": scale_fitted,
+            }
+        )
+        mega_df = pd.concat([mega_df, df], ignore_index=True)
 
-    mega_df = mega_df.melt(
-        id_vars=["log2fpkm", "sample_name"],
-        value_vars=["fpkm_density", "fitted_density_scaled"],
-        var_name="source",
-        value_name="density",
-    )
-
+    mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")
     subplot_titles = list(results.keys()) if subplot_titles else None
     fig = make_subplots(
-        rows=len(results), cols=1, subplot_titles=subplot_titles, vertical_spacing=min(0.05, (1 / (len(results) - 1)))
+        rows=len(results),
+        cols=1,
+        subplot_titles=subplot_titles,
+        vertical_spacing=min(0.05, (1 / (len(results) - 1))),
     )
 
     for i, (name, group) in enumerate(mega_df.groupby("sample_name"), start=1):
@@ -505,7 +505,7 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
             col=1,
         )
         fig.update_xaxes(title_text="log2(FPKM)", range=[plot_xfloor, max(group["log2fpkm"].tolist())], row=i, col=1)
-        fig.update_yaxes(title_text="[scaled] density", row=i, col=1)
+        fig.update_yaxes(title_text="density [scaled]", row=i, col=1)
         fig.update_layout(legend_tracegroupgap=0)
 
     fig.update_layout(height=600 * len(results), width=1000, title_text="zFPKM Plots", showlegend=True)
@@ -621,63 +621,35 @@ def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
 
 def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions, calcualte_fpkm: bool) -> NamedMetrics:
     """Apply zFPKM filtering to the FPKM matrix for a given sample."""
-    n_exp = filtering_options.replicate_ratio
-    n_top = filtering_options.high_replicate_ratio
+    min_sample_expression = filtering_options.replicate_ratio
+    high_confidence_sample_expression = filtering_options.high_replicate_ratio
     cut_off = filtering_options.cut_off
-    metrics = calculate_fpkm(metrics)
+
+    if calcualte_fpkm:
+        metrics = calculate_fpkm(metrics)
 
     metric: _StudyMetrics
     for metric in metrics.values():
-        fpkm_df = metric.normalization_matrix
-        fpkm_df = fpkm_df[fpkm_df.sum(axis=1) > 0]
+        # if fpkm was not calculated, the normalization matrix will be empty; collect the count matrix instead
+        matrix = metric.count_matrix if metric.normalization_matrix.empty else metric.normalization_matrix
+        matrix = matrix[matrix.sum(axis=1) > 0]
 
-        minimums = fpkm_df == 0
-        results, zfpkm_df = zfpkm_transform(fpkm_df)
+        minimums = matrix == 0
+        results, zfpkm_df = zfpkm_transform(matrix)
         zfpkm_df[minimums] = -4
+        zfpkm_plot(results)
 
-        # TODO: Plot zFPKM results
-
-        min_samples = round(n_exp * len(zfpkm_df.columns))
-        top_samples = round(n_top * len(zfpkm_df.columns))
-
+        # determine which genes are expressed
+        min_samples = round(min_sample_expression * len(zfpkm_df.columns))
         min_func = k_over_a(min_samples, cut_off)
-        top_func = k_over_a(top_samples, cut_off)
-
         min_genes: npt.NDArray[bool] = genefilter(zfpkm_df, min_func)
-        top_genes: npt.NDArray[bool] = genefilter(zfpkm_df, top_func)
-
-        # Only keep `entrez_gene_ids` that pass `min_genes`
         metric.entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, min_genes) if keep]
+
+        # determine which genes are confidently expressed
+        top_samples = round(high_confidence_sample_expression * len(zfpkm_df.columns))
+        top_func = k_over_a(top_samples, cut_off)
+        top_genes: npt.NDArray[bool] = genefilter(zfpkm_df, top_func)
         metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, top_genes) if keep]
-
-    return metrics
-
-
-def umi_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions) -> NamedMetrics:
-    """Apply Unique Molecular Identifier (UMI) filtering to the count matrix for a given sample."""
-    for metric in metrics.values():
-        entrez_ids = metric.entrez_gene_ids
-        count_matrix = metric.count_matrix
-
-        count_matrix = count_matrix[count_matrix.sum(axis=1) > 0]
-        minimums = count_matrix == 0
-
-        zfpkm_results, z_matrix = zfpkm_transform(count_matrix)
-        z_matrix[minimums] = -4
-        z_matrix.insert(0, "entrez_gene_id", pd.Series(entrez_ids))
-        zfpkm_plot(zfpkm_results, plot_xfloor=z_matrix.min().min())
-
-        min_samples = round(filtering_options.replicate_ratio * len(z_matrix.columns))
-        top_samples = round(filtering_options.high_replicate_ratio * len(z_matrix.columns))
-
-        min_func = k_over_a(min_samples, filtering_options.cut_off)
-        top_func = k_over_a(top_samples, filtering_options.cut_off)
-
-        min_genes: npt.NDArray[bool] = genefilter(z_matrix, min_func)
-        top_genes: npt.NDArray[bool] = genefilter(z_matrix, top_func)
-
-        metric.entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, min_genes) if keep]
-        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, top_genes) if keep]
 
     return metrics
 
@@ -699,9 +671,9 @@ def filter_counts(
         case FilteringTechnique.tpm:
             return tpm_quantile_filter(metrics=metrics, filtering_options=filtering_options)
         case FilteringTechnique.zfpkm:
-            return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, prep=prep)
+            return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calcualte_fpkm=True)
         case FilteringTechnique.umi:
-            return umi_filter(metrics=metrics, filtering_options=filtering_options)
+            return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calcualte_fpkm=False)
         case _:
             raise ValueError(f"Technique must be one of {FilteringTechnique}")
 
@@ -780,6 +752,9 @@ async def save_rnaseq_tests(
             boolean_matrix.loc[gene, "expressed"] = 1
         if gene in top_df["entrez_gene_id"]:
             boolean_matrix.loc[gene, "high"] = 1
+
+    expressed_count = len(boolean_matrix[boolean_matrix["expressed"] == 1])
+    high_confidence_count = len(boolean_matrix[boolean_matrix["high"] == 1])
 
     boolean_matrix.to_csv(output_filepath, index=False)
     logger.info(
