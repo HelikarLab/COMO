@@ -4,11 +4,10 @@ dynamic = ["version"]
 requires-python = ">=3.10,<3.13"
 dependencies = [
     "cobra>=0.28.0",
-    "fast-bioservices@git+https://github.com/JoshLoecker/fast_bioservices@drop-pandas-version",
+    "fast-bioservices>=0.3.9",
     "gurobipy>=11.0",
     "kaleido==0.2.1",
     "loguru>=0.7.2",
-    "numpy>=1.16.5,<1.23.0",
     "pandas>=1.3.5",
     "plotly>=5.24.1",
     "scanpy>=1.9.8",
