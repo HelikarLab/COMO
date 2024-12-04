@@ -282,7 +282,7 @@ def _combine_omics_zdistros(
     return combine_z
 
 
-def combine_zscores_main(
+def _combine_zscores(
     working_dir,
     context_names,
     global_use_mrna,
