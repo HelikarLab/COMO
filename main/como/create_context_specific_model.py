@@ -4,6 +4,7 @@ import argparse
 import ast
 import collections
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -11,6 +12,7 @@ from typing import NamedTuple
 
 import cobra
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from cobra import Model
 from cobra.flux_analysis import pfba
@@ -248,7 +250,7 @@ def _feasibility_test(model_cobra: cobra.Model, step: str):
     return incon_rxns, model_cobra_rm
 
 
-def _seed_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
+def _build_with_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
     # `Becker and Palsson (2008). Context-specific metabolic networks are
     # consistent with experiments. PLoS Comput. Biol. 4, e1000082.`
     properties = GIMMEProperties(
@@ -274,7 +276,7 @@ def _seed_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
     return context_cobra_model
 
 
-def _seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
+def _build_with_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
     # 'Vlassis, Pacheco, Sauter (2014). Fast reconstruction of compact
     # context-specific metabolic network models. PLoS Comput. Biol. 10,
     # e1003424.'
@@ -295,21 +297,28 @@ def _seed_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
     return context_cobra_model
 
 
-def _seed_imat(cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force):
-    config = Config()
+def _build_with_imat(
+    cobra_model: cobra.Model,
+    s_matrix: npt.NDArray,
+    lb: Sequence[float],
+    ub: Sequence[float],
+    expr_vector: npt.NDArray,
+    expr_thesh: tuple[float, float],
+    force_gene_ids: Sequence[int],
+) -> (cobra.Model, pd.DataFrame):
     expr_vector = np.array(expr_vector)
-    properties = IMATProperties(exp_vector=expr_vector, exp_thresholds=expr_thesh, core=idx_force, epsilon=0.01)
+    properties = IMATProperties(exp_vector=expr_vector, exp_thresholds=expr_thesh, core=force_gene_ids, epsilon=0.01)
     algorithm = IMAT(s_matrix, lb, ub, properties)
-    context_rxns = algorithm.run()
-    fluxes = algorithm.sol.to_series()
+    context_rxns: npt.NDArray = algorithm.run()
+    fluxes: pd.Series = algorithm.sol.to_series()
     context_cobra_model = cobra_model.copy()
-    r_ids = [r.id for r in context_cobra_model.reactions]
-    pd.DataFrame({"rxns": r_ids}).to_csv(config.data_dir / "rxns_test.csv")
-    remove_rxns = [r_ids[int(i)] for i in range(s_matrix.shape[1]) if not np.isin(i, context_rxns)]
+    reaction_ids = [r.id for r in context_cobra_model.reactions]
+
+    remove_rxns = [reaction_ids[i] for i in range(s_matrix.shape[1]) if i not in context_rxns]
     flux_df = pd.DataFrame(columns=["rxn", "flux"])
     for idx, (_, val) in enumerate(fluxes.items()):
         if idx <= len(cobra_model.reactions) - 1:
-            r_id = str(context_cobra_model.reactions.get_by_id(r_ids[idx])).split(":")[0]
+            r_id = str(context_cobra_model.reactions.get_by_id(reaction_ids[idx])).split(":")[0]
             getattr(context_cobra_model.reactions, r_id).fluxes = val
             flux_df.loc[len(flux_df.index)] = [r_id, val]
 
@@ -318,7 +327,7 @@ def _seed_imat(cobra_model, s_matrix, lb, ub, expr_vector, expr_thesh, idx_force
     return context_cobra_model, flux_df
 
 
-def _seed_tinit(cobra_model: cobra.Model, s_matrix, lb, ub, expr_vector, solver, idx_force) -> Model:
+def _build_with_tinit(cobra_model: cobra.Model, s_matrix, lb, ub, expr_vector, solver, idx_force) -> Model:
     expr_vector = np.array(expr_vector)
     properties = tINITProperties(
         reactions_scores=expr_vector,
@@ -408,44 +417,46 @@ def _build_model(
     force excluded even if they meet GPR association requirements using the force exclude file.
     """
     config = Config()
-    model: cobra.Model
+    reference_model: cobra.Model
     match general_model_file.suffix:
         case ".mat":
-            model = cobra.io.load_matlab_model(general_model_file)
+            reference_model = cobra.io.load_matlab_model(general_model_file)
         case ".xml":
-            model = cobra.io.read_sbml_model(general_model_file)
+            reference_model = cobra.io.read_sbml_model(general_model_file)
         case ".json":
-            model = cobra.io.load_json_model(general_model_file)
+            reference_model = cobra.io.load_json_model(general_model_file)
         case _:
-            raise NameError("reference model format must be .xml, .mat, or .json")
+            raise NameError(
+                f"Reference reference_model format must be .xml, .mat, or .json, found '{general_model_file.suffix}'"
+            )
 
-    model.objective = {getattr(model.reactions, objective): 1}  # set objective
+    reference_model.objective = {getattr(reference_model.reactions, objective): 1}  # set objective
 
     if objective not in force_rxns:
         force_rxns.append(objective)
 
     # set boundaries
-    model, bound_rm_rxns = _set_boundaries(model, bound_rxns, bound_lb, bound_ub)
+    reference_model, bound_rm_rxns = _set_boundaries(reference_model, bound_rxns, bound_lb, bound_ub)
 
     # set solver
-    model.solver = solver.lower()
+    reference_model.solver = solver.lower()
 
     # check number of unsolvable reactions for reference model under media assumptions
     # incon_rxns, cobra_model = _feasibility_test(cobra_model, "before_seeding")
     incon_rxns = []
 
-    s_matrix = cobra.util.array.create_stoichiometric_matrix(model, array_type="dense")
+    s_matrix = cobra.util.array.create_stoichiometric_matrix(reference_model, array_type="dense")
     lb = []
     ub = []
     rx_names = []
-    for reaction in model.reactions:
+    for reaction in reference_model.reactions:
         lb.append(reaction.lower_bound)
         ub.append(reaction.upper_bound)
         rx_names.append(reaction.id)
 
     # get expressed reactions
     expression_rxns, expr_vector = _map_expression_to_reaction(
-        model,
+        reference_model,
         gene_expression_file,
         recon_algorithm,
         high_thresh=high_thresh,
@@ -488,20 +499,21 @@ def _build_model(
     exp_thresh = (low_thresh, high_thresh)
 
     if recon_algorithm == Algorithm.GIMME:
-        context_model_cobra = _seed_gimme(model, s_matrix, lb, ub, idx_obj, expr_vector)
+        context_model_cobra = _build_with_gimme(reference_model, s_matrix, lb, ub, idx_obj, expr_vector)
     elif recon_algorithm == Algorithm.FASTCORE:
-        context_model_cobra = _seed_fastcore(model, s_matrix, lb, ub, exp_idx_list, solver)
+        context_model_cobra = _build_with_fastcore(reference_model, s_matrix, lb, ub, exp_idx_list, solver)
     elif recon_algorithm == Algorithm.IMAT:
         context_model_cobra: cobra.Model
-        flux_df: pd.DataFrame
-        context_model_cobra, flux_df = _seed_imat(model, s_matrix, lb, ub, expr_vector, exp_thresh, idx_force)
+        context_model_cobra, flux_df = _build_with_imat(
+            reference_model, s_matrix, lb, ub, expr_vector, exp_thresh, idx_force
+        )
         imat_reactions = flux_df.rxn
         model_reactions = [reaction.id for reaction in context_model_cobra.reactions]
         reaction_intersections = set(imat_reactions).intersection(model_reactions)
         flux_df = flux_df[~flux_df["rxn"].isin(reaction_intersections)]
         flux_df.to_csv(config.data_dir / "results" / context_name / f"{recon_algorithm.value}_flux.csv")
     elif recon_algorithm == Algorithm.TINIT:
-        context_model_cobra = _seed_tinit(model, s_matrix, lb, ub, expr_vector, solver, idx_force)
+        context_model_cobra = _build_with_tinit(reference_model, s_matrix, lb, ub, expr_vector, solver, idx_force)
 
     incon_rxns_cs = []
     incon_df = pd.DataFrame({"general_infeasible_rxns": list(incon_rxns)})
