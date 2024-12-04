@@ -1,10 +1,7 @@
+import argparse
+import asyncio
 import sys
 from pathlib import Path
-
-sys.path.insert(0, Path(__file__).parent.parent.as_posix())
-
-
-import argparse
 
 import numpy as np
 import pandas as pd
@@ -58,8 +55,8 @@ async def load_gene_symbol_map(gene_symbols: list[str]):
         df = pd.read_csv(filepath, index_col="gene_symbol")
     else:
         biodbnet = BioDBNet()
-        df = biodbnet.db2db(
-            input_values=gene_symbols, input_db=Input.GENE_SYMBOL, output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID]
+        df = await biodbnet.async_db2db(
+            values=gene_symbols, input_db=Input.GENE_SYMBOL, output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID]
         )
         df.loc[df["gene_id"] == "-", ["gene_id"]] = np.nan
         df.to_csv(filepath, index_label="gene_symbol")

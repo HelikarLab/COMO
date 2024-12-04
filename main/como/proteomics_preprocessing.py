@@ -1,13 +1,15 @@
+from __future__ import annotations
+
 import colorsys
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union
 
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import plotly.graph_objs as go
+from loguru import logger
 from plotly.subplots import make_subplots
 from scipy import stats
 from scipy.signal import find_peaks
@@ -49,16 +51,14 @@ def z_score_calc(abundance: pd.DataFrame, min_thresh: int) -> ZResult:
     )
 
     for i, col in enumerate(abundance.columns):
-        kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=0.5).fit(
-            log_abundance_filt[:, i].reshape(-1, 1)
-        )  # type: ignore
+        kde = KernelDensity(kernel="gaussian", bandwidth=0.5).fit(log_abundance_filt[:, i].reshape(-1, 1))
         x_range = np.linspace(log_abundance[:, i].min(), log_abundance[:, i].max(), 1000)
-        density = np.exp(kde.score_samples(x_range.reshape(-1, 1)))
+        density = np.exp(kde.score_samples(x_range.reshape(-1, 1)))  # type: ignore
         peaks, _ = find_peaks(density, height=0.02, distance=1.0)
         peak_positions = x_range[peaks]
 
         mu = peak_positions.max()
-        max_fpkm_peak = density[peaks[np.argmax(peak_positions)]]
+        max_fpkm_peak = density[peaks[np.argmax(peak_positions)]]  # type: ignore
 
         # Select rows from `log_abundance` that are greater than 0 and less than mu in the column `i`
         u = log_abundance[:, i][(log_abundance[:, i] > 0) & (log_abundance[:, i] < mu)].mean()
