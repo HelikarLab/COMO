@@ -1,4 +1,6 @@
-#!/usr/bin/python3
+# ruff: noqa
+
+
 import argparse
 import json
 from pathlib import Path

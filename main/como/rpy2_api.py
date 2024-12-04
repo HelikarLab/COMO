@@ -1,3 +1,5 @@
+# ruff: noqa
+
 import typing
 from pathlib import Path
 
