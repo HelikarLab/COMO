@@ -1,4 +1,5 @@
 from pathlib import Path
+
 import rpy2_api
 
 # read and translate R functions
@@ -17,5 +18,5 @@ cluster_sources = rpy2_api.Rpy2(
     source_type=source_type,
     use_trna=use_trna,
     use_mrna=use_mrna,
-    binarize_data=binarize_data
+    binarize_data=binarize_data,
 ).call_function("cluster_sources_main")

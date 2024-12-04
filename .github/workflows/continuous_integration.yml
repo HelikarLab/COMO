@@ -1,0 +1,84 @@
+name: Continuous Integration
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Create Virtual Environment
+        run: uv venv
+
+      - name: Install Jupyter
+        run: uv pip install jupyter nbconvert
+
+      - name: Strip Notebook Output
+        run: uv run jupyter nbconvert --clear-output --inplace "main/COMO.ipynb"
+
+      - name: Format Python Imports
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: "check --fix --select I"
+
+      - name: Format code
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: "format"
+
+      - name: Format Notebook
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: "format main/COMO.ipynb"
+
+      - name: Commit Changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "style: format code, Jupyter Notebook(s), and Python imports with `ruff`"
+          file_pattern: "main/como/*.py"
+
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Lint
+        uses: astral-sh/ruff-action@v1
+        with:
+          args: "check --no-fix --verbose"
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ "3.10" ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: "true"
+          cache-suffix: "${{ matrix.python-version }}"
+          cache-dependency-glob: 'uv.lock'
+
+      - name: Install Dependencies
+        run: uv sync --python "${{ matrix.python-version }}" --all-extras --dev
+
+      - name: Run tests
+        run: uv run --python "${{ matrix.python-version }}" pytest --cov --junitxml=junit.xml -o junit_family=legacy
+
+      - name: Cache Clear
+        run: uv cache prune --ci
