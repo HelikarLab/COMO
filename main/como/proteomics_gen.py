@@ -18,9 +18,7 @@ from como.proteomics_preprocessing import protein_transform_main
 
 # Load Proteomics
 def load_proteomics_data(datafilename, context_name):
-    """
-    Add description......
-    """
+    """Add description......"""
     config = Config()
     data_path = config.data_dir / "data_matrices" / context_name / datafilename
     logger.info(f"Data Matrix Path: {data_path}")
@@ -52,10 +50,8 @@ def load_proteomics_data(datafilename, context_name):
 
 
 # read map to convert to entrez
-def load_gene_symbol_map(gene_symbols: list[str]):
-    """
-    Add descirption....
-    """
+async def load_gene_symbol_map(gene_symbols: list[str]):
+    """Add descirption...."""
     config = Config()
     filepath = config.data_dir / "proteomics_entrez_map.csv"
     if filepath.exists():
@@ -72,9 +68,7 @@ def load_gene_symbol_map(gene_symbols: list[str]):
 
 
 def abundance_to_bool_group(context_name, group_name, abundance_matrix, rep_ratio, hi_rep_ratio, quantile):
-    """
-    Descrioption....
-    """
+    """Descrioption...."""
     config = Config()
     output_dir = config.result_dir / context_name / "proteomics"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -84,8 +78,6 @@ def abundance_to_bool_group(context_name, group_name, abundance_matrix, rep_rati
         config.result_dir / context_name / "proteomics" / "".join(["protein_abundance_", group_name, ".csv"])
     )
     abundance_matrix.to_csv(abundance_filepath, index_label="entrez_gene_id")
-
-    # Z-tranform
     protein_transform_main(abundance_matrix, output_dir, group_name)
 
     # Logical Calculation
@@ -139,9 +131,6 @@ def to_bool_context(context_name, group_ratio, hi_group_ratio, group_names):
 
 # read data from csv files
 def load_proteomics_tests(filename, context_name):
-    """
-    Description....
-    """
     config = Config()
 
     def load_empty_dict():
@@ -154,7 +143,7 @@ def load_proteomics_tests(filename, context_name):
     if not inquiry_full_path.exists():
         raise FileNotFoundError(f"Error: file not found {inquiry_full_path}")
 
-    filename = "Proteomics_{}.csv".format(context_name)
+    filename = f"Proteomics_{context_name}.csv"
     full_save_filepath = config.result_dir / context_name / "proteomics" / filename
     if full_save_filepath.exists():
         data = pd.read_csv(full_save_filepath, index_col="entrez_gene_id")
@@ -163,12 +152,13 @@ def load_proteomics_tests(filename, context_name):
 
     else:
         logger.warning(
-            f"Proteomics gene expression file for {context_name} was not found at {full_save_filepath}. Is this intentional?"
+            f"Proteomics gene expression file for {context_name} was not found at {full_save_filepath}. "
+            f"Is this intentional?"
         )
         return load_empty_dict()
 
 
-def proteomics_gen(
+async def proteomics_gen(
     config_file: str,
     rep_ratio: float = 0.5,
     group_ratio: float = 0.5,
@@ -196,13 +186,13 @@ def proteomics_gen(
         groups = config_sheet["group"].unique().tolist()
 
         for group in groups:
-            group_idx = np.where([True if g == group else False for g in config_sheet["group"].tolist()])
-            cols = np.take(config_sheet["sample_name"].to_numpy(), group_idx).ravel().tolist() + ["gene_symbol"]
+            group_idx = np.where([g == group for g in config_sheet["group"].tolist()])
+            cols = [*np.take(config_sheet["sample_name"].to_numpy(), group_idx).ravel().tolist(), "gene_symbol"]
 
             proteomics_data = load_proteomics_data(datafilename, context_name)
             proteomics_data = proteomics_data.loc[:, cols]
 
-            symbols_to_ids = load_gene_symbol_map(gene_symbols=proteomics_data["gene_symbol"].tolist())
+            symbols_to_ids = await load_gene_symbol_map(gene_symbols=proteomics_data["gene_symbol"].tolist())
             proteomics_data.dropna(subset=["gene_symbol"], inplace=True)
             if "uniprot" in proteomics_data.columns:
                 proteomics_data.drop(columns=["uniprot"], inplace=True)
@@ -280,8 +270,15 @@ def main():
         "to 100% (all proteins pass).",
     )
     args = parser.parse_args()
-    proteomics_gen(
-        args.config_file, args.rep_ratio, args.group_ratio, args.hi_rep_ratio, args.hi_group_ratio, args.quantile
+    asyncio.run(
+        proteomics_gen(
+            args.config_file,
+            args.rep_ratio,
+            args.group_ratio,
+            args.hi_rep_ratio,
+            args.hi_group_ratio,
+            args.quantile,
+        )
     )
 
 

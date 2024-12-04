@@ -46,13 +46,16 @@ class _HighExpressionHeaderNames:
 
 
 class AdjustmentMethod(Enum):
+    """Adjustment method for expression requirement based on differences in number of provided data source types."""
+
     PROGRESSIVE = "progressive"
     REGRESSIVE = "regressive"
     FLAT = "flat"
     CUSTOM = "custom"
 
     @classmethod
-    def from_string(cls, value: str) -> "AdjustmentMethod":
+    def from_string(cls, value: str) -> AdjustmentMethod:
+        """Convert a string to an AdjustmentMethod enum."""
         if value.lower() not in [t.value for t in cls]:
             raise ValueError(f"Adjustment method must be one of {cls}; got: {value}")
         return cls(value)
@@ -94,7 +97,10 @@ class _Arguments:
 
 
 def _load_rnaseq_tests(filename, context_name, prep_method: RNASeqPreparationMethod) -> tuple[str, pd.DataFrame]:
-    """Load rnaseq results returning a dictionary of test (context, context, cell, etc ) names and rnaseq expression data"""
+    """Load rnaseq results.
+
+    Returns a dictionary of test (context, context, cell, etc ) names and rnaseq expression data
+    """
     config = Config()
 
     def load_dummy_dict():
@@ -117,7 +123,8 @@ def _load_rnaseq_tests(filename, context_name, prep_method: RNASeqPreparationMet
             filename = f"rnaseq_scrna_{context_name}.csv"
         case _:
             raise ValueError(
-                f"Unsupported RNA-seq library type: {prep_method.value}. Must be an option defined in 'RNASeqPreparationMethod'."
+                f"Unsupported RNA-seq library type: {prep_method.value}. "
+                f"Must be an option defined in 'RNASeqPreparationMethod'."
             )
 
     save_filepath = config.result_dir / context_name / prep_method.value / filename
@@ -127,15 +134,17 @@ def _load_rnaseq_tests(filename, context_name, prep_method: RNASeqPreparationMet
 
     else:
         logger.warning(
-            f"'{prep_method.value}' gene expression file for '{context_name}' was not found at '{save_filepath}'. If this is not intentional, please fix the filename to match '{save_filepath}'."
+            f"'{prep_method.value}' gene expression file for '{context_name}' was not found at '{save_filepath}'. "
+            f"If this is not intentional, please fix the filename to match '{save_filepath}'."
         )
         return load_dummy_dict()
 
 
 # Merge Output
 def _merge_logical_table(df: pd.DataFrame):
-    """Merge the Rows of Logical Table belongs to the same entrez_gene_id
-    :param df:
+    """Merge rows of Logical Table belonging to the same entrez_gene_id.
+
+    :param df: pandas dataframe of logical table
     :return: pandas dataframe of merged table
     """
     # step 1: get all plural ENTREZ_GENE_IDs in the input table, extract unique IDs
@@ -212,7 +221,9 @@ def _merge_logical_table(df: pd.DataFrame):
 
 
 async def _get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
-    """This function will get the following details of transcriptomic data:
+    """Get details of transcriptomic data.
+
+    This function will get the following details of transcriptomic data:
     - Gene Symbol
     - Gene Name
     - entrez_gene_id
@@ -220,18 +231,9 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
     The resulting dataframe will have its columns created in the order listed above
     It will return a pandas dataframe with this information
 
-    :param merged_df: A dataframe containing all the transcriptomic and proteomic data after determining which genes are active
+    :param merged_df: A dataframe containing all active transcriptomic and proteomic genes
     :return: A dataframe with the above-listed columns
     """
-    # import numpy as np
-    # merged_df["prote_exp"] = np.random.choice([0, 1], size=len(merged_df))
-    # merged_df["prote_high"] = pd.NA
-    # for row in merged_df.itertuples():
-    #     if row.prote_exp == 1:
-    #         merged_df.at[row.Index, "TotalExpressed"] += 1
-
-    # merged_df["TotalExpressed"] += 1 if merged_df["prote_exp"] == 1 else 0
-
     # If _ExpressedHeaderNames.PROTEOMICS.value is in the dataframe, lower the required expression by 1
     # We are only trying to get details for transcriptomic data
     if _ExpressedHeaderNames.PROTEOMICS in merged_df.columns:
@@ -246,7 +248,6 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
         if required_expression > 1:
             required_expression -= 1
 
-        # Create a new dataframe without [_ExpressedHeaderNames.PROTEOMICS.value, _HighExpressionHeaderNames.PROTEOMICS.value] columns
         transcriptomic_df: pd.DataFrame = merged_df.drop(
             columns=[
                 _ExpressedHeaderNames.PROTEOMICS,
@@ -467,23 +468,22 @@ async def _merge_xomics(
 
 
 async def _handle_context_batch(
-    trnaseq_file,
-    mrnaseq_file,
-    scrnaseq_file,
-    proteomics_file,
-    tweight,
-    mweight,
-    sweight,
-    pweight,
-    expression_requirement,
-    adjust_method,
-    no_hc,
-    no_na,
-    custom_df,
-    merge_distro,
-    keep_gene_score,
+    trnaseq_file: Path | None,
+    mrnaseq_file: Path | None,
+    scrnaseq_file: Path | None,
+    proteomics_file: Path | None,
+    tweight: float,
+    mweight: float,
+    sweight: float,
+    pweight: float,
+    expression_requirement: int,
+    adjust_method: AdjustmentMethod,
+    no_hc: bool,
+    no_na: bool,
+    merge_zfpkm_distribution: bool,
+    keep_gene_score: bool,
 ):
-    """Handle merging of different data sources for each context type"""
+    """Merge different data sources for each context type."""
     if all(file is None for file in [trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file]):
         raise ValueError("No configuration file was passed!")
 
@@ -504,7 +504,7 @@ async def _handle_context_batch(
     use_proteins = proteomics_file is not None
 
     counts = Counter(sheet_names)
-    sheet_names = sorted(list(set(sheet_names)))
+    sheet_names = sorted(set(sheet_names))
     logger.info("Beginning to merge data within contexts")
     dict_list = {}
 
@@ -544,7 +544,8 @@ async def _handle_context_batch(
 
         if exp_req > num_sources:
             logger.warning(
-                f"Expression requirement for {context_name} was calculated to be greater than max number of input data sources. "
+                f"Expression requirement for {context_name} was calculated to be greater "
+                f"than max number of input data sources. "
                 f"Will be force changed to {num_sources} to prevent output from having 0 active genes. "
                 f"Consider lowering the expression requirement or changing the adjustment method."
             )
@@ -552,8 +553,8 @@ async def _handle_context_batch(
 
         if exp_req < 1:  # never allow expression requirement to be less than one
             logger.warning(
-                "Expression requirement for {context_name} was calculated to be less than 1. "
-                "Will be force changed to 1 to prevent output from having 0 active genes. "
+                f"Expression requirement for {context_name} was calculated to be less than 1. "
+                "Will be changed to 1 to prevent output from having 0 active genes. "
             )
             exp_req = 1
 
@@ -572,22 +573,22 @@ async def _handle_context_batch(
 
     files_json = config.result_dir / "step1_results_files.json"
     files_json.parent.mkdir(parents=True, exist_ok=True)
-    with open(files_json.as_posix(), "w") as fp:
-        json.dump(dict_list, fp)  # type: ignore
+    with files_json.open("w") as f:
+        json.dump(dict_list, f)  # type: ignore
 
     return
 
 
 async def merge_xomics(
-    trnaseq_filepath: str = None,
-    mrnaseq_filepath: str = None,
-    scrnaseq_filepath: str = None,
-    proteomics_filepath: str = None,
+    trnaseq_filepath: str | Path | None = None,
+    mrnaseq_filepath: str | Path | None = None,
+    scrnaseq_filepath: str | Path | None = None,
+    proteomics_filepath: str | Path | None = None,
     trna_weight: float = 1,
     mrna_weight: float = 1,
     scrna_weight: float = 1,
     proteomics_weight: float = 2,
-    expression_requirement: int = None,
+    expression_requirement: int | None = None,
     adjust_method: AdjustmentMethod = AdjustmentMethod.FLAT,
     no_high_confidence: bool = False,
     no_na: bool = False,
@@ -595,15 +596,7 @@ async def merge_xomics(
     merge_zfpkm_distribution: bool = False,
     keep_transcriptomics_score: bool = True,
 ):
-    config = Config()
-    # read custom expression requirment file if used
-    if custom_expression_file is not None:
-        custom_filepath = config.data_dir / custom_expression_file
-        custom_df = pd.read_excel(custom_filepath, sheet_name=0)
-        custom_df.columns = ["context", "req"]
-    else:
-        custom_df = pd.DataFrame([])
-
+    """Merge expression tables of multiple sources (RNA-seq, proteomics) into one."""
     if expression_requirement is None:
         expression_requirement = sum(
             test is not None
@@ -627,7 +620,7 @@ async def merge_xomics(
         scrna_weight,
         proteomics_weight,
         expression_requirement,
-        adjust_method.value,
+        adjust_method,
         no_high_confidence,
         no_na,
         custom_df,
@@ -722,7 +715,8 @@ def _parse_args() -> _Arguments:
         required=False,
         default=None,
         dest="expression_requirement",
-        help="Number of sources with active gene for it to be considered active even if it is not a high confidence-gene",
+        help="Number of sources with active gene for it to be considered active "
+        "even if it is not a high confidence-gene",
     )
 
     parser.add_argument(
@@ -741,7 +735,8 @@ def _parse_args() -> _Arguments:
         required="custom" in sys.argv,  # required if --requriement-adjust is "custom",
         dest="custom_expression_filename",
         default=None,
-        help="Name of .xlsx file where first column is context names and second column is expression requirement for that context, in /main/data/",
+        help="Name of .xlsx file where first column is context names and "
+        "second column is expression requirement for that context",
     )
 
     parser.add_argument(
@@ -751,7 +746,8 @@ def _parse_args() -> _Arguments:
         required=False,
         default=False,
         dest="no_high_confidence",
-        help="Flag to prevent high-confidence genes forcing a gene to be used in final model irrespective of other other data sources",
+        help="Prevent high-confidence genes forcing a gene to be used in final model, "
+        "irrespective of other other data sources",
     )
 
     parser.add_argument(
@@ -761,7 +757,7 @@ def _parse_args() -> _Arguments:
         required=False,
         default=False,
         dest="no_na",
-        help="Flag to prevent genes missing in a data source library, but present in others from "
+        help="Prevent genes missing in a data source library, but present in others from "
         "subtracting 1 from the expression requirement per data source that gene is missing in",
     )
 

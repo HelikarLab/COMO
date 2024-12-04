@@ -400,7 +400,7 @@ def _build_model(
     low_thresh: float,
     high_thresh: float,
 ) -> _BuildResults:
-    """Seed a context specific model.
+    """Seed a context specific reference_model.
 
     Core reactions are determined from GPR associations with gene expression logicals.
     Core reactions that do not necessarily meet GPR association requirements can be forced if in the force reaction
@@ -455,8 +455,8 @@ def _build_model(
     for rxn in force_rxns:
         if rxn not in rx_names:
             logger.warning(
-                f"The force reaction '{rxn}' was not found in the general model. "
-                f"Check BiGG, or the relevant database for your general model, for synonyms."
+                f"The force reaction '{rxn}' was not found in the general reference_model. "
+                f"Check BiGG, or the relevant database for your general reference_model, for synonyms."
             )
 
     # collect list of reactions that are infeasible but active in expression data or user defined

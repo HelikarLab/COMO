@@ -64,6 +64,13 @@ class FilteringTechnique(Enum):
                 raise ValueError(f"Filtering technique must be one of {possible_values}; got: {value}")
 
 
+class LayoutMethod(Enum):
+    """RNA sequencing layout method."""
+
+    paired_end = "paired-end"
+    single_end = "single-end"
+
+
 @dataclass
 class _StudyMetrics:
     study: str
@@ -71,7 +78,7 @@ class _StudyMetrics:
     count_matrix: pd.DataFrame
     fragment_lengths: npt.NDArray[np.float32]
     sample_names: list[str]
-    layout: list[str]
+    layout: list[LayoutMethod]
     entrez_gene_ids: list[str]
     gene_sizes: npt.NDArray[np.float32]
     __normalization_matrix: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -80,7 +87,7 @@ class _StudyMetrics:
 
     def __post_init__(self):
         for layout in self.layout:
-            if layout not in ["paired-end", "single-end", ""]:
+            if layout not in LayoutMethod:
                 raise ValueError(f"Layout must be 'paired-end' or 'single-end'; got: {layout}")
 
     @property
@@ -212,7 +219,10 @@ async def _read_counts_matrix(
             )
 
     if counts_matrix.empty:
-        raise ValueError("Counts matrix is empty. Ensure the file is not empty and contains data.")
+        raise ValueError(
+            f"Counts matrix is empty. Ensure the file contains data. "
+            f"Attempted to process file '{counts_matrix_filepath}'"
+        )
 
     # Only include Entrez and Ensembl Gene IDs that are present in `gene_info`
     counts_matrix["entrez_gene_id"] = counts_matrix["entrez_gene_id"].str.split("//")
@@ -233,6 +243,7 @@ async def _read_counts_matrix(
         on=["entrez_gene_id", "ensembl_gene_id"],
         how="inner",
     )
+
     entrez_gene_ids: list[str] = gene_info["entrez_gene_id"].tolist()
 
     metrics: NamedMetrics = {}
@@ -280,7 +291,6 @@ def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
     for study in metrics:
         for sample in range(metrics[study].num_samples):
             layout = metrics[study].layout[sample]
-
             count_matrix: npt.NDArray = metrics[study].count_matrix.iloc[:, sample].values
             gene_size = metrics[study].gene_sizes
 
@@ -288,18 +298,16 @@ def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
             gene_size = gene_size.astype(np.float32)
 
             match layout:
-                case "paired-end":  # FPKM
+                case LayoutMethod.paired_end:  # FPKM
                     mean_fragment_lengths = metrics[study].fragment_lengths[sample]
-                    effective_length = [
-                        max(0, size - mean_fragment_lengths + 1) for size in gene_size
-                    ]  # Ensure non-negative value
+                    # Ensure non-negative value
+                    effective_length = [max(0, size - (mean_fragment_lengths + 1)) for size in gene_size]
                     n = count_matrix.sum()
-                    fpkm = (count_matrix + 1) * 1e9 / (np.array(effective_length) * n)
+                    fpkm = ((count_matrix + 1) * 1e9) / (np.array(effective_length) * n)
                     matrix_values.append(fpkm)
-                case "single-end":  # RPKM
-                    rate = np.log(count_matrix + 1) - np.log(
-                        gene_size
-                    )  # Add a pseudocount before log to ensure log(0) does not happen
+                case LayoutMethod.single_end:  # RPKM
+                    # Add a pseudocount before log to ensure log(0) does not happen
+                    rate = np.log(count_matrix + 1) - np.log(gene_size)
                     exp_rate = np.exp(rate - np.log(np.sum(count_matrix)) + np.log(1e9))
                     matrix_values.append(exp_rate)
                 case _:
@@ -314,11 +322,7 @@ def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
     return metrics
 
 
-def _zfpkm_calculation(
-    col: pd.Series,
-    kernel: KernelDensity,
-    peak_parameters: tuple[float, float],
-) -> _ZFPKMResult:
+def _zfpkm_calculation(col: pd.Series, kernel: KernelDensity, peak_parameters: tuple[float, float]) -> _ZFPKMResult:
     """Log2 Transformations.
 
     Stabilize the variance in the data to make the distribution more symmetric; this is helpful for Gaussian fitting
@@ -391,12 +395,8 @@ def zfpkm_transform(
     bandwidth: int = 0.5,
     peak_parameters: tuple[float, float] = (0.02, 1.0),
     update_every_percent: float = 0.1,
-) -> tuple[dict[str, _ZFPKMResult], pd.DataFrame]:
-    """Transform FPKM values to zFPKM values."""
-    # dynamic multi-processing: if more than 100 columns exist, split the work up between 4 processors
-    #   CPU bound work means we should use ProcessPoolExecutor
-    total = len(fpkm_df.columns)
-
+) -> tuple[dict[str, _ZFPKMResult], DataFrame]:
+    """Perform zFPKM calculation/transformation."""
     if update_every_percent > 1:
         logger.warning(
             f"update_every_percent should be a decimal value between 0 and 1; got: {update_every_percent} - "
@@ -619,12 +619,7 @@ def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
     return metrics
 
 
-def zfpkm_filter(
-    *,
-    metrics: NamedMetrics,
-    filtering_options: _FilteringOptions,
-    prep: RNASeqPreparationMethod,
-) -> NamedMetrics:
+def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions, calcualte_fpkm: bool) -> NamedMetrics:
     """Apply zFPKM filtering to the FPKM matrix for a given sample."""
     n_exp = filtering_options.replicate_ratio
     n_top = filtering_options.high_replicate_ratio
@@ -739,7 +734,8 @@ async def save_rnaseq_tests(
         technique = FilteringTechnique.umi
         logger.warning(
             "Single cell filtration does not normalize and assumes "
-            "gene counts are counted with Unique Molecular Identifiers (UMIs)"
+            "gene counts are counted with Unique Molecular Identifiers (UMIs). "
+            "Setting filtering technique to UMI now."
         )
 
     read_counts_results: _ReadMatrixResults = await _read_counts_matrix(
@@ -786,4 +782,7 @@ async def save_rnaseq_tests(
             boolean_matrix.loc[gene, "high"] = 1
 
     boolean_matrix.to_csv(output_filepath, index=False)
-    logger.info(f"Wrote boolean matrix to {output_filepath}")
+    logger.info(
+        f"{context_name} - Found {expressed_count} expressed and {high_confidence_count} confidently expressed genes"
+    )
+    logger.success(f"Wrote boolean matrix to {output_filepath}")
