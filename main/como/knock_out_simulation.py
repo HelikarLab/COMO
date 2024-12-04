@@ -1,9 +1,10 @@
+# ruff: noqa
+
 import argparse
-from concurrent.futures import Future, as_completed, ProcessPoolExecutor, ThreadPoolExecutor
 import os
 import re
 import sys
-from concurrent.futures import Future, ProcessPoolExecutor, as_completed
+from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Union
@@ -32,9 +33,7 @@ def _perform_knockout(
     gene_id: str,
     reference_solution,
 ) -> tuple[str, pd.Series]:
-    """
-    This function will perform a single gene knockout. It will be used in multiprocessing
-    """
+    """This function will perform a single gene knockout. It will be used in multiprocessing"""
     with model:
         gene: cobra.Gene = model.genes.get_by_id(gene_id)
         gene.knock_out()
@@ -119,12 +118,12 @@ def knock_out_simulation(
     flux_solution_diffs = flux_solution.sub(wild_type_model["fluxes"], axis=0)
 
     return KnockoutResults(
-        model,
-        gene_ind2genes,
-        genes_with_metabolic_effects,
-        flux_solution,
-        flux_solution_ratios,
-        flux_solution_diffs,
+        model=model,
+        gene_ind2genes=gene_ind2genes,
+        genes_with_metabolic_effects=genes_with_metabolic_effects,
+        flux_solution=flux_solution,
+        flux_solution_ratios=flux_solution_ratios,
+        flux_solution_diffs=flux_solution_diffs,
     )
 
 
@@ -190,7 +189,7 @@ def score_gene_pairs(gene_pairs, filename, input_reg):
         d_score.at[p_gene, "score"] = d_s
 
     d_score.index.name = "Gene ID"
-    d_score.to_csv(os.path.join(configs.data_dir, filename))
+    d_score.to_csv(configs.data_dir / filename)
     return d_score
 
 
@@ -281,7 +280,8 @@ def main(argv):
     parser = argparse.ArgumentParser(
         prog="knock_out_simulation.py",
         description="This script is responsible for mapping drug targets in metabolic models, performing knock out simulations, and comparing simulation results with disease genes. It also identified drug targets and repurposable drugs.",
-        epilog="For additional help, please post questions/issues in the MADRID GitHub repo at " "https://github.com/HelikarLab/COMO",
+        epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
+        "https://github.com/HelikarLab/COMO",
     )
     parser.add_argument(
         "-m",
@@ -382,7 +382,7 @@ def main(argv):
 
     output_dir = Path(configs.data_dir, "results", context, disease)
     inhibitors_filepath = Path(output_dir, f"{context}_{disease}_inhibitors.tsv")
-    biodbnet = BioDBNet(show_progress=True, cache=False)
+    biodbnet = BioDBNet(cache=False)
     thread_pool = ThreadPoolExecutor(max_workers=1)
 
     print(f"Output directory: '{output_dir.as_posix()}'")
@@ -416,14 +416,7 @@ def main(argv):
     cobra_model.solver = solver
     thread_pool.shutdown()
 
-    (
-        model,
-        gene_ind2genes,
-        has_effects_gene,
-        fluxsolution,
-        flux_solution_ratios,
-        flux_solution_diffs,
-    ) = knock_out_simulation(
+    knockout_results = knock_out_simulation(
         model=cobra_model,
         inhibitors_filepath=inhibitors_filepath,
         drug_db=drug_info_df,
@@ -437,24 +430,24 @@ def main(argv):
 
     gene_pairs_down = create_gene_pairs(
         configs.data_dir,
-        model,
-        gene_ind2genes,
-        fluxsolution,
-        flux_solution_ratios,
-        flux_solution_diffs,
-        has_effects_gene,
+        knockout_results.model,
+        knockout_results.gene_ind2genes,
+        knockout_results.flux_solution,
+        knockout_results.flux_solution_ratios,
+        knockout_results.flux_solution_diffs,
+        knockout_results.genes_with_metabolic_effects,
         disease_genes_filename=disease_down_file,
     )
     gene_pairs_down.to_csv(os.path.join(output_dir, f"{context}_Gene_Pairs_Inhi_Fratio_DOWN.txt"), index=False)
 
     gene_pairs_up = create_gene_pairs(
         configs.data_dir,
-        model,
-        gene_ind2genes,
-        fluxsolution,
-        flux_solution_ratios,
-        flux_solution_diffs,
-        has_effects_gene,
+        knockout_results.model,
+        knockout_results.gene_ind2genes,
+        knockout_results.flux_solution,
+        knockout_results.flux_solution_ratios,
+        knockout_results.flux_solution_diffs,
+        knockout_results.genes_with_metabolic_effects,
         disease_genes_filename=disease_up_file,
     )
     gene_pairs_up.to_csv(os.path.join(output_dir, f"{context}_Gene_Pairs_Inhi_Fratio_UP.txt"), index=False)

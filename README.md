@@ -3,6 +3,8 @@
 ![GitHub release (with filter)](https://img.shields.io/github/v/release/HelikarLab/COMO?filter=v*-master&style=for-the-badge&color=blue)
 ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/HelikarLab/COMO/unit_tests.yml?style=for-the-badge&logo=pytest&logoColor=white&label=Tests)
 ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/HelikarLab/COMO/container_build.yml?style=for-the-badge&logo=docker&logoColor=white&label=Docker%20Build)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
+
 
 # Setting up COMO
 

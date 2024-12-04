@@ -1,62 +1,315 @@
+from __future__ import annotations
+
 import argparse
+import asyncio
 import re
-import sys
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Union
+from typing import Literal
 
 import numpy as np
 import pandas as pd
-from fast_bioservices import BioDBNet, Input, Output, Taxon
+import scanpy as sc
+from fast_bioservices import Input, Taxon
+from fast_bioservices.biothings.mygene import MyGene
+from loguru import logger
 
-from como import como_utilities, rpy2_api
-from como.project import Config
-
-r_file_path: Path = Path(__file__).parent / "rscripts" / "generate_counts_matrix.R"
+from como import Config, stringlist_to_list
+from como.utils import convert_gene_data
 
 
-def create_counts_matrix(context_name):
-    """
-    Create a counts matrix by reading gene counts tables in COMO_input/<context name>/<study number>/geneCounts/
-    Uses R in backend (generate_counts_matrix.R)
-    """
-    config = Config()
-    input_dir = config.data_dir / "COMO_input" / context_name
-    print(f"Looking for STAR gene count tables in '{input_dir}'")
+@dataclass
+class _Arguments:
+    context_names: list[str]
+    taxon_id: Taxon | int | str
+    mode: Literal["create", "provide"]
+    input_format: str
+    provided_matrix_fname: str = None
+
+
+@dataclass
+class _STARinformation:
+    num_unmapped: list[int]
+    num_multimapping: list[int]
+    num_no_feature: list[int]
+    num_ambiguous: list[int]
+    gene_names: list[str]
+    count_matrix: pd.DataFrame
+
+    @property
+    def num_genes(self):
+        return len(self.count_matrix)
+
+    @classmethod
+    def build_from_tab(cls, filepath: Path) -> _STARinformation:
+        if filepath.suffix != ".tab":
+            raise ValueError(f"Building STAR information requires a '.tab' file; received: '{filepath}'")
+        with filepath.open("r") as i_stream:
+            num_unmapped = [int(i) for i in next(i_stream).rstrip("\n").split("\t")[1:]]
+            num_multimapping = [int(i) for i in next(i_stream).rstrip("\n").split("\t")[1:]]
+            num_no_feature = [int(i) for i in next(i_stream).rstrip("\n").split("\t")[1:]]
+            num_ambiguous = [int(i) for i in next(i_stream).rstrip("\n").split("\t")[1:]]
+
+        df = pd.read_csv(
+            filepath,
+            sep="\t",
+            skiprows=4,
+            names=[
+                "ensembl_gene_id",
+                "unstranded_rna_counts",
+                "first_read_transcription_strand",
+                "second_read_transcription_strand",
+            ],
+        )
+        # Remove NA values
+        df = df[~df["ensembl_gene_id"].isna()]
+        return _STARinformation(
+            num_unmapped=num_unmapped,
+            num_multimapping=num_multimapping,
+            num_no_feature=num_no_feature,
+            num_ambiguous=num_ambiguous,
+            gene_names=df["ensembl_gene_id"].values.tolist(),
+            count_matrix=df,
+        )
+
+
+@dataclass
+class _StudyMetrics:
+    study_name: str
+    count_files: list[Path]
+    strandedness_files: list[Path]
+    __sample_names: list[str] = field(default_factory=list)
+    __num_samples: int = 0
+
+    @property
+    def sample_names(self) -> list[str]:
+        return self.__sample_names
+
+    @property
+    def num_samples(self):
+        return self.__num_samples
+
+    def __post_init__(self):
+        self.__num_samples = len(self.count_files)
+        self.__sample_names = [f.stem for f in self.count_files]
+
+        if len(self.count_files) != len(self.strandedness_files):
+            raise ValueError(
+                f"Unequal number of count files and strand files for study '{self.study_name}'. "
+                f"Found {len(self.count_files)} count files and {len(self.strandedness_files)} strand files."
+            )
+
+        if self.num_samples != len(self.count_files):
+            raise ValueError(
+                f"Unequal number of samples and count files for study '{self.study_name}'. "
+                f"Found {self.num_samples} samples and {len(self.count_files)} count files."
+            )
+
+        if self.num_samples != len(self.strandedness_files):
+            raise ValueError(
+                f"Unequal number of samples and strand files for study '{self.study_name}'. "
+                f"Found {self.num_samples} samples and {len(self.strandedness_files)} strand files."
+            )
+
+        if self.__num_samples == 1:
+            raise ValueError(f"Only one sample exists for study {self.study_name}. Provide at least two samples")
+
+        self.count_files.sort()
+        self.strandedness_files.sort()
+        self.__sample_names.sort()
+
+
+def _context_from_filepath(file: Path) -> str:
+    return file.stem.split("_S")[0]
+
+
+def _sample_name_from_filepath(file: Path) -> str:
+    return re.search(r".+_S\d+R\d+", file.stem).group()
+
+
+def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
+    root_gene_count_dir = Path(data_dir, "geneCounts")
+    root_strandedness_dir = Path(data_dir, "strandedness")
+
+    gene_counts_directories: list[Path] = sorted(
+        [p for p in Path(root_gene_count_dir).glob("*") if not p.name.startswith(".")]
+    )
+    strandedness_directories: list[Path] = sorted(
+        [p for p in Path(root_strandedness_dir).glob("*") if not p.name.startswith(".")]
+    )
+
+    if len(gene_counts_directories) != len(strandedness_directories):
+        raise ValueError(
+            f"Unequal number of gene count directories and strandedness directories. "
+            f"Found {len(gene_counts_directories)} gene count directories and {len(strandedness_directories)} strandedness directories."  # noqa: E501
+            f"\nGene count directory: {root_gene_count_dir}\nStrandedness directory: {root_strandedness_dir}"
+        )
+
+    # For each study, collect gene count files, fragment files, insert size files, layouts, and strandedness information
+    study_metrics: list[_StudyMetrics] = []
+    for gene_dir, strand_dir in zip(gene_counts_directories, strandedness_directories):
+        if gene_dir.stem != strand_dir.stem:
+            raise ValueError(
+                f"Gene directory name of '{gene_dir.stem}' does not match stranded directory name of '{strand_dir.stem}'"  # noqa: E501
+            )
+
+        study_metrics.append(
+            _StudyMetrics(
+                study_name=gene_dir.stem,
+                count_files=list(gene_dir.glob("*.tab")),
+                strandedness_files=list(strand_dir.glob("*.txt")),
+            )
+        )
+    return study_metrics
+
+
+def _process_first_multirun_sample(strand_file: Path, all_counts_files: list[Path]):
+    sample_count = pd.DataFrame()
+    for file in all_counts_files:
+        star_information = _STARinformation.build_from_tab(file)
+        strand_information = strand_file.read_text().rstrip("\n").lower()
+
+        if strand_information not in ("none", "first_read_transcription_strand", "second_read_transcription_strand"):
+            raise ValueError(
+                f"Unrecognized Strand Information: {strand_information}; "
+                f"expected 'none', 'first_read_transcription_strand', or 'second_read_transcription_strand'"
+            )
+
+        if strand_information == "none":
+            strand_information = "unstranded_rna_counts"
+
+        run_counts = star_information.count_matrix[["gene_id", strand_information]]
+        run_counts.columns = pd.Index(["ensembl_gene_id", "counts"])
+        if sample_count.empty:
+            sample_count = run_counts
+        else:
+            # Merge to take all items from both data frames
+            sample_count = sample_count.merge(run_counts, on="ensembl_gene_id", how="outer")
+
+    # Set na values to 0
+    sample_count = sample_count.fillna(value="0")
+    sample_count.iloc[:, 1:] = sample_count.iloc[:, 1:].apply(pd.to_numeric)
+
+    count_sums: pd.DataFrame = pd.DataFrame(sample_count.sum(axis=1, numeric_only=True))
+    count_sums.insert(0, "ensembl_gene_id", sample_count["ensembl_gene_id"])
+    count_sums.columns = pd.Index(["ensembl_gene_id", _sample_name_from_filepath(strand_file)])
+    return count_sums
+
+
+def _process_standard_replicate(counts_file: Path, strand_file: Path, sample_name: str):
+    star_information = _STARinformation.build_from_tab(counts_file)
+    strand_information = strand_file.read_text().rstrip("\n").lower()
+
+    if strand_information not in ("none", "first_read_transcription_strand", "second_read_transcription_strand"):
+        raise ValueError(
+            f"Unrecognized Strand Information: {strand_information}; "
+            f"expected 'none', 'first_read_transcription_strand', or 'second_read_transcription_strand'"
+        )
+
+    if strand_information == "none":
+        strand_information = "unstranded_rna_counts"
+
+    sample_count = star_information.count_matrix[["ensembl_gene_id", strand_information]]
+    sample_count.columns = pd.Index(["ensembl_gene_id", sample_name])
+    return sample_count
+
+
+def _prepare_sample_counts(
+    sample_name: str,
+    counts_file: Path,
+    strand_file: Path,
+    all_counts_files: list[Path],
+) -> pd.DataFrame | Literal["SKIP"]:
+    # Test if the counts_file is the first run in a multi-run smaple
+    if re.search(r"R\d+r1", counts_file.as_posix()):
+        return _process_first_multirun_sample(strand_file=strand_file, all_counts_files=all_counts_files)
+    elif re.search(r"R\d+r\d+", counts_file.as_posix()):
+        return "SKIP"
+    else:
+        return _process_standard_replicate(counts_file, strand_file, sample_name)
+
+
+async def _create_sample_counts_matrix(metrics: _StudyMetrics) -> pd.DataFrame:
+    adjusted_index = 0
+    counts: pd.DataFrame | Literal["SKIP"] = _prepare_sample_counts(
+        sample_name=metrics.sample_names[0],
+        counts_file=metrics.count_files[0],
+        strand_file=metrics.strandedness_files[0],
+        all_counts_files=metrics.count_files,
+    )
+
+    for i in range(1, metrics.num_samples):
+        new_counts = _prepare_sample_counts(
+            sample_name=metrics.sample_names[i],
+            counts_file=metrics.count_files[i],
+            strand_file=metrics.strandedness_files[i],
+            all_counts_files=metrics.count_files,
+        )
+        if isinstance(new_counts, str) and new_counts == "SKIP":
+            adjusted_index += 1
+            continue
+
+        counts: pd.DataFrame = counts.merge(new_counts, on="ensembl_gene_id", how="outer")
+        counts = counts.fillna(value=0)
+
+        # Remove run number "r\d+" from multi-run names
+        if re.search(r"R\d+r1", metrics.sample_names[i]):
+            new_sample_name = re.sub(r"r\d+", "", metrics.sample_names[i])
+            counts.columns[i + 1 - adjusted_index] = new_sample_name
+
+    return counts
+
+
+async def _create_counts_matrix(context_name: str, config: Config):
+    """Create a counts matrix by reading gene counts table(s)."""
+    data_dir = config.data_dir / "COMO_input" / context_name
     matrix_output_dir = config.data_dir / "data_matrices" / context_name
-    print(f"Creating Counts Matrix for '{context_name}'")
 
-    # call generate_counts_matrix.R to create count matrix from COMO_input folder
-    rpy2_api.Rpy2(
-        r_file_path=r_file_path,
-        data_dir=input_dir.as_posix(),
-        out_dir=matrix_output_dir.as_posix(),
-    ).call_function("generate_counts_matrix_main")
+    study_metrics = _organize_gene_counts_files(data_dir=data_dir)
+    final_matrix: pd.DataFrame = pd.DataFrame()
+
+    for metric in study_metrics:
+        counts: pd.DataFrame = await _create_sample_counts_matrix(metric)
+        final_matrix = (
+            counts if final_matrix.empty else pd.merge(final_matrix, counts, on="ensembl_gene_id", how="outer")
+        )
+
+    output_filename = matrix_output_dir / f"gene_counts_matrix_full_{data_dir.stem}.csv"
+    output_filename.parent.mkdir(parents=True, exist_ok=True)
+    final_matrix.to_csv(output_filename, index=False)
+    logger.success(f"Wrote gene count matrix for '{data_dir.stem}' at '{output_filename}'")
 
 
-def create_config_df(context_name):
-    """
-    Create configuration sheet at /main/data/config_sheets/rnaseq_data_inputs_auto.xlsx
-    based on the gene counts matrix. If using zFPKM normalization technique, fetch mean fragment lengths from
-    /work/data/COMO_input/<context name>/<study number>/fragmentSizes/
+async def _create_config_df(context_name: str) -> pd.DataFrame:  # noqa: C901
+    """Create configuration sheet.
+
+    The configuration file created is based on the gene counts matrix.
+     If using zFPKM normalization technique, mean fragment lengths will be fetched
     """
     config = Config()
     gene_counts_files = list(Path(config.data_dir, "COMO_input", context_name, "geneCounts").rglob("*.tab"))
 
-    out_df = pd.DataFrame(columns=["SampleName", "FragmentLength", "Layout", "Strand", "Group"])
+    sample_names: list[str] = []
+    fragment_lengths: list[int | float] = []
+    layouts: list[str] = []
+    strands: list[str] = []
+    groups: list[str] = []
+    preparation_method: list[str] = []
 
-    for gcfilename in gene_counts_files:
+    for gene_count_filename in sorted(gene_counts_files):
         try:
             # Match S___R___r___
             # \d{1,3} matches 1-3 digits
             # (?:r\d{1,3})? matches an option "r" followed by three digits
-            label = re.findall(r"S\d{1,3}R\d{1,3}(?:r\d{1,3})?", gcfilename.as_posix())[0]
+            label = re.findall(r"S\d{1,3}R\d{1,3}(?:r\d{1,3})?", gene_count_filename.as_posix())[0]
 
-        except IndexError:
+        except IndexError as e:
             raise IndexError(
-                f"\n\nFilename of '{gcfilename}' is not valid. Should be 'contextName_SXRYrZ.tab', where X is the "
-                "study/batch number, Y is the replicate number, and Z is the run number."
+                f"\n\nFilename of '{gene_count_filename}' is not valid. "
+                f"Should be 'contextName_SXRYrZ.tab', where X is the study/batch number, Y is the replicate number, "
+                f"and Z is the run number."
                 "\n\nIf not a multi-run sample, exclude 'rZ' from the filename."
-            )
+            ) from e
 
         study_number = re.findall(r"S\d{1,3}", label)[0]
         rep_number = re.findall(r"R\d{1,3}", label)[0]
@@ -74,67 +327,74 @@ def create_config_df(context_name):
 
                 for r in runs:
                     r_label = re.findall(r"r\d{1,3}", r.as_posix())[0]
-                    R_label = re.findall(r"R\d{1,3}", r.as_posix())[0]
+                    R_label = re.findall(r"R\d{1,3}", r.as_posix())[0]  # noqa: N806
                     frag_filename = "".join([context_name, "_", study_number, R_label, r_label, "_fragment_size.txt"])
-                    frag_files.append(config.data_dir / "COMO_input" / context_name / "fragmentSizes" / study_number / frag_filename)
-
-        layout_filename = context_name + "_" + label + "_layout.txt"
-        strand_filename = context_name + "_" + label + "_strandedness.txt"
-        frag_filename = context_name + "_" + label + "_fragment_size.txt"
-        prep_filename = context_name + "_" + label + "_prep_method.txt"
+                    frag_files.append(
+                        config.data_dir / "COMO_input" / context_name / "fragmentSizes" / study_number / frag_filename
+                    )
 
         context_path = config.data_dir / "COMO_input" / context_name
-        layout_path = context_path / "layouts"
-        strand_path = context_path / "strandedness"
-        frag_path = context_path / "fragmentSizes"
-        prep_path = context_path / "prepMethods"
 
-        layout_files = list(layout_path.rglob(layout_filename))
-        strand_files = list(strand_path.rglob(strand_filename))
-        frag_files = list(frag_path.rglob(frag_filename))
-        prep_files = list(prep_path.rglob(prep_filename))
+        layout_files: list[Path] = list((context_path / "layouts").rglob(f"{context_name}_{label}_layout.txt"))
+        strand_files: list[Path] = list(
+            (context_path / "strandedness").rglob(f"{context_name}_{label}_strandedness.txt")
+        )
+        frag_files: list[Path] = list(
+            (context_path / "fragmentSizes").rglob(f"{context_name}_{label}_fragment_size.txt")
+        )
+        prep_files: list[Path] = list((context_path / "prepMethods").rglob(f"{context_name}_{label}_prep_method.txt"))
 
-        # Get layout
         layout = "UNKNOWN"
         if len(layout_files) == 0:
-            print(
-                f"No layout file found for {label}, writing as 'UNKNOWN', this should be defined by user if using zFPKM or rnaseq_gen.py will not run"
+            logger.warning(
+                f"No layout file found for {label}, writing as 'UNKNOWN', "
+                f"this should be defined by user if using zFPKM or rnaseq_gen.py will not run"
             )
         elif len(layout_files) == 1:
-            with open(layout_files[0]) as file:
+            with layout_files[0].open("w") as file:
                 layout = file.read().strip()
         elif len(layout_files) > 1:
-            raise ValueError(f"Multiple matching layout files for {label}, make sure there is only one copy for each replicate in COMO_input")
+            raise ValueError(
+                f"Multiple matching layout files for {label}, "
+                f"make sure there is only one copy for each replicate in COMO_input"
+            )
 
-        # Get strandedness
         strand = "UNKNOWN"
         if len(strand_files) == 0:
-            print(
+            logger.warning(
                 f"No strandedness file found for {label}, writing as 'UNKNOWN'. "
-                f"This will not interfere with the analysis since you have already set rnaseq_preprocess.py to infer the strandedness when writing the counts matrix"
+                f"This will not interfere with the analysis since you have already set rnaseq_preprocess.py to "
+                f"infer the strandedness when writing the counts matrix"
             )
         elif len(strand_files) == 1:
-            with open(strand_files[0]) as file:
+            with strand_files[0].open("w") as file:
                 strand = file.read().strip()
         elif len(strand_files) > 1:
-            raise ValueError(f"Multiple matching strandedness files for {label}, make sure there is only one copy for each replicate in COMO_input")
+            raise ValueError(
+                f"Multiple matching strandedness files for {label}, "
+                f"make sure there is only one copy for each replicate in COMO_input"
+            )
 
-        # Get preparation method
         prep = "total"
         if len(prep_files) == 0:
-            print(f"No prep file found for {label}, assuming 'total' as in Total RNA library preparation")
+            logger.warning(f"No prep file found for {label}, assuming 'total' as in Total RNA library preparation")
         elif len(prep_files) == 1:
-            with open(prep_files[0]) as file:
+            with prep_files[0].open("w") as file:
                 prep = file.read().strip().lower()
                 if prep not in ["total", "mrna"]:
                     raise ValueError(f"Prep method must be either 'total' or 'mrna' for {label}")
         elif len(prep_files) > 1:
-            raise ValueError(f"Multiple matching prep files for {label}, make sure there is only one copy for each replicate in COMO_input")
+            raise ValueError(
+                f"Multiple matching prep files for {label}, "
+                f"make sure there is only one copy for each replicate in COMO_input"
+            )
 
-        # Get fragment length
         mean_fragment_size = 100
         if len(frag_files) == 0:
-            print(f"\nNo fragment file found for {label}, using '100'. This must be defined by the user in order to use zFPKM normalization")
+            logger.warning(
+                f"No fragment file found for {label}, using '100'. "
+                f"This must be defined by the user in order to use zFPKM normalization"
+            )
         elif len(frag_files) == 1:
             if layout == "single-end":
                 mean_fragment_size = 0
@@ -156,180 +416,233 @@ def create_config_df(context_name):
 
                     mean_fragment_size = sum(mean_fragment_sizes * library_sizes) / sum(library_sizes)
         elif len(frag_files) > 1:
-            raise ValueError(f"Multiple matching fragment files for {label}, make sure there is only one copy for each replicate in COMO_input")
+            raise ValueError(
+                f"Multiple matching fragment files for {label}, "
+                f"make sure there is only one copy for each replicate in COMO_input"
+            )
 
-        new_row = pd.DataFrame(
-            {
-                "SampleName": [f"{context_name}_{study_number}{rep_number}"],
-                "FragmentLength": [mean_fragment_size],
-                "Layout": [layout],
-                "Strand": [strand],
-                "Group": [study_number],
-                "LibraryPrep": [prep],
-            }
-        )
+        sample_names.append(f"{context_name}_{study_number}{rep_number}")
+        fragment_lengths.append(mean_fragment_size)
+        layouts.append(layout)
+        strands.append(strand)
+        groups.append(study_number)
+        preparation_method.append(prep)
 
-        out_df = pd.concat([out_df, new_row], sort=True)
-        out_df.sort_values("SampleName", inplace=True)
-
+    out_df = pd.DataFrame(
+        {
+            "sample_name": sample_names,
+            "fragment_length": fragment_lengths,
+            "layout": layouts,
+            "strand": strands,
+            "study": groups,
+            "library_prep": preparation_method,
+        }
+    ).sort_values("sample_name")
     return out_df
 
 
-def split_config_df(df):
+def _split_config_df(df):
+    """Split a config dataframe to two.
+
+    One for Total RNA library prep, one for mRNA
     """
-    Split a config dataframe into two seperate ones. One for Total RNA library prep, one for mRNA
-    """
-    df_t = df[df["LibraryPrep"] == "total"]
-    df_m = df[df["LibraryPrep"] == "mrna"]
+    df_t = df[df["library_prep"] == "total"]
+    df_m = df[df["library_prep"] == "mrna"]
 
     return df_t, df_m
 
 
-def split_counts_matrices(count_matrix_all, df_total, df_mrna):
+def _split_counts_matrices(
+    count_matrix_all: Path, df_total: pd.DataFrame, df_mrna: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Split a counts-matrix dataframe to two.
+
+    One for Total RNA library prep, one for mRNA
     """
-    Split a counts-matrix dataframe into two seperate ones. One for Total RNA library prep, one for mRNA
-    """
+    logger.info(f"Reading gene count matrix file at '{count_matrix_all}'")
     matrix_all = pd.read_csv(count_matrix_all)
-    matrix_total = matrix_all[["genes"] + [n for n in matrix_all.columns if n in df_total["SampleName"].tolist()]]
-    matrix_mrna = matrix_all[["genes"] + [n for n in matrix_all.columns if n in df_mrna["SampleName"].tolist()]]
+    matrix_total = matrix_all[
+        ["ensembl_gene_id"] + [n for n in matrix_all.columns if n in df_total["sample_name"].tolist()]
+    ]
+    matrix_mrna = matrix_all[
+        ["ensembl_gene_id"] + [n for n in matrix_all.columns if n in df_mrna["sample_name"].tolist()]
+    ]
 
     return matrix_total, matrix_mrna
 
 
-def create_gene_info_file(matrix_file_list: list[str], input_format: Input, taxon_id):
-    """
-    Create gene info file for specified context by reading first column in its count matrix file at
-     results/<context name>/gene_info_<context name>.csv
-    """
-    config = Config()
+async def _create_gene_info_file(
+    *,
+    matrix_files: list[Path],
+    taxon_id,
+    config: Config,
+    cache: bool,
+):
+    """Create gene info file for specified context by reading first column in its count matrix file."""
+    logger.info("Fetching gene info")
+    genes = set()
+    for file in matrix_files:
+        data: pd.DataFrame | sc.AnnData = pd.read_csv(file) if file.suffix == ".csv" else sc.read_h5ad(file)
+        input_values = data.iloc[:, 0].tolist() if isinstance(data, pd.DataFrame) else data.var_names.tolist()
+        conversion = await convert_gene_data(input_values, taxon_id)
+        genes.update(conversion["entrez_gene_id"].astype(str).tolist())
 
-    print("Fetching gene info")
-    gene_info_file = config.data_dir / "gene_info.csv"
-    genes: list[str] = []
-    for file in matrix_file_list:
-        genes += pd.read_csv(file)["genes"].tolist()
-    genes = list(set(genes))
-
-    # Create our output database format
-    # Do not include values equal to "form"
-    # Remove items not equal to `form` because the input database cannot exist as an output database
-    output_db: list[Output] = [
-        i for i in [Output.ENSEMBL_GENE_ID, Output.GENE_SYMBOL, Output.GENE_ID, Output.CHROMOSOMAL_LOCATION] if i.value != input_format.value
-    ]
-
-    biodbnet = BioDBNet()
-    gene_info = biodbnet.db2db(
-        input_values=genes,
-        input_db=input_format,
-        output_db=output_db,
+    mygene = MyGene(cache=cache)
+    gene_data = await mygene.query(
+        items=list(genes),
         taxon=taxon_id,
+        scopes="entrezgene",
     )
+    gene_info: pd.DataFrame = pd.DataFrame(
+        data=None,
+        columns=pd.Index(data=["ensembl_gene_id", "gene_symbol", "entrez_gene_id", "start_position", "end_position"]),
+        index=pd.Index(data=range(len(gene_data))),
+    )
+    for i, data in enumerate(gene_data):
+        ensembl_ids = data.get("ensembl.gene", "-")
+        if isinstance(ensembl_ids, list):
+            ensembl_ids = ensembl_ids[0]
 
-    gene_info.rename(columns={Output.ENSEMBL_GENE_ID.value: "ensembl_gene_id"}, inplace=True)
-    gene_info["start_position"] = gene_info["Chromosomal Location"].str.extract(r"chr_start: (\d+)")
-    gene_info["end_position"] = gene_info["Chromosomal Location"].str.extract(r"chr_end: (\d+)")
-    gene_info.rename(columns={"Gene Symbol": "hgnc_symbol", "Gene ID": "entrezgene_id"}, inplace=True)
-    gene_info.drop(["Chromosomal Location"], axis=1, inplace=True)
-    gene_info.to_csv(gene_info_file, index=False)
-    print(f"Gene Info file written at '{gene_info_file}'")
+        start_pos = data.get("genomic_pos.start", 0)
+        end_pos = data.get("genomic_pos.end", 0)
+        if isinstance(start_pos, list):
+            start_pos = sum(start_pos) / len(start_pos)
+        if isinstance(end_pos, list):
+            end_pos = sum(end_pos) / len(end_pos)
+
+        gene_info.at[i, "gene_symbol"] = data.get("symbol", "-")
+        gene_info.at[i, "entrez_gene_id"] = data.get("entrezgene", "-")
+        gene_info.at[i, "ensembl_gene_id"] = ensembl_ids
+        gene_info.at[i, "start_position"] = start_pos
+        gene_info.at[i, "end_position"] = end_pos
+
+    gene_info = gene_info[
+        (gene_info["entrez_gene_id"] != "-") & (gene_info["ensembl_gene_id"] != "-") & (gene_info["gene_symbol"] != "-")
+    ]
+    gene_info["size"] = gene_info["end_position"].astype(int) - gene_info["start_position"].astype(int)
+    gene_info.drop(columns=["start_position", "end_position"], inplace=True)
+    output_filepath = config.data_dir / "gene_info.csv"
+    gene_info.to_csv(output_filepath, index=False)
+    logger.success(f"Gene Info file written at '{output_filepath}'")
 
 
-def handle_context_batch(context_names, mode, input_format: Input, taxon_id, provided_matrix_file):
-    """
-    Handle iteration through each context type and create files according to flag used (config, matrix, info)
-    """
-    config = Config()
+async def _handle_context_batch(  # noqa: C901
+    context_names: list[str],
+    mode: Literal["create", "provide"],
+    taxon_id,
+    provided_matrix_file,
+    config: Config,
+    cache: bool,
+):
+    """Handle iteration through each context type and create appropriate files."""
     trnaseq_config_filename = config.config_dir / "trnaseq_data_inputs_auto.xlsx"
     mrnaseq_config_filename = config.config_dir / "mrnaseq_data_inputs_auto.xlsx"
 
-    tflag = False  # turn on when any total set is found to prevent writer from being init multiple times or empty
-    mflag = False  # turn on when any mrna set is found to prevent writer from being init multiple times or empty
+    using_trna = False  # turn on when any total set is found to prevent writer from being init multiple times or empty
+    using_mrna = False  # turn on when any mrna set is found to prevent writer from being init multiple times or empty
 
-    print(f"Found {len(context_names)} contexts to process: {', '.join(context_names)}")
+    logger.success(f"Found {len(context_names)} contexts to process: {', '.join(context_names)}")
 
-    tmatrix_files = []
-    mmatrix_files = []
-    for context_name in context_names:
-        context_name = context_name.strip(" ")
-        print(f"Preprocessing {context_name}")
-        gene_output_dir = config.result_dir / context_name
-        matrix_output_dir = config.data_dir / "data_matrices" / context_name
+    tmatrix_files: list[Path] = []
+    mmatrix_files: list[Path] = []
+    match mode:
+        case "create":
+            for context_name in context_names:
+                context_name = context_name.strip(" ")
+                logger.info(f"Processing {context_name}")
+                gene_output_dir = config.result_dir / context_name
+                matrix_output_dir = config.data_dir / "data_matrices" / context_name
 
-        gene_output_dir.parent.mkdir(parents=True, exist_ok=True)
-        matrix_output_dir.parent.mkdir(parents=True, exist_ok=True)
+                gene_output_dir.parent.mkdir(parents=True, exist_ok=True)
+                matrix_output_dir.parent.mkdir(parents=True, exist_ok=True)
 
-        print('Gene info output directory is "{}"'.format(gene_output_dir))
+                logger.info(f"Gene info output directory is '{gene_output_dir}'")
 
-        matrix_path_all = matrix_output_dir / f"gene_counts_matrix_full_{context_name}.csv"
-        matrix_path_total = matrix_output_dir / f"gene_counts_matrix_total_{context_name}.csv"
-        matrix_path_mrna = matrix_output_dir / f"gene_counts_matrix_mrna_{context_name}.csv"
+                await _create_counts_matrix(context_name, config=config)
+                # TODO: warn user or remove samples that are all 0 to prevent density plot error in zFPKM
+                config_df = await _create_config_df(context_name)
+                trna_df, mrna_df = _split_config_df(config_df)
 
-        if mode == "make":
-            create_counts_matrix(context_name)
-            # TODO: warn user or remove samples that are all 0 to prevent density plot error in zFPKM
-            df = create_config_df(context_name)
-            df_t, df_m = split_config_df(df)
+                matrix_path_total = matrix_output_dir / f"gene_counts_matrix_total_{context_name}.csv"
+                if not trna_df.empty:
+                    if not using_trna:
+                        using_trna = True
+                        twriter = pd.ExcelWriter(trnaseq_config_filename)
 
-            if not df_t.empty:
-                if not tflag:
-                    tflag = True
-                    twriter = pd.ExcelWriter(trnaseq_config_filename)
+                    tmatrix_files.append(matrix_path_total)
+                    trna_df.to_excel(twriter, sheet_name=context_name, header=True, index=False)
 
-                tmatrix_files.append(matrix_path_total)
-                df_t.to_excel(twriter, sheet_name=context_name, header=True, index=False)
+                matrix_path_mrna = matrix_output_dir / f"gene_counts_matrix_mrna_{context_name}.csv"
+                if not mrna_df.empty:
+                    if not using_mrna:
+                        using_mrna = True
+                        mwriter = pd.ExcelWriter(mrnaseq_config_filename)
 
-            if not df_m.empty:
-                if not mflag:
-                    mflag = True
-                    mwriter = pd.ExcelWriter(mrnaseq_config_filename)
+                    mmatrix_files.append(matrix_path_mrna)
+                    mrna_df.to_excel(mwriter, sheet_name=context_name, header=True, index=False)
 
-                mmatrix_files.append(matrix_path_mrna)
-                df_m.to_excel(mwriter, sheet_name=context_name, header=True, index=False)
+                matrix_path_all = matrix_output_dir / f"gene_counts_matrix_full_{context_name}.csv"
+                trna_matrix, mrna_matrix = _split_counts_matrices(matrix_path_all, trna_df, mrna_df)
+                if len(trna_matrix.columns) >= 1:
+                    trna_matrix.to_csv(matrix_path_total, header=True, index=False)
+                if len(mrna_matrix.columns) >= 1:
+                    mrna_matrix.to_csv(matrix_path_mrna, header=True, index=False)
 
-            tmatrix, mmatrix = split_counts_matrices(matrix_path_all, df_t, df_m)
-            if len(tmatrix.columns) >= 1:
-                tmatrix.to_csv(matrix_path_total, header=True, index=False)
-            if len(mmatrix.columns) >= 1:
-                mmatrix.to_csv(matrix_path_mrna, header=True, index=False)
+            if using_trna:
+                twriter.close()
+            if using_mrna:
+                mwriter.close()
 
-    if mode == "make":
-        if tflag:
-            twriter.close()
-        if mflag:
-            mwriter.close()
+            await _create_gene_info_file(
+                matrix_files=tmatrix_files + mmatrix_files,
+                taxon_id=taxon_id,
+                config=config,
+                cache=cache,
+            )
+        case "provide":
+            matrix_files: list[Path] = [Path(p) for p in stringlist_to_list(provided_matrix_file)]
+            await _create_gene_info_file(
+                matrix_files=matrix_files,
+                taxon_id=taxon_id,
+                config=config,
+                cache=cache,
+            )
+        case _:
+            raise ValueError("'--mode' must be either 'create' or 'provide'")
 
-        create_gene_info_file(tmatrix_files + mmatrix_files, input_format, taxon_id)
 
-    else:
-        matrix_files: list[str] = como_utilities.stringlist_to_list(provided_matrix_file)
-        create_gene_info_file(matrix_files, input_format, taxon_id)
+async def rnaseq_preprocess(
+    context_names: list[str],
+    mode: Literal["create", "provide"],
+    taxon_id: int | str,
+    input_format: Input | str,
+    matrix_file: str | Path | None = None,
+    config: Config = None,
+    cache: bool = True,
+) -> None:
+    """Preprocesses RNA-seq data for downstream analysis.
 
-
-def rnaseq_preprocess(context_names: str, mode: str, input_format: Input, taxon_id: Union[int, str], matrix_file: Optional[str] = None) -> None:
-    if not mode == "make" and not mode == "provide":
-        raise ValueError("mode must be either 'make' or 'provide'")
-
-    if input_format not in [Input.ENSEMBL_GENE_ID, Input.GENE_SYMBOL, Input.GENE_ID]:
-        raise ValueError("input_format must be either 'ENSEMBL_GENE_ID', 'GENE_SYMBOL', or 'GENE_ID'")
+    Fetches additional gene information from a provided matrix or gene counts,
+        or optionally creates this matrix using gene count files obtained using STAR aligner
+    """
+    config = Config() if config is None else config
+    if mode not in {"create", "provide"}:
+        raise ValueError("mode must be either 'create' or 'provide'")
 
     if not isinstance(taxon_id, int) and taxon_id not in ["human", "mouse"]:
         raise ValueError("taxon_id must be either an integer, or accepted string ('mouse', 'human')")
 
-    handle_context_batch(context_names=context_names, mode=mode, input_format=input_format, taxon_id=taxon_id, provided_matrix_file=matrix_file)
+    await _handle_context_batch(
+        context_names=context_names,
+        mode=mode,
+        taxon_id=taxon_id,
+        provided_matrix_file=Path(matrix_file if matrix_file is not None else "").as_posix(),
+        config=config,
+        cache=cache,
+    )
 
 
-def parse_args():
-    """
-    Parse arguments to rnaseq_preprocess.py, create a gene info files for each provided context at:
-    /work/data/results/<context name>/gene_info_<context name>.csv.
-
-     If using --info-matrix or --info-matrix-config:
-    create gene count matrix file at /work/data/data_matrices/<context name>/gene_counts_matrix_<context name>.csv,
-
-    If using --info-matrix-config:
-    create config file at /work/data/config_sheets/rnaseq_data_inputs_auto.xlsx
-    """
-
+def _parse_args():
     parser = argparse.ArgumentParser(
         prog="rnaseq_preprocess.py",
         description="""
@@ -343,7 +656,6 @@ def parse_args():
             For additional help, please post questions/issues in the MADRID GitHub repo at
             https://github.com/HelikarLab/MADRID or email babessell@gmail.com""",
     )
-
     parser.add_argument(
         "-n",
         "--context-names",
@@ -357,107 +669,73 @@ def parse_args():
                              the count matrix as an imported .csv file. If making multiple models in a batch, then
                              use the format: "context1 context2 context3". """,
     )
-
     parser.add_argument(
-        "-f",
-        "--gene-format",
+        "-i",
+        "--taxon-id",
+        required=False,
+        default=9606,
+        dest="taxon_id",
+        help="BioDbNet taxon ID number, also accepts 'human', or 'mouse'",
+    )
+    parser.add_argument(
+        "--input-format",
+        required=True,
+        dest="input_format",
+        help="The data input format, such as Ensembl, Entrez, etc.",
+    )
+    parser.add_argument(
+        "--mode",
         type=str,
-        required=False,
-        default="Ensembl Gene ID",
-        dest="gene_format",
-        help="Format of Genes, accepts 'Ensembl', 'Entrez', or'HGNC symbol'",
+        required=True,
+        dest="mode",
+        choices={"create", "provide"},
+        help="Mode of rnaseq_preprocess.py, either 'make' or 'provide'",
     )
-
     parser.add_argument(
-        "-i", "--taxon-id", required=False, default=9606, dest="taxon_id", help="BioDbNet taxon ID number, also accepts 'human', or 'mouse'"
-    )
-
-    group = parser.add_mutually_exclusive_group(required=True)
-
-    group.add_argument(
-        "-p",
-        "--provide-matrix",
-        action="store_true",
-        required=False,
-        default=False,
-        dest="provide_matrix",
-        help="Provide your own count matrix. Requires additional argument '--matrix' which is .csv file "
-        "where colnames are sample names (in contextName_SXRY format) and rownames are genes in "
-        "in format specified by --gene-format",
-    )  # would be nice if this was a directory full matrices in case you want to do in batches
-
-    group.add_argument(
-        "-y",
-        "--create-matrix",
-        action="store_true",
-        required=False,
-        default=False,
-        dest="make_matrix",
-        help="Flag for if you want to make a counts matrix, but not a config file. "
-        "Requires a correctly structured COMO_input folder in /work/data/. Can make one using: "
-        "https://github.com/HelikarLab/FastqToGeneCounts",
-    )
-
-    parser.add_argument(
-        "-m",
         "--matrix",
-        required="--provide-matrix" in sys.argv,  # require if using --provide-matrix flag,
+        required=False,
         dest="provided_matrix_fname",
-        default="SKIP",
-        help="Name of provided counts matrix in " "/work/data/data_matrices/<context name>/<NAME OF FILE>.csv",
+        default=None,
+        help="Name of provided counts matrix in /work/data/data_matrices/<context name>/<NAME OF FILE>.csv",
     )
 
-    args = parser.parse_args()
-    args.context_names = como_utilities.stringlist_to_list(args.context_names)
+    parsed = parser.parse_args()
+    parsed.context_names = stringlist_to_list(parsed.context_names)
 
+    if parsed.mode == "provide" and parsed.provided_matrix_fname is None:
+        raise ValueError("If provide_matrix is True, then provided_matrix_fname must be provided")
+
+    # handle species alternative ids
+    taxon_id = str(parsed.taxon_id)
+    if taxon_id.isdigit():
+        try:
+            parsed.taxon_id = Taxon.from_int(int(taxon_id))
+        except ValueError:
+            parsed.taxon_id = int(taxon_id)
+    else:
+        if taxon_id.upper() in {"HUMAN", "HOMO SAPIENS"}:
+            parsed.taxon_id = Taxon.HOMO_SAPIENS
+        elif taxon_id.upper() in {"MOUSE", "MUS MUSCULUS"}:
+            parsed.taxon_id = Taxon.MUS_MUSCULUS
+        else:
+            raise ValueError(
+                f"Taxon id (--taxon-id) is invalid; accepts 'human', 'mouse', or an integer value; provided: {taxon_id}"
+            )
+
+    args = _Arguments(**vars(parsed))
     return args
 
 
-def main():
-    args = parse_args()
-
-    if args.gene_format.upper() in ["ENSEMBL", "ENSEMBLE", "ENSG", "ENSMUSG", "ENSEMBL ID", "ENSEMBL GENE ID"]:
-        gene_format_database: Input = Input.ENSEMBL_GENE_ID
-
-    elif args.gene_format.upper() in ["HGNC SYMBOL", "HUGO", "HUGO SYMBOL", "SYMBOL", "HGNC", "GENE SYMBOL"]:
-        gene_format_database: Input = Input.GENE_SYMBOL
-
-    elif args.gene_format.upper() in ["ENTREZ", "ENTRES", "ENTREZ ID", "ENTREZ NUMBER" "GENE ID"]:
-        gene_format_database: Input = Input.GENE_ID
-
-    else:  # provided invalid gene format
-        raise ValueError(f"Gene format (--gene_format) is invalid; accepts 'Ensembl', 'Entrez', and 'HGNC symbol'; provided: {args.gene_format}")
-
-    # handle species alternative ids
-    if isinstance(args.taxon_id, str):
-        if args.taxon_id.upper() == "HUMAN" or args.taxon_id.upper() == "HOMO SAPIENS":
-            taxon_id = Taxon.HOMO_SAPIENS
-        elif args.taxon_id.upper() == "MOUSE" or args.taxon_id.upper() == "MUS MUSCULUS":
-            taxon_id = Taxon.MUS_MUSCULUS
-        else:
-            raise ValueError(f"Taxon id (--taxon-id) is invalid; accepts 'human', 'mouse'; provided: {args.taxon_id}")
-
-    elif isinstance(args.taxon_id, int):
-        taxon_id = args.taxon_id
-    else:
-        raise ValueError(f"Taxon id (--taxon-id) is invalid; accepts 'human', 'mouse'; provided: {args.taxon_id}")
-
-    # use mutually exclusive flag to set mode which tells which files to generate
-    if args.provide_matrix:
-        mode = "provide"
-    elif args.make_matrix:
-        mode = "make"
-    else:
-        raise ValueError("Must set either --provide-matrix or --make-matrix")
-
-    handle_context_batch(
-        context_names=args.context_names,
-        mode=mode,
-        input_format=gene_format_database,
-        taxon_id=taxon_id,
-        provided_matrix_file=args.provided_matrix_fname,
-    )
-
-
 if __name__ == "__main__":
-    main()
+    args: _Arguments = _parse_args()
+    taxon_id_value = args.taxon_id.value if isinstance(args.taxon_id, Taxon) else args.taxon_id
+
+    asyncio.run(
+        rnaseq_preprocess(
+            context_names=args.context_names,
+            mode=args.mode,
+            taxon_id=taxon_id_value,
+            matrix_file=args.provided_matrix_fname,
+            input_format=args.input_format,
+        )
+    )
