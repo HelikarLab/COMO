@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 from dataclasses import dataclass
-from typing import Optional
 
 import pandas as pd
 from fast_bioservices import Taxon
@@ -116,6 +115,7 @@ async def _handle_context_batch(
 
 
 async def rnaseq_gen(
+    # config_filepath: Path,
     config_filename: str,
     prep: RNASeqPreparationMethod,
     taxon_id: int | str | Taxon,
@@ -151,24 +151,24 @@ async def rnaseq_gen(
     if isinstance(taxon_id, (str, int)):
         taxon_id = Taxon.from_string(str(taxon_id))
 
-    if technique.value not in [t.value for t in FilteringTechnique]:
-        raise ValueError(f"Technique must be one of {FilteringTechnique}")
+    match technique:
+        case FilteringTechnique.tpm:
+            cut_off = 25 if cut_off is None else cut_off
+            if cut_off < 1 or cut_off > 100:
+                raise ValueError("Quantile must be between 1 - 100")
 
-    if technique == FilteringTechnique.tpm:
-        if cut_off is None:
-            cut_off = 25
+        case FilteringTechnique.cpm:
+            if cut_off is not None and cut_off < 0:
+                raise ValueError("Cutoff must be greater than 0")
+            elif cut_off is None:
+                cut_off = "default"
 
-        if cut_off < 1 or cut_off > 100:
-            raise ValueError("Quantile must be between 1 - 100")
-
-    elif technique == FilteringTechnique.cpm:
-        if cut_off is not None and cut_off < 0:
-            raise ValueError("Cutoff must be greater than 0")
-
-        if cut_off is None:
-            cut_off = "default"
-    elif technique == FilteringTechnique.zfpkm and cut_off is None:
-        cut_off = "default"
+        case FilteringTechnique.zfpkm:
+            cut_off = "default" if cut_off is None else cut_off
+        case FilteringTechnique.umi:
+            pass
+        case _:
+            raise ValueError(f"Technique must be one of {FilteringTechnique}")
 
     await _handle_context_batch(
         config_filename=config_filename,
