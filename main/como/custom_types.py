@@ -1,4 +1,9 @@
+from __future__ import annotations
+
 from enum import Enum
+from pathlib import Path
+
+from fast_bioservices import Taxon
 
 
 class RNASeqPreparationMethod(Enum):
@@ -7,7 +12,7 @@ class RNASeqPreparationMethod(Enum):
     SCRNA = "scrna"
 
     @staticmethod
-    def from_string(value: str) -> "RNASeqPreparationMethod":
+    def from_string(value: str) -> RNASeqPreparationMethod:
         """Build a preparation method object from a string."""
         match_value = "".join(c for c in value if c.isascii()).lower()
 
@@ -21,3 +26,7 @@ class RNASeqPreparationMethod(Enum):
             case _:
                 possible_values = [t.value for t in RNASeqPreparationMethod]
                 raise ValueError(f"Filtering technique must be one of {possible_values}; got: {value}")
+
+
+type_taxon = Taxon | int | str
+type_path = str | Path
