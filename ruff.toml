@@ -1,6 +1,6 @@
 line-length = 120
-extend-include = ["docs/**/*.py", "tests/**/*.py"]
-exclude = ["__init__.py", "main/COMO.ipynb"]
+extend-include = ["docs/**/*.py", "tests/**/*.py", "**/*.ipynb"]
+exclude = ["__init__.py"]
 
 [format]
 quote-style = "double"
