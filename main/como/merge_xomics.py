@@ -344,15 +344,9 @@ async def _merge_xomics(
     config = Config()
     logger.info(f"Merging data for {context_name}")
     # load data for each source if it exists. IF not load an empty dummy dataset
-    trnaseq = _load_rnaseq_tests(
-        filename=trnaseq_file, context_name=context_name, prep_method=RNASeqPreparationMethod.TOTAL
-    )
-    mrnaseq = _load_rnaseq_tests(
-        filename=mrnaseq_file, context_name=context_name, prep_method=RNASeqPreparationMethod.MRNA
-    )
-    scrnaseq = _load_rnaseq_tests(
-        filename=scrnaseq_file, context_name=context_name, prep_method=RNASeqPreparationMethod.SCRNA
-    )
+    trnaseq = _load_rnaseq_tests(filename=trnaseq_file, context_name=context_name, prep_method=RNAPrepMethod.TOTAL)
+    mrnaseq = _load_rnaseq_tests(filename=mrnaseq_file, context_name=context_name, prep_method=RNAPrepMethod.MRNA)
+    scrnaseq = _load_rnaseq_tests(filename=scrnaseq_file, context_name=context_name, prep_method=RNAPrepMethod.SCRNA)
     proteomics = proteomics_gen.load_proteomics_tests(filename=proteomics_file, context_name=context_name)
 
     expression_list = []
