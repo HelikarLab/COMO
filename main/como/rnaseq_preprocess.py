@@ -253,7 +253,7 @@ async def _write_counts_matrix(
     config_df: pd.DataFrame,
     como_context_dir: Path,
     output_counts_matrix_filepath: Path,
-    rna_type: type_rna,
+    rna: type_rna,
 ) -> pd.DataFrame:
     """Create a counts matrix file by reading gene counts table(s)."""
     study_metrics = _organize_gene_counts_files(data_dir=como_context_dir)
@@ -264,12 +264,12 @@ async def _write_counts_matrix(
     for count in counts:
         final_matrix = count if final_matrix.empty else pd.merge(final_matrix, count, on="ensembl_gene_id", how="outer")
 
-    rna_specific_sample_names = config_df.loc[config_df["library_prep"] == rna_type, "sample_name"].tolist()
+    rna_specific_sample_names = config_df.loc[config_df["library_prep"] == rna, "sample_name"].tolist()
     final_matrix = final_matrix[["ensembl_gene_id", *rna_specific_sample_names]]
 
     output_counts_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
     final_matrix.to_csv(output_counts_matrix_filepath, index=False)
-    logger.success(f"Wrote gene count matrix at '{output_counts_matrix_filepath}'")
+    logger.success(f"Wrote gene count matrix for '{rna}' RNA at '{output_counts_matrix_filepath}'")
     return final_matrix
 
 
