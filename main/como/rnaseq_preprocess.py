@@ -1,22 +1,22 @@
 from __future__ import annotations
 
-import argparse
 import asyncio
+import contextlib
 import re
+import sys
 from dataclasses import dataclass, field
-from io import StringIO
+from io import StringIO, TextIOWrapper
+from itertools import chain
 from pathlib import Path
-from typing import Literal, NamedTuple
+from typing import Literal
 
 import aiofiles
 import numpy as np
 import pandas as pd
 import scanpy as sc
 from fast_bioservices.biothings.mygene import MyGene
+from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
-
-from como.custom_types import type_path, type_taxon
-from como.utils import _listify, convert_gene_data
 
 type_rna = Literal["total", "mrna"]
 
@@ -34,6 +34,7 @@ class _Arguments(NamedTuple):
     output_trna_count_matrix: list[Path] | None
     output_mrna_count_matrix: list[Path] | None
     cache: bool
+from como.types import RNAPrepMethod, type_path, type_rna
 
 
 @dataclass
