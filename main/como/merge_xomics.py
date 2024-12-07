@@ -16,7 +16,7 @@ from loguru import logger
 
 from como import proteomics_gen, return_placeholder_data
 from como.combine_distributions import _combine_zscores
-from como.custom_types import RNASeqPreparationMethod
+from como.custom_types import RNAPrepMethod
 from como.project import Config
 from como.utils import split_gene_expression_data
 
@@ -93,7 +93,7 @@ class _Arguments:
             raise ValueError("Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'")
 
 
-def _load_rnaseq_tests(filename, context_name, prep_method: RNASeqPreparationMethod) -> tuple[str, pd.DataFrame]:
+def _load_rnaseq_tests(filename, context_name, prep_method: RNAPrepMethod) -> tuple[str, pd.DataFrame]:
     """Load rnaseq results.
 
     Returns a dictionary of test (context, context, cell, etc ) names and rnaseq expression data
@@ -112,11 +112,11 @@ def _load_rnaseq_tests(filename, context_name, prep_method: RNASeqPreparationMet
         raise FileNotFoundError(f"Error: Config file not found at {inquiry_full_path}")
 
     match prep_method:
-        case RNASeqPreparationMethod.TOTAL:
+        case RNAPrepMethod.TOTAL:
             filename = f"rnaseq_total_{context_name}.csv"
-        case RNASeqPreparationMethod.MRNA:
+        case RNAPrepMethod.MRNA:
             filename = f"rnaseq_mrna_{context_name}.csv"
-        case RNASeqPreparationMethod.SCRNA:
+        case RNAPrepMethod.SCRNA:
             filename = f"rnaseq_scrna_{context_name}.csv"
         case _:
             raise ValueError(
