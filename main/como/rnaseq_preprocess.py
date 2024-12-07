@@ -168,11 +168,11 @@ async def _process_first_multirun_sample(strand_file: Path, all_counts_files: li
 
         run_counts = star_information.count_matrix[["ensembl_gene_id", strand_information]]
         run_counts.columns = pd.Index(["ensembl_gene_id", "counts"])
-        if sample_count.empty:
-            sample_count = run_counts
-        else:
-            # Merge to take all items from both data frames
-            sample_count = sample_count.merge(run_counts, on="ensembl_gene_id", how="outer")
+        sample_count = (
+            run_counts
+            if sample_count.empty
+            else sample_count.merge(run_counts, on=["ensembl_gene_id", "counts"], how="outer")
+        )
 
     # Set na values to 0
     sample_count = sample_count.fillna(value="0")
