@@ -166,7 +166,7 @@ async def _process_first_multirun_sample(strand_file: Path, all_counts_files: li
         if strand_information == "none":
             strand_information = "unstranded_rna_counts"
 
-        run_counts = star_information.count_matrix[["gene_id", strand_information]]
+        run_counts = star_information.count_matrix[["ensembl_gene_id", strand_information]]
         run_counts.columns = pd.Index(["ensembl_gene_id", "counts"])
         if sample_count.empty:
             sample_count = run_counts
