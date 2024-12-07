@@ -3,9 +3,3 @@ repos:
     rev: v0.6.1
     hooks:
       - id: conventional-gitmoji
-#  - repo: https://github.com/commitizen-tools/commitizen
-#    rev: v3.29.0
-#    hooks:
-#      - id: commitizen
-#        additional_dependencies: [cz-conventional-gitmoji]
-#        stages: [commit-msg]
