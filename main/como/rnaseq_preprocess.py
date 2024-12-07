@@ -18,23 +18,8 @@ from fast_bioservices.biothings.mygene import MyGene
 from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
 
-type_rna = Literal["total", "mrna"]
-
-
-class _Arguments(NamedTuple):
-    context_names: list[str]
-    mode: list[Literal["create", "provide"]]
-    taxon_id: list[str]
-    input_como_dirpath: list[Path] | None
-    input_matrix_filepath: list[Path] | None
-    output_gene_info_filepath: Path | None
-    output_count_matrices_dir: list[Path] | None
-    output_trna_config_filepath: Path | None
-    output_mrna_config_filepath: Path | None
-    output_trna_count_matrix: list[Path] | None
-    output_mrna_count_matrix: list[Path] | None
-    cache: bool
 from como.types import RNAPrepMethod, type_path, type_rna
+from como.utils import _listify
 
 
 @dataclass
