@@ -32,7 +32,7 @@ class _STARinformation:
     count_matrix: pd.DataFrame
 
     @property
-    def num_genes(self):
+    def num_genes(self) -> int:
         return len(self.count_matrix)
 
     @classmethod
@@ -120,8 +120,8 @@ def _sample_name_from_filepath(file: Path) -> str:
 
 
 def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
-    gene_count_dir = Path(data_dir, "geneCounts").resolve()
-    strand_dir = Path(data_dir, "strandedness").resolve()
+    gene_count_dir = Path(data_dir, "geneCounts")
+    strand_dir = Path(data_dir, "strandedness")
 
     gene_counts_directories: list[Path] = sorted([p for p in gene_count_dir.glob("*") if not p.name.startswith(".")])
     strandedness_directories: list[Path] = sorted([p for p in strand_dir.glob("*") if not p.name.startswith(".")])
