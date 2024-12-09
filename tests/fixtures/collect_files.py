@@ -81,13 +81,13 @@ def como_input_data_directory(request: SubRequest) -> Path:
 
 
 @pytest.fixture(params=["naiveB", "smB"])
-def packed_filepaths(sample_name: str) -> PackedFilepaths:
+def packed_filepaths(request: SubRequest) -> PackedFilepaths:
     return PackedFilepaths(
-        sample_name=sample_name,
-        fragment_size=Path(f"main/data/COMO_input/{sample_name}/fragmentSizes/{sample_name}_fragment_size.txt"),
-        gene_count=Path(f"main/data/COMO_input/{sample_name}/geneCounts/{sample_name}.tab"),
-        insert_size=Path(f"main/data/COMO_input/{sample_name}/insertSizes/{sample_name}_insert_size.txt"),
-        layout=Path(f"main/data/COMO_input/{sample_name}/layouts/{sample_name}_layout.txt"),
-        preparation_method=Path(f"main/data/COMO_input/{sample_name}/prepMethods/{sample_name}_prep_method.txt"),
-        strandedness=Path(f"main/data/COMO_input/{sample_name}/strandedness/{sample_name}_strandedness.txt"),
+        sample_name=request.param,
+        fragment_size=Path(f"main/data/COMO_input/{request.param}/fragmentSizes/{request.param}_fragment_size.txt"),
+        gene_count=Path(f"main/data/COMO_input/{request.param}/geneCounts/{request.param}.tab"),
+        insert_size=Path(f"main/data/COMO_input/{request.param}/insertSizes/{request.param}_insert_size.txt"),
+        layout=Path(f"main/data/COMO_input/{request.param}/layouts/{request.param}_layout.txt"),
+        preparation_method=Path(f"main/data/COMO_input/{request.param}/prepMethods/{request.param}_prep_method.txt"),
+        strandedness=Path(f"main/data/COMO_input/{request.param}/strandedness/{request.param}_strandedness.txt"),
     )
