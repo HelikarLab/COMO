@@ -241,9 +241,24 @@ async def _build_matrix_results(
     return _ReadMatrixResults(metrics=metrics, entrez_gene_ids=gene_info["entrez_gene_id"].tolist())
 
 
+def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
+    """Calculate the Transcripts Per Million (TPM) for each sample in the metrics dictionary."""
+    for sample in metrics:
+        count_matrix = metrics[sample].count_matrix
 
-        rnaseq_input_filepath = (
-            config.data_dir / "data_matrices" / context_name / f"gene_counts_matrix_{prep.value}_{context_name}"
+        gene_sizes = metrics[sample].gene_sizes
+
+        tpm_matrix = pd.DataFrame(data=None, index=count_matrix.index, columns=count_matrix.columns)
+        for i in range(len(count_matrix.columns)):
+            values: pd.Series = count_matrix.iloc[:, i] + 1  # Add 1 to prevent division by 0
+            rate = np.log(values.tolist()) - np.log(gene_sizes)
+            denominator = np.log(np.sum(np.exp(rate)))
+            tpm_value = np.exp(rate - denominator + np.log(1e6))
+            tpm_matrix.iloc[:, i] = tpm_value
+        metrics[sample].normalization_matrix = tpm_matrix
+
+    return metrics
+
         )
         if prep == RNAPrepMethod.SCRNA:
             rnaseq_input_filepath = rnaseq_input_filepath.with_suffix(".h5ad")
