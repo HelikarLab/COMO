@@ -460,10 +460,11 @@ def zfpkm_transform(
     return results, zfpkm_df
 
 
-def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
+def zfpkm_plot(results, *, write_png_filepath: Path, plot_xfloor: int = -4, subplot_titles: bool = True):
     """Plot the log2(FPKM) density and fitted Gaussian for each sample.
 
     :param results: A dictionary of intermediate results from zfpkm_transform.
+    :param write_png_filepath: The path to write the plot to
     :param: subplot_titles: Whether to display facet titles (sample names).
     :param plot_xfloor: Lower limit for the x-axis.
     :param subplot_titles: Whether to display facet titles (sample names).
@@ -509,7 +510,7 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
         fig.update_layout(legend_tracegroupgap=0)
 
     fig.update_layout(height=600 * len(results), width=1000, title_text="zFPKM Plots", showlegend=True)
-    fig.write_image("zfpkm_plot.png")
+    fig.write_image(write_png_filepath)
 
 
 def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
@@ -619,7 +620,13 @@ def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
     return metrics
 
 
-def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions, calcualte_fpkm: bool) -> NamedMetrics:
+def zfpkm_filter(
+    *,
+    metrics: NamedMetrics,
+    filtering_options: _FilteringOptions,
+    write_png_filepath: Path,
+    calcualte_fpkm: bool,
+) -> NamedMetrics:
     """Apply zFPKM filtering to the FPKM matrix for a given sample."""
     min_sample_expression = filtering_options.replicate_ratio
     high_confidence_sample_expression = filtering_options.high_replicate_ratio
@@ -637,7 +644,7 @@ def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions,
         minimums = matrix == 0
         results, zfpkm_df = zfpkm_transform(matrix)
         zfpkm_df[minimums] = -4
-        zfpkm_plot(results)
+        zfpkm_plot(results, write_png_filepath=write_png_filepath)
 
         # determine which genes are expressed
         min_samples = round(min_sample_expression * len(zfpkm_df.columns))
@@ -661,6 +668,7 @@ def filter_counts(
     technique: FilteringTechnique,
     filtering_options: _FilteringOptions,
     prep: RNASeqPreparationMethod,
+    write_zfpkm_png_filepath: Path,
 ) -> NamedMetrics:
     """Filter the count matrix based on the specified technique."""
     match technique:
@@ -671,9 +679,19 @@ def filter_counts(
         case FilteringTechnique.tpm:
             return tpm_quantile_filter(metrics=metrics, filtering_options=filtering_options)
         case FilteringTechnique.zfpkm:
-            return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calcualte_fpkm=True)
+            return zfpkm_filter(
+                metrics=metrics,
+                filtering_options=filtering_options,
+                write_png_filepath=write_zfpkm_png_filepath,
+                calcualte_fpkm=True,
+            )
         case FilteringTechnique.umi:
-            return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calcualte_fpkm=False)
+            return zfpkm_filter(
+                metrics=metrics,
+                filtering_options=filtering_options,
+                write_png_filepath=write_zfpkm_png_filepath,
+                calcualte_fpkm=False,
+            )
         case _:
             raise ValueError(f"Technique must be one of {FilteringTechnique}")
 
@@ -692,6 +710,7 @@ async def save_rnaseq_tests(
     high_batch_ratio: float,
     technique: FilteringTechnique,
     cut_off: int | float,
+    write_zfpkm_png_filepath: Path,
 ):
     """Save the results of the RNA-Seq tests to a CSV file."""
     filtering_options = _FilteringOptions(
@@ -726,6 +745,7 @@ async def save_rnaseq_tests(
         technique=technique,
         filtering_options=filtering_options,
         prep=prep,
+        write_zfpkm_png_filepath=write_zfpkm_png_filepath,
     )
 
     expressed_genes: list[str] = []
