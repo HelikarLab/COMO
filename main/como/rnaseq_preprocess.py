@@ -41,9 +41,11 @@ class _STARinformation:
             raise ValueError(f"Building STAR information requires a '.tab' file; received: '{filepath}'")
 
         async with aiofiles.open(filepath) as i_stream:
-            unmapped, multimapping, no_feature, ambiguous = await asyncio.gather(
-                *[i_stream.readline(), i_stream.readline(), i_stream.readline(), i_stream.readline()]
-            )
+            unmapped = await i_stream.readline()
+            multimapping = await i_stream.readline()
+            no_feature = await i_stream.readline()
+            ambiguous = await i_stream.readline()
+
             num_unmapped = [int(i) for i in unmapped.rstrip("\n").split("\t")[1:]]
             num_multimapping = [int(i) for i in multimapping.rstrip("\n").split("\t")[1:]]
             num_no_feature = [int(i) for i in no_feature.rstrip("\n").split("\t")[1:]]
