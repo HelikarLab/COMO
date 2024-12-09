@@ -505,80 +505,54 @@ async def _create_matrix_file(
         subset_config.to_excel(writer, sheet_name=context_name, header=True, index=False)
 
 
+async def _process(
+    context_name: str,
+    taxon: int,
     output_gene_info_filepath: Path,
+    como_context_dir: Path | None,
+    input_matrix_filepath: list[Path] | None,
     output_trna_config_filepath: Path | None,
     output_mrna_config_filepath: Path | None,
-    output_trna_count_matrix: list[Path] | None,
-    output_mrna_count_matrix: list[Path] | None,
+    output_trna_matrix_filepath: Path | None,
+    output_mrna_matrix_filepath: Path | None,
     cache: bool,
 ):
+    rna_types: list[tuple[type_rna, Path, Path]] = []
+    if output_trna_config_filepath:
+        rna_types.append(("total", output_trna_config_filepath, output_trna_matrix_filepath))
+    if output_mrna_config_filepath:
+        rna_types.append(("polya", output_mrna_config_filepath, output_mrna_matrix_filepath))
+
+    # if provided, iterate through como-input specific directories
     tasks = []
-    for i, m in enumerate(mode):
-        if m == "create" and output_trna_config_filepath:
-            tasks.append(
-                asyncio.create_task(
-                    _create_matrix_file(
-                        context_name=context_names[i],
-                        taxon_id=taxon_id[i],
-                        output_gene_matrix_filepath=output_trna_count_matrix[i],
-                        como_dirpath=input_como_dirpath[i],
-                        output_gene_info_filepath=output_gene_info_filepath,
-                        output_config_filepath=output_trna_config_filepath,
-                        rna_type="total",
-                        cache=cache,
-                    )
+    for rna, output_config_filepath, output_matrix_filepath in rna_types:
+        tasks.append(
+            asyncio.create_task(
+                _create_matrix_file(
+                    context_name=context_name,
+                    output_config_filepath=output_config_filepath,
+                    como_context_dir=como_context_dir,
+                    output_counts_matrix_filepath=output_matrix_filepath,
+                    rna=rna,
                 )
             )
-
-        if m == "create" and output_mrna_config_filepath:
-            tasks.append(
-                asyncio.create_task(
-                    _create_matrix_file(
-                        context_name=context_names[i],
-                        taxon_id=taxon_id[i],
-                        output_gene_matrix_filepath=output_mrna_count_matrix[i],
-                        como_dirpath=input_como_dirpath[i],
-                        output_gene_info_filepath=output_gene_info_filepath,
-                        output_config_filepath=output_mrna_config_filepath,
-                        rna_type="mrna",
-                        cache=cache,
-                    )
-                )
-            )
-
-        if m == "provide":
-            tasks.append(
-                asyncio.create_task(
-                    _create_gene_info_file(
-                        counts_matrix=input_matrix_filepath[i],
-                        output_filepath=output_gene_info_filepath,
-                        taxon_id=taxon_id[i],
-                        cache=cache,
-                    )
-                )
-            )
-    await asyncio.gather(*tasks)
-
-
-def _validate_matrix_output_args(
-    output_count_matrices_dirpath: list,
-    output_trna_count_matrix_filepath: list,
-    output_mrna_count_matrix_filepath: list,
-):
-    def _raise():
-        raise ValueError(
-            "output_count_matrices_dirpath OR "
-            "(output_trna_count_matrix_filepath AND output_mrna_count_matrix_filepath) can be provided"
         )
 
-    # output_count_matrices_dir OR (output_trna_count_matrix AND output_mrna_count_matrix) can be provided
-    # Check this condition is satisfied
-    if output_count_matrices_dirpath and (output_trna_count_matrix_filepath or output_mrna_count_matrix_filepath):
-        _raise()
-    if output_trna_count_matrix_filepath and not output_mrna_count_matrix_filepath:
-        _raise()
-    if not output_trna_count_matrix_filepath and output_mrna_count_matrix_filepath:
-        _raise()
+    await asyncio.gather(*tasks)
+
+    # create the gene info filepath based on provided data
+    await _create_gene_info_file(
+        counts_matrix_filepaths=[
+            f
+            for f in [*input_matrix_filepath, output_trna_matrix_filepath, output_mrna_matrix_filepath]
+            if f is not None
+        ],
+        output_filepath=output_gene_info_filepath,
+        taxon=taxon,
+        cache=cache,
+    )
+
+
 
 
 async def rnaseq_preprocess(  # noqa: C901
