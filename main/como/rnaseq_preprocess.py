@@ -462,11 +462,9 @@ async def _create_gene_info_file(
             ensembl_ids = ensembl_ids[0]
 
         start_pos = data.get("genomic_pos.start", 0)
+        start_pos = sum(start_pos) / len(start_pos) if isinstance(start_pos, list) else start_pos
         end_pos = data.get("genomic_pos.end", 0)
-        if isinstance(start_pos, list):
-            start_pos = sum(start_pos) / len(start_pos)
-        if isinstance(end_pos, list):
-            end_pos = sum(end_pos) / len(end_pos)
+        end_pos = sum(end_pos) / len(end_pos) if isinstance(end_pos, list) else end_pos
 
         gene_info.at[i, "gene_symbol"] = data.get("symbol", "-")
         gene_info.at[i, "entrez_gene_id"] = data.get("entrezgene", "-")
