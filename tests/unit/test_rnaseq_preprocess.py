@@ -44,12 +44,12 @@ class TestSTARInformation:
             await _STARinformation.build_from_tab(TestSTARInformation.invalid_data)
 
 
-def test_sample_name_from_filepath(any_como_input_filepath: Path):  # noqa: F811
+def test_sample_name_from_filepath(any_como_input_filepath: Path):
     expected = "_".join(any_como_input_filepath.stem.split("_")[:2])
     assert _sample_name_from_filepath(any_como_input_filepath) == expected
 
 
-def test_organize_gene_counts_files(como_input_data_directory: Path):  # noqa: F811
+def test_organize_gene_counts_files(como_input_data_directory: Path):
     metrics: list[_StudyMetrics] = _organize_gene_counts_files(como_input_data_directory)
     for metric in metrics:
         assert len(metric.sample_names) == metric.num_samples == len(metric.count_files) == len(metric.strand_files)
@@ -66,7 +66,7 @@ def test_organize_gene_counts_files(como_input_data_directory: Path):  # noqa: F
 
 
 @pytest.mark.asyncio
-async def test_process_first_multirun_sample(strand_filepath: Path, all_gene_count_filepaths: list[Path]):  # noqa: F811
+async def test_process_first_multirun_sample(strand_filepath: Path, all_gene_count_filepaths: list[Path]):
     result: pd.DataFrame = await _process_first_multirun_sample(strand_filepath, all_gene_count_filepaths)
     assert result.columns[0] == "ensembl_gene_id"
     assert len(result.columns) == 2
