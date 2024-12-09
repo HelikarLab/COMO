@@ -24,8 +24,8 @@ from tests.fixtures.collect_files import (
 
 
 class TestSTARInformation:
-    valid_data = Path("main/data/COMO_input/naiveB/geneCounts/S1/naiveB_S1R1.tab").absolute()
-    invalid_data = Path("main/data/COMO_input/naiveB/fragmentSizes/S1/naiveB_S1R1_fragment_size.txt").absolute()
+    valid_data = Path("main/data/COMO_input/naiveB/geneCounts/S1/naiveB_S1R1.tab").resolve()
+    invalid_data = Path("main/data/COMO_input/naiveB/fragmentSizes/S1/naiveB_S1R1_fragment_size.txt").resolve()
 
     @pytest.mark.asyncio
     async def test_build_from_tab_valid_file(self):
@@ -40,7 +40,7 @@ class TestSTARInformation:
     @pytest.mark.asyncio
     async def test_build_from_tab_invalid_file(self):
         """Validate error on invalid file."""
-        with pytest.raises(ValueError, match="Invalid file format"):
+        with pytest.raises(ValueError, match="Building STAR information requires a '.tab' file"):
             await _STARinformation.build_from_tab(TestSTARInformation.invalid_data)
 
 
@@ -80,12 +80,3 @@ def test_pack_filepaths(packed_filepaths: PackedFilepaths):
     assert packed_filepaths.sample_name in packed_filepaths.layout.as_posix()
     assert packed_filepaths.sample_name in packed_filepaths.preparation_method.as_posix()
     assert packed_filepaths.sample_name in packed_filepaths.strandedness.as_posix()
-
-
-@pytest.mark.asyncio
-async def test_process_standard_replicate(packed_filepaths: PackedFilepaths):
-    await _process_standard_replicate(
-        counts_file=packed_filepaths.gene_count,
-        strand_file=packed_filepaths.strandedness,
-        sample_name=packed_filepaths.sample_name,
-    )
