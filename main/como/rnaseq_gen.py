@@ -642,8 +642,82 @@ def filter_counts(
         case _:
             raise ValueError(f"Technique must be one of {FilteringTechnique}")
 
+
+async def _save_rnaseq_tests(
+    context_name: str,
+    rnaseq_matrix: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    gene_info_df: pd.DataFrame,
+    output_filepath: Path,
     prep: RNAPrepMethod,
-    taxon_id: int | str | Taxon,
+    taxon: int,
+    replicate_ratio: float,
+    batch_ratio: float,
+    high_replicate_ratio: float,
+    high_batch_ratio: float,
+    technique: FilteringTechnique,
+    cut_off: int | float,
+):
+    """Save the results of the RNA-Seq tests to a CSV file."""
+    filtering_options = _FilteringOptions(
+        replicate_ratio=replicate_ratio,
+        batch_ratio=batch_ratio,
+        cut_off=cut_off,
+        high_replicate_ratio=high_replicate_ratio,
+        high_batch_ratio=high_batch_ratio,
+    )
+
+    read_counts_results: _ReadMatrixResults = await _build_matrix_results(
+        matrix=rnaseq_matrix,
+        gene_info=gene_info_df,
+        metadata_df=metadata_df,
+        taxon=taxon,
+    )
+    metrics = read_counts_results.metrics
+    entrez_gene_ids = read_counts_results.entrez_gene_ids
+
+    metrics = filter_counts(
+        context_name=context_name,
+        metrics=metrics,
+        technique=technique,
+        filtering_options=filtering_options,
+        prep=prep,
+    )
+
+    expressed_genes: list[str] = []
+    top_genes: list[str] = []
+    for metric in metrics.values():
+        expressed_genes.extend(metric.entrez_gene_ids)
+        top_genes.extend(metric.high_confidence_entrez_gene_ids)
+
+    expression_frequency = pd.Series(expressed_genes).value_counts()
+    expression_df = pd.DataFrame(
+        {"entrez_gene_id": expression_frequency.index, "frequency": expression_frequency.values}
+    )
+    expression_df["prop"] = expression_df["frequency"] / len(metrics)
+    expression_df = expression_df[expression_df["prop"] >= filtering_options.batch_ratio]
+
+    top_frequency = pd.Series(top_genes).value_counts()
+    top_df = pd.DataFrame({"entrez_gene_id": top_frequency.index, "frequency": top_frequency.values})
+    top_df["prop"] = top_df["frequency"] / len(metrics)
+    top_df = top_df[top_df["prop"] >= filtering_options.high_batch_ratio]
+
+    boolean_matrix = pd.DataFrame(data={"entrez_gene_id": entrez_gene_ids, "expressed": 0, "high": 0})
+    for gene in entrez_gene_ids:
+        if gene in expression_df["entrez_gene_id"]:
+            boolean_matrix.loc[gene, "expressed"] = 1
+        if gene in top_df["entrez_gene_id"]:
+            boolean_matrix.loc[gene, "high"] = 1
+
+    expressed_count = len(boolean_matrix[boolean_matrix["expressed"] == 1])
+    high_confidence_count = len(boolean_matrix[boolean_matrix["high"] == 1])
+
+    boolean_matrix.to_csv(output_filepath, index=False)
+    logger.info(
+        f"{context_name} - Found {expressed_count} expressed and {high_confidence_count} confidently expressed genes"
+    )
+    logger.success(f"Wrote boolean matrix to {output_filepath}")
+
     replicate_ratio: float = 0.5,
     high_replicate_ratio: float = 1.0,
     batch_ratio: float = 0.5,
