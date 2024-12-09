@@ -615,72 +615,51 @@ async def rnaseq_preprocess(  # noqa: C901
     :param log_level: The logging level
     :param log_location: The logging location
     """
-    context_names = _listify(context_names)
-    mode = _listify(mode)
-    taxon_id = _listify(taxon_id)
-    output_count_matrices_dirpath: list[Path] = [Path(i) for i in _listify(output_count_matrices_dirpath)] if output_count_matrices_dirpath else []  # fmt: skip  # noqa: E501
-    output_trna_count_matrix: list[Path] = [Path(i) for i in _listify(output_trna_count_matrix)] if output_trna_count_matrix else []  # fmt: skip  # noqa: E501
-    output_mrna_count_matrix: list[Path] = [Path(i) for i in _listify(output_mrna_count_matrix)] if output_mrna_count_matrix else []  # fmt: skip  # noqa: E501
-    input_como_dirpath: list[Path] = [Path(i) for i in _listify(input_como_dirpath)] if input_como_dirpath else []
-    input_matrix_filepath: list[Path] = (
-        [Path(i) for i in _listify(input_matrix_filepath)] if input_matrix_filepath else []
-    )
-
-    _validate_matrix_output_args(
-        output_count_matrices_dirpath=output_count_matrices_dirpath,
-        output_trna_count_matrix_filepath=output_trna_count_matrix,
-        output_mrna_count_matrix_filepath=output_mrna_count_matrix,
-    )
-
-    if len(input_como_dirpath) == 0 and len(input_matrix_filepath) == 0:
-        raise ValueError("Either 'como_input_dirpath' or 'input_matrix_filepath' must be provided.")
-
-    if not any({output_trna_config_filepath, output_mrna_config_filepath}):
-        raise ValueError("Either 'output_trna_config_filepath' or 'output_mrna_config_filepath' must be provided.")
-    if output_trna_config_filepath and output_trna_config_filepath.suffix not in {".xlsx", ".xls"}:
-        raise ValueError("output_trna_config_filepath must be an Excel file.")
-    if output_mrna_config_filepath and output_mrna_config_filepath.suffix not in {".xlsx", ".xls"}:
-        raise ValueError("output_mrna_config_filepath must be an Excel file.")
-
-    if not all(m in {"create", "provide"} for m in mode):
-        raise ValueError(f"Invalid mode(s): {', '.join(m for m in mode if m not in {'create', 'provide'})}")
-
-    if not all(t.isdigit() or isinstance(t, int) or t in {"human", "mouse"} for t in taxon_id):
-        raise ValueError("Invalid taxon_id(s). Must be integer, 'human', or 'mouse'.")
-
-    if not (len(context_names) == len(mode) == len(taxon_id) == len(input_como_dirpath or input_matrix_filepath)):
-        raise ValueError(
-            "context_names, mode, taxon_id, and (como or matrix) input must be the same length.\n"
-            f"context_names: {len(context_names)}\n"
-            f"mode: {len(mode)}\n"
-            f"taxon_id: {len(taxon_id)}\n"
-            f"como_input_dirpath or matrix_filepath: {len(input_como_dirpath or input_matrix_filepath)}"
+    with contextlib.suppress(ValueError):
+        logger.remove(0)
+        logger.add(
+            sink=log_location,
+            level=log_level,
+            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",  # noqa: E501
         )
 
-    for path in input_como_dirpath:
-        if not path.exists():
-            raise ValueError(f"COMO input directory does not exist: {path}")
-        if not path.is_dir():
-            raise ValueError(f"COMO input directory must be a directory: {path}")
+    output_gene_info_filepath = output_gene_info_filepath.resolve()
+    como_context_dir = como_context_dir.resolve()
+    input_matrix_filepath = [i.resolve() for i in _listify(input_matrix_filepath)] if input_matrix_filepath else None
+    output_trna_config_filepath = (
+        output_trna_config_filepath.resolve() if output_trna_config_filepath else output_trna_config_filepath
+    )
+    output_polya_config_filepath = (
+        output_polya_config_filepath.resolve() if output_polya_config_filepath else output_polya_config_filepath
+    )
+    output_trna_count_matrix_filepath = (
+        output_trna_count_matrix_filepath.resolve()
+        if output_trna_count_matrix_filepath
+        else output_trna_count_matrix_filepath
+    )
+    output_polya_count_matrix_filepath = (
+        output_polya_count_matrix_filepath.resolve()
+        if output_polya_count_matrix_filepath
+        else output_polya_count_matrix_filepath
+    )
 
-    for path in input_matrix_filepath:
-        if not path.exists():
-            raise ValueError(f"Input matrix file does not exist: {path}")
-        if path.suffix not in {".csv", ".h5ad"}:
-            raise ValueError(f"Input matrix file must be a .csv or .h5ad file: {path}")
-        if not path.is_file():
-            raise ValueError(f"Input matrix file must be a file: {path}")
+    input_matrix_filepath = _listify(input_matrix_filepath)
+    preparation_method = _listify(preparation_method)
 
-    await _process_items(
-        context_names=context_names,
-        mode=mode,
-        taxon_id=taxon_id,
+    if len(input_matrix_filepath) != len(preparation_method):
+        raise ValueError(
+            "input_matrix_filepath (--input-matrix-filepath) and "
+            "preparation_method (--preparation-method) must be the same length."
+        )
+    await _process(
+        context_name=context_name,
+        taxon=taxon,
+        como_context_dir=como_context_dir,
+        input_matrix_filepath=input_matrix_filepath,
         output_gene_info_filepath=output_gene_info_filepath,
         output_trna_config_filepath=output_trna_config_filepath,
-        output_mrna_config_filepath=output_mrna_config_filepath,
-        output_trna_count_matrix=output_trna_count_matrix,
-        output_mrna_count_matrix=output_mrna_count_matrix,
-        input_como_dirpath=input_como_dirpath,
-        input_matrix_filepath=input_matrix_filepath,
+        output_mrna_config_filepath=output_polya_config_filepath,
+        output_trna_matrix_filepath=output_trna_count_matrix_filepath,
+        output_mrna_matrix_filepath=output_polya_count_matrix_filepath,
         cache=cache,
     )
