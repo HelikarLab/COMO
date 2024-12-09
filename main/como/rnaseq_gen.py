@@ -424,25 +424,58 @@ def zfpkm_transform(
                 chunk_time = current_time
     return results, zfpkm_df
 
-        )
-        rnaseq_output_filepath.parent.mkdir(parents=True, exist_ok=True)
 
-        await save_rnaseq_tests(
-            context_name=context_name,
-            counts_matrix_filepath=rnaseq_input_filepath,
-            config_filepath=config_filepath,
-            output_filepath=rnaseq_output_filepath.as_posix(),
-            gene_info_filepath=gene_info_filepath,
-            prep=prep,
-            replicate_ratio=replicate_ratio,
-            batch_ratio=batch_ratio,
-            high_replicate_ratio=replicate_ratio_high,
-            high_batch_ratio=batch_ratio_high,
-            technique=technique,
-            cut_off=cut_off,
-            taxon_id=taxon,
+def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
+    """Plot the log2(FPKM) density and fitted Gaussian for each sample.
+
+    :param results: A dictionary of intermediate results from zfpkm_transform.
+    :param: subplot_titles: Whether to display facet titles (sample names).
+    :param plot_xfloor: Lower limit for the x-axis.
+    :param subplot_titles: Whether to display facet titles (sample names).
+    """
+    mega_df = pd.DataFrame(columns=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
+    for name, result in results.items():
+        stddev = result.std_dev
+        x = np.array(result.density.x)
+        y = np.array(result.density.y)
+
+        fitted = np.exp(-0.5 * ((x - result.mu) / stddev) ** 2) / (stddev * np.sqrt(2 * np.pi))
+        max_fpkm = y.max()
+        max_fitted = fitted.max()
+        scale_fitted = fitted * (max_fpkm / max_fitted)
+
+        df = pd.DataFrame(
+            {
+                "sample_name": [name] * len(x),
+                "log2fpkm": x,
+                "fpkm_density": y,
+                "fitted_density_scaled": scale_fitted,
+            }
         )
-        logger.success(f"Results saved at '{rnaseq_output_filepath}'")
+        mega_df = pd.concat([mega_df, df], ignore_index=True)
+
+    mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")
+    subplot_titles = list(results.keys()) if subplot_titles else None
+    fig = make_subplots(
+        rows=len(results),
+        cols=1,
+        subplot_titles=subplot_titles,
+        vertical_spacing=min(0.05, (1 / (len(results) - 1))),
+    )
+
+    for i, (name, group) in enumerate(mega_df.groupby("sample_name"), start=1):
+        fig.add_trace(
+            trace=go.Scatter(x=group["log2fpkm"], y=group["density"], mode="lines", name=name, legendgroup=name),
+            row=i,
+            col=1,
+        )
+        fig.update_xaxes(title_text="log2(FPKM)", range=[plot_xfloor, max(group["log2fpkm"].tolist())], row=i, col=1)
+        fig.update_yaxes(title_text="density [scaled]", row=i, col=1)
+        fig.update_layout(legend_tracegroupgap=0)
+
+    fig.update_layout(height=600 * len(results), width=1000, title_text="zFPKM Plots", showlegend=True)
+    fig.write_image("zfpkm_plot.png")
+
 
 
 def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions, calcualte_fpkm: bool) -> NamedMetrics:
