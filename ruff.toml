@@ -46,5 +46,9 @@ ignore = [
     "D101",     # allow undocumented public class
     "D102",     # allow undocumented class method
     "D103",     # allow undocumented public method definitions
+    "F811",     # allow redefinition of variables, required for pytest fixtures
     "S101",     # allow use of `assert` in test files
+]
+"main/COMO.ipynb" = [
+    "E501",     # allow long lines
 ]
