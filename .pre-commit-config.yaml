@@ -1,5 +1,6 @@
 repos:
-  - repo: https://github.com/ljnsn/cz-conventional-gitmoji
-    rev: v0.6.1
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: master
     hooks:
-      - id: conventional-gitmoji
+      - id: commitizen
+        stages: [ commit-msg ]
