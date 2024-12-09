@@ -532,7 +532,7 @@ def _build_model(  # noqa: C901
     )
 
 
-def _create_df(path: Path) -> pd.DataFrame:
+def _create_df_from_file(path: Path) -> pd.DataFrame:
     match path.suffix:
         case ".csv":
             df = pd.read_csv(path, header=0, sep=",")
@@ -547,9 +547,10 @@ def _create_df(path: Path) -> pd.DataFrame:
 
 
 def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
-    df = _create_df(path)
+    df = _create_df_from_file(path)
     for column in df.columns:
         if column not in [
+            "boundary",
             "reaction",
             "abbreviation",
             "compartment",
@@ -642,7 +643,7 @@ def create_context_specific_model(  # noqa: C901
     exclude_rxns: list[str] = []
     if exclude_rxns_filepath:
         exclude_rxns_filepath: Path = Path(exclude_rxns_filepath)
-        df = _create_df(exclude_rxns_filepath)
+        df = _create_df_from_file(exclude_rxns_filepath)
         if "abbreviation" not in df.columns:
             raise ValueError("The exclude reactions file should have a single column with a header named Abbreviation")
         exclude_rxns = df["abbreviation"].tolist()
@@ -650,7 +651,7 @@ def create_context_specific_model(  # noqa: C901
     force_rxns: list[str] = []
     if force_rxns_filepath:
         force_rxns_filepath: Path = Path(force_rxns_filepath)
-        df = _create_df(force_rxns_filepath)
+        df = _create_df_from_file(force_rxns_filepath)
         if "abbreviation" not in df.columns:
             raise ValueError("The force reactions file should have a single column with a header named Abbreviation")
         force_rxns = df["abbreviation"].tolist()
