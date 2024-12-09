@@ -145,14 +145,27 @@ def k_over_a(k: int, a: float) -> Callable[[npt.NDArray], bool]:
         return np.sum(row >= a) >= k
 
     return filter_func
-    """
-    config = Config()
 
-    config_filepath = config.config_dir / config_filename
-    if not config_filepath.exists():
-        raise FileNotFoundError(f"Unable to find '{config_filename}' at the path: '{config_filepath}'")
-    xl = pd.ExcelFile(config_filepath)
-    sheet_names = xl.sheet_names
+
+def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDArray], bool]) -> npt.NDArray:
+    """Apply a filter function to the rows of the data and return the filtered array.
+
+    This code is based on the `genefilter` function found in R's `genefilter` package: https://www.rdocumentation.org/packages/genefilter/versions/1.54.2/topics/genefilter
+
+    :param data: The data to filter
+    :param filter_func: THe function to filter the data by
+    :return: A NumPy array of the filtered data.
+    """
+    if not isinstance(data, (pd.DataFrame, npt.NDArray)):
+        raise TypeError("Unsupported data type. Must be a Pandas DataFrame or a NumPy array.")
+
+    return (
+        data.apply(filter_func, axis=1).values
+        if isinstance(data, pd.DataFrame)
+        else np.apply_along_axis(filter_func, axis=1, arr=data)
+    )
+
+
 
     logger.info(f"Reading config file: {config_filepath}")
 
