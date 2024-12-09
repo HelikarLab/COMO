@@ -296,19 +296,134 @@ def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
 
     return metrics
 
+
+def _zfpkm_calculation(col: pd.Series, kernel: KernelDensity, peak_parameters: tuple[float, float]) -> _ZFPKMResult:
+    """Log2 Transformations.
+
+    Stabilize the variance in the data to make the distribution more symmetric; this is helpful for Gaussian fitting
+
+    Kernel Density Estimation (kde)
+        - Non-parametric method to estimate the probability density function (PDF) of a random variable
+        - Estimates the distribution of log2-transformed FPKM values
+        - Bandwidth parameter controls the smoothness of the density estimate
+        - KDE Explanation
+            - A way to smooth a histogram to get a better idea of the underlying distribution of the data
+            - Given a set of data points, we want to understand how they are distributed.
+                Histograms can be useful, but are sensitive to bin size and number
+            - The KDE places a "kernel" - a small symmetric function (i.e., Gaussian curve) - at each data point
+            - The "kernel" acts as a weight, giving more weight to points closer to the center of the kernel,
+                and less weight to points farther away
+            - Kernel functions are summed along each point on the x-axis
+            - A smooth curve is created that represents the estimated density of the data
+
+    Peak Finding
+        - Identifies that are above a certain height and separated by a minimum distance
+        - Represent potential local maxima in the distribution
+
+    Peak Selection
+        - The peak with the highest x-value (from log2-FPKM) is chosen as the mean (mu)
+            of the "inactive" gene distribution
+        - The peak representing unexpressed or inactive genes should be at a lower FPKM
+            value compared to the peak representing expressed genes
+
+    Standard Deviation Estimation
+         - The mean of log2-FPKM values are greater than the calculated mu
+         - Standard deviation is estimated based on the assumption that the right tail of the distribution
+            This represents expressed genes) can be approximated by a half-normal distribution
+
+     zFPKM Transformation
+        - Centers disbribution around 0 and scales it by the standard deviation.
+            This makes it easier to compare gene expression across different samples
+        - Represents the number of standard deviations away from the mean of the "inactive" gene distribution
+        - Higher zFPKM values indicate higher expression levels relative to the "inactive" peak
+        - A zFPKM value of 0 represents the mean of the "inactive" distribution
+        - Research shows that a zFPKM value of -3 or greater can be used as
+            a threshold for calling a gene as "expressed"
+            : https://doi.org/10.1186/1471-2164-14-778
+    """
+    col_log2: npt.NDArray = np.log2(col + 1)
+    col_log2 = np.nan_to_num(col_log2, nan=0)
+    refit: KernelDensity = kernel.fit(col_log2.reshape(-1, 1))  # type: ignore
+
+    # kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(col_log2.reshape(-1, 1))
+    x_range = np.linspace(col_log2.min(), col_log2.max(), 1000)
+    density = np.exp(refit.score_samples(x_range.reshape(-1, 1)))
+    peaks, _ = find_peaks(density, height=peak_parameters[0], distance=peak_parameters[1])
+    peak_positions = x_range[peaks]
+
+    mu = 0
+    max_fpkm = 0
+    stddev = 1
+
+    if len(peaks) != 0:
+        mu = peak_positions.max()
+        max_fpkm = density[peaks[np.argmax(peak_positions)]]
+        u = col_log2[col_log2 > mu].mean()
+        stddev = (u - mu) * np.sqrt(np.pi / 2)
+    zfpkm = pd.Series((col_log2 - mu) / stddev, dtype=np.float32, name=col.name)
+
+    return _ZFPKMResult(zfpkm=zfpkm, density=Density(x_range, density), mu=mu, std_dev=stddev, max_fpkm=max_fpkm)
+
+
+def zfpkm_transform(
+    fpkm_df: pd.DataFrame,
+    bandwidth: int = 0.5,
+    peak_parameters: tuple[float, float] = (0.02, 1.0),
+    update_every_percent: float = 0.1,
+) -> tuple[dict[str, _ZFPKMResult], DataFrame]:
+    """Perform zFPKM calculation/transformation."""
+    if update_every_percent > 1:
+        logger.warning(
+            f"update_every_percent should be a decimal value between 0 and 1; got: {update_every_percent} - "
+            f"will convert to percentage"
         )
-        if prep == RNAPrepMethod.SCRNA:
-            rnaseq_input_filepath = rnaseq_input_filepath.with_suffix(".h5ad")
-        elif prep in {RNAPrepMethod.TOTAL, RNAPrepMethod.MRNA}:
-            rnaseq_input_filepath = rnaseq_input_filepath.with_suffix(".csv")
+        update_every_percent /= 100
 
-        if not rnaseq_input_filepath.exists():
-            logger.warning(f"Gene counts matrix not found at {rnaseq_input_filepath}, skipping...")
-            continue
+    total = len(fpkm_df.columns)
+    update_per_step: int = int(np.ceil(total * update_every_percent))
+    cores = multiprocessing.cpu_count() - 2
+    logger.debug(f"Processing {total:,} samples through zFPKM transform using {cores} cores")
+    logger.debug(
+        f"Will update every {update_per_step:,} steps as this is approximately "
+        f"{update_every_percent:.1%} of {total:,}"
+    )
 
-        gene_info_filepath = config.data_dir / "gene_info.csv"
-        rnaseq_output_filepath = (
-            config.result_dir / context_name / prep.value / f"rnaseq_{prep.value}_{context_name}.csv"
+    with Pool(processes=cores) as pool:
+        kernel = KernelDensity(kernel="gaussian", bandwidth=bandwidth)
+        chunksize = int(math.ceil(len(fpkm_df.columns) / (4 * cores)))
+        partial_func = partial(_zfpkm_calculation, kernel=kernel, peak_parameters=peak_parameters)
+        chunk_time = time.time()
+        start_time = time.time()
+
+        log_padding = len(str(f"{total:,}"))
+        zfpkm_df = pd.DataFrame(data=0, index=fpkm_df.index, columns=fpkm_df.columns)
+        results: dict[str, _ZFPKMResult] = {}
+        result: _ZFPKMResult
+        for i, result in enumerate(
+            pool.imap(
+                partial_func,
+                (fpkm_df[col] for col in fpkm_df.columns),
+                chunksize=chunksize,
+            )
+        ):
+            key = str(result.zfpkm.name)
+            results[key] = result
+            zfpkm_df[key] = result.zfpkm
+
+            # show updates every X% and at the end, but skip on first iteration
+            if i != 0 and (i % update_per_step == 0 or i == total):
+                current_time = time.time()
+                chunk = current_time - chunk_time
+                total_time = current_time - start_time
+                formatted = f"{i:,}"
+                logger.debug(
+                    f"Processed {formatted:>{log_padding}} of {total:,} - "
+                    f"chunk took {chunk:.1f} seconds - "
+                    f"running for {total_time:.1f} seconds"
+                )
+                chunk_time = current_time
+    return results, zfpkm_df
+
         )
         rnaseq_output_filepath.parent.mkdir(parents=True, exist_ok=True)
 
