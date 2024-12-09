@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC
 from enum import Enum
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 from pydantic_settings import BaseSettings, SettingsConfigDict
