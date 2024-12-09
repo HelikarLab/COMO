@@ -550,6 +550,7 @@ def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
     df = _create_df(path)
     for column in df.columns:
         if column not in [
+            "boundary",
             "reaction",
             "abbreviation",
             "compartment",
