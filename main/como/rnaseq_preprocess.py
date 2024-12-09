@@ -488,40 +488,23 @@ async def _create_gene_info_file(
 
 async def _create_matrix_file(
     context_name: str,
-    taxon_id: type_taxon,
-    output_gene_info_filepath: Path,
     output_config_filepath: Path,
-    output_gene_matrix_filepath: Path,
-    como_dirpath: type_path,
-    rna_type: type_rna,
-    cache: bool,
+    como_context_dir: type_path,
+    output_counts_matrix_filepath: Path,
+    rna: type_rna,
 ) -> None:
-    como_context_dir = como_dirpath / context_name
-    config_df = await _create_config_df(context_name, como_input_dir=como_dirpath)
-    counts_matrix = await _write_counts_matrix(
+    config_df = await _create_config_df(context_name, como_input_dir=como_context_dir)
+    await _write_counts_matrix(
         config_df=config_df,
         como_context_dir=como_context_dir,
-        output_counts_matrix_filepath=output_gene_matrix_filepath,
-        rna_type=rna_type,
+        output_counts_matrix_filepath=output_counts_matrix_filepath,
+        rna=rna,
     )
     with pd.ExcelWriter(output_config_filepath) as writer:
-        subset_config = config_df[config_df["library_prep"] == rna_type]
+        subset_config = config_df[config_df["library_prep"] == rna]
         subset_config.to_excel(writer, sheet_name=context_name, header=True, index=False)
 
-    await _create_gene_info_file(
-        counts_matrix=counts_matrix,
-        output_filepath=output_gene_info_filepath,
-        taxon_id=taxon_id,
-        cache=cache,
-    )
 
-
-async def _process_items(
-    context_names: list[str],
-    mode: list[Literal["create", "provide"]],
-    taxon_id: list[str],
-    input_como_dirpath: list[Path] | None,
-    input_matrix_filepath: list[Path] | None,
     output_gene_info_filepath: Path,
     output_trna_config_filepath: Path | None,
     output_mrna_config_filepath: Path | None,
