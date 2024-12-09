@@ -62,3 +62,9 @@ troppo = { git = "https://github.com/JoshLoecker/troppo", rev = "update_dependen
 cobamp = { git = "https://github.com/JoshLoecker/cobamp", rev = "update_packages" }
 pydantic-settings = { git = "https://github.com/pydantic/pydantic-settings" }
 
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "$version"
+version_scheme = "semver2"
+version_provider = "pep621"
+update_changelog_on_bump = true
