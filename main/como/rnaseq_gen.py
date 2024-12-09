@@ -619,9 +619,29 @@ def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions,
     return metrics
 
 
-async def rnaseq_gen(
-    # config_filepath: Path,
-    config_filename: str,
+def filter_counts(
+    *,
+    context_name: str,
+    metrics: NamedMetrics,
+    technique: FilteringTechnique,
+    filtering_options: _FilteringOptions,
+    prep: RNAPrepMethod,
+) -> NamedMetrics:
+    """Filter the count matrix based on the specified technique."""
+    match technique:
+        case FilteringTechnique.cpm:
+            return cpm_filter(
+                context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep
+            )
+        case FilteringTechnique.tpm:
+            return tpm_quantile_filter(metrics=metrics, filtering_options=filtering_options)
+        case FilteringTechnique.zfpkm:
+            return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calcualte_fpkm=True)
+        case FilteringTechnique.umi:
+            return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calcualte_fpkm=False)
+        case _:
+            raise ValueError(f"Technique must be one of {FilteringTechnique}")
+
     prep: RNAPrepMethod,
     taxon_id: int | str | Taxon,
     replicate_ratio: float = 0.5,
