@@ -38,45 +38,97 @@ class _FilteringOptions(NamedTuple):
     high_batch_ratio: float
 
 
+class FilteringTechnique(Enum):
+    """RNA sequencing filtering capabilities."""
+
+    cpm = "cpm"
+    zfpkm = "zfpkm"
+    tpm = "quantile"
+    umi = "umi"
+
+    @staticmethod
+    def from_string(value: str) -> FilteringTechnique:
+        """Create a filtering technique object from a string."""
+        match value.lower():
+            case "cpm":
+                return FilteringTechnique.cpm
+            case "zfpkm":
+                return FilteringTechnique.zfpkm
+            case "quantile":
+                return FilteringTechnique.tpm
+            case "umi":
+                return FilteringTechnique.umi
+            case _:
+                possible_values = [t.value for t in FilteringTechnique]
+                raise ValueError(f"Got a filtering technique of '{value}'; should be one of: {possible_values}")
+
+
+class LayoutMethod(Enum):
+    """RNA sequencing layout method."""
+
+    paired_end = "paired-end"
+    single_end = "single-end"
+
+
+@dataclass
+class _StudyMetrics:
+    study: str
+    num_samples: int
+    count_matrix: pd.DataFrame
+    fragment_lengths: npt.NDArray[np.float32]
+    sample_names: list[str]
+    layout: list[LayoutMethod]
+    entrez_gene_ids: list[str]
+    gene_sizes: npt.NDArray[np.float32]
+    __normalization_matrix: pd.DataFrame = field(default_factory=pd.DataFrame)
+    __z_score_matrix: pd.DataFrame = field(default_factory=pd.DataFrame)
+    __high_confidence_entrez_gene_ids: list[str] = field(default=list)
+
     def __post_init__(self):
-        self.library_prep = RNAPrepMethod.from_string(str(self.library_prep))
-        self.filtering_technique = FilteringTechnique.from_string(str(self.filtering_technique))
+        for layout in self.layout:
+            if layout not in LayoutMethod:
+                raise ValueError(f"Layout must be 'paired-end' or 'single-end'; got: {layout}")
 
-        if self.minimum_cutoff is None:
-            if self.filtering_technique == FilteringTechnique.tpm:
-                self.minimum_cutoff = 25
-            elif self.filtering_technique == FilteringTechnique.cpm:
-                self.minimum_cutoff = "default"
-            elif self.filtering_technique == FilteringTechnique.zfpkm:
-                self.minimum_cutoff = -3
+    @property
+    def normalization_matrix(self) -> pd.DataFrame:
+        return self.__normalization_matrix
+
+    @normalization_matrix.setter
+    def normalization_matrix(self, value: pd.DataFrame) -> None:
+        self.__normalization_matrix = value
+
+    @property
+    def z_score_matrix(self) -> pd.DataFrame:
+        return self.__z_score_matrix
+
+    @z_score_matrix.setter
+    def z_score_matrix(self, value: pd.DataFrame) -> None:
+        self.__z_score_matrix = value
+
+    @property
+    def high_confidence_entrez_gene_ids(self) -> list[str]:
+        return self.__high_confidence_entrez_gene_ids
+
+    @high_confidence_entrez_gene_ids.setter
+    def high_confidence_entrez_gene_ids(self, values: list[str]) -> None:
+        self.__high_confidence_entrez_gene_ids = values
 
 
-async def _handle_context_batch(
-    config_filename: str,
-    replicate_ratio: float,
-    batch_ratio: float,
-    replicate_ratio_high: float,
-    batch_ratio_high: float,
-    technique: FilteringTechnique,
-    cut_off: int | float | str,
-    prep: RNAPrepMethod,
-    taxon: Taxon,
-) -> None:
-    """Iterate through each context type and create rnaseq expression file.
+class _ZFPKMResult(NamedTuple):
+    zfpkm: pd.Series
+    density: Density
+    mu: float
+    std_dev: float
+    max_fpkm: float
 
-    :param config_filename: The configuration filename to read
-    :param replicate_ratio: The percentage of replicates that a gene must
-        appear in for a gene to be marked as "active" in a batch/study
-    :param batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked as 'active"
-    :param replicate_ratio_high: The percentage of replicates that a gene must
-        appear in for a gene to be marked "highly confident" in its expression in a batch/study
-    :param batch_ratio_high: The percentage of batches that a gene must
-        appear in for a gene to be marked "highly confident" in its expression
-    :param technique: The filtering technique to use
-    :param cut_off: The cutoff value to use for the provided filtering technique
-    :param prep: The library preparation method
-    :param taxon: The NCBI Taxon ID
-    :return: None
+
+class _ReadMatrixResults(NamedTuple):
+    metrics: dict[str, _StudyMetrics]
+    entrez_gene_ids: list[str]
+
+
+Density = namedtuple("Density", ["x", "y"])
+NamedMetrics = dict[str, _StudyMetrics]
     """
     config = Config()
 
