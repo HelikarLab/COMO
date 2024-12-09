@@ -222,6 +222,41 @@ async def _read_counts(path: Path) -> pd.DataFrame:
         logger.success(f"Results saved at '{rnaseq_output_filepath}'")
 
 
+def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions, calcualte_fpkm: bool) -> NamedMetrics:
+    """Apply zFPKM filtering to the FPKM matrix for a given sample."""
+    min_sample_expression = filtering_options.replicate_ratio
+    high_confidence_sample_expression = filtering_options.high_replicate_ratio
+    cut_off = filtering_options.cut_off
+
+    if calcualte_fpkm:
+        metrics = calculate_fpkm(metrics)
+
+    metric: _StudyMetrics
+    for metric in metrics.values():
+        # if fpkm was not calculated, the normalization matrix will be empty; collect the count matrix instead
+        matrix = metric.count_matrix if metric.normalization_matrix.empty else metric.normalization_matrix
+        matrix = matrix[matrix.sum(axis=1) > 0]
+
+        minimums = matrix == 0
+        results, zfpkm_df = zfpkm_transform(matrix)
+        zfpkm_df[minimums] = -4
+        zfpkm_plot(results)
+
+        # determine which genes are expressed
+        min_samples = round(min_sample_expression * len(zfpkm_df.columns))
+        min_func = k_over_a(min_samples, cut_off)
+        min_genes: npt.NDArray[bool] = genefilter(zfpkm_df, min_func)
+        metric.entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, min_genes) if keep]
+
+        # determine which genes are confidently expressed
+        top_samples = round(high_confidence_sample_expression * len(zfpkm_df.columns))
+        top_func = k_over_a(top_samples, cut_off)
+        top_genes: npt.NDArray[bool] = genefilter(zfpkm_df, top_func)
+        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, top_genes) if keep]
+
+    return metrics
+
+
 async def rnaseq_gen(
     # config_filepath: Path,
     config_filename: str,
