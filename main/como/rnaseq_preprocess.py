@@ -450,11 +450,7 @@ async def _create_gene_info_file(
     genes = set(chain.from_iterable(await asyncio.gather(*[read_counts(f) for f in counts_matrix_filepaths])))
 
     mygene = MyGene(cache=cache)
-    gene_data = await mygene.query(
-        items=genes,
-        taxon=taxon_id,
-        scopes="entrezgene",
-    )
+    gene_data = await mygene.query(items=list(genes), taxon=taxon, scopes="entrezgene")
     gene_info: pd.DataFrame = pd.DataFrame(
         data=None,
         columns=pd.Index(data=["ensembl_gene_id", "gene_symbol", "entrez_gene_id", "start_position", "end_position"]),
