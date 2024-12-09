@@ -553,21 +553,20 @@ async def _process(
     )
 
 
-
-
-async def rnaseq_preprocess(  # noqa: C901
-    context_names: str | list[str],
-    mode: Literal["create", "provide"] | list[Literal["create", "provide"]],
-    taxon_id: type_taxon | list[type_taxon],
-    input_como_dirpath: type_path | list[type_path] | None = None,
-    input_matrix_filepath: type_path | list[type_path] | None = None,
-    output_gene_info_filepath: Path | None = None,
+async def rnaseq_preprocess(
+    context_name: str,
+    taxon: int,
+    output_gene_info_filepath: Path,
+    como_context_dir: Path | None = None,
+    input_matrix_filepath: Path | list[Path] | None = None,
+    preparation_method: RNAPrepMethod | list[RNAPrepMethod] | None = None,
     output_trna_config_filepath: Path | None = None,
-    output_mrna_config_filepath: Path | None = None,
-    output_count_matrices_dirpath: list[Path] | None = None,
-    output_trna_count_matrix: list[Path] | None = None,
-    output_mrna_count_matrix: list[Path] | None = None,
+    output_polya_config_filepath: Path | None = None,
+    output_trna_count_matrix_filepath: Path | None = None,
+    output_polya_count_matrix_filepath: Path | None = None,
     cache: bool = True,
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO",
+    log_location: str | TextIOWrapper = sys.stderr,
 ) -> None:
     """Preprocesses RNA-seq data for downstream analysis.
 
