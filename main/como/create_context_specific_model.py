@@ -562,31 +562,25 @@ def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
                 f"'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}"
             )
 
-    reactions: list[str] = []
+    reactions: list[str] = [""] * len(df)
     boundary_type: list[str] = df["reaction"].tolist()
     reaction_abbreviation: list[str] = df["abbreviation"].tolist()
     reaction_compartment: list[str] = df["compartment"].tolist()
-    lower_bounds = df["minimum reaction rate"].tolist()
-    upper_bounds = df["maximum reaction rate"].tolist()
+    lower_bound = df["minimum reaction rate"].tolist()
+    upper_bound = df["maximum reaction rate"].tolist()
+    boundary_map = {"exchange": "EX", "demand": "DM", "sink": "SK"}
     for i in range(len(boundary_type)):
-        current_type: str = boundary_type[i]
-        temp_reaction: str = ""
-
-        match current_type.lower():
-            case "exchange":
-                temp_reaction += "EX_"
-            case "demand":
-                temp_reaction += "DM_"
-            case "sink":
-                temp_reaction += "SK_"
+        boundary: str = boundary_type[i].lower()
+        if boundary not in boundary_map:
+            raise ValueError(f"Boundary reaction type must be 'Exchange', 'Demand', or 'Sink'. Found: {boundary[i]}")
 
         shorthand_compartment = Compartments.get(reaction_compartment[i])
-        temp_reaction += f"{reaction_abbreviation[i]}[{shorthand_compartment}]"
-        reactions.append(temp_reaction)
+        reactions[i] = f"{boundary_map.get(boundary)}_{reaction_abbreviation[i]}[{shorthand_compartment}]"
+
     return _BoundaryReactions(
         reactions=reactions,
-        lower_bounds=lower_bounds,
-        upper_bounds=upper_bounds,
+        lower_bounds=lower_bound,
+        upper_bounds=upper_bound,
     )
 
 
