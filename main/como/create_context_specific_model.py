@@ -26,7 +26,7 @@ from como.project import Config
 from como.utils import Algorithm, Compartments, split_gene_expression_data, stringlist_to_list
 
 
-class _Solver(Enum):
+class Solver(Enum):
     """Solver used to seed context specific model."""
 
     GLPK = "GLPK"
@@ -35,17 +35,17 @@ class _Solver(Enum):
     GLPK_EXACT = "GLPK_EXACT"
 
     @staticmethod
-    def from_string(value: str) -> _Solver:
+    def from_string(value: str) -> Solver:
         """Convert string to Solver enum."""
         match value.lower():
             case "glpk":
-                return _Solver.GLPK
+                return Solver.GLPK
             case "gurobi":
-                return _Solver.GUROBI
+                return Solver.GUROBI
             case "scipy":
-                return _Solver.SCIPY
+                return Solver.SCIPY
             case "glpk_exact":
-                return _Solver.GLPK_EXACT
+                return Solver.GLPK_EXACT
             case _:
                 raise ValueError(f"Unknown solver: {value}")
 
@@ -78,7 +78,7 @@ class _Arguments:
     exclude_reactions_filepath: Path
     force_reactions_filepath: Path
     recon_algorithm: Algorithm
-    solver: _Solver
+    solver: Solver
     low_threshold: int
     high_threshold: int
     output_filetypes: list[str]
@@ -615,7 +615,7 @@ def create_context_specific_model(  # noqa: C901
     algorithm: Algorithm = Algorithm.GIMME,
     low_threshold: float = -5,
     high_threshold: float = -3,
-    solver: _Solver = _Solver.GLPK,
+    solver: Solver = Solver.GLPK,
     output_filetypes: list[str] | None = None,
 ):
     """Create a context-specific model using the provided data."""
@@ -633,7 +633,7 @@ def create_context_specific_model(  # noqa: C901
     if algorithm not in Algorithm:
         raise ValueError(f"Algorithm {algorithm} not supported. Please use one of: GIMME, FASTCORE, or IMAT")
 
-    if solver not in _Solver:
+    if solver not in Solver:
         raise ValueError(f"Solver '{solver}' not supported. Use 'GLPK' or 'GUROBI'")
 
     if boundary_rxns_filepath:
@@ -825,7 +825,7 @@ def _parse_args():
     )
     args = parser.parse_args()
     args.output_filetypes = stringlist_to_list(args.output_filetypes)
-    args.solver = _Solver.from_string(args.solver)  # type: ignore
+    args.solver = Solver.from_string(args.solver)  # type: ignore
     args.recon_algorithm = Algorithm.from_string(args.recon_algorithm)  # type: ignore
     return _Arguments(**vars(args))
 
