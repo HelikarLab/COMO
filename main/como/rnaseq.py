@@ -651,24 +651,31 @@ def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions,
 
 def filter_counts(
     *,
-    context_name: str,
     metrics: NamedMetrics,
     technique: FilteringTechnique,
     filtering_options: _FilteringOptions,
-    prep: RNASeqPreparationMethod,
+    cpm_output_filepath: Path | None = None,
 ) -> NamedMetrics:
     """Filter the count matrix based on the specified technique."""
     match technique:
         case FilteringTechnique.cpm:
+            if cpm_output_filepath is None:
+                raise ValueError("CPM output filepath must be provided")
             return cpm_filter(
-                context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep
+                metrics=metrics,
+                filtering_options=filtering_options,
+                output_csv_filepath=cpm_output_filepath,
             )
+
         case FilteringTechnique.tpm:
             return tpm_quantile_filter(metrics=metrics, filtering_options=filtering_options)
+
         case FilteringTechnique.zfpkm:
             return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calcualte_fpkm=True)
+
         case FilteringTechnique.umi:
             return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calcualte_fpkm=False)
+
         case _:
             raise ValueError(f"Technique must be one of {FilteringTechnique}")
 
@@ -716,11 +723,9 @@ async def save_rnaseq_tests(
     entrez_gene_ids = read_counts_results.entrez_gene_ids
 
     metrics = filter_counts(
-        context_name=context_name,
         metrics=metrics,
         technique=technique,
         filtering_options=filtering_options,
-        prep=prep,
     )
 
     expressed_genes: list[str] = []
