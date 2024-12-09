@@ -758,6 +758,7 @@ async def save_rnaseq_tests(
 
     boolean_matrix.to_csv(output_filepath, index=False)
     logger.info(
-        f"{context_name} - Found {expressed_count} expressed and {high_confidence_count} confidently expressed genes"
+        f"{context_name} - Found {expressed_count} expressed genes, "
+        f"{high_confidence_count} of which are confidently expressed"
     )
     logger.success(f"Wrote boolean matrix to {output_filepath}")
