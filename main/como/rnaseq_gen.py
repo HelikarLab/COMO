@@ -477,6 +477,16 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
     fig.write_image("zfpkm_plot.png")
 
 
+def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
+    """Calculate the z-score for each sample in the metrics dictionary."""
+    for sample in metrics:
+        log_matrix = np.log(metrics[sample].normalization_matrix)
+        z_matrix = pd.DataFrame(
+            data=sklearn.preprocessing.scale(log_matrix, axis=1), columns=metrics[sample].sample_names
+        )
+        metrics[sample].z_score_matrix = z_matrix
+    return metrics
+
 
 def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions, calcualte_fpkm: bool) -> NamedMetrics:
     """Apply zFPKM filtering to the FPKM matrix for a given sample."""
