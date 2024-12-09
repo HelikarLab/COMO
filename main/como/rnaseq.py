@@ -27,9 +27,8 @@ from plotly.subplots import make_subplots
 from scipy.signal import find_peaks
 from sklearn.neighbors import KernelDensity
 
-from como.custom_types import RNAPrepMethod
 from como.migrations import gene_info_migrations
-from como.project import Config
+from como.types import RNAPrepMethod
 from como.utils import convert_gene_data
 
 
@@ -525,20 +524,17 @@ def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
 
 def cpm_filter(
     *,
-    context_name: str,
     metrics: NamedMetrics,
     filtering_options: _FilteringOptions,
-    prep: RNAPrepMethod,
+    output_csv_filepath: Path,
 ) -> NamedMetrics:
     """Apply Counts Per Million (CPM) filtering to the count matrix for a given sample."""
-    config = Config()
     n_exp = filtering_options.replicate_ratio
     n_top = filtering_options.high_replicate_ratio
     cut_off = filtering_options.cut_off
 
-    sample: str
     metric: _StudyMetrics
-    for sample, metric in metrics.items():
+    for metric in metrics.values():
         counts: pd.DataFrame = metric.count_matrix
         entrez_ids: list[str] = metric.entrez_gene_ids
         library_size: pd.DataFrame = counts.sum(axis=1)
@@ -548,12 +544,11 @@ def cpm_filter(
         #   thus, (0 / 1) * 1_000_000 = 0
         library_size[library_size == 0] = 1
 
-        output_filepath = config.result_dir / context_name / prep.value / f"CPM_Matrix_{prep.value}_{sample}.csv"
-        output_filepath.parent.mkdir(parents=True, exist_ok=True)
+        output_csv_filepath.parent.mkdir(parents=True, exist_ok=True)
         counts_per_million: pd.DataFrame = (counts / library_size) * 1_000_000
         counts_per_million.insert(0, "entrez_gene_ids", pd.Series(entrez_ids))
-        logger.debug(f"Writing CPM matrix to {output_filepath}")
-        counts_per_million.to_csv(output_filepath, index=False)
+        logger.debug(f"Writing CPM matrix to {output_csv_filepath}")
+        counts_per_million.to_csv(output_csv_filepath, index=False)
 
         # TODO: Counts per million is adding ~61,500 columns (equal to the number of genes) for some reason.
         #  Most likely due to multiplying by 1_000_000, not exactly sure why
@@ -656,24 +651,31 @@ def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions,
 
 def filter_counts(
     *,
-    context_name: str,
     metrics: NamedMetrics,
     technique: FilteringTechnique,
     filtering_options: _FilteringOptions,
-    prep: RNAPrepMethod,
+    cpm_output_filepath: Path | None = None,
 ) -> NamedMetrics:
     """Filter the count matrix based on the specified technique."""
     match technique:
         case FilteringTechnique.cpm:
+            if cpm_output_filepath is None:
+                raise ValueError("CPM output filepath must be provided")
             return cpm_filter(
-                context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep
+                metrics=metrics,
+                filtering_options=filtering_options,
+                output_csv_filepath=cpm_output_filepath,
             )
+
         case FilteringTechnique.tpm:
             return tpm_quantile_filter(metrics=metrics, filtering_options=filtering_options)
+
         case FilteringTechnique.zfpkm:
             return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calcualte_fpkm=True)
+
         case FilteringTechnique.umi:
             return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calcualte_fpkm=False)
+
         case _:
             raise ValueError(f"Technique must be one of {FilteringTechnique}")
 
@@ -721,11 +723,9 @@ async def save_rnaseq_tests(
     entrez_gene_ids = read_counts_results.entrez_gene_ids
 
     metrics = filter_counts(
-        context_name=context_name,
         metrics=metrics,
         technique=technique,
         filtering_options=filtering_options,
-        prep=prep,
     )
 
     expressed_genes: list[str] = []
@@ -758,6 +758,7 @@ async def save_rnaseq_tests(
 
     boolean_matrix.to_csv(output_filepath, index=False)
     logger.info(
-        f"{context_name} - Found {expressed_count} expressed and {high_confidence_count} confidently expressed genes"
+        f"{context_name} - Found {expressed_count} expressed genes, "
+        f"{high_confidence_count} of which are confidently expressed"
     )
     logger.success(f"Wrote boolean matrix to {output_filepath}")
