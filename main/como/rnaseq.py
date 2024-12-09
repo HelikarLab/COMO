@@ -524,7 +524,6 @@ def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
 
 def cpm_filter(
     *,
-    context_name: str,
     metrics: NamedMetrics,
     filtering_options: _FilteringOptions,
     output_csv_filepath: Path,
@@ -534,9 +533,8 @@ def cpm_filter(
     n_top = filtering_options.high_replicate_ratio
     cut_off = filtering_options.cut_off
 
-    sample: str
     metric: _StudyMetrics
-    for sample, metric in metrics.items():
+    for metric in metrics.values():
         counts: pd.DataFrame = metric.count_matrix
         entrez_ids: list[str] = metric.entrez_gene_ids
         library_size: pd.DataFrame = counts.sum(axis=1)
