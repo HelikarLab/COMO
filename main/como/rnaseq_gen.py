@@ -536,6 +536,54 @@ def cpm_filter(
 
     return metrics
 
+
+def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions) -> NamedMetrics:
+    """Apply quantile-based filtering to the TPM matrix for a given sample."""
+    # TODO: Write the TPM matrix to disk
+
+    n_exp = filtering_options.replicate_ratio
+    n_top = filtering_options.high_replicate_ratio
+    cut_off = filtering_options.cut_off
+    metrics = calculate_tpm(metrics)
+
+    sample: str
+    metric: _StudyMetrics
+    for sample, metric in metrics.items():
+        entrez_ids = metric.entrez_gene_ids
+        gene_size = metric.gene_sizes
+        tpm_matrix: pd.DataFrame = metric.normalization_matrix
+
+        min_samples = round(n_exp * len(tpm_matrix.columns))
+        top_samples = round(n_top * len(tpm_matrix.columns))
+
+        tpm_quantile = tpm_matrix[tpm_matrix > 0]
+        quantile_cutoff = np.quantile(
+            a=tpm_quantile.values, q=1 - (cut_off / 100), axis=0
+        )  # Compute quantile across columns
+        boolean_expression = pd.DataFrame(
+            data=tpm_matrix > quantile_cutoff, index=tpm_matrix.index, columns=tpm_matrix.columns
+        ).astype(int)
+
+        min_func = k_over_a(min_samples, 0.9)
+        top_func = k_over_a(top_samples, 0.9)
+
+        min_genes: npt.NDArray[bool] = genefilter(boolean_expression, min_func)
+        top_genes: npt.NDArray[bool] = genefilter(boolean_expression, top_func)
+
+        # Only keep `entrez_gene_ids` that pass `min_genes`
+        metric.entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, min_genes) if keep]
+        metric.gene_sizes = [gene for gene, keep in zip(gene_size, min_genes) if keep]
+        metric.count_matrix = metric.count_matrix.iloc[min_genes, :]
+        metric.normalization_matrix = metrics[sample].normalization_matrix.iloc[min_genes, :]
+
+        keep_top_genes = [gene for gene, keep in zip(entrez_ids, top_genes) if keep]
+        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, keep_top_genes) if keep]
+
+    metrics = calculate_z_score(metrics)
+
+    return metrics
+
+
 def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions, calcualte_fpkm: bool) -> NamedMetrics:
     """Apply zFPKM filtering to the FPKM matrix for a given sample."""
     min_sample_expression = filtering_options.replicate_ratio
