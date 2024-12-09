@@ -9,7 +9,7 @@ from fast_bioservices import Taxon
 from loguru import logger
 
 from como import Config
-from como.custom_types import RNASeqPreparationMethod
+from como.custom_types import RNAPrepMethod
 from como.rnaseq import FilteringTechnique, save_rnaseq_tests
 
 
@@ -22,11 +22,11 @@ class _Arguments:
     high_batch_ratio: float
     filtering_technique: FilteringTechnique
     minimum_cutoff: int | str
-    library_prep: RNASeqPreparationMethod
+    library_prep: RNAPrepMethod
     taxon: Taxon
 
     def __post_init__(self):
-        self.library_prep = RNASeqPreparationMethod.from_string(str(self.library_prep))
+        self.library_prep = RNAPrepMethod.from_string(str(self.library_prep))
         self.filtering_technique = FilteringTechnique.from_string(str(self.filtering_technique))
 
         if self.minimum_cutoff is None:
@@ -46,7 +46,7 @@ async def _handle_context_batch(
     batch_ratio_high: float,
     technique: FilteringTechnique,
     cut_off: int | float | str,
-    prep: RNASeqPreparationMethod,
+    prep: RNAPrepMethod,
     taxon: Taxon,
 ) -> None:
     """Iterate through each context type and create rnaseq expression file.
@@ -81,9 +81,9 @@ async def _handle_context_batch(
         rnaseq_input_filepath = (
             config.data_dir / "data_matrices" / context_name / f"gene_counts_matrix_{prep.value}_{context_name}"
         )
-        if prep == RNASeqPreparationMethod.SCRNA:
+        if prep == RNAPrepMethod.SCRNA:
             rnaseq_input_filepath = rnaseq_input_filepath.with_suffix(".h5ad")
-        elif prep in {RNASeqPreparationMethod.TOTAL, RNASeqPreparationMethod.MRNA}:
+        elif prep in {RNAPrepMethod.TOTAL, RNAPrepMethod.MRNA}:
             rnaseq_input_filepath = rnaseq_input_filepath.with_suffix(".csv")
 
         if not rnaseq_input_filepath.exists():
@@ -117,7 +117,7 @@ async def _handle_context_batch(
 async def rnaseq_gen(
     # config_filepath: Path,
     config_filename: str,
-    prep: RNASeqPreparationMethod,
+    prep: RNAPrepMethod,
     taxon_id: int | str | Taxon,
     replicate_ratio: float = 0.5,
     high_replicate_ratio: float = 1.0,
