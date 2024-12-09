@@ -429,7 +429,7 @@ async def _create_gene_info_file(
     *,
     counts_matrix_filepaths: list[Path],
     output_filepath: Path,
-    taxon_id: type_taxon,
+    taxon: int,
     cache: bool,
 ):
     """Create a gene information file context.
@@ -473,10 +473,15 @@ async def _create_gene_info_file(
         gene_info.at[i, "end_position"] = end_pos
 
     gene_info = gene_info[
-        (gene_info["entrez_gene_id"] != "-") & (gene_info["ensembl_gene_id"] != "-") & (gene_info["gene_symbol"] != "-")
+        (
+            (gene_info["entrez_gene_id"] != "-")
+            & (gene_info["ensembl_gene_id"] != "-")
+            & (gene_info["gene_symbol"] != "-")
+        )
     ]
     gene_info["size"] = gene_info["end_position"].astype(int) - gene_info["start_position"].astype(int)
     gene_info.drop(columns=["start_position", "end_position"], inplace=True)
+    gene_info.sort_values(by="ensembl_gene_id", inplace=True)
     gene_info.to_csv(output_filepath, index=False)
     logger.success(f"Gene Info file written at '{output_filepath}'")
 
