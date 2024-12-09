@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 from dataclasses import dataclass
+from pathlib import Path
 
 import pandas as pd
 from fast_bioservices import Taxon
@@ -24,6 +25,7 @@ class _Arguments:
     minimum_cutoff: int | str
     library_prep: RNASeqPreparationMethod
     taxon: Taxon
+    write_zfpkm_png_filepath: Path
 
     def __post_init__(self):
         self.library_prep = RNASeqPreparationMethod.from_string(str(self.library_prep))
@@ -48,6 +50,7 @@ async def _handle_context_batch(
     cut_off: int | float | str,
     prep: RNASeqPreparationMethod,
     taxon: Taxon,
+    write_zfpkm_png_filepath: Path,
 ) -> None:
     """Iterate through each context type and create rnaseq expression file.
 
@@ -110,6 +113,7 @@ async def _handle_context_batch(
             technique=technique,
             cut_off=cut_off,
             taxon_id=taxon,
+            write_zfpkm_png_filepath=write_zfpkm_png_filepath,
         )
         logger.success(f"Results saved at '{rnaseq_output_filepath}'")
 
@@ -119,6 +123,7 @@ async def rnaseq_gen(
     config_filename: str,
     prep: RNASeqPreparationMethod,
     taxon_id: int | str | Taxon,
+    write_zfpkm_png_filepath: Path,
     replicate_ratio: float = 0.5,
     high_replicate_ratio: float = 1.0,
     batch_ratio: float = 0.5,
@@ -180,6 +185,7 @@ async def rnaseq_gen(
         cut_off=cut_off,
         prep=prep,
         taxon=taxon_id,
+        write_zfpkm_png_filepath=write_zfpkm_png_filepath,
     )
 
 
@@ -287,6 +293,12 @@ def _parse_args() -> _Arguments:
         "Will separate samples into groups to only compare similarly prepared libraries. "
         "For example, mRNA, total-rna, scRNA, etc",
     )
+    parser.add_argument(
+        "--write-zfpkm-png-filepath",
+        required=False,
+        type=Path,
+        help="If using zFPKM, the location to write graphs",
+    )
     args = parser.parse_args()
     args.filtering_technique = args.filtering_technique.lower()
     args.taxon = Taxon.from_int(int(args.taxon)) if str(args.taxon).isdigit() else Taxon.from_string(str(args.taxon))  # type: ignore
@@ -306,5 +318,6 @@ if __name__ == "__main__":
             cut_off=args.minimum_cutoff,
             prep=args.library_prep,
             taxon_id=args.taxon,
+            write_zfpkm_png_filepath=args.write_zfpkm_png_filepath,
         )
     )
