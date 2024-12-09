@@ -488,6 +488,54 @@ def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
     return metrics
 
 
+def cpm_filter(
+    *,
+    context_name: str,
+    metrics: NamedMetrics,
+    filtering_options: _FilteringOptions,
+    prep: RNAPrepMethod,
+) -> NamedMetrics:
+    """Apply Counts Per Million (CPM) filtering to the count matrix for a given sample."""
+    config = Config()
+    n_exp = filtering_options.replicate_ratio
+    n_top = filtering_options.high_replicate_ratio
+    cut_off = filtering_options.cut_off
+
+    sample: str
+    metric: _StudyMetrics
+    for sample, metric in metrics.items():
+        counts: pd.DataFrame = metric.count_matrix
+        entrez_ids: list[str] = metric.entrez_gene_ids
+        library_size: pd.DataFrame = counts.sum(axis=1)
+
+        # For library_sizes equal to 0, add 1 to prevent divide by 0
+        # This will not impact the final counts per million calculation because the original counts are still 0
+        #   thus, (0 / 1) * 1_000_000 = 0
+        library_size[library_size == 0] = 1
+
+        output_filepath = config.result_dir / context_name / prep.value / f"CPM_Matrix_{prep.value}_{sample}.csv"
+        output_filepath.parent.mkdir(parents=True, exist_ok=True)
+        counts_per_million: pd.DataFrame = (counts / library_size) * 1_000_000
+        counts_per_million.insert(0, "entrez_gene_ids", pd.Series(entrez_ids))
+        logger.debug(f"Writing CPM matrix to {output_filepath}")
+        counts_per_million.to_csv(output_filepath, index=False)
+
+        # TODO: Counts per million is adding ~61,500 columns (equal to the number of genes) for some reason.
+        #  Most likely due to multiplying by 1_000_000, not exactly sure why
+
+        min_samples = round(n_exp * len(counts.columns))  # noqa: F841
+        top_samples = round(n_top * len(counts.columns))  # noqa: F841
+        test_bools = pd.DataFrame({"entrez_gene_ids": entrez_ids})
+        for i in range(len(counts_per_million.columns)):
+            cutoff = (
+                10e6 / (np.median(np.sum(counts[:, i])))
+                if cut_off == "default"
+                else 1e6 * cut_off / np.median(np.sum(counts[:, i]))
+            )
+            test_bools = test_bools.merge(counts_per_million[counts_per_million.iloc[:, i] > cutoff])
+
+    return metrics
+
 def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions, calcualte_fpkm: bool) -> NamedMetrics:
     """Apply zFPKM filtering to the FPKM matrix for a given sample."""
     min_sample_expression = filtering_options.replicate_ratio
