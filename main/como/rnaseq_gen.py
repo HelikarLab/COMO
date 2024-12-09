@@ -166,8 +166,22 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
     )
 
 
+async def _read_counts(path: Path) -> pd.DataFrame:
+    if path.suffix not in {".csv", ".h5ad"}:
+        raise ValueError(f"Unknown file extension '{path.suffix}'. Valid options are '.csv' or '.h5ad'.")
 
-    logger.info(f"Reading config file: {config_filepath}")
+    matrix: pd.DataFrame
+    if path.suffix == ".csv":
+        logger.debug(f"Reading CSV file at '{path}'")
+        matrix = pd.read_csv(path, header=0)
+    elif path.suffix == ".h5ad":
+        logger.debug(f"Reading h5ad file at '{path}'")
+        # Make sample names the columns and gene data the index
+        matrix = sc.read_h5ad(path).to_df().T
+
+    return matrix
+
+
 
     for context_name in sheet_names:
         logger.debug(f"Starting '{context_name}'")
