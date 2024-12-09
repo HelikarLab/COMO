@@ -727,6 +727,16 @@ async def _create_metadata_df(path: Path) -> pd.DataFrame:
         )
     return pd.read_excel(path)
 
+
+async def rnaseq_gen(  # noqa: C901, allow complex function
+    context_name: str,
+    input_rnaseq_filepath: Path,
+    input_gene_info_filepath: Path,
+    output_rnaseq_filepath: Path,
+    prep: RNAPrepMethod,
+    taxon: int,
+    input_metadata_filepath: Path | None = None,
+    input_metadata_df: pd.DataFrame | None = None,
     replicate_ratio: float = 0.5,
     high_replicate_ratio: float = 1.0,
     batch_ratio: float = 0.5,
@@ -740,9 +750,9 @@ async def _create_metadata_df(path: Path) -> pd.DataFrame:
         then study/batch numbers are checked for consensus according to batch ratios.
     The zFPKM method is outlined here: https://pubmed.ncbi.nlm.nih.gov/24215113/
 
-    :param config_filename: The configuration filename to read
+    :param metadata_filepath: The configuration filename to read
     :param prep: The preparation method
-    :param taxon_id: The NCBI Taxon ID
+    :param taxon: The NCBI Taxon ID
     :param replicate_ratio: The percentage of replicates that a gene must
         appear in for a gene to be marked as "active" in a batch/study
     :param batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked as 'active"
@@ -754,41 +764,58 @@ async def _create_metadata_df(path: Path) -> pd.DataFrame:
     :param cut_off: The cutoff value to use for the provided filtering technique
     :return: None
     """
-    if isinstance(technique, str):
-        technique = FilteringTechnique(technique.lower())
-    if isinstance(taxon_id, (str, int)):
-        taxon_id = Taxon.from_string(str(taxon_id))
+    if not input_metadata_df and not input_metadata_filepath:
+        raise ValueError("At least one of input_metadata_filepath or input_metadata_df must be provided")
+
+    technique = (
+        FilteringTechnique.from_string(str(technique.lower())) if isinstance(technique, (str, int)) else technique
+    )
 
     match technique:
         case FilteringTechnique.tpm:
-            cut_off = 25 if cut_off is None else cut_off
+            cut_off = cut_off or 25
             if cut_off < 1 or cut_off > 100:
                 raise ValueError("Quantile must be between 1 - 100")
 
         case FilteringTechnique.cpm:
-            if cut_off is not None and cut_off < 0:
+            if cut_off and cut_off < 0:
                 raise ValueError("Cutoff must be greater than 0")
-            elif cut_off is None:
+            elif cut_off:
                 cut_off = "default"
 
         case FilteringTechnique.zfpkm:
-            cut_off = "default" if cut_off is None else cut_off
+            cut_off = "default" if cut_off else cut_off
         case FilteringTechnique.umi:
             pass
         case _:
             raise ValueError(f"Technique must be one of {FilteringTechnique}")
 
-    await _handle_context_batch(
-        config_filename=config_filename,
+    if not input_rnaseq_filepath.exists():
+        raise FileNotFoundError(f"Input RNA-seq file not found! Searching for: '{input_rnaseq_filepath}'")
+
+    if prep == RNAPrepMethod.SCRNA:
+        technique = FilteringTechnique.umi
+        logger.warning(
+            "Single cell filtration does not normalize and assumes "
+            "gene counts are counted with Unique Molecular Identifiers (UMIs). "
+            "Setting filtering technique to UMI now."
+        )
+
+    logger.debug(f"Starting '{context_name}'")
+    output_rnaseq_filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    await _save_rnaseq_tests(
+        context_name=context_name,
+        rnaseq_matrix=await _read_counts(input_rnaseq_filepath),
+        metadata_df=input_metadata_df or await _create_metadata_df(input_metadata_filepath),
+        gene_info_df=pd.read_csv(input_gene_info_filepath),
+        output_filepath=output_rnaseq_filepath,
+        prep=prep,
+        taxon=taxon,
         replicate_ratio=replicate_ratio,
-        replicate_ratio_high=high_replicate_ratio,
         batch_ratio=batch_ratio,
-        batch_ratio_high=high_batch_ratio,
+        high_replicate_ratio=high_replicate_ratio,
+        high_batch_ratio=high_batch_ratio,
         technique=technique,
         cut_off=cut_off,
-        prep=prep,
-        taxon=taxon_id,
-    )
-
-
     )
