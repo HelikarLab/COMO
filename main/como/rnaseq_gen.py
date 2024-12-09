@@ -129,6 +129,22 @@ class _ReadMatrixResults(NamedTuple):
 
 Density = namedtuple("Density", ["x", "y"])
 NamedMetrics = dict[str, _StudyMetrics]
+
+
+def k_over_a(k: int, a: float) -> Callable[[npt.NDArray], bool]:
+    """Return a function that filters rows of an array based on the sum of elements being greater than or equal to A at least k times.
+
+    This code is based on the `kOverA` function found in R's `genefilter` package: https://www.rdocumentation.org/packages/genefilter/versions/1.54.2/topics/kOverA
+
+    :param k: The minimum number of times the sum of elements must be greater than or equal to A.
+    :param a: The value to compare the sum of elements to.
+    :return: A function that accepts a NumPy array to perform the actual filtering
+    """  # noqa: E501
+
+    def filter_func(row: npt.NDArray) -> bool:
+        return np.sum(row >= a) >= k
+
+    return filter_func
     """
     config = Config()
 
