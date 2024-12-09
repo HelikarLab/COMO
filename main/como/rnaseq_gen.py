@@ -182,9 +182,65 @@ async def _read_counts(path: Path) -> pd.DataFrame:
     return matrix
 
 
+async def _build_matrix_results(
+    *,
+    matrix: pd.DataFrame,
+    gene_info: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    taxon: int,
+) -> _ReadMatrixResults:
+    """Read the counts matrix and returns the results.
 
-    for context_name in sheet_names:
-        logger.debug(f"Starting '{context_name}'")
+    :param matrix: The gene counts matrix to process
+    :param metadata_df: The configuration dataframe related to the current context
+    :param taxon: The NCBI Taxon ID
+    :return: A dataclass `ReadMatrixResults`
+    """
+    gene_info = gene_info_migrations(gene_info)
+    conversion = await ensembl_to_gene_id_and_symbol(ids=matrix["ensembl_gene_id"].tolist(), taxon=taxon)
+    matrix = matrix.merge(conversion, on="ensembl_gene_id", how="left")
+
+    # Only include Entrez and Ensembl Gene IDs that are present in `gene_info`
+    matrix["entrez_gene_id"] = matrix["entrez_gene_id"].str.split("//")
+    matrix = matrix.explode("entrez_gene_id")
+    matrix = matrix.replace(to_replace="-", value=pd.NA).dropna()
+    matrix["entrez_gene_id"] = matrix["entrez_gene_id"].astype(int)
+
+    gene_info = gene_info.replace(to_replace="-", value=pd.NA).dropna()
+    gene_info["entrez_gene_id"] = gene_info["entrez_gene_id"].astype(int)
+
+    counts_matrix = matrix.merge(
+        gene_info[["entrez_gene_id", "ensembl_gene_id"]],
+        on=["entrez_gene_id", "ensembl_gene_id"],
+        how="inner",
+    )
+    gene_info = gene_info.merge(
+        counts_matrix[["entrez_gene_id", "ensembl_gene_id"]],
+        on=["entrez_gene_id", "ensembl_gene_id"],
+        how="inner",
+    )
+
+    entrez_gene_ids: list[str] = gene_info["entrez_gene_id"].tolist()
+    metrics: NamedMetrics = {}
+    for study in metadata_df["study"].unique().tolist():
+        study_sample_names = metadata_df[metadata_df["study"] == study]["sample_name"].tolist()
+        layouts = metadata_df[metadata_df["study"] == study]["layout"].tolist()
+        metrics[study] = _StudyMetrics(
+            count_matrix=counts_matrix[counts_matrix.columns.intersection(study_sample_names)],
+            fragment_lengths=metadata_df[metadata_df["study"] == study]["fragment_length"].values,
+            sample_names=study_sample_names,
+            layout=[LayoutMethod(layout) for layout in layouts],
+            num_samples=len(study_sample_names),
+            entrez_gene_ids=entrez_gene_ids,
+            gene_sizes=np.array(gene_info["size"].values).astype(np.float32),
+            study=study,
+        )
+        metrics[study].fragment_lengths[np.isnan(metrics[study].fragment_lengths)] = 0
+        metrics[study].count_matrix.index = pd.Index(entrez_gene_ids, name="entrez_gene_id")
+
+    return _ReadMatrixResults(metrics=metrics, entrez_gene_ids=gene_info["entrez_gene_id"].tolist())
+
+
 
         rnaseq_input_filepath = (
             config.data_dir / "data_matrices" / context_name / f"gene_counts_matrix_{prep.value}_{context_name}"
