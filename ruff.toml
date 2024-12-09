@@ -48,3 +48,6 @@ ignore = [
     "D103",     # allow undocumented public method definitions
     "S101",     # allow use of `assert` in test files
 ]
+"main/COMO.ipynb" = [
+    "E501",     # allow long lines
+]
