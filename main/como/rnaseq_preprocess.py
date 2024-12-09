@@ -427,7 +427,7 @@ async def _create_config_df(context_name: str, /, como_input_dir: Path) -> pd.Da
 
 async def _create_gene_info_file(
     *,
-    counts_matrix: pd.DataFrame | Path,
+    counts_matrix_filepaths: list[Path],
     output_filepath: Path,
     taxon_id: type_taxon,
     cache: bool,
@@ -435,15 +435,17 @@ async def _create_gene_info_file(
     """Create gene info file for specified context by reading first column in its count matrix file."""
     logger.info("Fetching gene info")
 
-    data: pd.DataFrame | sc.AnnData = (
-        (pd.read_csv(counts_matrix) if counts_matrix.suffix == ".csv" else sc.read_h5ad(counts_matrix))
-        if isinstance(counts_matrix, Path)
-        else counts_matrix
-    )
+    async def read_counts(file: Path) -> list[str]:
+        data = await asyncio.to_thread(pd.read_csv if file.suffix == ".csv" else sc.read_h5ad, file)
+        conversion = (
+            await ensembl_to_gene_id_and_symbol(ids=data["ensembl_gene_id"].tolist(), taxon=taxon)
+            if isinstance(data, pd.DataFrame)
+            else await gene_symbol_to_ensembl_and_gene_id(symbols=data.var_names.tolist(), taxon=taxon)
+        )
+        return conversion["entrez_gene_id"].tolist()
 
-    input_values = data.iloc[:, 0].tolist() if isinstance(data, pd.DataFrame) else data.var_names.tolist()
-    conversion = await convert_gene_data(input_values, taxon_id)
-    genes = conversion["entrez_gene_id"].astype(str).tolist()
+    logger.info("Fetching gene info (this may take 1-5 minutes)")
+    genes = set(chain.from_iterable(await asyncio.gather(*[read_counts(f) for f in counts_matrix_filepaths])))
 
     mygene = MyGene(cache=cache)
     gene_data = await mygene.query(
