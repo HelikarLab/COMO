@@ -28,7 +28,6 @@ from scipy.signal import find_peaks
 from sklearn.neighbors import KernelDensity
 
 from como.migrations import gene_info_migrations
-from como.project import Config
 from como.types import RNAPrepMethod
 from como.utils import convert_gene_data
 
@@ -528,10 +527,9 @@ def cpm_filter(
     context_name: str,
     metrics: NamedMetrics,
     filtering_options: _FilteringOptions,
-    prep: RNASeqPreparationMethod,
+    output_csv_filepath: Path,
 ) -> NamedMetrics:
     """Apply Counts Per Million (CPM) filtering to the count matrix for a given sample."""
-    config = Config()
     n_exp = filtering_options.replicate_ratio
     n_top = filtering_options.high_replicate_ratio
     cut_off = filtering_options.cut_off
@@ -548,12 +546,11 @@ def cpm_filter(
         #   thus, (0 / 1) * 1_000_000 = 0
         library_size[library_size == 0] = 1
 
-        output_filepath = config.result_dir / context_name / prep.value / f"CPM_Matrix_{prep.value}_{sample}.csv"
-        output_filepath.parent.mkdir(parents=True, exist_ok=True)
+        output_csv_filepath.parent.mkdir(parents=True, exist_ok=True)
         counts_per_million: pd.DataFrame = (counts / library_size) * 1_000_000
         counts_per_million.insert(0, "entrez_gene_ids", pd.Series(entrez_ids))
-        logger.debug(f"Writing CPM matrix to {output_filepath}")
-        counts_per_million.to_csv(output_filepath, index=False)
+        logger.debug(f"Writing CPM matrix to {output_csv_filepath}")
+        counts_per_million.to_csv(output_csv_filepath, index=False)
 
         # TODO: Counts per million is adding ~61,500 columns (equal to the number of genes) for some reason.
         #  Most likely due to multiplying by 1_000_000, not exactly sure why
