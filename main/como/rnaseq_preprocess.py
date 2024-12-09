@@ -432,8 +432,10 @@ async def _create_gene_info_file(
     taxon_id: type_taxon,
     cache: bool,
 ):
-    """Create gene info file for specified context by reading first column in its count matrix file."""
-    logger.info("Fetching gene info")
+    """Create a gene information file context.
+
+    The gene information file will be created by reading each matrix filepath in the provided list
+    """
 
     async def read_counts(file: Path) -> list[str]:
         data = await asyncio.to_thread(pd.read_csv if file.suffix == ".csv" else sc.read_h5ad, file)
@@ -616,19 +618,20 @@ async def rnaseq_preprocess(  # noqa: C901
     Fetches additional gene information from a provided matrix or gene counts,
         or optionally creates this matrix using gene count files obtained using STAR aligner
 
-    :param context_names: The context/cell type being processed
-    :param mode: The mode of operation
-    :param taxon_id: The NCBI taxonomy ID
+    :param context_name: The context/cell type being processed
+    :param taxon: The NCBI taxonomy ID
     :param output_gene_info_filepath: Path to the output gene information CSV file
     :param output_trna_config_filepath: Path to the output tRNA config file (if in "create" mode)
-    :param output_mrna_config_filepath: Path to the output mRNA config file (if in "create" mode)
-    :param output_count_matrices_dirpath: The path to write all created count matrices
-    :param output_trna_count_matrix: The path to write total RNA count matrices
-    :param output_mrna_count_matrix: The path to write messenger RNA count matrices
-    :param input_como_dirpath: If in "create" mode, the input path(s) to the COMO_input directory of the current context
+    :param output_polya_config_filepath: Path to the output mRNA config file (if in "create" mode)
+    :param output_trna_count_matrix_filepath: The path to write total RNA count matrices
+    :param output_polya_count_matrix_filepath: The path to write messenger RNA count matrices
+    :param como_context_dir: If in "create" mode, the input path(s) to the COMO_input directory of the current context
         i.e., the directory containing "fragmentSizes", "geneCounts", "insertSizeMetrics", etc. directories
     :param input_matrix_filepath: If in "provide" mode, the path(s) to the count matrices to be processed
+    :param preparation_method: The preparation method
     :param cache: Should HTTP requests be cached
+    :param log_level: The logging level
+    :param log_location: The logging location
     """
     context_names = _listify(context_names)
     mode = _listify(mode)
