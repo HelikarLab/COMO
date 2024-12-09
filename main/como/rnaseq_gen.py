@@ -30,17 +30,13 @@ from como.project import Config
 from como.types import RNAPrepMethod
 
 
-@dataclass
-class _Arguments:
-    config_file: str
+class _FilteringOptions(NamedTuple):
     replicate_ratio: float
     batch_ratio: float
+    cut_off: float
     high_replicate_ratio: float
     high_batch_ratio: float
-    filtering_technique: FilteringTechnique
-    minimum_cutoff: int | str
-    library_prep: RNAPrepMethod
-    taxon: Taxon
+
 
     def __post_init__(self):
         self.library_prep = RNAPrepMethod.from_string(str(self.library_prep))
@@ -200,128 +196,4 @@ async def rnaseq_gen(
     )
 
 
-def _parse_args() -> _Arguments:
-    parser = argparse.ArgumentParser(
-        prog="rnaseq_gen.py",
-        description="Generate a list of active and high-confidence genes from a counts matrix using a user defined "
-        "at normalization-technique at /work/data/results/<context name>/rnaseq_<context_name>.csv: "
-        "https://github.com/HelikarLab/FastqToGeneCounts",
-        epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
-        "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
-    )
-    parser.add_argument(
-        "-c",
-        "--config-file",
-        type=str,
-        required=True,
-        dest="config_file",
-        help="Name of config .xlsx file in the /work/data/config_files/. Can be generated using "
-        "rnaseq_preprocess.py or manually created and imported into the Juypterlab",
-    )
-    parser.add_argument(
-        "-r",
-        "--replicate-ratio",
-        type=float,
-        required=False,
-        default=0.5,
-        dest="replicate_ratio",
-        help="Ratio of replicates required for a gene to be active within that study/batch group "
-        "Example: 0.7 means that for a gene to be active, at least 70% of replicates in a group "
-        "must pass the cutoff after normalization",
-    )
-    parser.add_argument(
-        "-g",
-        "--batch-ratio",
-        type=float,
-        required=False,
-        default=0.5,
-        dest="batch_ratio",
-        help="Ratio of groups (studies or batches) required for a gene to be active "
-        "Example: 0.7 means that for a gene to be active, at least 70% of groups in a study must  "
-        "have passed the replicate ratio test",
-    )
-    parser.add_argument(
-        "-rh",
-        "--high-replicate-ratio",
-        type=float,
-        required=False,
-        default=1.0,
-        dest="high_replicate_ratio",
-        help="Ratio of replicates required for a gene to be considered high-confidence. "
-        "High-confidence genes ignore consensus with other data-sources, such as proteomics. "
-        "Example: 0.9 means that for a gene to be high-confidence, "
-        "at least 90% of replicates in a group must pass the cutoff after normalization",
-    )
-    parser.add_argument(
-        "-gh",
-        "--high-batch-ratio",
-        type=float,
-        required=False,
-        default=1.0,
-        dest="high_batch_ratio",
-        help="Ratio of studies/batches required for a gene to be considered high-confidence within that group. "
-        "High-confidence genes ignore consensus with other data-sources, like proteomics. "
-        "Example: 0.9 means that for a gene to be high-confidence, "
-        "at least 90% of groups in a study must have passed the replicate ratio test",
-    )
-    parser.add_argument(
-        "--taxon",
-        "--taxon-id",
-        type=str,
-        required=True,
-        dest="taxon",
-        help="The NCBI Taxonomy ID that is being proessed. '9606' for humans, '10090' for mice.",
-    )
-    parser.add_argument(
-        "-t",
-        "--filt-technique",
-        type=str,
-        required=False,
-        default="quantile",
-        dest="filtering_technique",
-        help="Technique to normalize and filter counts with. "
-        "Either 'zfpkm', 'quantile', or 'cpm'. More info about each method is discussed in pipeline.ipynb.",
-    )
-    parser.add_argument(
-        "--minimum-cutoff",
-        type=int,
-        required=False,
-        default=None,
-        dest="minimum_cutoff",
-        help="The minimum cutoff used for the filtration technique. "
-        "If the filtering technique is zFPKM, the default is -3. "
-        "If the filtering technique is quantile-tpm, the default is 25. "
-        "If the filtering technique is flat-cpm, the default is determined dynamically. "
-        "If the filtering technique is quantile, the default is 25.",
-    )
-    parser.add_argument(
-        "-p",
-        "--library-prep",
-        required=True,
-        choices=["total", "mrna", "scrna"],
-        dest="library_prep",
-        help="Library preparation method. "
-        "Will separate samples into groups to only compare similarly prepared libraries. "
-        "For example, mRNA, total-rna, scRNA, etc",
-    )
-    args = parser.parse_args()
-    args.filtering_technique = args.filtering_technique.lower()
-    args.taxon = Taxon.from_int(int(args.taxon)) if str(args.taxon).isdigit() else Taxon.from_string(str(args.taxon))  # type: ignore
-    return _Arguments(**vars(args))
-
-
-if __name__ == "__main__":
-    args = _parse_args()
-    asyncio.run(
-        rnaseq_gen(
-            config_filename=args.config_file,
-            replicate_ratio=args.replicate_ratio,
-            batch_ratio=args.batch_ratio,
-            high_replicate_ratio=args.high_replicate_ratio,
-            high_batch_ratio=args.high_batch_ratio,
-            technique=args.filtering_technique,
-            cut_off=args.minimum_cutoff,
-            prep=args.library_prep,
-            taxon_id=args.taxon,
-        )
     )
