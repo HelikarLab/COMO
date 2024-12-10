@@ -351,7 +351,7 @@ async def _create_config_df(
         if len(layout_files) == 0:
             logger.warning(
                 f"No layout file found for {label}, writing as 'UNKNOWN', "
-                f"this should be defined by user if using zFPKM or rnaseq_gen.py will not run"
+                f"this should be defined if you are using zFPKM or downstream 'rnaseq_gen.py' will not run"
             )
         elif len(layout_files) == 1:
             with layout_files[0].open("r") as file:
@@ -380,7 +380,7 @@ async def _create_config_df(
 
         prep = "total"
         if len(prep_files) == 0:
-            logger.warning(f"No prep file found for {label}, assuming 'total' as in Total RNA library preparation")
+            logger.warning(f"No prep file found for {label}, assuming 'total', as in 'Total RNA' library preparation")
         elif len(prep_files) == 1:
             with prep_files[0].open("r") as file:
                 prep = file.read().strip().lower()
@@ -393,10 +393,10 @@ async def _create_config_df(
             )
 
         mean_fragment_size = 100
-        if len(frag_files) == 0:
+        if len(frag_files) == 0 and prep != RNAPrepMethod.TOTAL.value:
             logger.warning(
                 f"No fragment file found for {label}, using '100'. "
-                f"This must be defined by the user in order to use zFPKM normalization"
+                "You should define this if you are going to use downstream zFPKM normalization"
             )
         elif len(frag_files) == 1:
             if layout == "single-end":
@@ -512,7 +512,7 @@ async def _create_matrix_file(
     output_counts_matrix_filepath: Path,
     rna: type_rna,
 ) -> None:
-    config_df = await _create_config_df(context_name, como_input_dir=como_context_dir)
+    config_df = await _create_config_df(context_name, como_context_dir=como_context_dir)
     await _write_counts_matrix(
         config_df=config_df,
         como_context_dir=como_context_dir,
