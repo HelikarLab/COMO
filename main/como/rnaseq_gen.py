@@ -27,7 +27,7 @@ from sklearn.neighbors import KernelDensity
 
 from como.migrations import gene_info_migrations
 from como.project import Config
-from como.types import RNAPrepMethod
+from como.types import FilteringTechnique, RNAPrepMethod
 
 
 class _FilteringOptions(NamedTuple):
@@ -36,31 +36,6 @@ class _FilteringOptions(NamedTuple):
     cut_off: float
     high_replicate_ratio: float
     high_batch_ratio: float
-
-
-class FilteringTechnique(Enum):
-    """RNA sequencing filtering capabilities."""
-
-    cpm = "cpm"
-    zfpkm = "zfpkm"
-    tpm = "quantile"
-    umi = "umi"
-
-    @staticmethod
-    def from_string(value: str) -> FilteringTechnique:
-        """Create a filtering technique object from a string."""
-        match value.lower():
-            case "cpm":
-                return FilteringTechnique.cpm
-            case "zfpkm":
-                return FilteringTechnique.zfpkm
-            case "quantile":
-                return FilteringTechnique.tpm
-            case "umi":
-                return FilteringTechnique.umi
-            case _:
-                possible_values = [t.value for t in FilteringTechnique]
-                raise ValueError(f"Got a filtering technique of '{value}'; should be one of: {possible_values}")
 
 
 class LayoutMethod(Enum):
