@@ -311,27 +311,25 @@ async def _create_config_df(
         raise FileNotFoundError(f"No gene count files found in '{gene_counts_dir}'.")
 
     for gene_count_filename in sorted(gene_counts_files):
-        try:
-            # Match S___R___r___
-            # \d{1,3} matches 1-3 digits
-            # (?:r\d{1,3})? matches an option "r" followed by three digits
-            label = re.findall(r"S\d{1,3}R\d{1,3}(?:r\d{1,3})?", gene_count_filename.as_posix())[0]
-
-        except IndexError as e:
-            raise IndexError(
+        # Match S___R___r___
+        # \d{1,3} matches 1-3 digits
+        # (?:r\d{1,3})? optionally matches a "r" followed by three digits
+        label = re.findall(r"S\d{1,3}R\d{1,3}(?:r\d{1,3})?", gene_count_filename.as_posix())[0]
+        if not label:
+            raise ValueError(
                 f"\n\nFilename of '{gene_count_filename}' is not valid. "
                 f"Should be 'contextName_SXRYrZ.tab', where X is the study/batch number, Y is the replicate number, "
                 f"and Z is the run number."
                 "\n\nIf not a multi-run sample, exclude 'rZ' from the filename."
-            ) from e
+            )
 
         study_number = re.findall(r"S\d{1,3}", label)[0]
         rep_number = re.findall(r"R\d{1,3}", label)[0]
-        run = re.findall(r"r\d{1,3}", label)
+        run_number = re.findall(r"r\d{1,3}", label)
 
         multi_flag = 0
-        if len(run) > 0:
-            if run[0] != "r1":
+        if len(run_number) > 0:
+            if run_number[0] != "r1":
                 continue
             else:
                 label_glob = study_number + rep_number + "r*"
