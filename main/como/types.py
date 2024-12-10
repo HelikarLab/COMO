@@ -47,4 +47,4 @@ class RNAPrepMethod(Enum):
 
 
 type_path = str | Path
-type_rna = Literal["total", "polya"]
+type_rna = Literal["total", "mrna"]

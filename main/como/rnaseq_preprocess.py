@@ -523,7 +523,7 @@ async def _process(
     if output_trna_config_filepath:
         rna_types.append(("total", output_trna_config_filepath, output_trna_matrix_filepath))
     if output_mrna_config_filepath:
-        rna_types.append(("polya", output_mrna_config_filepath, output_mrna_matrix_filepath))
+        rna_types.append(("mrna", output_mrna_config_filepath, output_mrna_matrix_filepath))
 
     # if provided, iterate through como-input specific directories
     tasks = []
@@ -563,9 +563,9 @@ async def rnaseq_preprocess(
     input_matrix_filepath: Path | list[Path] | None = None,
     preparation_method: RNAPrepMethod | list[RNAPrepMethod] | None = None,
     output_trna_config_filepath: Path | None = None,
-    output_polya_config_filepath: Path | None = None,
+    output_mrna_config_filepath: Path | None = None,
     output_trna_count_matrix_filepath: Path | None = None,
-    output_polya_count_matrix_filepath: Path | None = None,
+    output_mrna_count_matrix_filepath: Path | None = None,
     cache: bool = True,
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO",
     log_location: str | TextIOWrapper = sys.stderr,
@@ -579,9 +579,9 @@ async def rnaseq_preprocess(
     :param taxon: The NCBI taxonomy ID
     :param output_gene_info_filepath: Path to the output gene information CSV file
     :param output_trna_config_filepath: Path to the output tRNA config file (if in "create" mode)
-    :param output_polya_config_filepath: Path to the output mRNA config file (if in "create" mode)
+    :param output_mrna_config_filepath: Path to the output mRNA config file (if in "create" mode)
     :param output_trna_count_matrix_filepath: The path to write total RNA count matrices
-    :param output_polya_count_matrix_filepath: The path to write messenger RNA count matrices
+    :param output_mrna_count_matrix_filepath: The path to write messenger RNA count matrices
     :param como_context_dir: If in "create" mode, the input path(s) to the COMO_input directory of the current context
         i.e., the directory containing "fragmentSizes", "geneCounts", "insertSizeMetrics", etc. directories
     :param input_matrix_filepath: If in "provide" mode, the path(s) to the count matrices to be processed
@@ -604,18 +604,18 @@ async def rnaseq_preprocess(
     output_trna_config_filepath = (
         output_trna_config_filepath.resolve() if output_trna_config_filepath else output_trna_config_filepath
     )
-    output_polya_config_filepath = (
-        output_polya_config_filepath.resolve() if output_polya_config_filepath else output_polya_config_filepath
+    output_mrna_config_filepath = (
+        output_mrna_config_filepath.resolve() if output_mrna_config_filepath else output_mrna_config_filepath
     )
     output_trna_count_matrix_filepath = (
         output_trna_count_matrix_filepath.resolve()
         if output_trna_count_matrix_filepath
         else output_trna_count_matrix_filepath
     )
-    output_polya_count_matrix_filepath = (
-        output_polya_count_matrix_filepath.resolve()
-        if output_polya_count_matrix_filepath
-        else output_polya_count_matrix_filepath
+    output_mrna_count_matrix_filepath = (
+        output_mrna_count_matrix_filepath.resolve()
+        if output_mrna_count_matrix_filepath
+        else output_mrna_count_matrix_filepath
     )
 
     input_matrix_filepath = _listify(input_matrix_filepath)
@@ -633,8 +633,8 @@ async def rnaseq_preprocess(
         input_matrix_filepath=input_matrix_filepath,
         output_gene_info_filepath=output_gene_info_filepath,
         output_trna_config_filepath=output_trna_config_filepath,
-        output_mrna_config_filepath=output_polya_config_filepath,
+        output_mrna_config_filepath=output_mrna_config_filepath,
         output_trna_matrix_filepath=output_trna_count_matrix_filepath,
-        output_mrna_matrix_filepath=output_polya_count_matrix_filepath,
+        output_mrna_matrix_filepath=output_mrna_count_matrix_filepath,
         cache=cache,
     )
