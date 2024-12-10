@@ -419,6 +419,7 @@ def _build_model(  # noqa: C901
     force excluded even if they meet GPR association requirements using the force exclude file.
     """
     config = Config()
+    cobra.Configuration().solver = solver.lower()
     reference_model: cobra.Model
     match general_model_file.suffix:
         case ".mat":
@@ -442,7 +443,6 @@ def _build_model(  # noqa: C901
 
     # set solver
     reference_model.solver = solver.lower()
-    cobra.Configuration().solver = solver.lower()
 
     # check number of unsolvable reactions for reference model under media assumptions
     # incon_rxns, cobra_model = _feasibility_test(cobra_model, "before_seeding")
