@@ -742,7 +742,7 @@ async def rnaseq_gen(  # noqa: C901, allow complex function
     batch_ratio: float = 0.5,
     high_batch_ratio: float = 1.0,
     technique: FilteringTechnique | str = FilteringTechnique.tpm,
-    cut_off: int | float | None = None,
+    cutoff: int | float | None = None,
 ) -> None:
     """Generate a list of active and high-confidence genes from a gene count matrix.
 
@@ -761,7 +761,7 @@ async def rnaseq_gen(  # noqa: C901, allow complex function
     :param high_batch_ratio: The percentage of batches that a gene must
         appear in for a gene to be marked "highly confident" in its expression
     :param technique: The filtering technique to use
-    :param cut_off: The cutoff value to use for the provided filtering technique
+    :param cutoff: The cutoff value to use for the provided filtering technique
     :return: None
     """
     if not input_metadata_df and not input_metadata_filepath:
@@ -773,18 +773,18 @@ async def rnaseq_gen(  # noqa: C901, allow complex function
 
     match technique:
         case FilteringTechnique.tpm:
-            cut_off = cut_off or 25
-            if cut_off < 1 or cut_off > 100:
+            cutoff = cutoff or 25
+            if cutoff < 1 or cutoff > 100:
                 raise ValueError("Quantile must be between 1 - 100")
 
         case FilteringTechnique.cpm:
-            if cut_off and cut_off < 0:
+            if cutoff and cutoff < 0:
                 raise ValueError("Cutoff must be greater than 0")
-            elif cut_off:
-                cut_off = "default"
+            elif cutoff:
+                cutoff = "default"
 
         case FilteringTechnique.zfpkm:
-            cut_off = "default" if cut_off else cut_off
+            cutoff = "default" if cutoff else cutoff
         case FilteringTechnique.umi:
             pass
         case _:
@@ -817,5 +817,5 @@ async def rnaseq_gen(  # noqa: C901, allow complex function
         high_replicate_ratio=high_replicate_ratio,
         high_batch_ratio=high_batch_ratio,
         technique=technique,
-        cut_off=cut_off,
+        cut_off=cutoff,
     )
