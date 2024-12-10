@@ -138,16 +138,18 @@ def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
     # For each study, collect gene count files, fragment files, insert size files, layouts, and strandedness information
     study_metrics: list[_StudyMetrics] = []
     for gene_dir, strand_dir in zip(gene_counts_directories, strandedness_directories):
-        if gene_dir.stem != strand_dir.stem:
-            raise ValueError(
-                f"Gene directory name of '{gene_dir.stem}' does not match stranded directory name of '{strand_dir.stem}'"  # noqa: E501
-            )
+        count_files = list(gene_dir.glob("*.tab"))
+        strand_files = list(strand_dir.glob("*.txt"))
+        if len(count_files) == 0:
+            raise ValueError(f"No count files found for study '{gene_dir.stem}'.")
+        if len(strand_files) == 0:
+            raise ValueError(f"No strandedness files found for study '{gene_dir.stem}'.")
 
         study_metrics.append(
             _StudyMetrics(
                 study_name=gene_dir.stem,
-                count_files=list(gene_dir.glob("*.tab")),
-                strand_files=list(strand_dir.glob("*.txt")),
+                count_files=count_files,
+                strand_files=strand_files,
             )
         )
     return study_metrics
@@ -262,6 +264,7 @@ async def _write_counts_matrix(
     counts: list[pd.DataFrame] = await asyncio.gather(
         *[_create_sample_counts_matrix(metric) for metric in study_metrics]
     )
+
     final_matrix = pd.DataFrame()
     for count in counts:
         final_matrix = count if final_matrix.empty else pd.merge(final_matrix, count, on="ensembl_gene_id", how="outer")
