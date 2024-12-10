@@ -331,23 +331,21 @@ async def _create_config_df(
         if len(run_number) > 0:
             if run_number[0] != "r1":
                 continue
-            else:
-                label_glob = study_number + rep_number + "r*"
-                runs = [run for run in gene_counts_files if re.search(label_glob, run.as_posix())]
-                multi_flag = 1
-                frag_files = []
+            label_glob = f"{study_number}{rep_number}r*"  # S__R__r*
+            runs = [run for run in gene_counts_files if re.search(label_glob, run.as_posix())]
+            multi_flag = 1
+            frag_files = []
 
-                for r in runs:
-                    r_label = re.findall(r"r\d{1,3}", r.as_posix())[0]
-                    R_label = re.findall(r"R\d{1,3}", r.as_posix())[0]  # noqa: N806
-                    frag_filename = "".join([context_name, "_", study_number, R_label, r_label, "_fragment_size.txt"])
-                    frag_files.append(como_input_dir / context_name / "fragmentSizes" / study_number / frag_filename)
+            for run in runs:
+                run_number = re.findall(r"R\d{1,3}", run.as_posix())[0]
+                replicate = re.findall(r"r\d{1,3}", run.as_posix())[0]
+                frag_filename = "".join([context_name, "_", study_number, run_number, replicate, "_fragment_size.txt"])
+                frag_files.append(como_context_dir / fragment_sizes_dirname / study_number / frag_filename)
 
-        context_path = como_input_dir / context_name
-        layout_files: list[Path] = list((context_path / "layouts").rglob(f"{context_name}_{label}_layout.txt"))
-        strand_files: list[Path] = list((context_path / "strandedness").rglob(f"{context_name}_{label}_strandedness.txt"))  # fmt: skip  # noqa: E501
-        frag_files: list[Path] = list((context_path / "fragmentSizes").rglob(f"{context_name}_{label}_fragment_size.txt"))  # fmt: skip  # noqa: E501
-        prep_files: list[Path] = list((context_path / "prepMethods").rglob(f"{context_name}_{label}_prep_method.txt"))
+        layout_files: list[Path] = list(layout_dir.rglob(f"{context_name}_{label}_layout.txt"))
+        strand_files: list[Path] = list(strandedness_dir.rglob(f"{context_name}_{label}_strandedness.txt"))
+        frag_files: list[Path] = list(fragment_sizes_dir.rglob(f"{context_name}_{label}_fragment_size.txt"))
+        prep_files: list[Path] = list(prep_method_dir.rglob(f"{context_name}_{label}_prep_method.txt"))
 
         layout = "UNKNOWN"
         if len(layout_files) == 0:
