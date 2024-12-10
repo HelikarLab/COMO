@@ -442,6 +442,7 @@ def _build_model(  # noqa: C901
 
     # set solver
     reference_model.solver = solver.lower()
+    cobra.Configuration().solver = solver.lower()
 
     # check number of unsolvable reactions for reference model under media assumptions
     # incon_rxns, cobra_model = _feasibility_test(cobra_model, "before_seeding")
@@ -626,10 +627,10 @@ def create_context_specific_model(  # noqa: C901
             raise ValueError(f"Output file type {output_type} not recognized. Must be one of: 'xml', 'mat', 'json'")
 
     if algorithm not in Algorithm:
-        raise ValueError(f"Algorithm {algorithm} not supported. Please use one of: GIMME, FASTCORE, or IMAT")
+        raise ValueError(f"Algorithm {algorithm} not supported. Use one of {', '.join(a.value for a in Algorithm)}")
 
     if solver not in Solver:
-        raise ValueError(f"Solver '{solver}' not supported. Use 'GLPK' or 'GUROBI'")
+        raise ValueError(f"Solver '{solver}' not supported. Use one of {', '.join(s.value for s in Solver)}")
 
     if boundary_rxns_filepath:
         boundary_reactions = _collect_boundary_reactions(boundary_rxns_filepath)
@@ -662,7 +663,7 @@ def create_context_specific_model(  # noqa: C901
         bound_ub=boundary_reactions.upper_bounds,
         exclude_rxns=exclude_rxns,
         force_rxns=force_rxns,
-        solver=solver.value,
+        solver=solver.value.lower(),
         low_thresh=low_threshold,
         high_thresh=high_threshold,
     )
