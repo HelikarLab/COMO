@@ -419,7 +419,12 @@ def _build_model(  # noqa: C901
     force excluded even if they meet GPR association requirements using the force exclude file.
     """
     config = Config()
-    cobra.Configuration().solver = solver.lower()
+
+    cobra_config = cobra.Configuration()
+    print(cobra_config.solver)
+    cobra_config.solver = solver.lower()
+    print(cobra_config.solver)
+
     reference_model: cobra.Model
     match general_model_file.suffix:
         case ".mat":
