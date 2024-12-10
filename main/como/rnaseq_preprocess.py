@@ -278,19 +278,37 @@ async def _write_counts_matrix(
     return final_matrix
 
 
-async def _create_config_df(context_name: str, /, como_input_dir: Path) -> pd.DataFrame:  # noqa: C901
+async def _create_config_df(
+    context_name: str,
+    /,
+    como_context_dir: Path,
+    gene_count_dirname: str = "geneCounts",
+    layout_dirname: str = "layouts",
+    strandedness_dirname: str = "strandedness",
+    fragment_sizes_dirname: str = "fragmentSizes",
+    prep_method_dirname: str = "prepMethods",
+) -> pd.DataFrame:
     """Create configuration sheet.
 
     The configuration file created is based on the gene counts matrix.
      If using zFPKM normalization technique, mean fragment lengths will be fetched
     """
-    gene_counts_files = list(Path(como_input_dir, context_name, "geneCounts").rglob("*.tab"))
+    gene_counts_dir = como_context_dir / gene_count_dirname
+    layout_dir = como_context_dir / layout_dirname
+    strandedness_dir = como_context_dir / strandedness_dirname
+    fragment_sizes_dir = como_context_dir / fragment_sizes_dirname
+    prep_method_dir = como_context_dir / prep_method_dirname
+
+    gene_counts_files = list(gene_counts_dir.rglob("*.tab"))
     sample_names: list[str] = []
     fragment_lengths: list[int | float] = []
     layouts: list[str] = []
     strands: list[str] = []
     groups: list[str] = []
     preparation_method: list[str] = []
+
+    if len(gene_counts_files) == 0:
+        raise FileNotFoundError(f"No gene count files found in '{gene_counts_dir}'.")
 
     for gene_count_filename in sorted(gene_counts_files):
         try:
