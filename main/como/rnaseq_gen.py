@@ -356,7 +356,7 @@ def zfpkm_transform(
 
     total = len(fpkm_df.columns)
     update_per_step: int = int(np.ceil(total * update_every_percent))
-    cores = multiprocessing.cpu_count() - 2
+    cores = min(multiprocessing.cpu_count() - 2, total)
     logger.debug(f"Processing {total:,} samples through zFPKM transform using {cores} cores")
     logger.debug(
         f"Will update every {update_per_step:,} steps as this is approximately "
