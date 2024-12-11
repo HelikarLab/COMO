@@ -316,7 +316,8 @@ def _build_with_imat(
         exp_thresholds=expr_thesh,
         core=force_gene_ids,
         epsilon=0.01,
-        solver=solver.upper(),
+        solver=solver.upper()z
+    ,
     )
     algorithm = IMAT(s_matrix, np.array(lb), np.array(ub), properties)
     context_rxns: npt.NDArray = algorithm.run()
@@ -426,12 +427,6 @@ def _build_model(  # noqa: C901
     force excluded even if they meet GPR association requirements using the force exclude file.
     """
     config = Config()
-
-    cobra_config = cobra.Configuration()
-    print(cobra_config.solver)
-    cobra_config.solver = solver.lower()
-    print(cobra_config.solver)
-
     reference_model: cobra.Model
     match general_model_file.suffix:
         case ".mat":
