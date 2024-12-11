@@ -4,7 +4,7 @@ from como.project import Config
 from como.utils import stringlist_to_list
 
 __all__ = ["stringlist_to_list", "Config"]
-__version__ = "1.10.0"
+__version__ = "1.11.1"
 
 
 def return_placeholder_data() -> pd.DataFrame:
