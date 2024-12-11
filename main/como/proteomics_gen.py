@@ -39,7 +39,7 @@ async def load_gene_symbol_map(gene_symbols: list[str], entrez_map: Path | None 
             output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID],
         )
         df.loc[df["gene_id"] == "-", ["gene_id"]] = np.nan
-        df.to_csv(filepath, index_label="gene_symbol")
+        df.to_csv(entrez_map, index_label="gene_symbol")
 
     return df[~df.index.duplicated()]
 
@@ -75,12 +75,11 @@ def abundance_to_bool_group(
 
     abundance_matrix["pos"] = (abundance_matrix > 0).sum(axis=1) / abundance_matrix.count(axis=1)
     abundance_matrix["expressed"] = 0
-    abundance_matrix.loc[(abundance_matrix["pos"] >= rep_ratio), ["expressed"]] = 1
     abundance_matrix["high"] = 0
-    abundance_matrix.loc[(abundance_matrix["pos"] >= hi_rep_ratio), ["high"]] = 1
+    abundance_matrix.loc[(abundance_matrix["pos"] >= replicate_ratio), ["expressed"]] = 1
+    abundance_matrix.loc[(abundance_matrix["pos"] >= high_confidence_replicate_ratio), ["high"]] = 1
 
-    bool_filepath = output_dir / f"bool_prot_Matrix_{context_name}_{group_name}.csv"
-    abundance_matrix.to_csv(bool_filepath, index_label="entrez_gene_id")
+    abundance_matrix.to_csv(output_boolean_filepath, index_label="entrez_gene_id")
 
 
 def to_bool_context(context_name, group_ratio, hi_group_ratio, group_names):
