@@ -316,8 +316,7 @@ def _build_with_imat(
         exp_thresholds=expr_thesh,
         core=force_gene_ids,
         epsilon=0.01,
-        solver=solver.upper()z
-    ,
+        solver=solver.upper(),
     )
     algorithm = IMAT(s_matrix, np.array(lb), np.array(ub), properties)
     context_rxns: npt.NDArray = algorithm.run()
