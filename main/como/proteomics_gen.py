@@ -171,37 +171,42 @@ async def proteomics_gen(
         raise ValueError("Quantile must be an integer from 0 to 100")
     quantile /= 100
 
-    logger.info(f"Config file is at '{prot_config_filepath}'")
+    config_df = pd.read_excel(config_filepath, sheet_name=context_name)
+    matrix: pd.DataFrame = process_proteomics_data(matrix_filepath)
 
-    xl = pd.ExcelFile(prot_config_filepath)
-    sheet_names = xl.sheet_names
+    groups = config_df["group"].unique().tolist()
 
-    for context_name in sheet_names:
-        datafilename = "".join(["protein_abundance_", context_name, ".csv"])
-        config_sheet = pd.read_excel(prot_config_filepath, sheet_name=context_name)
-        groups = config_sheet["group"].unique().tolist()
+    for group in groups:
+        indices = np.where([g == group for g in config_df["group"]])
+        sample_columns = [*np.take(config_df["sample_name"].to_numpy(), indices).ravel().tolist(), "gene_symbol"]
+        matrix = matrix.loc[:, sample_columns]
 
-        for group in groups:
-            group_idx = np.where([g == group for g in config_sheet["group"].tolist()])
-            cols = [*np.take(config_sheet["sample_name"].to_numpy(), group_idx).ravel().tolist(), "gene_symbol"]
-
-            proteomics_data = load_proteomics_data(datafilename, context_name)
-            proteomics_data = proteomics_data.loc[:, cols]
-
-            symbols_to_ids = await load_gene_symbol_map(gene_symbols=proteomics_data["gene_symbol"].tolist())
-            proteomics_data.dropna(subset=["gene_symbol"], inplace=True)
-            if "uniprot" in proteomics_data.columns:
-                proteomics_data.drop(columns=["uniprot"], inplace=True)
-
-            proteomics_data = proteomics_data.groupby(["gene_symbol"]).agg("max")
-            proteomics_data["entrez_gene_id"] = symbols_to_ids["gene_id"]
-            proteomics_data.dropna(subset=["entrez_gene_id"], inplace=True)
-            proteomics_data.set_index("entrez_gene_id", inplace=True)
-
-            # save proteomics data by test
-            abundance_to_bool_group(context_name, group, proteomics_data, rep_ratio, hi_rep_ratio, quantile)
-        to_bool_context(context_name, group_ratio, hi_group_ratio, groups)
-
-
+        symbols_to_gene_ids = await load_gene_symbol_map(
+            gene_symbols=matrix["gene_symbol"].tolist(),
+            entrez_map=input_entrez_map,
         )
+        matrix.dropna(subset=["gene_symbol"], inplace=True)
+        if "uniprot" in matrix.columns:
+            matrix.drop(columns=["uniprot"], inplace=True)
+
+        matrix = matrix.groupby(["gene_symbol"]).agg("max")
+        matrix["entrez_gene_id"] = symbols_to_gene_ids["gene_id"]
+        matrix.dropna(subset=["entrez_gene_id"], inplace=True)
+        matrix.set_index("entrez_gene_id", inplace=True)
+
+        # bool_filepath = output_dir / f"bool_prot_Matrix_{context_name}_{group_name}.csv"
+        abundance_to_bool_group(
+            context_name=context_name,
+            group_name=group,
+            abundance_matrix=matrix,
+            replicate_ratio=replicate_ratio,
+            high_confidence_replicate_ratio=high_confidence_replicate_ratio,
+            quantile=quantile,
+            output_boolean_filepath=output_boolean_filepath,
+        )
+    to_bool_context(
+        context_name=context_name,
+        group_ratio=batch_ratio,
+        hi_group_ratio=high_confience_batch_ratio,
+        group_names=groups,
     )
