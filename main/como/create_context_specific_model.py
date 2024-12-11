@@ -520,7 +520,14 @@ def _build_model(  # noqa: C901
     elif recon_algorithm == Algorithm.IMAT:
         context_model_cobra: cobra.Model
         context_model_cobra, flux_df = _build_with_imat(
-            reference_model, s_matrix, lb, ub, expr_vector, exp_thresh, idx_force
+            reference_model,
+            s_matrix,
+            lb,
+            ub,
+            expr_vector,
+            exp_thresh,
+            idx_force,
+            solver=solver,
         )
         imat_reactions = flux_df.rxn
         model_reactions = [reaction.id for reaction in context_model_cobra.reactions]
