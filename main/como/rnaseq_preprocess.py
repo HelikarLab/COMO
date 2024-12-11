@@ -278,7 +278,7 @@ async def _write_counts_matrix(
     return final_matrix
 
 
-async def _create_config_df(
+async def _create_config_df(  # noqa: C901
     context_name: str,
     /,
     como_context_dir: Path,
