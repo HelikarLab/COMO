@@ -131,7 +131,8 @@ def plot_gaussian_fit(z_results: ZResult, facet_titles: bool = True, x_min: int 
 # Main function for protein abundance transformation
 def protein_transform_main(
     abundance_df: pd.DataFrame | str | Path,
-    output_gaussian_img_filepath: Path,
+    output_gaussian_png_filepath: Path,
+    output_gaussian_html_filepath: Path,
     output_z_score_matrix_filepath: Path,
 ) -> None:
     """Transform protein abundance data."""
@@ -142,9 +143,13 @@ def protein_transform_main(
     z_transform: ZResult = z_score_calc(abundance_df, min_thresh=0)
 
     fig = plot_gaussian_fit(z_results=z_transform, facet_titles=True, x_min=-4)
-    fig.write_image(output_gaussian_img_filepath.with_suffix(".png"))
-    fig.write_html(output_gaussian_img_filepath.with_suffix(".html"))
-    logger.info(f"Gaussian fit figure written to {output_gaussian_img_filepath}")
+
+    if output_gaussian_png_filepath:
+        fig.write_image(output_gaussian_png_filepath.with_suffix(".png"))
+        logger.info(f"PNG gaussian figure written to {output_gaussian_png_filepath}")
+    if output_gaussian_html_filepath:
+        fig.write_html(output_gaussian_html_filepath.with_suffix(".html"))
+        logger.info(f"Interactive HTML gaussian figure written to {output_gaussian_png_filepath}")
 
     z_transformed_abundances = z_transform.zfpkm
     z_transformed_abundances[abundance_df == 0] = -4
