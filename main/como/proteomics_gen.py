@@ -46,11 +46,13 @@ async def load_gene_symbol_map(gene_symbols: list[str], entrez_map: Path | None 
 
 def abundance_to_bool_group(
     context_name,
-    group_name,
-    abundance_matrix,
-    replicate_ratio,
-    high_confidence_replicate_ratio,
-    quantile,
+    abundance_filepath: Path,
+    output_gaussian_img_filepath: Path,
+    output_z_score_matrix_filepath: Path,
+    abundance_matrix: pd.DataFrame,
+    replicate_ratio: float,
+    high_confidence_replicate_ratio: float,
+    quantile: float,
     output_boolean_filepath: Path,
 ):
     """Convert proteomic data to boolean expression."""
@@ -145,6 +147,8 @@ async def proteomics_gen(
     config_filepath: Path,
     matrix_filepath: Path,
     output_boolean_filepath: Path,
+    output_gaussian_img_filepath: Path,
+    output_z_score_matrix_filepath: Path,
     input_entrez_map: Path | None = None,
     replicate_ratio: float = 0.5,
     batch_ratio: float = 0.5,
@@ -193,12 +197,14 @@ async def proteomics_gen(
         # bool_filepath = output_dir / f"bool_prot_Matrix_{context_name}_{group_name}.csv"
         abundance_to_bool_group(
             context_name=context_name,
-            group_name=group,
+            abundance_filepath=matrix_filepath,
             abundance_matrix=matrix,
             replicate_ratio=replicate_ratio,
             high_confidence_replicate_ratio=high_confidence_replicate_ratio,
             quantile=quantile,
             output_boolean_filepath=output_boolean_filepath,
+            output_gaussian_img_filepath=output_gaussian_img_filepath,
+            output_z_score_matrix_filepath=output_z_score_matrix_filepath,
         )
     to_bool_context(
         context_name=context_name,
