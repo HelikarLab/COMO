@@ -17,8 +17,8 @@ dependencies = [
     "openpyxl>=3.1.5",
     "aiofiles>=24.1.0",
     "aioftp>=0.23.1",
-    "troppo",
-    "cobamp",
+    "git+https://github.com/JoshLoecker/troppo@feat/allow-setting-solver",
+    "git+https://github.com/JoshLoecker/cobamp@update_packages",
 ]
 
 [build-system]
@@ -47,6 +47,6 @@ dev-dependencies = [
     "pytest-cov>=6.0.0",
 ]
 
-[tool.uv.sources]
-troppo = { git = "https://github.com/JoshLoecker/troppo", branch = "feat/allow-setting-solver" }
-cobamp = { git = "https://github.com/JoshLoecker/cobamp", branch = "update_packages" }
+#[tool.uv.sources]
+#troppo = { git = "https://github.com/JoshLoecker/troppo", branch = "feat/allow-setting-solver" }
+#cobamp = { git = "https://github.com/JoshLoecker/cobamp", branch = "update_packages" }
