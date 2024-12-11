@@ -47,6 +47,6 @@ dev-dependencies = [
     "pytest-cov>=6.0.0",
 ]
 
-#[tool.uv.sources]
-#troppo = { git = "https://github.com/JoshLoecker/troppo", rev = "update_dependencies" }
-#cobamp = { git = "https://github.com/JoshLoecker/cobamp", rev = "update_packages" }
+[tool.uv.sources]
+troppo = { git = "https://github.com/JoshLoecker/troppo", rev = "update_dependencies" }
+cobamp = { git = "https://github.com/JoshLoecker/cobamp", rev = "update_packages" }
