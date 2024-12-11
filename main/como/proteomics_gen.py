@@ -15,34 +15,15 @@ from como.proteomics_preprocessing import protein_transform_main
 # Load Proteomics
 def process_proteomics_data(path: Path) -> pd.DataFrame:
     """Load proteomics data from a given context and filename."""
-    config = Config()
-    data_path = config.data_dir / "data_matrices" / context_name / datafilename
-    logger.info(f"Data Matrix Path: {data_path}")
-
-    if data_path.exists():
-        proteomics_data = pd.read_csv(data_path, header=0)
-    else:
-        logger.error(f"Error: file not found: {data_path}")
-
-        return None
-
     # Preprocess data, drop na, duplicate ';' in symbol,
-    proteomics_data["gene_symbol"] = proteomics_data["gene_symbol"].astype(str)
-    proteomics_data.dropna(subset=["gene_symbol"], inplace=True)
-    pluralnames = proteomics_data[proteomics_data["gene_symbol"].str.contains(";") == True]  # noqa: E712
+    matrix: pd.DataFrame = pd.read_csv(path)
+    if "gene_symbol" not in matrix.columns:
+        raise ValueError("No gene_symbol column found in proteomics data.")
 
-    for idx, row in pluralnames.iterrows():
-        names = row["gene_symbol"].split(";")
-        rows = []
-
-        for name in names:
-            rowcopy = row.copy()
-            rowcopy["gene_symbol"] = name
-            rows.append(rowcopy)
-        proteomics_data.drop(index=idx, inplace=True)
-        proteomics_data = pd.concat([proteomics_data, pd.DataFrame(rows)], ignore_index=True)
-
-    return proteomics_data
+    matrix["gene_symbol"] = matrix["gene_symbol"].astype(str)
+    matrix.dropna(subset=["gene_symbol"], inplace=True)
+    matrix = matrix.assign(gene_symbol=matrix["gene_symbol"].str.split(";")).explode("gene_symbol")
+    return matrix
 
 
 # read map to convert to entrez
