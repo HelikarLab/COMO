@@ -1,135 +1,723 @@
 from __future__ import annotations
 
-import argparse
-import asyncio
-from dataclasses import dataclass
+import math
+import multiprocessing
+import time
+from collections import namedtuple
+from dataclasses import dataclass, field
+from enum import Enum
+from functools import partial
+from multiprocessing.pool import Pool
 from pathlib import Path
+from typing import Callable, NamedTuple
 
+import numpy as np
+import numpy.typing as npt
 import pandas as pd
-from fast_bioservices import Taxon
+import plotly.graph_objs as go
+import scanpy as sc
+import sklearn
+import sklearn.neighbors
+from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol
 from loguru import logger
+from pandas import DataFrame
+from plotly.subplots import make_subplots
+from scipy.signal import find_peaks
+from sklearn.neighbors import KernelDensity
 
-from como import Config
-from como.custom_types import RNASeqPreparationMethod
-from como.rnaseq import FilteringTechnique, save_rnaseq_tests
+from como.migrations import gene_info_migrations
+from como.project import Config
+from como.types import FilteringTechnique, RNAPrepMethod
+
+
+class _FilteringOptions(NamedTuple):
+    replicate_ratio: float
+    batch_ratio: float
+    cut_off: float
+    high_replicate_ratio: float
+    high_batch_ratio: float
+
+
+class LayoutMethod(Enum):
+    """RNA sequencing layout method."""
+
+    paired_end = "paired-end"
+    single_end = "single-end"
 
 
 @dataclass
-class _Arguments:
-    config_file: str
-    replicate_ratio: float
-    batch_ratio: float
-    high_replicate_ratio: float
-    high_batch_ratio: float
-    filtering_technique: FilteringTechnique
-    minimum_cutoff: int | str
-    library_prep: RNASeqPreparationMethod
-    taxon: Taxon
-    write_zfpkm_png_filepath: Path
+class _StudyMetrics:
+    study: str
+    num_samples: int
+    count_matrix: pd.DataFrame
+    fragment_lengths: npt.NDArray[np.float32]
+    sample_names: list[str]
+    layout: list[LayoutMethod]
+    entrez_gene_ids: list[str]
+    gene_sizes: npt.NDArray[np.float32]
+    __normalization_matrix: pd.DataFrame = field(default_factory=pd.DataFrame)
+    __z_score_matrix: pd.DataFrame = field(default_factory=pd.DataFrame)
+    __high_confidence_entrez_gene_ids: list[str] = field(default=list)
 
     def __post_init__(self):
-        self.library_prep = RNASeqPreparationMethod.from_string(str(self.library_prep))
-        self.filtering_technique = FilteringTechnique.from_string(str(self.filtering_technique))
+        for layout in self.layout:
+            if layout not in LayoutMethod:
+                raise ValueError(f"Layout must be 'paired-end' or 'single-end'; got: {layout}")
 
-        if self.minimum_cutoff is None:
-            if self.filtering_technique == FilteringTechnique.tpm:
-                self.minimum_cutoff = 25
-            elif self.filtering_technique == FilteringTechnique.cpm:
-                self.minimum_cutoff = "default"
-            elif self.filtering_technique == FilteringTechnique.zfpkm:
-                self.minimum_cutoff = -3
+    @property
+    def normalization_matrix(self) -> pd.DataFrame:
+        return self.__normalization_matrix
+
+    @normalization_matrix.setter
+    def normalization_matrix(self, value: pd.DataFrame) -> None:
+        self.__normalization_matrix = value
+
+    @property
+    def z_score_matrix(self) -> pd.DataFrame:
+        return self.__z_score_matrix
+
+    @z_score_matrix.setter
+    def z_score_matrix(self, value: pd.DataFrame) -> None:
+        self.__z_score_matrix = value
+
+    @property
+    def high_confidence_entrez_gene_ids(self) -> list[str]:
+        return self.__high_confidence_entrez_gene_ids
+
+    @high_confidence_entrez_gene_ids.setter
+    def high_confidence_entrez_gene_ids(self, values: list[str]) -> None:
+        self.__high_confidence_entrez_gene_ids = values
 
 
-async def _handle_context_batch(
-    config_filename: str,
+class _ZFPKMResult(NamedTuple):
+    zfpkm: pd.Series
+    density: Density
+    mu: float
+    std_dev: float
+    max_fpkm: float
+
+
+class _ReadMatrixResults(NamedTuple):
+    metrics: dict[str, _StudyMetrics]
+    entrez_gene_ids: list[str]
+
+
+Density = namedtuple("Density", ["x", "y"])
+NamedMetrics = dict[str, _StudyMetrics]
+
+
+def k_over_a(k: int, a: float) -> Callable[[npt.NDArray], bool]:
+    """Return a function that filters rows of an array based on the sum of elements being greater than or equal to A at least k times.
+
+    This code is based on the `kOverA` function found in R's `genefilter` package: https://www.rdocumentation.org/packages/genefilter/versions/1.54.2/topics/kOverA
+
+    :param k: The minimum number of times the sum of elements must be greater than or equal to A.
+    :param a: The value to compare the sum of elements to.
+    :return: A function that accepts a NumPy array to perform the actual filtering
+    """  # noqa: E501
+
+    def filter_func(row: npt.NDArray) -> bool:
+        return np.sum(row >= a) >= k
+
+    return filter_func
+
+
+def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDArray], bool]) -> npt.NDArray:
+    """Apply a filter function to the rows of the data and return the filtered array.
+
+    This code is based on the `genefilter` function found in R's `genefilter` package: https://www.rdocumentation.org/packages/genefilter/versions/1.54.2/topics/genefilter
+
+    :param data: The data to filter
+    :param filter_func: THe function to filter the data by
+    :return: A NumPy array of the filtered data.
+    """
+    if not isinstance(data, (pd.DataFrame, npt.NDArray)):
+        raise TypeError("Unsupported data type. Must be a Pandas DataFrame or a NumPy array.")
+
+    return (
+        data.apply(filter_func, axis=1).values
+        if isinstance(data, pd.DataFrame)
+        else np.apply_along_axis(filter_func, axis=1, arr=data)
+    )
+
+
+async def _read_counts(path: Path) -> pd.DataFrame:
+    if path.suffix not in {".csv", ".h5ad"}:
+        raise ValueError(f"Unknown file extension '{path.suffix}'. Valid options are '.csv' or '.h5ad'.")
+
+    matrix: pd.DataFrame
+    if path.suffix == ".csv":
+        logger.debug(f"Reading CSV file at '{path}'")
+        matrix = pd.read_csv(path, header=0)
+    elif path.suffix == ".h5ad":
+        logger.debug(f"Reading h5ad file at '{path}'")
+        # Make sample names the columns and gene data the index
+        matrix = sc.read_h5ad(path).to_df().T
+
+    return matrix
+
+
+async def _build_matrix_results(
+    *,
+    matrix: pd.DataFrame,
+    gene_info: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    taxon: int,
+) -> _ReadMatrixResults:
+    """Read the counts matrix and returns the results.
+
+    :param matrix: The gene counts matrix to process
+    :param metadata_df: The configuration dataframe related to the current context
+    :param taxon: The NCBI Taxon ID
+    :return: A dataclass `ReadMatrixResults`
+    """
+    gene_info = gene_info_migrations(gene_info)
+    conversion = await ensembl_to_gene_id_and_symbol(ids=matrix["ensembl_gene_id"].tolist(), taxon=taxon)
+    matrix = matrix.merge(conversion, on="ensembl_gene_id", how="left")
+
+    # Only include Entrez and Ensembl Gene IDs that are present in `gene_info`
+    matrix["entrez_gene_id"] = matrix["entrez_gene_id"].str.split("//")
+    matrix = matrix.explode("entrez_gene_id")
+    matrix = matrix.replace(to_replace="-", value=pd.NA).dropna()
+    matrix["entrez_gene_id"] = matrix["entrez_gene_id"].astype(int)
+
+    gene_info = gene_info.replace(to_replace="-", value=pd.NA).dropna()
+    gene_info["entrez_gene_id"] = gene_info["entrez_gene_id"].astype(int)
+
+    counts_matrix = matrix.merge(
+        gene_info[["entrez_gene_id", "ensembl_gene_id"]],
+        on=["entrez_gene_id", "ensembl_gene_id"],
+        how="inner",
+    )
+    gene_info = gene_info.merge(
+        counts_matrix[["entrez_gene_id", "ensembl_gene_id"]],
+        on=["entrez_gene_id", "ensembl_gene_id"],
+        how="inner",
+    )
+
+    entrez_gene_ids: list[str] = gene_info["entrez_gene_id"].tolist()
+    metrics: NamedMetrics = {}
+    for study in metadata_df["study"].unique().tolist():
+        study_sample_names = metadata_df[metadata_df["study"] == study]["sample_name"].tolist()
+        layouts = metadata_df[metadata_df["study"] == study]["layout"].tolist()
+        metrics[study] = _StudyMetrics(
+            count_matrix=counts_matrix[counts_matrix.columns.intersection(study_sample_names)],
+            fragment_lengths=metadata_df[metadata_df["study"] == study]["fragment_length"].values,
+            sample_names=study_sample_names,
+            layout=[LayoutMethod(layout) for layout in layouts],
+            num_samples=len(study_sample_names),
+            entrez_gene_ids=entrez_gene_ids,
+            gene_sizes=np.array(gene_info["size"].values).astype(np.float32),
+            study=study,
+        )
+        metrics[study].fragment_lengths[np.isnan(metrics[study].fragment_lengths)] = 0
+        metrics[study].count_matrix.index = pd.Index(entrez_gene_ids, name="entrez_gene_id")
+
+    return _ReadMatrixResults(metrics=metrics, entrez_gene_ids=gene_info["entrez_gene_id"].tolist())
+
+
+def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
+    """Calculate the Transcripts Per Million (TPM) for each sample in the metrics dictionary."""
+    for sample in metrics:
+        count_matrix = metrics[sample].count_matrix
+
+        gene_sizes = metrics[sample].gene_sizes
+
+        tpm_matrix = pd.DataFrame(data=None, index=count_matrix.index, columns=count_matrix.columns)
+        for i in range(len(count_matrix.columns)):
+            values: pd.Series = count_matrix.iloc[:, i] + 1  # Add 1 to prevent division by 0
+            rate = np.log(values.tolist()) - np.log(gene_sizes)
+            denominator = np.log(np.sum(np.exp(rate)))
+            tpm_value = np.exp(rate - denominator + np.log(1e6))
+            tpm_matrix.iloc[:, i] = tpm_value
+        metrics[sample].normalization_matrix = tpm_matrix
+
+    return metrics
+
+
+def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
+    """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary."""  # noqa: E501
+    matrix_values = []
+    for study in metrics:
+        for sample in range(metrics[study].num_samples):
+            layout = metrics[study].layout[sample]
+            count_matrix: npt.NDArray = metrics[study].count_matrix.iloc[:, sample].values
+            gene_size = metrics[study].gene_sizes
+
+            count_matrix = count_matrix.astype(np.float32)
+            gene_size = gene_size.astype(np.float32)
+
+            match layout:
+                case LayoutMethod.paired_end:  # FPKM
+                    mean_fragment_lengths = metrics[study].fragment_lengths[sample]
+                    # Ensure non-negative value
+                    effective_length = [max(0, size - (mean_fragment_lengths + 1)) for size in gene_size]
+                    n = count_matrix.sum()
+                    fpkm = ((count_matrix + 1) * 1e9) / (np.array(effective_length) * n)
+                    matrix_values.append(fpkm)
+                case LayoutMethod.single_end:  # RPKM
+                    # Add a pseudocount before log to ensure log(0) does not happen
+                    rate = np.log(count_matrix + 1) - np.log(gene_size)
+                    exp_rate = np.exp(rate - np.log(np.sum(count_matrix)) + np.log(1e9))
+                    matrix_values.append(exp_rate)
+                case _:
+                    raise ValueError("Invalid normalization method specified")
+
+        fpkm_matrix = pd.DataFrame(matrix_values).T  # Transpose is needed because values were appended as rows
+        fpkm_matrix = fpkm_matrix[~pd.isna(fpkm_matrix)]
+        metrics[study].normalization_matrix = fpkm_matrix
+
+        metrics[study].normalization_matrix.columns = metrics[study].count_matrix.columns
+
+    return metrics
+
+
+def _zfpkm_calculation(col: pd.Series, kernel: KernelDensity, peak_parameters: tuple[float, float]) -> _ZFPKMResult:
+    """Log2 Transformations.
+
+    Stabilize the variance in the data to make the distribution more symmetric; this is helpful for Gaussian fitting
+
+    Kernel Density Estimation (kde)
+        - Non-parametric method to estimate the probability density function (PDF) of a random variable
+        - Estimates the distribution of log2-transformed FPKM values
+        - Bandwidth parameter controls the smoothness of the density estimate
+        - KDE Explanation
+            - A way to smooth a histogram to get a better idea of the underlying distribution of the data
+            - Given a set of data points, we want to understand how they are distributed.
+                Histograms can be useful, but are sensitive to bin size and number
+            - The KDE places a "kernel" - a small symmetric function (i.e., Gaussian curve) - at each data point
+            - The "kernel" acts as a weight, giving more weight to points closer to the center of the kernel,
+                and less weight to points farther away
+            - Kernel functions are summed along each point on the x-axis
+            - A smooth curve is created that represents the estimated density of the data
+
+    Peak Finding
+        - Identifies that are above a certain height and separated by a minimum distance
+        - Represent potential local maxima in the distribution
+
+    Peak Selection
+        - The peak with the highest x-value (from log2-FPKM) is chosen as the mean (mu)
+            of the "inactive" gene distribution
+        - The peak representing unexpressed or inactive genes should be at a lower FPKM
+            value compared to the peak representing expressed genes
+
+    Standard Deviation Estimation
+         - The mean of log2-FPKM values are greater than the calculated mu
+         - Standard deviation is estimated based on the assumption that the right tail of the distribution
+            This represents expressed genes) can be approximated by a half-normal distribution
+
+     zFPKM Transformation
+        - Centers disbribution around 0 and scales it by the standard deviation.
+            This makes it easier to compare gene expression across different samples
+        - Represents the number of standard deviations away from the mean of the "inactive" gene distribution
+        - Higher zFPKM values indicate higher expression levels relative to the "inactive" peak
+        - A zFPKM value of 0 represents the mean of the "inactive" distribution
+        - Research shows that a zFPKM value of -3 or greater can be used as
+            a threshold for calling a gene as "expressed"
+            : https://doi.org/10.1186/1471-2164-14-778
+    """
+    col_log2: npt.NDArray = np.log2(col + 1)
+    col_log2 = np.nan_to_num(col_log2, nan=0)
+    refit: KernelDensity = kernel.fit(col_log2.reshape(-1, 1))  # type: ignore
+
+    # kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(col_log2.reshape(-1, 1))
+    x_range = np.linspace(col_log2.min(), col_log2.max(), 1000)
+    density = np.exp(refit.score_samples(x_range.reshape(-1, 1)))
+    peaks, _ = find_peaks(density, height=peak_parameters[0], distance=peak_parameters[1])
+    peak_positions = x_range[peaks]
+
+    mu = 0
+    max_fpkm = 0
+    stddev = 1
+
+    if len(peaks) != 0:
+        mu = peak_positions.max()
+        max_fpkm = density[peaks[np.argmax(peak_positions)]]
+        u = col_log2[col_log2 > mu].mean()
+        stddev = (u - mu) * np.sqrt(np.pi / 2)
+    zfpkm = pd.Series((col_log2 - mu) / stddev, dtype=np.float32, name=col.name)
+
+    return _ZFPKMResult(zfpkm=zfpkm, density=Density(x_range, density), mu=mu, std_dev=stddev, max_fpkm=max_fpkm)
+
+
+def zfpkm_transform(
+    fpkm_df: pd.DataFrame,
+    bandwidth: int = 0.5,
+    peak_parameters: tuple[float, float] = (0.02, 1.0),
+    update_every_percent: float = 0.1,
+) -> tuple[dict[str, _ZFPKMResult], DataFrame]:
+    """Perform zFPKM calculation/transformation."""
+    if update_every_percent > 1:
+        logger.warning(
+            f"update_every_percent should be a decimal value between 0 and 1; got: {update_every_percent} - "
+            f"will convert to percentage"
+        )
+        update_every_percent /= 100
+
+    total = len(fpkm_df.columns)
+    update_per_step: int = int(np.ceil(total * update_every_percent))
+    cores = min(multiprocessing.cpu_count() - 2, total)
+    logger.debug(f"Processing {total:,} samples through zFPKM transform using {cores} cores")
+    logger.debug(
+        f"Will update every {update_per_step:,} steps as this is approximately "
+        f"{update_every_percent:.1%} of {total:,}"
+    )
+
+    with Pool(processes=cores) as pool:
+        kernel = KernelDensity(kernel="gaussian", bandwidth=bandwidth)
+        chunksize = int(math.ceil(len(fpkm_df.columns) / (4 * cores)))
+        partial_func = partial(_zfpkm_calculation, kernel=kernel, peak_parameters=peak_parameters)
+        chunk_time = time.time()
+        start_time = time.time()
+
+        log_padding = len(str(f"{total:,}"))
+        zfpkm_df = pd.DataFrame(data=0, index=fpkm_df.index, columns=fpkm_df.columns)
+        results: dict[str, _ZFPKMResult] = {}
+        result: _ZFPKMResult
+        for i, result in enumerate(
+            pool.imap(
+                partial_func,
+                (fpkm_df[col] for col in fpkm_df.columns),
+                chunksize=chunksize,
+            )
+        ):
+            key = str(result.zfpkm.name)
+            results[key] = result
+            zfpkm_df[key] = result.zfpkm
+
+            # show updates every X% and at the end, but skip on first iteration
+            if i != 0 and (i % update_per_step == 0 or i == total):
+                current_time = time.time()
+                chunk = current_time - chunk_time
+                total_time = current_time - start_time
+                formatted = f"{i:,}"
+                logger.debug(
+                    f"Processed {formatted:>{log_padding}} of {total:,} - "
+                    f"chunk took {chunk:.1f} seconds - "
+                    f"running for {total_time:.1f} seconds"
+                )
+                chunk_time = current_time
+    return results, zfpkm_df
+
+
+def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
+    """Plot the log2(FPKM) density and fitted Gaussian for each sample.
+
+    :param results: A dictionary of intermediate results from zfpkm_transform.
+    :param: subplot_titles: Whether to display facet titles (sample names).
+    :param plot_xfloor: Lower limit for the x-axis.
+    :param subplot_titles: Whether to display facet titles (sample names).
+    """
+    mega_df = pd.DataFrame(columns=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
+    for name, result in results.items():
+        stddev = result.std_dev
+        x = np.array(result.density.x)
+        y = np.array(result.density.y)
+
+        fitted = np.exp(-0.5 * ((x - result.mu) / stddev) ** 2) / (stddev * np.sqrt(2 * np.pi))
+        max_fpkm = y.max()
+        max_fitted = fitted.max()
+        scale_fitted = fitted * (max_fpkm / max_fitted)
+
+        df = pd.DataFrame(
+            {
+                "sample_name": [name] * len(x),
+                "log2fpkm": x,
+                "fpkm_density": y,
+                "fitted_density_scaled": scale_fitted,
+            }
+        )
+        mega_df = pd.concat([mega_df, df], ignore_index=True)
+
+    mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")
+    subplot_titles = list(results.keys()) if subplot_titles else None
+    fig = make_subplots(
+        rows=len(results),
+        cols=1,
+        subplot_titles=subplot_titles,
+        vertical_spacing=min(0.05, (1 / (len(results) - 1))),
+    )
+
+    for i, (name, group) in enumerate(mega_df.groupby("sample_name"), start=1):
+        fig.add_trace(
+            trace=go.Scatter(x=group["log2fpkm"], y=group["density"], mode="lines", name=name, legendgroup=name),
+            row=i,
+            col=1,
+        )
+        fig.update_xaxes(title_text="log2(FPKM)", range=[plot_xfloor, max(group["log2fpkm"].tolist())], row=i, col=1)
+        fig.update_yaxes(title_text="density [scaled]", row=i, col=1)
+        fig.update_layout(legend_tracegroupgap=0)
+
+    fig.update_layout(height=600 * len(results), width=1000, title_text="zFPKM Plots", showlegend=True)
+    fig.write_image("zfpkm_plot.png")
+
+
+def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
+    """Calculate the z-score for each sample in the metrics dictionary."""
+    for sample in metrics:
+        log_matrix = np.log(metrics[sample].normalization_matrix)
+        z_matrix = pd.DataFrame(
+            data=sklearn.preprocessing.scale(log_matrix, axis=1), columns=metrics[sample].sample_names
+        )
+        metrics[sample].z_score_matrix = z_matrix
+    return metrics
+
+
+def cpm_filter(
+    *,
+    context_name: str,
+    metrics: NamedMetrics,
+    filtering_options: _FilteringOptions,
+    prep: RNAPrepMethod,
+) -> NamedMetrics:
+    """Apply Counts Per Million (CPM) filtering to the count matrix for a given sample."""
+    config = Config()
+    n_exp = filtering_options.replicate_ratio
+    n_top = filtering_options.high_replicate_ratio
+    cut_off = filtering_options.cut_off
+
+    sample: str
+    metric: _StudyMetrics
+    for sample, metric in metrics.items():
+        counts: pd.DataFrame = metric.count_matrix
+        entrez_ids: list[str] = metric.entrez_gene_ids
+        library_size: pd.DataFrame = counts.sum(axis=1)
+
+        # For library_sizes equal to 0, add 1 to prevent divide by 0
+        # This will not impact the final counts per million calculation because the original counts are still 0
+        #   thus, (0 / 1) * 1_000_000 = 0
+        library_size[library_size == 0] = 1
+
+        output_filepath = config.result_dir / context_name / prep.value / f"CPM_Matrix_{prep.value}_{sample}.csv"
+        output_filepath.parent.mkdir(parents=True, exist_ok=True)
+        counts_per_million: pd.DataFrame = (counts / library_size) * 1_000_000
+        counts_per_million.insert(0, "entrez_gene_ids", pd.Series(entrez_ids))
+        logger.debug(f"Writing CPM matrix to {output_filepath}")
+        counts_per_million.to_csv(output_filepath, index=False)
+
+        # TODO: Counts per million is adding ~61,500 columns (equal to the number of genes) for some reason.
+        #  Most likely due to multiplying by 1_000_000, not exactly sure why
+
+        min_samples = round(n_exp * len(counts.columns))  # noqa: F841
+        top_samples = round(n_top * len(counts.columns))  # noqa: F841
+        test_bools = pd.DataFrame({"entrez_gene_ids": entrez_ids})
+        for i in range(len(counts_per_million.columns)):
+            cutoff = (
+                10e6 / (np.median(np.sum(counts[:, i])))
+                if cut_off == "default"
+                else (1e6 * cut_off) / np.median(np.sum(counts[:, i]))
+            )
+            test_bools = test_bools.merge(counts_per_million[counts_per_million.iloc[:, i] > cutoff])
+
+    return metrics
+
+
+def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions) -> NamedMetrics:
+    """Apply quantile-based filtering to the TPM matrix for a given sample."""
+    # TODO: Write the TPM matrix to disk
+
+    n_exp = filtering_options.replicate_ratio
+    n_top = filtering_options.high_replicate_ratio
+    cut_off = filtering_options.cut_off
+    metrics = calculate_tpm(metrics)
+
+    sample: str
+    metric: _StudyMetrics
+    for sample, metric in metrics.items():
+        entrez_ids = metric.entrez_gene_ids
+        gene_size = metric.gene_sizes
+        tpm_matrix: pd.DataFrame = metric.normalization_matrix
+
+        min_samples = round(n_exp * len(tpm_matrix.columns))
+        top_samples = round(n_top * len(tpm_matrix.columns))
+
+        tpm_quantile = tpm_matrix[tpm_matrix > 0]
+        quantile_cutoff = np.quantile(
+            a=tpm_quantile.values, q=1 - (cut_off / 100), axis=0
+        )  # Compute quantile across columns
+        boolean_expression = pd.DataFrame(
+            data=tpm_matrix > quantile_cutoff, index=tpm_matrix.index, columns=tpm_matrix.columns
+        ).astype(int)
+
+        min_func = k_over_a(min_samples, 0.9)
+        top_func = k_over_a(top_samples, 0.9)
+
+        min_genes: npt.NDArray[bool] = genefilter(boolean_expression, min_func)
+        top_genes: npt.NDArray[bool] = genefilter(boolean_expression, top_func)
+
+        # Only keep `entrez_gene_ids` that pass `min_genes`
+        metric.entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, min_genes) if keep]
+        metric.gene_sizes = [gene for gene, keep in zip(gene_size, min_genes) if keep]
+        metric.count_matrix = metric.count_matrix.iloc[min_genes, :]
+        metric.normalization_matrix = metrics[sample].normalization_matrix.iloc[min_genes, :]
+
+        keep_top_genes = [gene for gene, keep in zip(entrez_ids, top_genes) if keep]
+        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, keep_top_genes) if keep]
+
+    metrics = calculate_z_score(metrics)
+
+    return metrics
+
+
+def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions, calcualte_fpkm: bool) -> NamedMetrics:
+    """Apply zFPKM filtering to the FPKM matrix for a given sample."""
+    min_sample_expression = filtering_options.replicate_ratio
+    high_confidence_sample_expression = filtering_options.high_replicate_ratio
+    cut_off = filtering_options.cut_off
+
+    if calcualte_fpkm:
+        metrics = calculate_fpkm(metrics)
+
+    metric: _StudyMetrics
+    for metric in metrics.values():
+        # if fpkm was not calculated, the normalization matrix will be empty; collect the count matrix instead
+        matrix = metric.count_matrix if metric.normalization_matrix.empty else metric.normalization_matrix
+        matrix = matrix[matrix.sum(axis=1) > 0]
+
+        minimums = matrix == 0
+        results, zfpkm_df = zfpkm_transform(matrix)
+        zfpkm_df[minimums] = -4
+        zfpkm_plot(results)
+
+        # determine which genes are expressed
+        min_samples = round(min_sample_expression * len(zfpkm_df.columns))
+        min_func = k_over_a(min_samples, cut_off)
+        min_genes: npt.NDArray[bool] = genefilter(zfpkm_df, min_func)
+        metric.entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, min_genes) if keep]
+
+        # determine which genes are confidently expressed
+        top_samples = round(high_confidence_sample_expression * len(zfpkm_df.columns))
+        top_func = k_over_a(top_samples, cut_off)
+        top_genes: npt.NDArray[bool] = genefilter(zfpkm_df, top_func)
+        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, top_genes) if keep]
+
+    return metrics
+
+
+def filter_counts(
+    *,
+    context_name: str,
+    metrics: NamedMetrics,
+    technique: FilteringTechnique,
+    filtering_options: _FilteringOptions,
+    prep: RNAPrepMethod,
+) -> NamedMetrics:
+    """Filter the count matrix based on the specified technique."""
+    match technique:
+        case FilteringTechnique.cpm:
+            return cpm_filter(
+                context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep
+            )
+        case FilteringTechnique.tpm:
+            return tpm_quantile_filter(metrics=metrics, filtering_options=filtering_options)
+        case FilteringTechnique.zfpkm:
+            return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calcualte_fpkm=True)
+        case FilteringTechnique.umi:
+            return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calcualte_fpkm=False)
+        case _:
+            raise ValueError(f"Technique must be one of {FilteringTechnique}")
+
+
+async def _save_rnaseq_tests(
+    context_name: str,
+    rnaseq_matrix: pd.DataFrame,
+    metadata_df: pd.DataFrame,
+    gene_info_df: pd.DataFrame,
+    output_filepath: Path,
+    prep: RNAPrepMethod,
+    taxon: int,
     replicate_ratio: float,
     batch_ratio: float,
-    replicate_ratio_high: float,
-    batch_ratio_high: float,
+    high_replicate_ratio: float,
+    high_batch_ratio: float,
     technique: FilteringTechnique,
-    cut_off: int | float | str,
-    prep: RNASeqPreparationMethod,
-    taxon: Taxon,
-    write_zfpkm_png_filepath: Path,
-) -> None:
-    """Iterate through each context type and create rnaseq expression file.
+    cut_off: int | float,
+):
+    """Save the results of the RNA-Seq tests to a CSV file."""
+    filtering_options = _FilteringOptions(
+        replicate_ratio=replicate_ratio,
+        batch_ratio=batch_ratio,
+        cut_off=float(cut_off),
+        high_replicate_ratio=high_replicate_ratio,
+        high_batch_ratio=high_batch_ratio,
+    )
 
-    :param config_filename: The configuration filename to read
-    :param replicate_ratio: The percentage of replicates that a gene must
-        appear in for a gene to be marked as "active" in a batch/study
-    :param batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked as 'active"
-    :param replicate_ratio_high: The percentage of replicates that a gene must
-        appear in for a gene to be marked "highly confident" in its expression in a batch/study
-    :param batch_ratio_high: The percentage of batches that a gene must
-        appear in for a gene to be marked "highly confident" in its expression
-    :param technique: The filtering technique to use
-    :param cut_off: The cutoff value to use for the provided filtering technique
-    :param prep: The library preparation method
-    :param taxon: The NCBI Taxon ID
-    :return: None
-    """
-    config = Config()
+    read_counts_results: _ReadMatrixResults = await _build_matrix_results(
+        matrix=rnaseq_matrix,
+        gene_info=gene_info_df,
+        metadata_df=metadata_df,
+        taxon=taxon,
+    )
+    metrics = read_counts_results.metrics
+    entrez_gene_ids = read_counts_results.entrez_gene_ids
 
-    config_filepath = config.config_dir / config_filename
-    if not config_filepath.exists():
-        raise FileNotFoundError(f"Unable to find '{config_filename}' at the path: '{config_filepath}'")
-    xl = pd.ExcelFile(config_filepath)
-    sheet_names = xl.sheet_names
+    metrics = filter_counts(
+        context_name=context_name,
+        metrics=metrics,
+        technique=technique,
+        filtering_options=filtering_options,
+        prep=prep,
+    )
 
-    logger.info(f"Reading config file: {config_filepath}")
+    expressed_genes: list[str] = []
+    top_genes: list[str] = []
+    for metric in metrics.values():
+        expressed_genes.extend(metric.entrez_gene_ids)
+        top_genes.extend(metric.high_confidence_entrez_gene_ids)
 
-    for context_name in sheet_names:
-        logger.debug(f"Starting '{context_name}'")
+    expression_frequency = pd.Series(expressed_genes).value_counts()
+    expression_df = pd.DataFrame(
+        {"entrez_gene_id": expression_frequency.index, "frequency": expression_frequency.values}
+    )
+    expression_df["prop"] = expression_df["frequency"] / len(metrics)
+    expression_df = expression_df[expression_df["prop"] >= filtering_options.batch_ratio]
 
-        rnaseq_input_filepath = (
-            config.data_dir / "data_matrices" / context_name / f"gene_counts_matrix_{prep.value}_{context_name}"
+    top_frequency = pd.Series(top_genes).value_counts()
+    top_df = pd.DataFrame({"entrez_gene_id": top_frequency.index, "frequency": top_frequency.values})
+    top_df["prop"] = top_df["frequency"] / len(metrics)
+    top_df = top_df[top_df["prop"] >= filtering_options.high_batch_ratio]
+
+    boolean_matrix = pd.DataFrame(data={"entrez_gene_id": entrez_gene_ids, "expressed": 0, "high": 0})
+    for gene in entrez_gene_ids:
+        if gene in expression_df["entrez_gene_id"]:
+            boolean_matrix.loc[gene, "expressed"] = 1
+        if gene in top_df["entrez_gene_id"]:
+            boolean_matrix.loc[gene, "high"] = 1
+
+    expressed_count = len(boolean_matrix[boolean_matrix["expressed"] == 1])
+    high_confidence_count = len(boolean_matrix[boolean_matrix["high"] == 1])
+
+    boolean_matrix.to_csv(output_filepath, index=False)
+    logger.info(
+        f"{context_name} - Found {expressed_count} expressed and {high_confidence_count} confidently expressed genes"
+    )
+    logger.success(f"Wrote boolean matrix to {output_filepath}")
+
+
+async def _create_metadata_df(path: Path) -> pd.DataFrame:
+    if path.suffix not in {".xls", ".xlsx"}:
+        raise ValueError(
+            f"Expected an excel file with extension of '.xlsx' or '.xls', got '{path.suffix}'. "
+            f"Attempted to process: {path}"
         )
-        if prep == RNASeqPreparationMethod.SCRNA:
-            rnaseq_input_filepath = rnaseq_input_filepath.with_suffix(".h5ad")
-        elif prep in {RNASeqPreparationMethod.TOTAL, RNASeqPreparationMethod.MRNA}:
-            rnaseq_input_filepath = rnaseq_input_filepath.with_suffix(".csv")
-
-        if not rnaseq_input_filepath.exists():
-            logger.warning(f"Gene counts matrix not found at {rnaseq_input_filepath}, skipping...")
-            continue
-
-        gene_info_filepath = config.data_dir / "gene_info.csv"
-        rnaseq_output_filepath = (
-            config.result_dir / context_name / prep.value / f"rnaseq_{prep.value}_{context_name}.csv"
-        )
-        rnaseq_output_filepath.parent.mkdir(parents=True, exist_ok=True)
-
-        await save_rnaseq_tests(
-            context_name=context_name,
-            counts_matrix_filepath=rnaseq_input_filepath,
-            config_filepath=config_filepath,
-            output_filepath=rnaseq_output_filepath.as_posix(),
-            gene_info_filepath=gene_info_filepath,
-            prep=prep,
-            replicate_ratio=replicate_ratio,
-            batch_ratio=batch_ratio,
-            high_replicate_ratio=replicate_ratio_high,
-            high_batch_ratio=batch_ratio_high,
-            technique=technique,
-            cut_off=cut_off,
-            taxon_id=taxon,
-            write_zfpkm_png_filepath=write_zfpkm_png_filepath,
-        )
-        logger.success(f"Results saved at '{rnaseq_output_filepath}'")
+    return pd.read_excel(path)
 
 
-async def rnaseq_gen(
-    # config_filepath: Path,
-    config_filename: str,
-    prep: RNASeqPreparationMethod,
-    taxon_id: int | str | Taxon,
-    write_zfpkm_png_filepath: Path,
+async def rnaseq_gen(  # noqa: C901, allow complex function
+    context_name: str,
+    input_rnaseq_filepath: Path,
+    input_gene_info_filepath: Path,
+    output_rnaseq_filepath: Path,
+    prep: RNAPrepMethod,
+    taxon: int,
+    input_metadata_filepath: Path | None = None,
+    input_metadata_df: pd.DataFrame | None = None,
     replicate_ratio: float = 0.5,
     high_replicate_ratio: float = 1.0,
     batch_ratio: float = 0.5,
     high_batch_ratio: float = 1.0,
     technique: FilteringTechnique | str = FilteringTechnique.tpm,
-    cut_off: int | float | None = None,
+    cutoff: int | float | None = None,
 ) -> None:
     """Generate a list of active and high-confidence genes from a gene count matrix.
 
@@ -137,9 +725,14 @@ async def rnaseq_gen(
         then study/batch numbers are checked for consensus according to batch ratios.
     The zFPKM method is outlined here: https://pubmed.ncbi.nlm.nih.gov/24215113/
 
-    :param config_filename: The configuration filename to read
+    :param context_name: The name of the context being processed
+    :param input_rnaseq_filepath: The filepath to the gene count matrix
+    :param input_gene_info_filepath: The filepath to the gene info file
+    :param output_rnaseq_filepath: The filepath to write the output gene count matrix
     :param prep: The preparation method
-    :param taxon_id: The NCBI Taxon ID
+    :param taxon: The NCBI Taxon ID
+    :param input_metadata_filepath: The filepath to the metadata file
+    :param input_metadata_df: The metadata dataframe
     :param replicate_ratio: The percentage of replicates that a gene must
         appear in for a gene to be marked as "active" in a batch/study
     :param batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked as 'active"
@@ -148,176 +741,61 @@ async def rnaseq_gen(
     :param high_batch_ratio: The percentage of batches that a gene must
         appear in for a gene to be marked "highly confident" in its expression
     :param technique: The filtering technique to use
-    :param cut_off: The cutoff value to use for the provided filtering technique
+    :param cutoff: The cutoff value to use for the provided filtering technique
     :return: None
     """
-    if isinstance(technique, str):
-        technique = FilteringTechnique(technique.lower())
-    if isinstance(taxon_id, (str, int)):
-        taxon_id = Taxon.from_string(str(taxon_id))
+    if not input_metadata_df and not input_metadata_filepath:
+        raise ValueError("At least one of input_metadata_filepath or input_metadata_df must be provided")
+
+    technique = (
+        FilteringTechnique.from_string(str(technique.lower())) if isinstance(technique, (str, int)) else technique
+    )
 
     match technique:
         case FilteringTechnique.tpm:
-            cut_off = 25 if cut_off is None else cut_off
-            if cut_off < 1 or cut_off > 100:
+            cutoff = cutoff or 25
+            if cutoff < 1 or cutoff > 100:
                 raise ValueError("Quantile must be between 1 - 100")
 
         case FilteringTechnique.cpm:
-            if cut_off is not None and cut_off < 0:
+            if cutoff and cutoff < 0:
                 raise ValueError("Cutoff must be greater than 0")
-            elif cut_off is None:
-                cut_off = "default"
+            elif cutoff:
+                cutoff = "default"
 
         case FilteringTechnique.zfpkm:
-            cut_off = "default" if cut_off is None else cut_off
+            cutoff = cutoff or -3
         case FilteringTechnique.umi:
             pass
         case _:
             raise ValueError(f"Technique must be one of {FilteringTechnique}")
 
-    await _handle_context_batch(
-        config_filename=config_filename,
-        replicate_ratio=replicate_ratio,
-        replicate_ratio_high=high_replicate_ratio,
-        batch_ratio=batch_ratio,
-        batch_ratio_high=high_batch_ratio,
-        technique=technique,
-        cut_off=cut_off,
-        prep=prep,
-        taxon=taxon_id,
-        write_zfpkm_png_filepath=write_zfpkm_png_filepath,
-    )
+    if not input_rnaseq_filepath.exists():
+        raise FileNotFoundError(f"Input RNA-seq file not found! Searching for: '{input_rnaseq_filepath}'")
 
-
-def _parse_args() -> _Arguments:
-    parser = argparse.ArgumentParser(
-        prog="rnaseq_gen.py",
-        description="Generate a list of active and high-confidence genes from a counts matrix using a user defined "
-        "at normalization-technique at /work/data/results/<context name>/rnaseq_<context_name>.csv: "
-        "https://github.com/HelikarLab/FastqToGeneCounts",
-        epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
-        "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
-    )
-    parser.add_argument(
-        "-c",
-        "--config-file",
-        type=str,
-        required=True,
-        dest="config_file",
-        help="Name of config .xlsx file in the /work/data/config_files/. Can be generated using "
-        "rnaseq_preprocess.py or manually created and imported into the Juypterlab",
-    )
-    parser.add_argument(
-        "-r",
-        "--replicate-ratio",
-        type=float,
-        required=False,
-        default=0.5,
-        dest="replicate_ratio",
-        help="Ratio of replicates required for a gene to be active within that study/batch group "
-        "Example: 0.7 means that for a gene to be active, at least 70% of replicates in a group "
-        "must pass the cutoff after normalization",
-    )
-    parser.add_argument(
-        "-g",
-        "--batch-ratio",
-        type=float,
-        required=False,
-        default=0.5,
-        dest="batch_ratio",
-        help="Ratio of groups (studies or batches) required for a gene to be active "
-        "Example: 0.7 means that for a gene to be active, at least 70% of groups in a study must  "
-        "have passed the replicate ratio test",
-    )
-    parser.add_argument(
-        "-rh",
-        "--high-replicate-ratio",
-        type=float,
-        required=False,
-        default=1.0,
-        dest="high_replicate_ratio",
-        help="Ratio of replicates required for a gene to be considered high-confidence. "
-        "High-confidence genes ignore consensus with other data-sources, such as proteomics. "
-        "Example: 0.9 means that for a gene to be high-confidence, "
-        "at least 90% of replicates in a group must pass the cutoff after normalization",
-    )
-    parser.add_argument(
-        "-gh",
-        "--high-batch-ratio",
-        type=float,
-        required=False,
-        default=1.0,
-        dest="high_batch_ratio",
-        help="Ratio of studies/batches required for a gene to be considered high-confidence within that group. "
-        "High-confidence genes ignore consensus with other data-sources, like proteomics. "
-        "Example: 0.9 means that for a gene to be high-confidence, "
-        "at least 90% of groups in a study must have passed the replicate ratio test",
-    )
-    parser.add_argument(
-        "--taxon",
-        "--taxon-id",
-        type=str,
-        required=True,
-        dest="taxon",
-        help="The NCBI Taxonomy ID that is being proessed. '9606' for humans, '10090' for mice.",
-    )
-    parser.add_argument(
-        "-t",
-        "--filt-technique",
-        type=str,
-        required=False,
-        default="quantile",
-        dest="filtering_technique",
-        help="Technique to normalize and filter counts with. "
-        "Either 'zfpkm', 'quantile', or 'cpm'. More info about each method is discussed in pipeline.ipynb.",
-    )
-    parser.add_argument(
-        "--minimum-cutoff",
-        type=int,
-        required=False,
-        default=None,
-        dest="minimum_cutoff",
-        help="The minimum cutoff used for the filtration technique. "
-        "If the filtering technique is zFPKM, the default is -3. "
-        "If the filtering technique is quantile-tpm, the default is 25. "
-        "If the filtering technique is flat-cpm, the default is determined dynamically. "
-        "If the filtering technique is quantile, the default is 25.",
-    )
-    parser.add_argument(
-        "-p",
-        "--library-prep",
-        required=True,
-        choices=["total", "mrna", "scrna"],
-        dest="library_prep",
-        help="Library preparation method. "
-        "Will separate samples into groups to only compare similarly prepared libraries. "
-        "For example, mRNA, total-rna, scRNA, etc",
-    )
-    parser.add_argument(
-        "--write-zfpkm-png-filepath",
-        required=False,
-        type=Path,
-        help="If using zFPKM, the location to write graphs",
-    )
-    args = parser.parse_args()
-    args.filtering_technique = args.filtering_technique.lower()
-    args.taxon = Taxon.from_int(int(args.taxon)) if str(args.taxon).isdigit() else Taxon.from_string(str(args.taxon))  # type: ignore
-    return _Arguments(**vars(args))
-
-
-if __name__ == "__main__":
-    args = _parse_args()
-    asyncio.run(
-        rnaseq_gen(
-            config_filename=args.config_file,
-            replicate_ratio=args.replicate_ratio,
-            batch_ratio=args.batch_ratio,
-            high_replicate_ratio=args.high_replicate_ratio,
-            high_batch_ratio=args.high_batch_ratio,
-            technique=args.filtering_technique,
-            cut_off=args.minimum_cutoff,
-            prep=args.library_prep,
-            taxon_id=args.taxon,
-            write_zfpkm_png_filepath=args.write_zfpkm_png_filepath,
+    if prep == RNAPrepMethod.SCRNA:
+        technique = FilteringTechnique.umi
+        logger.warning(
+            "Single cell filtration does not normalize and assumes "
+            "gene counts are counted with Unique Molecular Identifiers (UMIs). "
+            "Setting filtering technique to UMI now."
         )
+
+    logger.debug(f"Starting '{context_name}'")
+    output_rnaseq_filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    await _save_rnaseq_tests(
+        context_name=context_name,
+        rnaseq_matrix=await _read_counts(input_rnaseq_filepath),
+        metadata_df=input_metadata_df or await _create_metadata_df(input_metadata_filepath),
+        gene_info_df=pd.read_csv(input_gene_info_filepath),
+        output_filepath=output_rnaseq_filepath,
+        prep=prep,
+        taxon=taxon,
+        replicate_ratio=replicate_ratio,
+        batch_ratio=batch_ratio,
+        high_replicate_ratio=high_replicate_ratio,
+        high_batch_ratio=high_batch_ratio,
+        technique=technique,
+        cut_off=cutoff,
     )

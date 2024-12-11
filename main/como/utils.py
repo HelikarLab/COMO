@@ -115,32 +115,32 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
 
     :param stringlist: The "string list" gathered from the command line. Example input: "['mat', 'xml', 'json']"
     """
-    if isinstance(stringlist, str):
-        if stringlist.startswith("[") and stringlist.endswith("]"):
-            # Remove any brackets from the first and last items; replace quotation marks and commas with nothing
-            new_list: list[str] = stringlist.strip("[]").replace("'", "").replace(" ", "").split(",")
+    if isinstance(stringlist, list):
+        return stringlist
 
-            # Show a warning if more than one item is present in the list (this means we are using the old method)
-            logger.critical(
-                "DeprecationWarning: Please use the new method of providing context names, "
-                "i.e. --output-filetypes 'type1 type2 type3'."
-            )
-            logger.critical(
-                "If you are using COMO, this can be done by setting the 'context_names' variable to a "
-                "simple string separated by spaces. Here are a few examples!"
-            )
-            logger.critical("context_names = 'cellType1 cellType2 cellType3'")
-            logger.critical("output_filetypes = 'output1 output2 output3'")
-            logger.critical(
-                "\nYour current method of passing context names will be removed in the future. "
-                "Update your variables above accordingly!\n\n"
-            )
+    if not (stringlist.startswith("[") and stringlist.endswith("]")):
+        return stringlist.split(" ")
 
-        else:
-            new_list: list[str] = stringlist.split(" ")
+    # Remove any brackets from the first and last items; replace quotation marks and commas with nothing
+    new_list: list[str] = stringlist.strip("[]").replace("'", "").replace(" ", "").split(",")
 
-        return new_list
-    return stringlist
+    # Show a warning if more than one item is present in the list (this means we are using the old method)
+    logger.critical(
+        "DeprecationWarning: Please use the new method of providing context names, "
+        "i.e. --output-filetypes 'type1 type2 type3'."
+    )
+    logger.critical(
+        "If you are using COMO, this can be done by setting the 'context_names' variable to a "
+        "simple string separated by spaces. Here are a few examples!"
+    )
+    logger.critical("context_names = 'cellType1 cellType2 cellType3'")
+    logger.critical("output_filetypes = 'output1 output2 output3'")
+    logger.critical(
+        "\nYour current method of passing context names will be removed in the future. "
+        "Update your variables above accordingly!\n\n"
+    )
+
+    return new_list
 
 
 def split_gene_expression_data(expression_data: pd.DataFrame, recon_algorithm: Algorithm | None = None):
@@ -258,3 +258,8 @@ async def convert_gene_data(values: list[str], taxon_id: int | str | Taxon) -> p
         return await gene_id_to_ensembl_and_gene_symbol(ids=values, taxon=taxon_id)
     else:
         raise ValueError("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
+
+
+def _listify(value):
+    """Convert items into a list."""
+    return [value] if not isinstance(value, list) else value
