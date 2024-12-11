@@ -34,7 +34,9 @@ async def load_gene_symbol_map(gene_symbols: list[str], entrez_map: Path | None 
     else:
         biodbnet = BioDBNet()
         df = await biodbnet.async_db2db(
-            values=gene_symbols, input_db=Input.GENE_SYMBOL, output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID]
+            values=gene_symbols,
+            input_db=Input.GENE_SYMBOL,
+            output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID],
         )
         df.loc[df["gene_id"] == "-", ["gene_id"]] = np.nan
         df.to_csv(filepath, index_label="gene_symbol")
