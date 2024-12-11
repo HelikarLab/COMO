@@ -47,7 +47,8 @@ async def load_gene_symbol_map(gene_symbols: list[str], entrez_map: Path | None 
 def abundance_to_bool_group(
     context_name,
     abundance_filepath: Path,
-    output_gaussian_img_filepath: Path,
+    output_gaussian_png_filepath: Path,
+    output_gaussian_html_filepath: Path,
     output_z_score_matrix_filepath: Path,
     abundance_matrix: pd.DataFrame,
     replicate_ratio: float,
@@ -59,7 +60,8 @@ def abundance_to_bool_group(
     abundance_matrix.to_csv(abundance_filepath, index_label="entrez_gene_id")
     protein_transform_main(
         abundance_df=abundance_matrix,
-        output_gaussian_img_filepath=output_gaussian_img_filepath,
+        output_gaussian_png_filepath=output_gaussian_png_filepath,
+        output_gaussian_html_filepath=output_gaussian_html_filepath,
         output_z_score_matrix_filepath=output_z_score_matrix_filepath,
     )
 
@@ -147,13 +149,14 @@ async def proteomics_gen(
     config_filepath: Path,
     matrix_filepath: Path,
     output_boolean_filepath: Path,
-    output_gaussian_img_filepath: Path,
     output_z_score_matrix_filepath: Path,
+    output_gaussian_png_filepath: Path | None = None,
+    output_gaussian_html_filepath: Path | None = None,
     input_entrez_map: Path | None = None,
     replicate_ratio: float = 0.5,
     batch_ratio: float = 0.5,
     high_confidence_replicate_ratio: float = 0.7,
-    high_confience_batch_ratio: float = 0.7,
+    high_confidence_batch_ratio: float = 0.7,
     quantile: int = 25,
 ):
     """Generate proteomics data."""
@@ -203,12 +206,13 @@ async def proteomics_gen(
             high_confidence_replicate_ratio=high_confidence_replicate_ratio,
             quantile=quantile,
             output_boolean_filepath=output_boolean_filepath,
-            output_gaussian_img_filepath=output_gaussian_img_filepath,
+            output_gaussian_png_filepath=output_gaussian_png_filepath,
+            output_gaussian_html_filepath=output_gaussian_html_filepath,
             output_z_score_matrix_filepath=output_z_score_matrix_filepath,
         )
     to_bool_context(
         context_name=context_name,
         group_ratio=batch_ratio,
-        hi_group_ratio=high_confience_batch_ratio,
+        hi_group_ratio=high_confidence_batch_ratio,
         group_names=groups,
     )
