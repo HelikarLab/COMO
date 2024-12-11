@@ -53,17 +53,13 @@ def abundance_to_bool_group(
     quantile,
     output_boolean_filepath: Path,
 ):
-    """Descrioption...."""
-    config = Config()
-    output_dir = config.result_dir / context_name / "proteomics"
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # write group abundances to individual files
-    abundance_filepath = (
-        config.result_dir / context_name / "proteomics" / "".join(["protein_abundance_", group_name, ".csv"])
-    )
+    """Convert proteomic data to boolean expression."""
     abundance_matrix.to_csv(abundance_filepath, index_label="entrez_gene_id")
-    protein_transform_main(abundance_matrix, output_dir, group_name)
+    protein_transform_main(
+        abundance_df=abundance_matrix,
+        output_gaussian_img_filepath=output_gaussian_img_filepath,
+        output_z_score_matrix_filepath=output_z_score_matrix_filepath,
+    )
 
     # Logical Calculation
     abundance_matrix_nozero = abundance_matrix.replace(0, np.nan)
