@@ -308,9 +308,16 @@ def _build_with_imat(
     expr_vector: npt.NDArray,
     expr_thesh: tuple[float, float],
     force_gene_ids: Sequence[int],
+    solver: str,
 ) -> (cobra.Model, pd.DataFrame):
     expr_vector = np.array(expr_vector)
-    properties = IMATProperties(exp_vector=expr_vector, exp_thresholds=expr_thesh, core=force_gene_ids, epsilon=0.01)
+    properties = IMATProperties(
+        exp_vector=expr_vector,
+        exp_thresholds=expr_thesh,
+        core=force_gene_ids,
+        epsilon=0.01,
+        solver=solver.upper(),
+    )
     algorithm = IMAT(s_matrix, np.array(lb), np.array(ub), properties)
     context_rxns: npt.NDArray = algorithm.run()
     fluxes: pd.Series = algorithm.sol.to_series()
@@ -419,7 +426,6 @@ def _build_model(  # noqa: C901
     force excluded even if they meet GPR association requirements using the force exclude file.
     """
     config = Config()
-    cobra.Configuration().solver = solver.lower()
     reference_model: cobra.Model
     match general_model_file.suffix:
         case ".mat":
@@ -508,7 +514,14 @@ def _build_model(  # noqa: C901
     elif recon_algorithm == Algorithm.IMAT:
         context_model_cobra: cobra.Model
         context_model_cobra, flux_df = _build_with_imat(
-            reference_model, s_matrix, lb, ub, expr_vector, exp_thresh, idx_force
+            reference_model,
+            s_matrix,
+            lb,
+            ub,
+            expr_vector,
+            exp_thresh,
+            idx_force,
+            solver=solver,
         )
         imat_reactions = flux_df.rxn
         model_reactions = [reaction.id for reaction in context_model_cobra.reactions]
