@@ -505,7 +505,7 @@ def cpm_filter(
             cutoff = (
                 10e6 / (np.median(np.sum(counts[:, i])))
                 if cut_off == "default"
-                else 1e6 * cut_off / np.median(np.sum(counts[:, i]))
+                else (1e6 * cut_off) / np.median(np.sum(counts[:, i]))
             )
             test_bools = test_bools.merge(counts_per_million[counts_per_million.iloc[:, i] > cutoff])
 
@@ -637,7 +637,7 @@ async def _save_rnaseq_tests(
     filtering_options = _FilteringOptions(
         replicate_ratio=replicate_ratio,
         batch_ratio=batch_ratio,
-        cut_off=cut_off,
+        cut_off=float(cut_off),
         high_replicate_ratio=high_replicate_ratio,
         high_batch_ratio=high_batch_ratio,
     )
@@ -725,9 +725,14 @@ async def rnaseq_gen(  # noqa: C901, allow complex function
         then study/batch numbers are checked for consensus according to batch ratios.
     The zFPKM method is outlined here: https://pubmed.ncbi.nlm.nih.gov/24215113/
 
-    :param metadata_filepath: The configuration filename to read
+    :param context_name: The name of the context being processed
+    :param input_rnaseq_filepath: The filepath to the gene count matrix
+    :param input_gene_info_filepath: The filepath to the gene info file
+    :param output_rnaseq_filepath: The filepath to write the output gene count matrix
     :param prep: The preparation method
     :param taxon: The NCBI Taxon ID
+    :param input_metadata_filepath: The filepath to the metadata file
+    :param input_metadata_df: The metadata dataframe
     :param replicate_ratio: The percentage of replicates that a gene must
         appear in for a gene to be marked as "active" in a batch/study
     :param batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked as 'active"
@@ -759,7 +764,7 @@ async def rnaseq_gen(  # noqa: C901, allow complex function
                 cutoff = "default"
 
         case FilteringTechnique.zfpkm:
-            cutoff = "default" if cutoff else cutoff
+            cutoff = cutoff or -3
         case FilteringTechnique.umi:
             pass
         case _:
