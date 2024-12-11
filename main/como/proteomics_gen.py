@@ -29,10 +29,8 @@ def process_proteomics_data(path: Path) -> pd.DataFrame:
 # read map to convert to entrez
 async def load_gene_symbol_map(gene_symbols: list[str], entrez_map: Path | None = None):
     """Add descirption...."""
-    config = Config()
-    filepath = config.data_dir / "proteomics_entrez_map.csv"
-    if filepath.exists():
-        df = pd.read_csv(filepath, index_col="gene_symbol")
+    if entrez_map and entrez_map.exists():
+        df = pd.read_csv(entrez_map, index_col="gene_symbol")
     else:
         biodbnet = BioDBNet()
         df = await biodbnet.async_db2db(
@@ -158,15 +156,20 @@ async def proteomics_gen(
     quantile: int = 25,
 ):
     """Generate proteomics data."""
-    config = Config()
-    if not config_file:
-        raise ValueError("Config file must be provided")
+    if not config_filepath.exists():
+        raise FileNotFoundError(f"Config file not found at {config_filepath}")
+    if config_filepath.suffix not in (".xlsx", ".xls"):
+        raise FileNotFoundError(f"Config file must be an xlsx or xls file at {config_filepath}")
+
+    if not matrix_filepath.exists():
+        raise FileNotFoundError(f"Matrix file not found at {matrix_filepath}")
+    if matrix_filepath.suffix not in {".csv"}:
+        raise FileNotFoundError(f"Matrix file must be a csv file at {matrix_filepath}")
 
     if quantile < 0 or quantile > 100:
         raise ValueError("Quantile must be an integer from 0 to 100")
     quantile /= 100
 
-    prot_config_filepath = config.data_dir / "config_sheets" / config_file
     logger.info(f"Config file is at '{prot_config_filepath}'")
 
     xl = pd.ExcelFile(prot_config_filepath)
