@@ -1,5 +1,6 @@
-import argparse
-import asyncio
+from __future__ import annotations
+
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -12,7 +13,7 @@ from como.proteomics_preprocessing import protein_transform_main
 
 
 # Load Proteomics
-def load_proteomics_data(datafilename, context_name):
+def process_proteomics_data(path: Path) -> pd.DataFrame:
     """Load proteomics data from a given context and filename."""
     config = Config()
     data_path = config.data_dir / "data_matrices" / context_name / datafilename
@@ -45,7 +46,7 @@ def load_proteomics_data(datafilename, context_name):
 
 
 # read map to convert to entrez
-async def load_gene_symbol_map(gene_symbols: list[str]):
+async def load_gene_symbol_map(gene_symbols: list[str], entrez_map: Path | None = None):
     """Add descirption...."""
     config = Config()
     filepath = config.data_dir / "proteomics_entrez_map.csv"
@@ -62,7 +63,15 @@ async def load_gene_symbol_map(gene_symbols: list[str]):
     return df[~df.index.duplicated()]
 
 
-def abundance_to_bool_group(context_name, group_name, abundance_matrix, rep_ratio, hi_rep_ratio, quantile):
+def abundance_to_bool_group(
+    context_name,
+    group_name,
+    abundance_matrix,
+    replicate_ratio,
+    high_confidence_replicate_ratio,
+    quantile,
+    output_boolean_filepath: Path,
+):
     """Descrioption...."""
     config = Config()
     output_dir = config.result_dir / context_name / "proteomics"
@@ -156,11 +165,15 @@ def load_proteomics_tests(filename, context_name):
 
 
 async def proteomics_gen(
-    config_file: str,
-    rep_ratio: float = 0.5,
-    group_ratio: float = 0.5,
-    hi_rep_ratio: float = 0.5,
-    hi_group_ratio: float = 0.5,
+    context_name: str,
+    config_filepath: Path,
+    matrix_filepath: Path,
+    output_boolean_filepath: Path,
+    input_entrez_map: Path | None = None,
+    replicate_ratio: float = 0.5,
+    batch_ratio: float = 0.5,
+    high_confidence_replicate_ratio: float = 0.7,
+    high_confience_batch_ratio: float = 0.7,
     quantile: int = 25,
 ):
     """Generate proteomics data."""
