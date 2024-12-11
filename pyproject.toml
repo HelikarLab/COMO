@@ -17,8 +17,8 @@ dependencies = [
     "openpyxl>=3.1.5",
     "aiofiles>=24.1.0",
     "aioftp>=0.23.1",
-#    "troppo",
-#    "cobamp",
+    "troppo",
+    "cobamp",
 ]
 
 [build-system]
@@ -47,6 +47,6 @@ dev-dependencies = [
     "pytest-cov>=6.0.0",
 ]
 
-[tool.uv.sources]
+#[tool.uv.sources]
 #troppo = { git = "https://github.com/JoshLoecker/troppo", rev = "update_dependencies" }
 #cobamp = { git = "https://github.com/JoshLoecker/cobamp", rev = "update_packages" }
