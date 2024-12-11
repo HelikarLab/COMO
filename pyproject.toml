@@ -5,7 +5,7 @@ requires-python = ">=3.10,<3.13"
 dependencies = [
     "aiofiles>=24.1.0",
     "aioftp>=0.23.1",
-    "cobamp",
+    "cobamp@git+https://github.com/JoshLoecker/cobamp@master",
     "cobra>=0.28.0",
     "fast-bioservices>=0.3.9",
     "gurobipy>=11.0",
@@ -20,7 +20,7 @@ dependencies = [
     "scikit-learn>=1.5.2",
     "scipy>=1.7.3",
     "setuptools<60.0",
-    "troppo",
+    "troppo@git+https://github.com/JoshLoecker/troppo@master",
 ]
 
 [project.optional-dependencies]
@@ -56,11 +56,6 @@ dev-dependencies = [
     "commitizen>=4.1.0",
     "cz-conventional-gitmoji>=0.6.1",
 ]
-
-[tool.uv.sources]
-troppo = { git = "https://github.com/JoshLoecker/troppo", rev = "update_dependencies" }
-cobamp = { git = "https://github.com/JoshLoecker/cobamp", rev = "update_packages" }
-pydantic-settings = { git = "https://github.com/pydantic/pydantic-settings" }
 
 [tool.commitizen]
 name = "cz_conventional_commits"
