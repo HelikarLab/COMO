@@ -64,14 +64,14 @@ def abundance_to_bool_group(
     # Logical Calculation
     abundance_matrix_nozero = abundance_matrix.replace(0, np.nan)
     thresholds = abundance_matrix_nozero.quantile(quantile, axis=0)
-    testbool = pd.DataFrame(0, columns=list(abundance_matrix), index=abundance_matrix.index)
+    testbool = pd.DataFrame(0, columns=abundance_matrix.columns, index=abundance_matrix.index)
 
-    for col in list(abundance_matrix):
+    for col in abundance_matrix.columns:
         testbool.loc[abundance_matrix[col] > thresholds[col], [col]] = 1
 
-    abundance_matrix["pos"] = (abundance_matrix > 0).sum(axis=1) / abundance_matrix.count(axis=1)
     abundance_matrix["expressed"] = 0
     abundance_matrix["high"] = 0
+    abundance_matrix["pos"] = abundance_matrix[abundance_matrix > 0].sum(axis=1) / abundance_matrix.count(axis=1)
     abundance_matrix.loc[(abundance_matrix["pos"] >= replicate_ratio), ["expressed"]] = 1
     abundance_matrix.loc[(abundance_matrix["pos"] >= high_confidence_replicate_ratio), ["high"]] = 1
 
