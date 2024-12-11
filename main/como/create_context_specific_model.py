@@ -308,9 +308,16 @@ def _build_with_imat(
     expr_vector: npt.NDArray,
     expr_thesh: tuple[float, float],
     force_gene_ids: Sequence[int],
+    solver: str,
 ) -> (cobra.Model, pd.DataFrame):
     expr_vector = np.array(expr_vector)
-    properties = IMATProperties(exp_vector=expr_vector, exp_thresholds=expr_thesh, core=force_gene_ids, epsilon=0.01)
+    properties = IMATProperties(
+        exp_vector=expr_vector,
+        exp_thresholds=expr_thesh,
+        core=force_gene_ids,
+        epsilon=0.01,
+        solver=solver,
+    )
     algorithm = IMAT(s_matrix, np.array(lb), np.array(ub), properties)
     context_rxns: npt.NDArray = algorithm.run()
     fluxes: pd.Series = algorithm.sol.to_series()
