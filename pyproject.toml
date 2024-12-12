@@ -1,47 +1,29 @@
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
 [project]
 name = "COMO"
 dynamic = ["version"]
 requires-python = ">=3.10,<3.13"
 dependencies = [
-    "aiofiles>=24.1.0",
-    "aioftp>=0.23.1",
-    "cobamp@git+https://github.com/JoshLoecker/cobamp@master",
     "cobra>=0.28.0",
     "fast-bioservices>=0.3.9",
+    "gurobipy>=11.0",
     "kaleido==0.2.1",
     "loguru>=0.7.2",
-    "openpyxl>=3.1.5",
     "pandas>=1.3.5",
     "plotly>=5.24.1",
-    "pydantic-settings",
-    "pydantic>=2.10.3",
     "scanpy>=1.9.8",
-    "scikit-learn>=1.5.2",
     "scipy>=1.7.3",
+    "scikit-learn>=1.5.2",
     "setuptools<60.0",
-    "troppo@git+https://github.com/JoshLoecker/troppo@master",
+    "openpyxl>=3.1.5",
+    "aiofiles>=24.1.0",
+    "aioftp>=0.23.1",
+    "troppo",
+    "cobamp",
 ]
 
-[project.optional-dependencies]
-gurobi = [ "gurobipy>=10.0.0" ]
-interactive =   [
-    "ipython>=8.0.0",
-    "jupyterlab>=4.3.2"
-]
-dev = [
-    "commitlint>=1.3.0",
-    "pytest-asyncio>=0.24.0",
-    "pytest>=8.3.3",
-    "ruff>=0.8.0",
-    "hypothesis>=6.122.1",
-    "pytest-cov>=6.0.0",
-    "commitizen>=4.1.0",
-]
-
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.hatch.version]
 path = "main/como/__init__.py"
@@ -55,9 +37,16 @@ allow-direct-references = true
 [tool.pytest.ini_options]
 pythonpath = [ "main/src" ]
 
-[tool.commitizen]
-name = "cz_conventional_commits"
-tag_format = "$version"
-version_scheme = "semver2"
-version_provider = "pep621"
-update_changelog_on_bump = true
+[tool.uv]
+dev-dependencies = [
+    "commitlint>=1.3.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest>=8.3.3",
+    "ruff>=0.8.0",
+    "hypothesis>=6.122.1",
+    "pytest-cov>=6.0.0",
+]
+
+[tool.uv.sources]
+troppo = { git = "https://github.com/JoshLoecker/troppo", rev = "update_dependencies" }
+cobamp = { git = "https://github.com/JoshLoecker/cobamp", rev = "update_packages" }

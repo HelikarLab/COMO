@@ -308,16 +308,9 @@ def _build_with_imat(
     expr_vector: npt.NDArray,
     expr_thesh: tuple[float, float],
     force_gene_ids: Sequence[int],
-    solver: str,
 ) -> (cobra.Model, pd.DataFrame):
     expr_vector = np.array(expr_vector)
-    properties = IMATProperties(
-        exp_vector=expr_vector,
-        exp_thresholds=expr_thesh,
-        core=force_gene_ids,
-        epsilon=0.01,
-        solver=solver.upper(),
-    )
+    properties = IMATProperties(exp_vector=expr_vector, exp_thresholds=expr_thesh, core=force_gene_ids, epsilon=0.01)
     algorithm = IMAT(s_matrix, np.array(lb), np.array(ub), properties)
     context_rxns: npt.NDArray = algorithm.run()
     fluxes: pd.Series = algorithm.sol.to_series()
@@ -514,14 +507,7 @@ def _build_model(  # noqa: C901
     elif recon_algorithm == Algorithm.IMAT:
         context_model_cobra: cobra.Model
         context_model_cobra, flux_df = _build_with_imat(
-            reference_model,
-            s_matrix,
-            lb,
-            ub,
-            expr_vector,
-            exp_thresh,
-            idx_force,
-            solver=solver,
+            reference_model, s_matrix, lb, ub, expr_vector, exp_thresh, idx_force
         )
         imat_reactions = flux_df.rxn
         model_reactions = [reaction.id for reaction in context_model_cobra.reactions]
@@ -640,10 +626,10 @@ def create_context_specific_model(  # noqa: C901
             raise ValueError(f"Output file type {output_type} not recognized. Must be one of: 'xml', 'mat', 'json'")
 
     if algorithm not in Algorithm:
-        raise ValueError(f"Algorithm {algorithm} not supported. Use one of {', '.join(a.value for a in Algorithm)}")
+        raise ValueError(f"Algorithm {algorithm} not supported. Please use one of: GIMME, FASTCORE, or IMAT")
 
     if solver not in Solver:
-        raise ValueError(f"Solver '{solver}' not supported. Use one of {', '.join(s.value for s in Solver)}")
+        raise ValueError(f"Solver '{solver}' not supported. Use 'GLPK' or 'GUROBI'")
 
     if boundary_rxns_filepath:
         boundary_reactions = _collect_boundary_reactions(boundary_rxns_filepath)
@@ -676,7 +662,7 @@ def create_context_specific_model(  # noqa: C901
         bound_ub=boundary_reactions.upper_bounds,
         exclude_rxns=exclude_rxns,
         force_rxns=force_rxns,
-        solver=solver.value.lower(),
+        solver=solver.value,
         low_thresh=low_threshold,
         high_thresh=high_threshold,
     )
