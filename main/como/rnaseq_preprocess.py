@@ -578,6 +578,7 @@ async def rnaseq_preprocess(
     output_gene_info_filepath: Path,
     como_context_dir: Path | None = None,
     input_matrix_filepath: Path | list[Path] | None = None,
+    preparation_method: RNAPrepMethod | list[RNAPrepMethod] | None = None,
     output_trna_config_filepath: Path | None = None,
     output_mrna_config_filepath: Path | None = None,
     output_trna_count_matrix_filepath: Path | None = None,
@@ -600,7 +601,8 @@ async def rnaseq_preprocess(
     :param output_mrna_count_matrix_filepath: The path to write messenger RNA count matrices
     :param como_context_dir: If in "create" mode, the input path(s) to the COMO_input directory of the current context
         i.e., the directory containing "fragmentSizes", "geneCounts", "insertSizeMetrics", etc. directories
-    :param input_matrix_filepath: If in "provide" mode, the path(s) to the count matrices to be processed~
+    :param input_matrix_filepath: If in "provide" mode, the path(s) to the count matrices to be processed
+    :param preparation_method: The preparation method
     :param cache: Should HTTP requests be cached
     :param log_level: The logging level
     :param log_location: The logging location
@@ -634,6 +636,13 @@ async def rnaseq_preprocess(
     )
 
     input_matrix_filepath = _listify(input_matrix_filepath)
+    preparation_method = _listify(preparation_method)
+
+    if len(input_matrix_filepath) != len(preparation_method):
+        raise ValueError(
+            "input_matrix_filepath (--input-matrix-filepath) and "
+            "preparation_method (--preparation-method) must be the same length."
+        )
     await _process(
         context_name=context_name,
         taxon=taxon,
