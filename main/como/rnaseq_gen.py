@@ -99,6 +99,10 @@ async def _handle_context_batch(
         )
         rnaseq_output_filepath.parent.mkdir(parents=True, exist_ok=True)
 
+        write_zfpkm_png_filepath = write_zfpkm_png_filepath or Path(
+            f"data/results/{context_name}/zfpkm_{prep.value}_{context_name}.png"
+        )
+
         await save_rnaseq_tests(
             context_name=context_name,
             counts_matrix_filepath=rnaseq_input_filepath,

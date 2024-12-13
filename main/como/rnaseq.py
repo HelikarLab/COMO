@@ -297,8 +297,8 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
 
 def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
     """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary."""  # noqa: E501
-    matrix_values = []
     for study in metrics:
+        matrix_values = []
         for sample in range(metrics[study].num_samples):
             layout = metrics[study].layout[sample]
             count_matrix: npt.NDArray = metrics[study].count_matrix.iloc[:, sample].values
@@ -311,7 +311,7 @@ def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
                 case LayoutMethod.paired_end:  # FPKM
                     mean_fragment_lengths = metrics[study].fragment_lengths[sample]
                     # Ensure non-negative value
-                    effective_length = [max(0, size - (mean_fragment_lengths + 1)) for size in gene_size]
+                    effective_length = [max(1e-9, size - (mean_fragment_lengths + 1)) for size in gene_size]
                     n = count_matrix.sum()
                     fpkm = ((count_matrix + 1) * 1e9) / (np.array(effective_length) * n)
                     matrix_values.append(fpkm)
@@ -326,7 +326,6 @@ def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
         fpkm_matrix = pd.DataFrame(matrix_values).T  # Transpose is needed because values were appended as rows
         fpkm_matrix = fpkm_matrix[~pd.isna(fpkm_matrix)]
         metrics[study].normalization_matrix = fpkm_matrix
-
         metrics[study].normalization_matrix.columns = metrics[study].count_matrix.columns
 
     return metrics
