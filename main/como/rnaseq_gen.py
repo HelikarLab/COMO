@@ -10,8 +10,8 @@ from fast_bioservices import Taxon
 from loguru import logger
 
 from como import Config
+from como.custom_types import RNASeqPreparationMethod
 from como.rnaseq import FilteringTechnique, save_rnaseq_tests
-from como.type import RNAPrepMethod
 
 
 @dataclass
@@ -23,12 +23,12 @@ class _Arguments:
     high_batch_ratio: float
     filtering_technique: FilteringTechnique
     minimum_cutoff: int | str
-    library_prep: RNAPrepMethod
+    library_prep: RNASeqPreparationMethod
     taxon: Taxon
     write_zfpkm_png_filepath: Path
 
     def __post_init__(self):
-        self.library_prep = RNAPrepMethod.from_string(str(self.library_prep))
+        self.library_prep = RNASeqPreparationMethod.from_string(str(self.library_prep))
         self.filtering_technique = FilteringTechnique.from_string(str(self.filtering_technique))
 
         if self.minimum_cutoff is None:
@@ -48,7 +48,7 @@ async def _handle_context_batch(
     batch_ratio_high: float,
     technique: FilteringTechnique,
     cut_off: int | float | str,
-    prep: RNAPrepMethod,
+    prep: RNASeqPreparationMethod,
     taxon: Taxon,
     write_zfpkm_png_filepath: Path,
 ) -> None:
@@ -84,9 +84,9 @@ async def _handle_context_batch(
         rnaseq_input_filepath = (
             config.data_dir / "data_matrices" / context_name / f"gene_counts_matrix_{prep.value}_{context_name}"
         )
-        if prep == RNAPrepMethod.SCRNA:
+        if prep == RNASeqPreparationMethod.SCRNA:
             rnaseq_input_filepath = rnaseq_input_filepath.with_suffix(".h5ad")
-        elif prep in {RNAPrepMethod.TOTAL, RNAPrepMethod.MRNA}:
+        elif prep in {RNASeqPreparationMethod.TOTAL, RNASeqPreparationMethod.MRNA}:
             rnaseq_input_filepath = rnaseq_input_filepath.with_suffix(".csv")
 
         if not rnaseq_input_filepath.exists():
@@ -124,7 +124,7 @@ async def _handle_context_batch(
 async def rnaseq_gen(
     # config_filepath: Path,
     config_filename: str,
-    prep: RNAPrepMethod,
+    prep: RNASeqPreparationMethod,
     taxon_id: int | str | Taxon,
     write_zfpkm_png_filepath: Path,
     replicate_ratio: float = 0.5,
