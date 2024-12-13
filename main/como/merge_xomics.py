@@ -16,8 +16,8 @@ from loguru import logger
 
 from como import proteomics_gen, return_placeholder_data
 from como.combine_distributions import _combine_zscores
-from como.custom_types import RNAPrepMethod
 from como.project import Config
+from como.types import RNAPrepMethod
 from como.utils import split_gene_expression_data
 
 
