@@ -565,7 +565,6 @@ def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
     for column in df.columns:
         if column not in [
             "boundary",
-            "reaction",
             "abbreviation",
             "compartment",
             "minimum reaction rate",
@@ -577,7 +576,7 @@ def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
             )
 
     reactions: list[str] = [""] * len(df)
-    boundary_type: list[str] = df["reaction"].tolist()
+    boundary_type: list[str] = df["boundary"].tolist()
     reaction_abbreviation: list[str] = df["abbreviation"].tolist()
     reaction_compartment: list[str] = df["compartment"].tolist()
     lower_bound = df["minimum reaction rate"].tolist()
