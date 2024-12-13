@@ -351,7 +351,7 @@ async def _create_config_df(context_name: str) -> pd.DataFrame:  # noqa: C901
                 f"this should be defined by user if using zFPKM or rnaseq_gen.py will not run"
             )
         elif len(layout_files) == 1:
-            with layout_files[0].open("w") as file:
+            with layout_files[0].open("r") as file:
                 layout = file.read().strip()
         elif len(layout_files) > 1:
             raise ValueError(
@@ -367,7 +367,7 @@ async def _create_config_df(context_name: str) -> pd.DataFrame:  # noqa: C901
                 f"infer the strandedness when writing the counts matrix"
             )
         elif len(strand_files) == 1:
-            with strand_files[0].open("w") as file:
+            with strand_files[0].open("r") as file:
                 strand = file.read().strip()
         elif len(strand_files) > 1:
             raise ValueError(
@@ -379,7 +379,7 @@ async def _create_config_df(context_name: str) -> pd.DataFrame:  # noqa: C901
         if len(prep_files) == 0:
             logger.warning(f"No prep file found for {label}, assuming 'total' as in Total RNA library preparation")
         elif len(prep_files) == 1:
-            with prep_files[0].open("w") as file:
+            with prep_files[0].open("r") as file:
                 prep = file.read().strip().lower()
                 if prep not in ["total", "mrna"]:
                     raise ValueError(f"Prep method must be either 'total' or 'mrna' for {label}")

@@ -340,11 +340,11 @@ def _build_with_imat(
 def _build_with_tinit(cobra_model: cobra.Model, s_matrix, lb, ub, expr_vector, solver, idx_force) -> Model:
     properties = tINITProperties(
         reactions_scores=expr_vector,
-        solver=solver,
         essential_reactions=idx_force,
         production_weight=0.0,
         allow_excretion=False,
         no_reverse_loops=True,
+        solver=solver,
     )
     algorithm = tINIT(s_matrix, lb, ub, properties)
     algorithm.preprocessing()
@@ -565,7 +565,6 @@ def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
     for column in df.columns:
         if column not in [
             "boundary",
-            "reaction",
             "abbreviation",
             "compartment",
             "minimum reaction rate",
@@ -577,7 +576,7 @@ def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
             )
 
     reactions: list[str] = [""] * len(df)
-    boundary_type: list[str] = df["reaction"].tolist()
+    boundary_type: list[str] = df["boundary"].tolist()
     reaction_abbreviation: list[str] = df["abbreviation"].tolist()
     reaction_compartment: list[str] = df["compartment"].tolist()
     lower_bound = df["minimum reaction rate"].tolist()
