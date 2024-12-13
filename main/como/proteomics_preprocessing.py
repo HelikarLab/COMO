@@ -129,13 +129,12 @@ def plot_gaussian_fit(z_results: ZResult, facet_titles: bool = True, x_min: int 
 
 
 # Main function for protein abundance transformation
-def protein_transform_main(
-    abundance_df: pd.DataFrame | str | Path,
-    output_gaussian_png_filepath: Path,
-    output_gaussian_html_filepath: Path,
-    output_z_score_matrix_filepath: Path,
-) -> None:
+def protein_transform_main(abundance_df: pd.DataFrame | str | Path, out_dir: str | Path, group_name: str) -> None:
     """Transform protein abundance data."""
+    out_dir: Path = Path(out_dir)
+    output_figure_directory = out_dir / "figures"
+    output_figure_directory.mkdir(parents=True, exist_ok=True)
+
     abundance_df: pd.DataFrame = (
         pd.read_csv(abundance_df) if isinstance(abundance_df, (str, Path)) else abundance_df.fillna(0)
     )
@@ -143,14 +142,10 @@ def protein_transform_main(
     z_transform: ZResult = z_score_calc(abundance_df, min_thresh=0)
 
     fig = plot_gaussian_fit(z_results=z_transform, facet_titles=True, x_min=-4)
-
-    if output_gaussian_png_filepath:
-        fig.write_image(output_gaussian_png_filepath.with_suffix(".png"))
-        logger.info(f"PNG gaussian figure written to {output_gaussian_png_filepath}")
-    if output_gaussian_html_filepath:
-        fig.write_html(output_gaussian_html_filepath.with_suffix(".html"))
-        logger.info(f"Interactive HTML gaussian figure written to {output_gaussian_png_filepath}")
+    fig.write_image(out_dir / "gaussian_fit.png")
+    fig.write_html(out_dir / "gaussian_fit.html")
+    logger.info(f"Wrote image to {out_dir / 'gaussian_fit.png'}")
 
     z_transformed_abundances = z_transform.zfpkm
     z_transformed_abundances[abundance_df == 0] = -4
-    z_transformed_abundances.to_csv(output_z_score_matrix_filepath, index=False)
+    z_transformed_abundances.to_csv(out_dir / f"protein_zscore_Matrix_{group_name}.csv", index=False)
