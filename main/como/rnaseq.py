@@ -27,9 +27,9 @@ from plotly.subplots import make_subplots
 from scipy.signal import find_peaks
 from sklearn.neighbors import KernelDensity
 
+from como.custom_types import RNASeqPreparationMethod
 from como.migrations import gene_info_migrations
 from como.project import Config
-from como.type import RNAPrepMethod
 from como.utils import convert_gene_data
 
 
@@ -528,7 +528,7 @@ def cpm_filter(
     context_name: str,
     metrics: NamedMetrics,
     filtering_options: _FilteringOptions,
-    prep: RNAPrepMethod,
+    prep: RNASeqPreparationMethod,
 ) -> NamedMetrics:
     """Apply Counts Per Million (CPM) filtering to the count matrix for a given sample."""
     config = Config()
@@ -666,7 +666,7 @@ def filter_counts(
     metrics: NamedMetrics,
     technique: FilteringTechnique,
     filtering_options: _FilteringOptions,
-    prep: RNAPrepMethod,
+    prep: RNASeqPreparationMethod,
     write_zfpkm_png_filepath: Path,
 ) -> NamedMetrics:
     """Filter the count matrix based on the specified technique."""
@@ -701,7 +701,7 @@ async def save_rnaseq_tests(
     config_filepath: Path,
     gene_info_filepath: Path,
     output_filepath: Path,
-    prep: RNAPrepMethod,
+    prep: RNASeqPreparationMethod,
     taxon_id: Taxon,
     replicate_ratio: float,
     batch_ratio: float,
@@ -720,7 +720,7 @@ async def save_rnaseq_tests(
         high_batch_ratio=high_batch_ratio,
     )
 
-    if prep == RNAPrepMethod.SCRNA:
+    if prep == RNASeqPreparationMethod.SCRNA:
         technique = FilteringTechnique.umi
         logger.warning(
             "Single cell filtration does not normalize and assumes "

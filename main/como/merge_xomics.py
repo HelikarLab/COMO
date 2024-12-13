@@ -16,8 +16,8 @@ from loguru import logger
 
 from como import proteomics_gen, return_placeholder_data
 from como.combine_distributions import _combine_zscores
+from como.custom_types import RNASeqPreparationMethod
 from como.project import Config
-from como.type import RNAPrepMethod
 from como.utils import split_gene_expression_data
 
 
@@ -93,7 +93,7 @@ class _Arguments:
             raise ValueError("Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'")
 
 
-def _load_rnaseq_tests(filename, context_name, prep_method: RNAPrepMethod) -> tuple[str, pd.DataFrame]:
+def _load_rnaseq_tests(filename, context_name, prep_method: RNASeqPreparationMethod) -> tuple[str, pd.DataFrame]:
     """Load rnaseq results.
 
     Returns a dictionary of test (context, context, cell, etc ) names and rnaseq expression data
@@ -112,11 +112,11 @@ def _load_rnaseq_tests(filename, context_name, prep_method: RNAPrepMethod) -> tu
         raise FileNotFoundError(f"Error: Config file not found at {inquiry_full_path}")
 
     match prep_method:
-        case RNAPrepMethod.TOTAL:
+        case RNASeqPreparationMethod.TOTAL:
             filename = f"rnaseq_total_{context_name}.csv"
-        case RNAPrepMethod.MRNA:
+        case RNASeqPreparationMethod.MRNA:
             filename = f"rnaseq_mrna_{context_name}.csv"
-        case RNAPrepMethod.SCRNA:
+        case RNASeqPreparationMethod.SCRNA:
             filename = f"rnaseq_scrna_{context_name}.csv"
         case _:
             raise ValueError(
@@ -344,9 +344,15 @@ async def _merge_xomics(
     config = Config()
     logger.info(f"Merging data for {context_name}")
     # load data for each source if it exists. IF not load an empty dummy dataset
-    trnaseq = _load_rnaseq_tests(filename=trnaseq_file, context_name=context_name, prep_method=RNAPrepMethod.TOTAL)
-    mrnaseq = _load_rnaseq_tests(filename=mrnaseq_file, context_name=context_name, prep_method=RNAPrepMethod.MRNA)
-    scrnaseq = _load_rnaseq_tests(filename=scrnaseq_file, context_name=context_name, prep_method=RNAPrepMethod.SCRNA)
+    trnaseq = _load_rnaseq_tests(
+        filename=trnaseq_file, context_name=context_name, prep_method=RNASeqPreparationMethod.TOTAL
+    )
+    mrnaseq = _load_rnaseq_tests(
+        filename=mrnaseq_file, context_name=context_name, prep_method=RNASeqPreparationMethod.MRNA
+    )
+    scrnaseq = _load_rnaseq_tests(
+        filename=scrnaseq_file, context_name=context_name, prep_method=RNASeqPreparationMethod.SCRNA
+    )
     proteomics = proteomics_gen.load_proteomics_tests(filename=proteomics_file, context_name=context_name)
 
     expression_list = []
