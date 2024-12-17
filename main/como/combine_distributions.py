@@ -62,375 +62,268 @@ class _CombineOmicsInput:
     weight: int
 
 
-
-def _combine_batch_zdistro(wd, context, batch, zmat):
-    plot_name_png = wd / "figures" / f"plot_{context}_{batch}_combine_distro.png"
-
-    def weighted_z(x):
-        floor_score = -6
-        ceil_score = 6
-        x = np.array(x, dtype=float)
+def _combine_batch_zdistro(
+    matrix: pd.DataFrame,
+    context_name: str,
+    batch_num: int,
+    output_png_filepath: Path,
+    weighted_z_floor: int = -6,
+    weighted_z_ceiling: int = 6,
+) -> pd.DataFrame:
+    def weighted_z(x: npt.NDArray[float], floor: int, ceiling: int) -> npt.NDArray[float]:
         result = np.sum(x) / np.sqrt(len(x))
-        return np.clip(result, floor_score, ceil_score)
+        return np.clip(result, floor, ceiling)
 
-    combine_z = zmat
-    if zmat.shape[1] > 2:
-        combine_z = np.apply_along_axis(weighted_z, axis=1, arr=zmat.iloc[:, 1:].values)
-        merge_df = pd.concat([zmat, pd.Series(combine_z, name="combined")], axis=1)
-        combine_z = pd.DataFrame({"entrez_gene_id": zmat["entrez_gene_id"].astype(str), "combine_z": combine_z})
+    if _num_rows(matrix) < 2:
+        return matrix
 
-        stack_df = pd.concat(
-            [
-                pd.DataFrame(
-                    {"entrez_gene_id": merge_df["entrez_gene_id"], "zscore": merge_df[col].astype(float), "source": col}
-                )
-                for col in merge_df.columns[1:]
-            ]
-        )
-
-        # Simplified plot for many sources (optional)
-        if len(stack_df["source"].unique()) > 10:
-            stack_df = stack_df[stack_df["source"] == "combined"]
-
-        fig = px.histogram(
-            stack_df,
-            x="zscore",
-            color="source",
-            nbins=100,
-            marginal="rug",
-            title=f"Combined Z-score Distribution for {context} - {batch}",
-        )
-        fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font={"family": "sans-serif", "size": 12})
-        fig.write_image(plot_name_png)
-
-    return combine_z
-
-
-def _combine_context_zdistro(wd, context, n_reps, zmat):
-    plot_name_png = wd / "figures" / f"plot_{context}_combine_batches_distro.png"
-
-    def weighted_z(x, n_reps):
-        floor_score = -6
-        ceil_score = 6
-        x = np.array(x, dtype=float)
-        nas = np.where(np.isnan(x))[0]
-        if len(nas) > 0:
-            x = np.delete(x, nas)
-            n_reps = np.delete(n_reps, nas)
-        weights = n_reps / np.sum(n_reps)
-        numer = np.sum(weights * x)
-        denom = np.sqrt(np.sum(weights**2))
-        result = numer / denom
-        return np.clip(result, floor_score, ceil_score)
-
-    if zmat.shape[1] > 2:
-        combine_z = np.apply_along_axis(weighted_z, axis=1, arr=zmat.iloc[:, 1:].values, n_reps=n_reps)
-        merge_df = pd.concat([zmat, pd.Series(combine_z, name="combined")], axis=1)
-        combine_z = pd.DataFrame({"entrez_gene_id": zmat["entrez_gene_id"].astype(str), "combine_z": combine_z})
-
-        stack_df = pd.concat(
-            [
-                pd.DataFrame(
-                    {"entrez_gene_id": merge_df["entrez_gene_id"], "zscore": merge_df[col].astype(float), "source": col}
-                )
-                for col in merge_df.columns[1:]
-            ]
-        )
-
-        fig = px.histogram(
-            stack_df,
-            x="zscore",
-            color="source",
-            nbins=100,  # Adjust as needed
-            marginal="rug",
-            title=f"Combined Batches Z-score Distribution for {context}",
-        )
-
-        fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font=dict(family="sans-serif", size=12))  # noqa: C408
-
-        fig.write_image(plot_name_png)
-
-    else:
-        combine_z = zmat
-        combine_z.columns = ["entrez_gene_id", "combine_z"]
-
-    return combine_z
-
-
-def _combine_omics_zdistros(
-    wd,
-    context,
-    comb_batches_z_trna,
-    comb_batches_z_mrna,
-    comb_batches_z_scrna,
-    comb_batches_z_prot,
-    trna_weight: int,
-    mrna_weight: int,
-    scrna_weight: int,
-    proteomics_weight: int,
-    keep_gene_scores=True,
-):
-    fig_path = wd / context / "figures"
-    if not fig_path.exists():
-        fig_path.mkdir(parents=True)
-    plot_name_png = fig_path / f"plot_{context}_combine_omics_distro.png"
-
-    weights = []
-    names = []
-    dfs = []
-    counter = 0
-    if comb_batches_z_trna is not None:
-        counter += 1
-        weights.append(trna_weight)
-        names.append("total")
-        dfs.append(comb_batches_z_trna)
-    if comb_batches_z_mrna is not None:
-        counter += 1
-        weights.append(mrna_weight)
-        names.append("polyA")
-        dfs.append(comb_batches_z_mrna)
-    if comb_batches_z_scrna is not None:
-        counter += 1
-        weights.append(scrna_weight)
-        names.append("singleCell")
-        dfs.append(comb_batches_z_scrna)
-    if comb_batches_z_prot is not None:
-        counter += 1
-        weights.append(proteomics_weight)
-        names.append("proteome")
-        dfs.append(comb_batches_z_prot)
-
-    def weighted_z(x, weights):
-        floor_score = -6
-        ceil_score = 10
-        x = np.array(x, dtype=float)
-        nas = np.where(np.isnan(x))[0]
-        if len(nas) > 0:
-            x = np.delete(x, nas)
-            weights = np.delete(weights, nas)
-        weights = weights / np.sum(weights)
-        numer = np.sum(weights * x)
-        denom = np.sqrt(np.sum(weights**2))
-        result = numer / denom
-        return np.clip(result, floor_score, ceil_score)
-
-    zmat = dfs[0].copy()
-    zmat.columns = ["entrez_gene_id", names[0]]
-    for i in range(1, counter):
-        add_df = dfs[i]
-        add_df.columns = ["entrez_gene_id", names[i]]
-        zmat = pd.merge(zmat, add_df, on="entrez_gene_id", how="outer")
-
-    if zmat.shape[1] > 2:
-        combine_z = np.apply_along_axis(weighted_z, axis=1, arr=zmat.iloc[:, 1:].values, weights=weights)
-    else:
-        combine_z = zmat.iloc[:, 1:].values
-
-    combine_z = combine_z.ravel()
-    merge_df = pd.concat([zmat, pd.Series(combine_z, name="combined")], axis=1)
-    combine_z = pd.DataFrame({"entrez_gene_id": zmat["entrez_gene_id"].astype(str), "combine_z": combine_z})
+    weighted_matrix = np.apply_along_axis(
+        weighted_z,
+        axis=1,
+        arr=matrix.iloc[:, 1:].values,
+        floor=weighted_z_floor,
+        ceiling=weighted_z_ceiling,
+    )
+    merge_df = pd.concat([matrix, pd.Series(weighted_matrix, name="combined")], axis=1)
+    weighted_matrix = pd.DataFrame(
+        {
+            "ensembl_gene_id": matrix["ensembl_gene_id"].astype(str),
+            "combine_z": weighted_matrix,
+        },
+    )
 
     stack_df = pd.concat(
         [
             pd.DataFrame(
-                {"entrez_gene_id": merge_df["entrez_gene_id"], "zscore": merge_df[col].astype(float), "source": col}
+                {"ensembl_gene_id": merge_df["ensembl_gene_id"], "zscore": merge_df[col].astype(float), "source": col}
+            )
+            for col in merge_df.columns[1:]
+        ]
+    )
+    if len(stack_df["source"].unique()) > 10:
+        stack_df = stack_df[stack_df["source"] == "combined"]
+
+    graph.z_score_distribution(
+        stack_df,
+        title=f"Combined Z-score Distribution for {context_name} - batch #{batch_num}",
+        output_png_filepath=output_png_filepath,
+    )
+    return weighted_matrix
+
+
+def _combine_context_zdistro(
+    matrix: pd.DataFrame,
+    context_name: str,
+    batch_num: int,
+    num_replicates: int,
+    output_png_filepath: Path,
+    weighted_z_floor: int = -6,
+    weighted_z_ceiling: int = 6,
+):
+    def weighted_z(
+        x: npt.NDArray[float],
+        n_reps: int,
+        floor: int,
+        ceiling: int,
+    ) -> npt.NDArray[float]:
+        na_values = np.where(np.isnan(x))[0]
+        if len(na_values) > 0:
+            x = np.delete(x, na_values)
+            n_reps = np.delete(n_reps, na_values)
+        weights = n_reps / np.sum(n_reps)
+        numerator = np.sum(weights * x)
+        denominator = np.sqrt(np.sum(weights**2))
+        result = numerator / denominator
+        return np.clip(result, floor, ceiling)
+
+    if _num_rows(matrix) < 2:
+        matrix.columns = ["entrez_gene_id", "combine_z"]
+        return matrix
+
+    weighted_matrix = np.apply_along_axis(
+        weighted_z,
+        axis=1,
+        arr=matrix.iloc[:, 1:].values,
+        n_reps=num_replicates,
+        floor=weighted_z_floor,
+        ceiling=weighted_z_ceiling,
+    )
+    merge_df = pd.concat([matrix, pd.Series(weighted_matrix, name="combined")], axis=1)
+    weighted_matrix = pd.DataFrame(
+        {"ensembl_gene_id": matrix["ensembl_gene_id"].astype(str), "combine_z": weighted_matrix}
+    )
+    stack_df = pd.concat(
+        [
+            pd.DataFrame(
+                {"ensembl_gene_id": merge_df["ensembl_gene_id"], "zscore": merge_df[col].astype(float), "source": col}
+                for col in merge_df.columns[1:]
+            )
+        ]
+    )
+    graph.z_score_distribution(
+        df=stack_df,
+        title=f"Combined Z-score Distribution for {context_name} - batch #{batch_num}",
+        output_png_filepath=output_png_filepath,
+    )
+    return weighted_matrix
+
+
+def _combine_omics_zdistros(
+    context: str,
+    zscore_results: list[_CombineOmicsInput],
+    output_png_filepath: Path,
+    weighted_z_floor: int = -6,
+    weighted_z_ceiling: int = 6,
+):
+    def weighted_z(
+        x: npt.NDArray[float],
+        weights,
+        floor: int,
+        ceiling: int,
+    ):
+        na_values = np.where(np.isnan(x))[0]
+        if len(na_values) > 0:
+            x = np.delete(x, na_values)
+            weights = np.delete(weights, na_values)
+        weights = weights / np.sum(weights)
+        numerator = np.sum(weights * x)
+        denominator = np.sqrt(np.sum(weights**2))
+        result = numerator / denominator
+        return np.clip(result, floor, ceiling)
+
+    z_matrix = pd.DataFrame()
+    for result in zscore_results:
+        result.z_score_matrix.columns = ["ensembl_gene_id", result.type]
+        z_matrix = (
+            result.z_score_matrix
+            if z_matrix.empty
+            else pd.merge(z_matrix, result.z_score_matrix, on="ensembl_gene_id", how="outer")
+        )
+
+    combined_z_matrix = (
+        np.apply_along_axis(
+            weighted_z,
+            axis=1,
+            arr=z_matrix.iloc[:, 1:].values,
+            weights=[r.weight for r in zscore_results],
+            floor=weighted_z_floor,
+            ceiling=weighted_z_ceiling,
+        )
+        if _num_rows(z_matrix) > 2
+        else z_matrix.iloc[:, 1:].values
+    ).ravel()
+    merge_df = pd.concat([z_matrix, pd.Series(combined_z_matrix, name="combined")], axis=1)
+    combined_z_matrix = pd.DataFrame(
+        {
+            "ensembl_gene_id": z_matrix["ensembl_gene_id"].astype(str),
+            "combine_z": combined_z_matrix,
+        }
+    )
+
+    stack_df = pd.concat(
+        [
+            pd.DataFrame(
+                {
+                    "ensembl_gene_id": merge_df["ensembl_gene_id"],
+                    "zscore": merge_df[col].astype(float),
+                    "source": col,
+                }
             )
             for col in merge_df.columns[1:]
         ]
     )
 
-    fig = px.histogram(
-        stack_df,
-        x="zscore",
-        color="source",
-        nbins=100,  # Adjust as needed
-        marginal="rug",
+    graph.z_score_distribution(
+        df=stack_df,
         title=f"Combined Omics Z-score Distribution for {context}",
+        output_png_filepath=output_png_filepath,
     )
-
-    fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font={"family": "sans-serif", "size": 12})
-
-    fig.write_image(plot_name_png)
-
-    return combine_z
+    return combined_z_matrix
 
 
-def _combine_zscores(  # noqa: C901
-    working_dir,
-    context_names,
-    global_use_mrna,
-    global_use_trna,
-    global_use_scrna,
-    global_use_proteins,
-    keep_gene_scores,
-    global_trna_weight,
-    global_mrna_weight,
-    global_scrna_weight,
-    global_protein_weight,
+def _combine_zscores(
+    context_name: str,
+    input_matrices: _InputMatrices,
+    batch_names: _BatchNames,
+    source_weights: _SourceWeights,
+    output_filepaths: _OutputCombinedSourceFilepath,
+    output_figure_dirpath: Path,
+    output_final_model_scores: Path,
+    weighted_z_floor: int = -6,
+    weighted_z_ceiling: int = 6,
 ):
-    working_dir = Path(working_dir)
-    figure_output_dir = working_dir / "figures"
-    figure_output_dir.mkdir(parents=True, exist_ok=True)
+    output_figure_dirpath.mkdir(parents=True, exist_ok=True)
+    source_name: list[str] = ["totalrna", "mrna", "scrna", "proteomics"]
+    zscore_results: list[_CombineOmicsInput] = []
+    for matrix, source in zip(input_matrices, source_name):
+        matrix: pd.DataFrame | None = pd.read_csv(matrix) if isinstance(matrix, Path) else matrix
 
-    global_trna_batches = _parse_contexts_zfpkm(working_dir, context_names, "total")
-    global_mrna_batches = _parse_contexts_zfpkm(working_dir, context_names, "mrna")
-    global_scrna_batches = _parse_contexts_zumi(working_dir, context_names, "scrna")
-    global_protein_batches = _parse_contexts_zscore_prot(working_dir, context_names)
+        if matrix is not None:
+            if source == "totalrna":
+                batch_data = batch_names.trna
+                weight = source_weights.trna
+                output_filepath = output_filepaths.trna
+            elif source == "mrna":
+                batch_data = batch_names.mrna
+                weight = source_weights.mrna
+                output_filepath = output_filepaths.mrna
+            elif source == "scrna":
+                batch_data = batch_names.scrna
+                weight = source_weights.scrna
+                output_filepath = output_filepaths.scrna
+            elif source == "proteomics":
+                batch_data = batch_names.proteomics
+                weight = source_weights.proteomics
+                output_filepath = output_filepaths.proteomics
+            else:
+                raise ValueError(f"Invalid source; got '{source}', expected one of '{','.join(source_name)}'")
 
-    for context in context_names:
-        context_use_trna = global_use_trna
-        context_use_mrna = global_use_mrna
-        context_use_scrna = global_use_scrna
-        context_use_proteins = global_use_proteins
-
-        context_trna_batch = global_trna_batches.get(context, [])
-        if len(context_trna_batch) == 0 and global_use_trna:
-            context_use_trna = False
-            logger.warning(f"No total RNA-seq zFPKM Matrix files found for {context}. Will not use for this context.")
-
-        context_mrna_batch = global_mrna_batches.get(context, [])
-        if len(context_mrna_batch) == 0 and global_use_mrna:
-            context_use_mrna = False
-            logger.warning(f"No polyA RNA-seq zFPKM Matrix files found for {context}. Will not use for this context.")
-
-        context_scrna_batch = global_scrna_batches.get(context, [])
-        if len(context_scrna_batch) == 0 and global_use_scrna:
-            context_use_scrna = False
-            logger.warning(f"No SC RNA-seq zFPKM Matrix files found for {context}. Will not use for this context.")
-
-        context_protein_batch = global_protein_batches.get(context, [])
-        if len(context_protein_batch) == 0 and global_use_proteins:
-            context_use_proteins = False
-            logger.warning(f"No proteomics z-score Matrix files found for {context}. Will not use for this context.")
-
-        comb_batches_z_trna = None
-        if context_use_trna:
-            logger.info("Will merge total RNA-seq distributions")
-            trna_workdir = working_dir / context / "total"
-            num_reps = []
+            replicate_count: list[int] = []
             merge_z_data = pd.DataFrame()
 
-            for batch in context_trna_batch:
-                res = _merge_batch(trna_workdir, context, batch)
-                z_matrix = res[0]
-                num_reps.extend(res[1])
-                combine_z_matrix = _combine_batch_zdistro(trna_workdir, context, batch, z_matrix)
-                combine_z_matrix.columns = ["entrez_gene_id", batch]
+            batch: _BatchEntry
+            for batch in batch_data:
+                replicate_count.append(len(batch.sample_names))
+
+                batch_df: pd.DataFrame = matrix[["ensembl_gene_id", *batch.sample_names]]
+                # graph.z_score_distribution(
+                #     batch_df,
+                #     title=f"Z-Score Distribution for {context_name} - batch #{batch.batch_num} - {source}",
+                #     output_png_filepath=output_figure_dirpath
+                #     / f"{source}_batch{batch.batch_num}_zscore_distribution.png",
+                # )
+                combine_z_matrix: pd.DataFrame = _combine_batch_zdistro(
+                    matrix=batch_df,
+                    context_name=context_name,
+                    batch_num=batch.batch_num,
+                    output_png_filepath=(
+                        output_figure_dirpath
+                        / f"combined_{source}_{context_name}_batch{batch.batch_num}_distribution.png"
+                    ),
+                    weighted_z_floor=weighted_z_floor,
+                    weighted_z_ceiling=weighted_z_ceiling,
+                )
+                combine_z_matrix.columns = ["ensembl_gene_id", batch.batch_num]
                 merge_z_data = (
                     combine_z_matrix
                     if merge_z_data.empty
-                    else pd.merge(merge_z_data, combine_z_matrix, on="entrez_gene_id", how="outer")
+                    else pd.merge(merge_z_data, combine_z_matrix, on="ensembl_gene_id", how="outer")
                 )
-
-            comb_batches_z_trna = _combine_context_zdistro(trna_workdir, context, num_reps, merge_z_data)
-            filename = trna_workdir / f"combined_zFPKM_{context}.csv"
-            comb_batches_z_trna.to_csv(filename, index=False)
-
-            if not context_use_proteins and not context_use_mrna and not context_use_scrna:
-                filename = trna_workdir / f"model_scores_{context}.csv"
-                comb_batches_z_trna.to_csv(filename, index=False)
-
-        comb_batches_z_mrna = None
-        if context_use_mrna:
-            logger.info("Will merge polyA enriched RNA-seq distributions")
-            mrna_workdir = working_dir / context / "mrna"
-            num_reps = []
-            merge_z_data = pd.DataFrame()
-            for batch in context_mrna_batch:
-                res = _merge_batch(mrna_workdir, context, batch)
-                z_matrix = res[0]
-                num_reps.extend(res[1])
-                combine_z_matrix = _combine_batch_zdistro(mrna_workdir, context, batch, z_matrix)
-                combine_z_matrix.columns = ["entrez_gene_id", batch]
-                merge_z_data = (
-                    combine_z_matrix
-                    if merge_z_data.empty
-                    else pd.merge(merge_z_data, combine_z_matrix, on="entrez_gene_id", how="outer")
-                )
-
-            comb_batches_z_mrna = _combine_context_zdistro(mrna_workdir, context, num_reps, merge_z_data)
-            filename = mrna_workdir / f"combined_zFPKM_{context}.csv"
-            comb_batches_z_mrna.to_csv(filename, index=False)
-
-            if not context_use_proteins and not context_use_trna and not context_use_scrna:
-                filename = mrna_workdir / f"model_scores_{context}.csv"
-                comb_batches_z_mrna.to_csv(filename, index=False)
-
-        comb_batches_z_scrna = None
-        if context_use_scrna:
-            logger.info(f"Will merge single-cell RNA-seq distributions for {context}")
-            scrna_workdir = working_dir / context / "scrna"
-            num_reps = []
-            merge_z_data = pd.DataFrame()
-            for batch in context_scrna_batch:
-                res = _merge_batch(scrna_workdir, context, batch)
-                z_matrix = res[0]
-                num_reps.extend(res[1])
-                combine_z_matrix = _combine_batch_zdistro(scrna_workdir, context, batch, z_matrix)
-                combine_z_matrix.columns = ["entrez_gene_id", batch]
-                merge_z_data = (
-                    combine_z_matrix
-                    if merge_z_data.empty
-                    else pd.merge(merge_z_data, combine_z_matrix, on="entrez_gene_id", how="outer")
-                )
-
-            comb_batches_z_scrna = _combine_context_zdistro(scrna_workdir, context, num_reps, merge_z_data)
-            filename = scrna_workdir / f"combined_zFPKM_{context}.csv"
-            comb_batches_z_scrna.to_csv(filename, index=False)
-
-            if not context_use_proteins and not context_use_trna and not context_use_mrna:
-                filename = scrna_workdir / f"model_scores_{context}.csv"
-                comb_batches_z_scrna.to_csv(filename, index=False)
-
-        comb_batches_z_prot = None
-        if context_use_proteins:
-            logger.info("Will merge protein abundance distributions")
-            protein_workdir = working_dir / context / "proteomics"
-            num_reps = []
-            merge_z_data = pd.DataFrame()
-            for batch in context_protein_batch:
-                res = _merge_batch(protein_workdir, context, batch)
-                z_matrix = res[0]
-                num_reps.extend(res[1])
-                combine_z_matrix = _combine_batch_zdistro(protein_workdir, context, batch, z_matrix)
-                combine_z_matrix.columns = ["entrez_gene_id", batch]
-                merge_z_data = (
-                    combine_z_matrix
-                    if merge_z_data.empty
-                    else pd.merge(merge_z_data, combine_z_matrix, on="entrez_gene_id", how="outer")
-                )
-
-            comb_batches_z_prot = _combine_context_zdistro(protein_workdir, context, num_reps, merge_z_data)
-            filename = protein_workdir / f"combined_zscore_proteinAbundance_{context}.csv"
-            comb_batches_z_prot.to_csv(filename, index=False)
-
-            if not context_use_mrna and not context_use_trna and not context_use_scrna:
-                filename = protein_workdir / f"model_scores_{context}.csv"
-                comb_batches_z_prot.to_csv(filename, index=False)
-
-        if (
-            comb_batches_z_mrna is None
-            and comb_batches_z_trna is None
-            and comb_batches_z_scrna is None
-            and comb_batches_z_prot is None
-        ):
-            logger.critical(
-                f"The context '{context}' was found in the configuration file but no data was found on disk!"
+            combine_batches_zscore = _combine_context_zdistro(
+                matrix=merge_z_data,
+                context_name=context_name,
+                batch_num=batch.batch_num,
+                num_replicates=sum(replicate_count),
+                output_png_filepath=output_figure_dirpath / f"totalrna_{context_name}_combined_distribution.png",
+                weighted_z_floor=weighted_z_floor,
+                weighted_z_ceiling=weighted_z_ceiling,
             )
-            continue
+            zscore_results.append(_CombineOmicsInput(z_score_matrix=combine_batches_zscore, type=source, weight=weight))  # type: ignore
+            combine_batches_zscore.to_csv(output_filepath, index=False)
 
-        comb_omics_z = _combine_omics_zdistros(
-            wd=working_dir,
-            context=context,
-            comb_batches_z_trna=comb_batches_z_trna,
-            comb_batches_z_mrna=comb_batches_z_mrna,
-            comb_batches_z_scrna=comb_batches_z_scrna,
-            comb_batches_z_prot=comb_batches_z_prot,
-            trna_weight=global_trna_weight,
-            mrna_weight=global_mrna_weight,
-            scrna_weight=global_scrna_weight,
-            proteomics_weight=global_protein_weight,
-        )
-
-        filename = working_dir / context / f"model_scores_{context}.csv"
-        comb_omics_z.to_csv(filename, index=False)
+    combined_z_omics = _combine_omics_zdistros(
+        context=context_name,
+        zscore_results=zscore_results,
+        output_png_filepath=output_figure_dirpath / f"{context_name}_combined_omics_distribution.png",
+    )
+    combined_z_omics.to_csv(output_final_model_scores, index=False)
