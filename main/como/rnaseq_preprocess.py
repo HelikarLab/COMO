@@ -578,12 +578,12 @@ async def rnaseq_preprocess(
     output_gene_info_filepath: Path,
     como_context_dir: Path | None = None,
     input_matrix_filepath: Path | list[Path] | None = None,
-    output_trna_config_filepath: Path | None = None,
-    output_mrna_config_filepath: Path | None = None,
+    output_trna_metadata_filepath: Path | None = None,
+    output_mrna_metadata_filepath: Path | None = None,
     output_trna_count_matrix_filepath: Path | None = None,
     output_mrna_count_matrix_filepath: Path | None = None,
     cache: bool = True,
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO",
+    log_level: LOG_LEVEL = "INFO",
     log_location: str | TextIOWrapper = sys.stderr,
 ) -> None:
     """Preprocesses RNA-seq data for downstream analysis.
@@ -594,8 +594,8 @@ async def rnaseq_preprocess(
     :param context_name: The context/cell type being processed
     :param taxon: The NCBI taxonomy ID
     :param output_gene_info_filepath: Path to the output gene information CSV file
-    :param output_trna_config_filepath: Path to the output tRNA config file (if in "create" mode)
-    :param output_mrna_config_filepath: Path to the output mRNA config file (if in "create" mode)
+    :param output_trna_metadata_filepath: Path to the output tRNA config file (if in "create" mode)
+    :param output_mrna_metadata_filepath: Path to the output mRNA config file (if in "create" mode)
     :param output_trna_count_matrix_filepath: The path to write total RNA count matrices
     :param output_mrna_count_matrix_filepath: The path to write messenger RNA count matrices
     :param como_context_dir: If in "create" mode, the input path(s) to the COMO_input directory of the current context
@@ -616,11 +616,11 @@ async def rnaseq_preprocess(
     output_gene_info_filepath = output_gene_info_filepath.resolve()
     como_context_dir = como_context_dir.resolve()
     input_matrix_filepath = [i.resolve() for i in _listify(input_matrix_filepath)] if input_matrix_filepath else None
-    output_trna_config_filepath = (
-        output_trna_config_filepath.resolve() if output_trna_config_filepath else output_trna_config_filepath
+    output_trna_metadata_filepath = (
+        output_trna_metadata_filepath.resolve() if output_trna_metadata_filepath else output_trna_metadata_filepath
     )
-    output_mrna_config_filepath = (
-        output_mrna_config_filepath.resolve() if output_mrna_config_filepath else output_mrna_config_filepath
+    output_mrna_metadata_filepath = (
+        output_mrna_metadata_filepath.resolve() if output_mrna_metadata_filepath else output_mrna_metadata_filepath
     )
     output_trna_count_matrix_filepath = (
         output_trna_count_matrix_filepath.resolve()
@@ -640,8 +640,8 @@ async def rnaseq_preprocess(
         como_context_dir=como_context_dir,
         input_matrix_filepath=input_matrix_filepath,
         output_gene_info_filepath=output_gene_info_filepath,
-        output_trna_config_filepath=output_trna_config_filepath,
-        output_mrna_config_filepath=output_mrna_config_filepath,
+        output_trna_config_filepath=output_trna_metadata_filepath,
+        output_mrna_config_filepath=output_mrna_metadata_filepath,
         output_trna_matrix_filepath=output_trna_count_matrix_filepath,
         output_mrna_matrix_filepath=output_mrna_count_matrix_filepath,
         cache=cache,
