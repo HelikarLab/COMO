@@ -12,8 +12,8 @@ from como import return_placeholder_data
 from como.combine_distributions import (
     _BatchEntry,
     _BatchNames,
+    _combine_zscores,
     _InputMatrices,
-    _new_combine_zscores,
     _OutputCombinedSourceFilepath,
     _SourceWeights,
 )
@@ -338,7 +338,6 @@ async def _process(
     weighted_z_ceiling: int,
     adjust_method: AdjustmentMethod,
     merge_zfpkm_distribution: bool,
-    keep_gene_score: bool,
     force_activate_high_confidence: bool,
     adjust_for_missing_sources: bool,
     output_merge_activity_filepath: Path,
@@ -354,7 +353,7 @@ async def _process(
     num_sources = sum(1 for source in [trna_matrix, mrna_matrix, scrna_matrix, proteomic_matrix] if source is not None)
 
     if merge_zfpkm_distribution:
-        _new_combine_zscores(
+        _combine_zscores(
             context_name=context_name,
             input_matrices=_InputMatrices(
                 trna=trna_matrix,
@@ -382,7 +381,6 @@ async def _process(
             ),
             output_figure_dirpath=output_figure_dirpath,
             output_final_model_scores=output_final_model_scores_filepath,
-            keep_gene_scores=keep_gene_score,
             weighted_z_floor=weighted_z_floor,
             weighted_z_ceiling=weighted_z_ceiling,
         )
@@ -470,7 +468,6 @@ async def merge_xomics(  # noqa: C901
     force_activate_high_confidence: bool = False,
     adjust_for_na: bool = False,
     merge_zfpkm_distribution: bool = False,
-    keep_transcriptomics_score: bool = True,
     weighted_z_floor: int = -6,
     weighted_z_ceiling: int = -6,
 ):
@@ -588,7 +585,6 @@ async def merge_xomics(  # noqa: C901
         weighted_z_ceiling=weighted_z_ceiling,
         adjust_method=adjust_method,
         merge_zfpkm_distribution=merge_zfpkm_distribution,
-        keep_gene_score=keep_transcriptomics_score,
         force_activate_high_confidence=force_activate_high_confidence,
         adjust_for_missing_sources=adjust_for_na,
         output_merge_activity_filepath=output_merge_activity_filepath,
