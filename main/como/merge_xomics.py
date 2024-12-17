@@ -1,11 +1,5 @@
 from __future__ import annotations
 
-import argparse
-import json
-import re
-import sys
-from collections import Counter
-from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
@@ -14,11 +8,17 @@ import pandas as pd
 from fast_bioservices.biothings.mygene import MyGene
 from loguru import logger
 
-from como import proteomics_gen, return_placeholder_data
-from como.combine_distributions import _combine_zscores
+from como import return_placeholder_data
+from como.combine_distributions import (
+    _BatchEntry,
+    _BatchNames,
+    _InputMatrices,
+    _new_combine_zscores,
+    _OutputCombinedSourceFilepath,
+    _SourceWeights,
+)
+from como.data_types import RNAPrepMethod
 from como.project import Config
-from como.types import RNAPrepMethod
-from como.utils import split_gene_expression_data
 
 
 class _MergedHeaderNames:
