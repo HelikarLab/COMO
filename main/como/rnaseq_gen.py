@@ -25,9 +25,9 @@ from plotly.subplots import make_subplots
 from scipy.signal import find_peaks
 from sklearn.neighbors import KernelDensity
 
+from como.data_types import FilteringTechnique, RNAPrepMethod
 from como.migrations import gene_info_migrations
 from como.project import Config
-from como.types import FilteringTechnique, RNAPrepMethod
 
 
 class _FilteringOptions(NamedTuple):
