@@ -59,10 +59,7 @@ class AdjustmentMethod(Enum):
 
 
 def _load_rnaseq_tests(filename, context_name, prep_method: RNAPrepMethod) -> tuple[str, pd.DataFrame]:
-    """Load rnaseq results.
-
-    Returns a dictionary of test (context, context, cell, etc ) names and rnaseq expression data
-    """
+    """Load rnaseq results."""
     config = Config()
 
     def load_dummy_dict():
@@ -111,7 +108,6 @@ def _merge_logical_table(df: pd.DataFrame):
     """
     # step 1: get all plural ENTREZ_GENE_IDs in the input table, extract unique IDs
 
-    df.reset_index(drop=False, inplace=True)
     df.dropna(axis=0, subset=["entrez_gene_id"], inplace=True)
     df["entrez_gene_id"] = df["entrez_gene_id"].astype(str).str.replace(" /// ", "//").astype(str)
 
@@ -164,7 +160,6 @@ def _merge_logical_table(df: pd.DataFrame):
     for merged_entrez_id, entrez_dups_list in entrez_dups_dict.items():
         df["entrez_gene_id"].replace(to_replace=entrez_dups_list, value=merged_entrez_id, inplace=True)
 
-    df.set_index("entrez_gene_id", inplace=True)
     df = df.fillna(-1).groupby(level=0).max()
     df.replace(-1, np.nan, inplace=True)
 
