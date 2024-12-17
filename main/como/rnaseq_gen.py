@@ -239,7 +239,7 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
     return metrics
 
 
-def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
+def _calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
     """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary."""  # noqa: E501
     for study in metrics:
         matrix_values = []
@@ -568,12 +568,12 @@ def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
     return metrics
 
 
-def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions, calcualte_fpkm: bool) -> NamedMetrics:
+def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions, calculate_fpkm: bool) -> NamedMetrics:
     """Apply zFPKM filtering to the FPKM matrix for a given sample."""
     min_sample_expression = filtering_options.replicate_ratio
     high_confidence_sample_expression = filtering_options.high_replicate_ratio
     cut_off = filtering_options.cut_off
-    metrics = calculate_fpkm(metrics) if calcualte_fpkm else metrics
+    metrics = _calculate_fpkm(metrics) if calculate_fpkm else metrics
 
     metric: _StudyMetrics
     for metric in metrics.values():
@@ -618,9 +618,9 @@ def filter_counts(
         case FilteringTechnique.tpm:
             return tpm_quantile_filter(metrics=metrics, filtering_options=filtering_options)
         case FilteringTechnique.zfpkm:
-            return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calcualte_fpkm=True)
+            return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calculate_fpkm=True)
         case FilteringTechnique.umi:
-            return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calcualte_fpkm=False)
+            return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calculate_fpkm=False)
         case _:
             raise ValueError(f"Technique must be one of {FilteringTechnique}")
 
