@@ -8,8 +8,6 @@ from typing import Literal, NamedTuple
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-import plotly.express as px
-from loguru import logger
 
 from como import graph
 from como.utils import _num_rows
