@@ -201,11 +201,11 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame, taxon_id: int) ->
     transcriptomic_df: pd.DataFrame = merged_df.copy()
     if _ExpressedHeaderNames.PROTEOMICS in merged_df.columns:
         # Get the number of sources required for a gene to be marked "expressed"
-        required_expression = merged_df["Required"].iloc[0]
+        required_expression = merged_df["required"].iloc[0]
 
         # Subtract 1 from merged_df["TotalExpressed"] if the current value is greater than or equal to 1
         # This is done to take into account the removal of proteomic expression
-        merged_df["TotalExpressed"] = merged_df["TotalExpressed"].apply(lambda x: x - 1 if x >= 1 else x)
+        merged_df["total_expressed"] = merged_df["total_expressed"].apply(lambda x: x - 1 if x >= 1 else x)
 
         # Subtract required_expression by 1 if it is greater than 1
         if required_expression > 1:
@@ -222,8 +222,8 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame, taxon_id: int) ->
         # Must recalculate TotalExpressed because proteomic data was removed
         # If the TotalExpressed column is less than the Required column, set active to 1, otherwise set it to 0
         transcriptomic_df.loc[
-            transcriptomic_df["TotalExpressed"] >= transcriptomic_df["Required"],
-            "Active",
+            transcriptomic_df["total_expressed"] >= transcriptomic_df["required"],
+            "active",
         ] = 1
 
     my_gene = MyGene()
@@ -332,16 +332,16 @@ async def _merge_xomics(
         )
         merge_data = prote_data if merge_data is None else merge_data.join(prote_data, how="outer")
 
-    if merge_data is None:
+    if merge_data.empty:
         logger.critical(
             f"No data is available for the '{context_name}' context. If this is intentional, ignore this error."
         )
         return {}
-    merge_data = _merge_logical_table(merge_data)
 
+    merge_data = _merge_logical_table(merge_data)
     num_sources = len(expression_list)
-    merge_data["Active"] = 0
-    merge_data["Required"] = 0
+    merge_data["active"] = 0
+    merge_data["required"] = 0
 
     if no_na:  # dont adjust for na values
         merge_data.loc[:, "Required"] = merge_data[expression_list].apply(
@@ -357,8 +357,6 @@ async def _merge_xomics(
         )
 
     # count number of sources gene is active in. Set to active in final output if at least adjusted expression reqirmnt
-    merge_data["TotalExpressed"] = merge_data[expression_list].sum(axis=1)
-    merge_data.loc[merge_data["TotalExpressed"] >= merge_data["Required"], "Active"] = 1
 
     if not no_hc:  # set genes that are high-confidence in at least one data source to active
         merge_data.loc[merge_data[high_confidence_list].sum(axis=1) > 0, "Active"] = 1
@@ -375,6 +373,8 @@ async def _merge_xomics(
     split_entrez = split_gene_expression_data(merge_data)
     split_entrez.to_csv(filepath, index_label="entrez_gene_id")
     files_dict = {context_name: filepath.as_posix()}
+    merge_data["total_expressed"] = merge_data[expression_list].sum(axis=1)
+    merge_data.loc[merge_data["total_expressed"] >= merge_data["required"], "active"] = 1
 
     transcriptomic_details = await _get_transcriptmoic_details(merge_data)
     transcriptomic_details_filepath = filepath.parent / f"TranscriptomicDetails_{context_name}.csv"
