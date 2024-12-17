@@ -144,11 +144,16 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
     return new_list
 
 
-def split_gene_expression_data(expression_data: pd.DataFrame, recon_algorithm: Algorithm | None = None):
+def split_gene_expression_data(
+    expression_data: pd.DataFrame,
+    recon_algorithm: Algorithm | None = None,
+    entrez_as_index: bool = True,
+):
     """Split the gene expression data into single-gene and multiple-gene names.
 
     :param expression_data: The gene expression data to map
     :param recon_algorithm: The recon algorithm used to generate the gene expression data
+    :param entrez_as_index: Should the 'entrez_gene_id' column be set as the index
     :return:
     """
     expression_data.columns = [c.lower() for c in expression_data.columns]
@@ -156,15 +161,15 @@ def split_gene_expression_data(expression_data: pd.DataFrame, recon_algorithm: A
         expression_data.rename(columns={"combine_z": "active"}, inplace=True)
 
     expression_data = expression_data[["entrez_gene_id", "active"]]
-    expression_data.loc[:, "entrez_gene_id"] = expression_data["entrez_gene_id"].astype(str)
-    single_gene_names = expression_data[~expression_data["entrez_gene_id"].str.contains("//")]
-    multiple_gene_names = expression_data[expression_data["entrez_gene_id"].str.contains("//")]
+    single_gene_names = expression_data[~expression_data["entrez_gene_id"].astype(str).str.contains("//")]
+    multiple_gene_names = expression_data[expression_data["entrez_gene_id"].astype(str).str.contains("//")]
     split_gene_names = multiple_gene_names.assign(
         entrez_gene_id=multiple_gene_names["entrez_gene_id"].str.split("///")
     ).explode("entrez_gene_id")
 
     gene_expressions = pd.concat([single_gene_names, split_gene_names], axis=0, ignore_index=True)
-    gene_expressions.set_index("entrez_gene_id", inplace=True)
+    if entrez_as_index:
+        gene_expressions.set_index("entrez_gene_id", inplace=True)
     return gene_expressions
 
 
