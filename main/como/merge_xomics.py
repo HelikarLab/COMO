@@ -243,89 +243,36 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame, taxon_id: int) ->
 
 async def _merge_xomics(
     context_name: str,
-    expression_requirement,
-    proteomics_file=None,
-    trnaseq_file=None,
-    mrnaseq_file=None,
-    scrnaseq_file=None,
-    no_hc=False,
-    no_na=False,
+    expression_requirement: int,
+    trna_boolean_matrix: pd.DataFrame | None,
+    mrna_boolean_matrix: pd.DataFrame | None,
+    scrna_boolean_matrix: pd.DataFrame | None,
+    proteomic_boolean_matrix: pd.DataFrame | None,
+    output_merged_filepath: Path,
+    output_gene_activity_filepath: Path,
+    output_transcriptomic_details_filepath: Path,
+    taxon_id: int,
+    force_activate_high_confidence: bool = True,
+    adjust_for_missing_sources: bool = False,
 ):
-    """Merge rnaseq and/or proteomics active genes.
+    expression_list: list[str] = []
+    high_confidence_list: list[str] = []
+    merge_data = pd.DataFrame()
 
-    :param proteomics_file: filename of proteomics config file in /main/data/config_sheets/
-    :param trnaseq_file: filename of Total RNA-seq config file in /main/data/config_sheets/
-    :param mrnaseq_file: filename of mRNA-seq config file in /main/data/config_sheets/
-    :param scrnaseq_file: filename of single-cell RNA-seq config file in /main/data/config_sheets/
-    :param no_hc: True if not adjusting for NA values (happens when gene missing from data source)
-    :param no_na: filename of single-cell RNA-seq config file in /main/data/config_sheets/
-    :param context_name: sheet name to use, should be context, context, cell type, etc
-    :param expression_requirement: integer, minimum number of provided sources with active gene for a it to be in model
-    :return: dictionary where keys are contexts, (tissue name, control type etc) and values are expression tables
-    """
-    config = Config()
-    logger.info(f"Merging data for {context_name}")
-    # load data for each source if it exists. IF not load an empty dummy dataset
-    trnaseq = _load_rnaseq_tests(filename=trnaseq_file, context_name=context_name, prep_method=RNAPrepMethod.TOTAL)
-    mrnaseq = _load_rnaseq_tests(filename=mrnaseq_file, context_name=context_name, prep_method=RNAPrepMethod.MRNA)
-    scrnaseq = _load_rnaseq_tests(filename=scrnaseq_file, context_name=context_name, prep_method=RNAPrepMethod.SCRNA)
-    proteomics = proteomics_gen.load_proteomics_tests(filename=proteomics_file, context_name=context_name)
+    for matrix, expressed_sourcetype, high_expressed_sourcetype in (
+        (trna_boolean_matrix, _ExpressedHeaderNames.TRNASEQ, _HighExpressionHeaderNames.TRNASEQ),
+        (mrna_boolean_matrix, _ExpressedHeaderNames.MRNASEQ, _HighExpressionHeaderNames.MRNASEQ),
+        (scrna_boolean_matrix, _ExpressedHeaderNames.SCRNASEQ, _HighExpressionHeaderNames.SCRNASEQ),
+        (proteomic_boolean_matrix, _ExpressedHeaderNames.PROTEOMICS, _HighExpressionHeaderNames.PROTEOMICS),
+    ):
+        if matrix is None:
+            continue
 
-    expression_list = []
-    high_confidence_list = []
-    merge_data = None
-
-    if trnaseq[0] != "dummy":
-        expression_list.append(_ExpressedHeaderNames.TRNASEQ)
-        high_confidence_list.append(_HighExpressionHeaderNames.TRNASEQ)
-        trnaseq_data = trnaseq[1].loc[:, ["expressed", "high"]]
-        trnaseq_data.rename(
-            columns={
-                "expressed": _ExpressedHeaderNames.TRNASEQ,
-                "high": _HighExpressionHeaderNames.TRNASEQ,
-            },
-            inplace=True,
-        )
-        merge_data = trnaseq_data
-
-    if mrnaseq[0] != "dummy":
-        expression_list.append(_ExpressedHeaderNames.MRNASEQ)
-        high_confidence_list.append(_HighExpressionHeaderNames.MRNASEQ)
-        mrnaseq_data = mrnaseq[1].loc[:, ["expressed", "high"]]
-        mrnaseq_data.rename(
-            columns={
-                "expressed": _ExpressedHeaderNames.MRNASEQ,
-                "high": _HighExpressionHeaderNames.MRNASEQ,
-            },
-            inplace=True,
-        )
-        merge_data = mrnaseq_data if merge_data is None else merge_data.join(mrnaseq_data, how="outer")
-
-    if scrnaseq[0] != "dummy":
-        expression_list.append(_ExpressedHeaderNames.SCRNASEQ)
-        high_confidence_list.append(_HighExpressionHeaderNames.SCRNASEQ)
-        scrnaseq_data = scrnaseq[1].loc[:, ["expressed", "high"]]
-        scrnaseq_data.rename(
-            columns={
-                "expressed": _ExpressedHeaderNames.SCRNASEQ,
-                "high": _HighExpressionHeaderNames.SCRNASEQ,
-            },
-            inplace=True,
-        )
-        merge_data = scrnaseq_data if merge_data is None else merge_data.join(scrnaseq_data, how="outer")
-
-    if proteomics[0] != "dummy":
-        expression_list.append(_ExpressedHeaderNames.PROTEOMICS)
-        high_confidence_list.append(_HighExpressionHeaderNames.PROTEOMICS)
-        prote_data = proteomics[1].loc[:, ["expressed", "high"]]
-        prote_data.rename(
-            columns={
-                "expressed": _ExpressedHeaderNames.PROTEOMICS,
-                "high": _HighExpressionHeaderNames.PROTEOMICS,
-            },
-            inplace=True,
-        )
-        merge_data = prote_data if merge_data is None else merge_data.join(prote_data, how="outer")
+        matrix: pd.DataFrame  # re-define type to assist in type hinting for IDEs
+        expression_list.append(expressed_sourcetype)
+        high_confidence_list.append(high_expressed_sourcetype)
+        matrix.rename(columns={"expressed": expressed_sourcetype, "high": high_expressed_sourcetype}, inplace=True)
+        merge_data = matrix if merge_data.empty else merge_data.merge(matrix, on="entrez_gene_id", how="outer")
 
     if merge_data.empty:
         logger.critical(
@@ -338,46 +285,31 @@ async def _merge_xomics(
     merge_data["active"] = 0
     merge_data["required"] = 0
 
-    if no_na:  # dont adjust for na values
-        merge_data.loc[:, "Required"] = merge_data[expression_list].apply(
-            lambda x: expression_requirement if (expression_requirement - (num_sources - x.count()) > 0) else 1,
-            axis=1,
-        )
-    else:  # subtract one from requirement per NA
-        merge_data.loc[:, "Required"] = merge_data[expression_list].apply(
+    if adjust_for_missing_sources:  # Subtract 1 from requirement per missing source
+        merge_data.loc[:, "required"] = merge_data[expression_list].apply(
             lambda x: expression_requirement - (num_sources - x.count())
             if (expression_requirement - (num_sources - x.count()) > 0)
             else 1,
             axis=1,
         )
+    else:  # Do not adjust for missing sources
+        merge_data.loc[:, "required"] = merge_data[expression_list].apply(
+            lambda x: expression_requirement if (expression_requirement - (num_sources - x.count()) > 0) else 1, axis=1
+        )
 
-    # count number of sources gene is active in. Set to active in final output if at least adjusted expression reqirmnt
-
-    if not no_hc:  # set genes that are high-confidence in at least one data source to active
-        merge_data.loc[merge_data[high_confidence_list].sum(axis=1) > 0, "Active"] = 1
-
-    # merge_data = merge_data.astype(int)
-    merge_data = merge_data
-
-    filepath = config.result_dir / context_name / f"merged_{context_name}.csv"
-    merge_data.to_csv(filepath, index_label="entrez_gene_id")
-
-    filepath = config.result_dir / context_name / f"ActiveGenes_{context_name}_Merged.csv"
-    merge_data.reset_index(drop=False, inplace=True)
-
-    split_entrez = split_gene_expression_data(merge_data)
-    split_entrez.to_csv(filepath, index_label="entrez_gene_id")
-    files_dict = {context_name: filepath.as_posix()}
+    # Count the number of sources each gene is active in
+    # set to active in final output if we meet the adjusted expression requirement
     merge_data["total_expressed"] = merge_data[expression_list].sum(axis=1)
     merge_data.loc[merge_data["total_expressed"] >= merge_data["required"], "active"] = 1
 
-    transcriptomic_details = await _get_transcriptmoic_details(merge_data)
-    transcriptomic_details_filepath = filepath.parent / f"TranscriptomicDetails_{context_name}.csv"
-    transcriptomic_details.to_csv(transcriptomic_details_filepath, index=False)
+    if force_activate_high_confidence:  # If a gene is high-confidence in at least 1 data source, set it to active
+        merge_data.loc[merge_data[high_confidence_list].sum(axis=1) > 0, "active"] = 1
 
-    logger.success(f"{context_name}: Save to {filepath}\n")
+    merge_data.to_csv(output_merged_filepath, index=False)
+    transcriptomic_details = await _get_transcriptmoic_details(merge_data, taxon_id=taxon_id)
+    transcriptomic_details.to_csv(output_transcriptomic_details_filepath, index=False)
 
-    return files_dict
+    return {context_name: output_gene_activity_filepath.as_posix()}
 
 
 async def _process(
@@ -489,7 +421,7 @@ async def _process(
         )
         adjusted_expression_requirement = 1
 
-    await _new_merge_xomics(
+    await _merge_xomics(
         context_name=context_name,
         expression_requirement=adjusted_expression_requirement,
         trna_boolean_matrix=trna_boolean_matrix,
@@ -505,67 +437,166 @@ async def _process(
     )
 
 
-
-    return
-
-
-async def merge_xomics(
-    trnaseq_filepath: str | Path | None = None,
-    mrnaseq_filepath: str | Path | None = None,
-    scrnaseq_filepath: str | Path | None = None,
-    proteomics_filepath: str | Path | None = None,
-    trna_weight: float = 1,
-    mrna_weight: float = 1,
-    scrna_weight: float = 1,
-    proteomics_weight: float = 2,
+async def merge_xomics(  # noqa: C901
+    context_name: str,
+    trna_matrix_or_filepath: Path | pd.DataFrame | None,
+    mrna_matrix_or_filepath: Path | pd.DataFrame | None,
+    scrna_matrix_or_filepath: Path | pd.DataFrame | None,
+    proteomic_matrix_or_filepath: Path | pd.DataFrame | None,
+    trna_boolean_matrix_or_filepath: Path | pd.DataFrame | None,
+    mrna_boolean_matrix_or_filepath: Path | pd.DataFrame | None,
+    scrna_boolean_matrix_or_filepath: Path | pd.DataFrame | None,
+    proteomic_boolean_matrix_or_filepath: Path | pd.DataFrame | None,
+    trna_batches: dict[int, list[str]],
+    mrna_batches: dict[int, list[str]],
+    scrna_batches: dict[int, list[str]],
+    proteomic_batches: dict[int, list[str]],
+    output_merge_activity_filepath: Path,
+    output_transcriptomic_details_filepath: Path,
+    output_trna_activity_filepath: Path | None,
+    output_mrna_activity_filepath: Path | None,
+    output_scrna_activity_filepath: Path | None,
+    output_proteomic_activity_filepath: Path | None,
+    output_final_model_scores_filepath: Path,
+    output_figure_dirpath: Path | None,
+    taxon_id: int,
+    trna_weight: int = 1,
+    mrna_weight: int = 1,
+    scrna_weight: int = 1,
+    proteomic_weight: int = 2,
+    minimum_source_expression: int = 1,
     expression_requirement: int | None = None,
     adjust_method: AdjustmentMethod = AdjustmentMethod.FLAT,
-    no_high_confidence: bool = False,
-    no_na: bool = False,
+    force_activate_high_confidence: bool = False,
+    adjust_for_na: bool = False,
     merge_zfpkm_distribution: bool = False,
     keep_transcriptomics_score: bool = True,
+    weighted_z_floor: int = -6,
+    weighted_z_ceiling: int = -6,
 ):
     """Merge expression tables of multiple sources (RNA-seq, proteomics) into one."""
+    if expression_requirement < 1:
+        raise ValueError("Expression requirement must be at least 1!")
+
     if expression_requirement is None:
         expression_requirement = sum(
             test is not None
             for test in [
-                trnaseq_filepath,
-                mrnaseq_filepath,
-                scrnaseq_filepath,
-                proteomics_filepath,
+                trna_matrix_or_filepath,
+                mrna_matrix_or_filepath,
+                scrna_matrix_or_filepath,
+                proteomic_matrix_or_filepath,
             ]
         )
-    elif expression_requirement < 1:
-        raise ValueError("Expression requirement must be at least 1!")
 
-    trnaseq_filepath = Path(trnaseq_filepath) if trnaseq_filepath else None
-    mrnaseq_filepath = Path(mrnaseq_filepath) if mrnaseq_filepath else None
-    scrnaseq_filepath = Path(scrnaseq_filepath) if scrnaseq_filepath else None
-    proteomics_filepath = Path(proteomics_filepath) if proteomics_filepath else None
+    if all(
+        file is None
+        for file in [
+            trna_matrix_or_filepath,
+            mrna_matrix_or_filepath,
+            scrna_matrix_or_filepath,
+            proteomic_matrix_or_filepath,
+        ]
+    ):
+        raise ValueError("No data was passed!")
 
-    await _handle_context_batch(
-        trnaseq_filepath,
-        mrnaseq_filepath,
-        scrnaseq_filepath,
-        proteomics_filepath,
-        trna_weight,
-        mrna_weight,
-        scrna_weight,
-        proteomics_weight,
-        expression_requirement,
-        adjust_method,
-        no_high_confidence,
-        no_na,
-        merge_zfpkm_distribution,
-        keep_transcriptomics_score,
+    if adjust_method not in AdjustmentMethod:
+        raise ValueError(f"Adjustment method must be one of {AdjustmentMethod}; got: {adjust_method}")
+
+    output_final_model_scores_filepath.parent.mkdir(parents=True, exist_ok=True)
+    if output_merge_activity_filepath:
+        output_merge_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
+    if output_transcriptomic_details_filepath:
+        output_transcriptomic_details_filepath.parent.mkdir(parents=True, exist_ok=True)
+    if output_trna_activity_filepath:
+        output_trna_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
+    if output_mrna_activity_filepath:
+        output_mrna_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
+    if output_scrna_activity_filepath:
+        output_scrna_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
+    if output_proteomic_activity_filepath:
+        output_proteomic_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
+    if output_figure_dirpath:
+        output_figure_dirpath.mkdir(parents=True, exist_ok=True)
+
+    # fmt: off
+    trna_matrix: pd.DataFrame | None = (
+        pd.read_csv(trna_matrix_or_filepath) if isinstance(trna_matrix_or_filepath, Path)
+        else trna_matrix_or_filepath if isinstance(trna_matrix_or_filepath, pd.DataFrame)
+        else None
     )
+    mrna_matrix: pd.DataFrame | None = (
+        pd.read_csv(mrna_matrix_or_filepath) if isinstance(mrna_matrix_or_filepath, Path)
+        else mrna_matrix_or_filepath if isinstance(mrna_matrix_or_filepath, pd.DataFrame)
+        else None
     )
+    scrna_matrix: pd.DataFrame | None = (
+        pd.read_csv(scrna_matrix_or_filepath) if isinstance(scrna_matrix_or_filepath, Path)
+        else scrna_matrix_or_filepath if isinstance(scrna_matrix_or_filepath, pd.DataFrame)
+        else None
     )
+    proteomic_matrix: pd.DataFrame | None = (
+        pd.read_csv(proteomic_matrix_or_filepath) if isinstance(proteomic_matrix_or_filepath, Path)
+        else proteomic_matrix_or_filepath if isinstance(proteomic_matrix_or_filepath, pd.DataFrame)
+        else None
     )
 
+    trna_boolean_matrix: pd.DataFrame | None = (
+        pd.read_csv(trna_boolean_matrix_or_filepath) if isinstance(trna_boolean_matrix_or_filepath, Path)
+        else trna_boolean_matrix_or_filepath if isinstance(trna_boolean_matrix_or_filepath, pd.DataFrame)
+        else None
     )
+    mrna_boolean_matrix: pd.DataFrame | None = (
+        pd.read_csv(mrna_boolean_matrix_or_filepath) if isinstance(mrna_boolean_matrix_or_filepath, Path)
+        else mrna_boolean_matrix_or_filepath if isinstance(mrna_boolean_matrix_or_filepath, pd.DataFrame)
+        else None
     )
+    scrna_boolean_matrix: pd.DataFrame | None = (
+        pd.read_csv(scrna_boolean_matrix_or_filepath) if isinstance(scrna_boolean_matrix_or_filepath, Path)
+        else scrna_boolean_matrix_or_filepath if isinstance(scrna_boolean_matrix_or_filepath, pd.DataFrame)
+        else None
     )
+    proteomic_boolean_matrix: pd.DataFrame | None = (
+        pd.read_csv(proteomic_boolean_matrix_or_filepath) if isinstance(proteomic_boolean_matrix_or_filepath, Path)
+        else proteomic_boolean_matrix_or_filepath if isinstance(proteomic_boolean_matrix_or_filepath, pd.DataFrame)
+        else None
     )
+    # fmt: on
+
+    await _process(
+        context_name=context_name,
+        trna_matrix=trna_matrix,
+        mrna_matrix=mrna_matrix,
+        scrna_matrix=scrna_matrix,
+        proteomic_matrix=proteomic_matrix,
+        trna_boolean_matrix=trna_boolean_matrix,
+        mrna_boolean_matrix=mrna_boolean_matrix,
+        scrna_boolean_matrix=scrna_boolean_matrix,
+        proteomic_boolean_matrix=proteomic_boolean_matrix,
+        trna_batches=trna_batches,
+        mrna_batches=mrna_batches,
+        scrna_batches=scrna_batches,
+        proteomic_batches=proteomic_batches,
+        trna_weight=trna_weight,
+        mrna_weight=mrna_weight,
+        scrna_weight=scrna_weight,
+        proteomic_weight=proteomic_weight,
+        taxon_id=taxon_id,
+        minimum_source_expression=minimum_source_expression,
+        expression_requirement=expression_requirement,
+        weighted_z_floor=weighted_z_floor,
+        weighted_z_ceiling=weighted_z_ceiling,
+        adjust_method=adjust_method,
+        merge_zfpkm_distribution=merge_zfpkm_distribution,
+        keep_gene_score=keep_transcriptomics_score,
+        force_activate_high_confidence=force_activate_high_confidence,
+        adjust_for_missing_sources=adjust_for_na,
+        output_merge_activity_filepath=output_merge_activity_filepath,
+        output_transcriptomic_details_filepath=output_transcriptomic_details_filepath,
+        output_trna_activity_filepath=output_trna_activity_filepath,
+        output_mrna_activity_filepath=output_mrna_activity_filepath,
+        output_scrna_activity_filepath=output_scrna_activity_filepath,
+        output_proteomic_activity_filepath=output_proteomic_activity_filepath,
+        output_final_model_scores_filepath=output_final_model_scores_filepath,
+        output_figure_dirpath=output_figure_dirpath,
     )
