@@ -18,7 +18,7 @@ from fast_bioservices.biothings.mygene import MyGene
 from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
 
-from como.types import RNAPrepMethod, type_path, type_rna
+from como.data_types import LOG_LEVEL, PATH_TYPE, RNA_TYPE, RNAPrepMethod
 from como.utils import _listify
 
 
@@ -257,7 +257,7 @@ async def _write_counts_matrix(
     config_df: pd.DataFrame,
     como_context_dir: Path,
     output_counts_matrix_filepath: Path,
-    rna: type_rna,
+    rna: RNA_TYPE,
 ) -> pd.DataFrame:
     """Create a counts matrix file by reading gene counts table(s)."""
     study_metrics = _organize_gene_counts_files(data_dir=como_context_dir)
@@ -508,9 +508,9 @@ async def _create_gene_info_file(
 async def _create_matrix_file(
     context_name: str,
     output_config_filepath: Path,
-    como_context_dir: type_path,
+    como_context_dir: PATH_TYPE,
     output_counts_matrix_filepath: Path,
-    rna: type_rna,
+    rna: RNA_TYPE,
 ) -> None:
     config_df = await _create_config_df(context_name, como_context_dir=como_context_dir)
     await _write_counts_matrix(
@@ -536,7 +536,7 @@ async def _process(
     output_mrna_matrix_filepath: Path | None,
     cache: bool,
 ):
-    rna_types: list[tuple[type_rna, Path, Path]] = []
+    rna_types: list[tuple[RNA_TYPE, Path, Path]] = []
     if output_trna_config_filepath:
         rna_types.append(("total", output_trna_config_filepath, output_trna_matrix_filepath))
     if output_mrna_config_filepath:
