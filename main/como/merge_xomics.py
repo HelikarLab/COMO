@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from fast_bioservices import BioDBNet, Input, Output
+from fast_bioservices.biothings.mygene import MyGene
 from loguru import logger
 
 from como import proteomics_gen, return_placeholder_data
@@ -182,7 +182,7 @@ def _merge_logical_table(df: pd.DataFrame):
     return df
 
 
-async def _get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
+async def _get_transcriptmoic_details(merged_df: pd.DataFrame, taxon_id: int) -> pd.DataFrame:
     """Get details of transcriptomic data.
 
     This function will get the following details of transcriptomic data:
@@ -198,6 +198,7 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
     """
     # If _ExpressedHeaderNames.PROTEOMICS.value is in the dataframe, lower the required expression by 1
     # We are only trying to get details for transcriptomic data
+    transcriptomic_df: pd.DataFrame = merged_df.copy()
     if _ExpressedHeaderNames.PROTEOMICS in merged_df.columns:
         # Get the number of sources required for a gene to be marked "expressed"
         required_expression = merged_df["Required"].iloc[0]
@@ -225,62 +226,23 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
             "Active",
         ] = 1
 
-    else:
-        transcriptomic_df: pd.DataFrame = merged_df.copy()
-
-    biodbnet = BioDBNet()
-    gene_details: pd.DataFrame = await biodbnet.async_db2db(
-        values=transcriptomic_df.index.astype(str).values.tolist(),
-        input_db=Input.GENE_ID,
-        output_db=[
-            Output.GENE_SYMBOL,
-            Output.ENSEMBL_GENE_INFO,
-            Output.GENE_INFO,
-        ],
+    my_gene = MyGene()
+    gene_details: pd.DataFrame = pd.DataFrame(
+        data=pd.NA,
+        columns=["entrez_gene_id", "gene_symbol", "description", "gene_type"],
+        index=list(range(len(transcriptomic_df))),
     )
-    gene_details["entrez_gene_id"] = gene_details.index
-    gene_details.reset_index(drop=True, inplace=True)
-
-    # Apply regex to search for "[Description: XXXXXX]" and retrieve the XXXXXX
-    # It excludes the square brackets and "Description: ", and only returns the description
-    # descriptions: list[str] = [
-    gene_details["description"] = [
-        i.group(1) if isinstance(i, re.Match) else "No Description Available"
-        for i in gene_details["Ensembl Gene Info"].apply(lambda x: re.search(r"\[Description: (.*)\]", x))
-    ]
-
-    gene_details["gene_info_type"] = [
-        i.group(1) if isinstance(i, re.Match) else "None"
-        for i in gene_details["Gene Info"].apply(lambda x: re.search(r"\[Gene Type: (.*)\]", x))
-    ]
-    gene_details["ensembl_info_type"] = [
-        i.group(1) if isinstance(i, re.Match) else "None"
-        for i in gene_details["Ensembl Gene Info"].apply(lambda x: re.search(r"\[Gene Type: (.*)\]", x))
-    ]
-
-    gene_type: list[str] = []
-    row: pd.DataFrame
-    for row in gene_details.itertuples():
-        if row.gene_info_type != "None":
-            gene_type.append(row.gene_info_type)
-        elif row.ensembl_info_type != "None":
-            gene_type.append(row.ensembl_info_type)
-        else:
-            gene_type.append("No Gene Type Available")
-    gene_details["gene_type"] = gene_type
-
-    # Drop gene_info_type and ensembl_info_type columns
-    gene_details.drop(
-        columns=[
-            "Ensembl Gene Info",
-            "Gene Info",
-            "gene_info_type",
-            "ensembl_info_type",
-        ],
-        inplace=True,
-    )
-    gene_details.rename(columns={"entrez_gene_id": "Entrez Gene ID"}, inplace=True)
-
+    for i, detail in enumerate(
+        await my_gene.query(
+            items=transcriptomic_df["entrez_gene_id"].tolist(),
+            taxon=taxon_id,
+            scopes="entrezgene",
+        )
+    ):
+        gene_details.at[i, "entrez_gene_id"] = detail["entrezgene"]
+        gene_details.at[i, "gene_symbol"] = detail["symbol"]
+        gene_details.at[i, "description"] = detail["name"]
+        gene_details.at[i, "gene_type"] = detail["type_of_gene"]
     return gene_details
 
 
