@@ -15,6 +15,55 @@ from como import graph
 from como.utils import _num_rows
 
 
+class _IterableDataclass:
+    def __iter__(self) -> Iterator[str]:
+        return iter(getattr(self, field.name) for field in fields(self))  # type: ignore
+
+
+class _BatchEntry(NamedTuple):
+    batch_num: int
+    sample_names: list[str]
+
+
+@dataclass
+class _InputMatrices(_IterableDataclass):
+    trna: Path | pd.DataFrame | None
+    mrna: Path | pd.DataFrame | None
+    scrna: Path | pd.DataFrame | None
+    proteomics: Path | pd.DataFrame | None
+
+
+@dataclass
+class _BatchNames(_IterableDataclass):
+    trna: list[_BatchEntry]
+    mrna: list[_BatchEntry]
+    scrna: list[_BatchEntry]
+    proteomics: list[_BatchEntry]
+
+
+@dataclass
+class _SourceWeights(_IterableDataclass):
+    trna: int
+    mrna: int
+    scrna: int
+    proteomics: int
+
+
+@dataclass
+class _OutputCombinedSourceFilepath(_IterableDataclass):
+    trna: Path | None
+    mrna: Path | None
+    scrna: Path | None
+    proteomics: Path | None
+
+
+@dataclass
+class _CombineOmicsInput:
+    z_score_matrix: pd.DataFrame
+    type: Literal["totalrna", "mrna", "scrna", "proteomics"]
+    weight: int
+
+
 def _get_batch_name(x):
     return Path(x).stem
 
