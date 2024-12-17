@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import ClassVar
 
 import aiofiles
+import numpy.typing as npt
 import pandas as pd
 from fast_bioservices import BioDBNet, Output, Taxon
 from fast_bioservices.pipeline import (
@@ -263,3 +264,11 @@ async def convert_gene_data(values: list[str], taxon_id: int | str | Taxon) -> p
 def _listify(value):
     """Convert items into a list."""
     return [value] if not isinstance(value, list) else value
+
+
+def _num_rows(item: pd.DataFrame | npt.NDArray) -> int:
+    return item.shape[1]
+
+
+def _num_columns(item: pd.DataFrame | npt.NDArray) -> int:
+    return item.shape[0]
