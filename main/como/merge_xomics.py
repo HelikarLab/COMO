@@ -22,24 +22,24 @@ from como.utils import split_gene_expression_data
 
 
 class _MergedHeaderNames:
-    PROTEOMICS = "prote"
     TRNASEQ = "trnaseq"
     MRNASEQ = "mrnaseq"
     SCRNASEQ = "scrnaseq"
+    PROTEOMICS = "prote"
 
 
 class _ExpressedHeaderNames:
-    PROTEOMICS = f"{_MergedHeaderNames.PROTEOMICS}_exp"
     TRNASEQ = f"{_MergedHeaderNames.TRNASEQ}_exp"
     MRNASEQ = f"{_MergedHeaderNames.MRNASEQ}_exp"
     SCRNASEQ = f"{_MergedHeaderNames.SCRNASEQ}_exp"
+    PROTEOMICS = f"{_MergedHeaderNames.PROTEOMICS}_exp"
 
 
 class _HighExpressionHeaderNames:
-    PROTEOMICS = f"{_MergedHeaderNames.PROTEOMICS}_high"
     TRNASEQ = f"{_MergedHeaderNames.TRNASEQ}_high"
     MRNASEQ = f"{_MergedHeaderNames.MRNASEQ}_high"
     SCRNASEQ = f"{_MergedHeaderNames.SCRNASEQ}_high"
+    PROTEOMICS = f"{_MergedHeaderNames.PROTEOMICS}_high"
 
 
 class AdjustmentMethod(Enum):
