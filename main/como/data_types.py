@@ -1,27 +1,8 @@
 from __future__ import annotations
 
-from abc import ABC
 from enum import Enum
 from pathlib import Path
 from typing import Literal
-
-from pydantic import BaseModel, ConfigDict
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-class _BaseModel(BaseModel, ABC):
-    model_config = ConfigDict()
-
-
-class _BaseArguments(BaseSettings, ABC):
-    model_config = SettingsConfigDict(
-        cli_parse_args=True,
-        cli_kebab_case=True,
-        nested_model_default_partial_update=True,
-        case_sensitive=True,
-        cli_avoid_json=True,
-        cli_enforce_required=True,
-    )
 
 
 class RNAPrepMethod(Enum):
@@ -71,5 +52,6 @@ class FilteringTechnique(Enum):
                 raise ValueError(f"Got a filtering technique of '{value}'; should be one of: {possible_values}")
 
 
-type_path = str | Path
-type_rna = Literal["total", "mrna"]
+PATH_TYPE = str | Path
+RNA_TYPE = Literal["total", "mrna"]
+LOG_LEVEL = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
