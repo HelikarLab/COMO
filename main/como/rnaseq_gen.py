@@ -272,7 +272,7 @@ def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
     return metrics
 
 
-def _zfpkm_calculation(col: pd.Series, kernel: KernelDensity, peak_parameters: tuple[float, float]) -> _ZFPKMResult:
+def _zfpkm_calculation(row: pd.Series, kernel: KernelDensity, peak_parameters: tuple[float, float]) -> _ZFPKMResult:
     """Log2 Transformations.
 
     Stabilize the variance in the data to make the distribution more symmetric; this is helpful for Gaussian fitting
@@ -316,12 +316,12 @@ def _zfpkm_calculation(col: pd.Series, kernel: KernelDensity, peak_parameters: t
             a threshold for calling a gene as "expressed"
             : https://doi.org/10.1186/1471-2164-14-778
     """
-    col_log2: npt.NDArray = np.log2(col + 1)
-    col_log2 = np.nan_to_num(col_log2, nan=0)
-    refit: KernelDensity = kernel.fit(col_log2.reshape(-1, 1))  # type: ignore
+    row_log2: npt.NDArray = np.log2(row + 1)
+    row_log2 = np.nan_to_num(row_log2, nan=0)
+    refit: KernelDensity = kernel.fit(row_log2.reshape(-1, 1))  # type: ignore
 
-    # kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(col_log2.reshape(-1, 1))
-    x_range = np.linspace(col_log2.min(), col_log2.max(), 1000)
+    # kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(row_log2.reshape(-1, 1))
+    x_range = np.linspace(row_log2.min(), row_log2.max(), 1000)
     density = np.exp(refit.score_samples(x_range.reshape(-1, 1)))
     peaks, _ = find_peaks(density, height=peak_parameters[0], distance=peak_parameters[1])
     peak_positions = x_range[peaks]
@@ -333,9 +333,9 @@ def _zfpkm_calculation(col: pd.Series, kernel: KernelDensity, peak_parameters: t
     if len(peaks) != 0:
         mu = peak_positions.max()
         max_fpkm = density[peaks[np.argmax(peak_positions)]]
-        u = col_log2[col_log2 > mu].mean()
+        u = row_log2[row_log2 > mu].mean()
         stddev = (u - mu) * np.sqrt(np.pi / 2)
-    zfpkm = pd.Series((col_log2 - mu) / stddev, dtype=np.float32, name=col.name)
+    zfpkm = pd.Series((row_log2 - mu) / stddev, dtype=np.float32, name=row.name)
 
     return _ZFPKMResult(zfpkm=zfpkm, density=Density(x_range, density), mu=mu, std_dev=stddev, max_fpkm=max_fpkm)
 
@@ -354,14 +354,13 @@ def zfpkm_transform(
         )
         update_every_percent /= 100
 
-    total = len(fpkm_df.columns)
-    update_per_step: int = int(np.ceil(total * update_every_percent))
-    cores = min(multiprocessing.cpu_count() - 2, total)
-    logger.debug(f"Processing {total:,} samples through zFPKM transform using {cores} cores")
+    total_rows = len(fpkm_df)
+    update_per_step: int = int(np.ceil(total_rows * update_every_percent))
+    cores = max(min(multiprocessing.cpu_count() - 2, total_rows), 1)  # Get at least 1 core and at most cpu_count() - 2
     logger.debug(
-        f"Will update every {update_per_step:,} steps as this is approximately "
-        f"{update_every_percent:.1%} of {total:,}"
+        f"zFPKM transforming {total_rows:,} gene(s) across {len(fpkm_df.columns)} sample(s) using {cores} cores"
     )
+    logger.debug(f"Will update every {update_per_step:,} steps (~{update_every_percent:.1%} of {total_rows:,})")
 
     with Pool(processes=cores) as pool:
         kernel = KernelDensity(kernel="gaussian", bandwidth=bandwidth)
@@ -369,34 +368,37 @@ def zfpkm_transform(
         partial_func = partial(_zfpkm_calculation, kernel=kernel, peak_parameters=peak_parameters)
         chunk_time = time.time()
         start_time = time.time()
+        log_padding = len(str(f"{total_rows:,}"))
 
-        log_padding = len(str(f"{total:,}"))
-        zfpkm_df = pd.DataFrame(data=0, index=fpkm_df.index, columns=fpkm_df.columns)
+        zfpkm_series: list[pd.Series | None] = [None] * total_rows
         results: dict[str, _ZFPKMResult] = {}
         result: _ZFPKMResult
         for i, result in enumerate(
             pool.imap(
                 partial_func,
-                (fpkm_df[col] for col in fpkm_df.columns),
+                (row for _, row in fpkm_df.iterrows()),
                 chunksize=chunksize,
             )
         ):
             key = str(result.zfpkm.name)
             results[key] = result
-            zfpkm_df[key] = result.zfpkm
+            zfpkm_series[i] = result.zfpkm
 
             # show updates every X% and at the end, but skip on first iteration
-            if i != 0 and (i % update_per_step == 0 or i == total):
+            if i != 0 and (i % update_per_step == 0 or i >= total_rows):
                 current_time = time.time()
                 chunk = current_time - chunk_time
                 total_time = current_time - start_time
-                formatted = f"{i:,}"
+                chunk_num = f"{i:,}"
                 logger.debug(
-                    f"Processed {formatted:>{log_padding}} of {total:,} - "
+                    f"Processed {chunk_num:>{log_padding}} of {total_rows:,} - "
                     f"chunk took {chunk:.1f} seconds - "
                     f"running for {total_time:.1f} seconds"
                 )
                 chunk_time = current_time
+
+    zfpkm_df = pd.concat(zfpkm_series, axis=1)
+
     return results, zfpkm_df
 
 
@@ -408,7 +410,7 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
     :param plot_xfloor: Lower limit for the x-axis.
     :param subplot_titles: Whether to display facet titles (sample names).
     """
-    mega_df = pd.DataFrame(columns=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
+    to_concat: list[pd.DataFrame | None] = [None] * len(results)
     for name, result in results.items():
         stddev = result.std_dev
         x = np.array(result.density.x)
@@ -419,15 +421,18 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
         max_fitted = fitted.max()
         scale_fitted = fitted * (max_fpkm / max_fitted)
 
-        df = pd.DataFrame(
-            {
-                "sample_name": [name] * len(x),
-                "log2fpkm": x,
-                "fpkm_density": y,
-                "fitted_density_scaled": scale_fitted,
-            }
+        to_concat.append(
+            pd.DataFrame(
+                {
+                    "sample_name": [name] * len(x),
+                    "log2fpkm": x,
+                    "fpkm_density": y,
+                    "fitted_density_scaled": scale_fitted,
+                }
+            )
         )
-        mega_df = pd.concat([mega_df, df], ignore_index=True)
+    mega_df = pd.concat(to_concat, ignore_index=True)
+    mega_df.columns = pd.Series(data=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
 
     mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")
     subplot_titles = list(results.keys()) if subplot_titles else None
