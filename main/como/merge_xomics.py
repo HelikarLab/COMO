@@ -385,120 +385,131 @@ async def _merge_xomics(
     return files_dict
 
 
-async def _handle_context_batch(  # noqa: C901
-    trnaseq_file: Path | None,
-    mrnaseq_file: Path | None,
-    scrnaseq_file: Path | None,
-    proteomics_file: Path | None,
-    tweight: float,
-    mweight: float,
-    sweight: float,
-    pweight: float,
+async def _process(
+    *,
+    context_name: str,
+    trna_matrix: pd.DataFrame | None,
+    mrna_matrix: pd.DataFrame | None,
+    scrna_matrix: pd.DataFrame | None,
+    proteomic_matrix: pd.DataFrame | None,
+    trna_boolean_matrix: pd.DataFrame | None,
+    mrna_boolean_matrix: pd.DataFrame | None,
+    scrna_boolean_matrix: pd.DataFrame | None,
+    proteomic_boolean_matrix: pd.DataFrame | None,
+    trna_batches: dict[int, list[str]],
+    mrna_batches: dict[int, list[str]],
+    scrna_batches: dict[int, list[str]],
+    proteomic_batches: dict[int, list[str]],
+    trna_weight: int,
+    mrna_weight: int,
+    scrna_weight: int,
+    proteomic_weight: int,
+    taxon_id: int,
+    minimum_source_expression: int,
     expression_requirement: int,
+    weighted_z_floor: int,
+    weighted_z_ceiling: int,
     adjust_method: AdjustmentMethod,
-    no_hc: bool,
-    no_na: bool,
     merge_zfpkm_distribution: bool,
     keep_gene_score: bool,
+    force_activate_high_confidence: bool,
+    adjust_for_missing_sources: bool,
+    output_merge_activity_filepath: Path,
+    output_transcriptomic_details_filepath: Path,
+    output_trna_activity_filepath: Path | None,
+    output_mrna_activity_filepath: Path | None,
+    output_scrna_activity_filepath: Path | None,
+    output_proteomic_activity_filepath: Path | None,
+    output_final_model_scores_filepath: Path,
+    output_figure_dirpath: Path | None,
 ):
     """Merge different data sources for each context type."""
-    if all(file is None for file in [trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file]):
-        raise ValueError("No configuration file was passed!")
-
-    config = Config()
-    sheet_names = []
-    for file in [trnaseq_file, mrnaseq_file, scrnaseq_file, proteomics_file]:
-        if file is not None:
-            config_filepath = config.config_dir / file
-            try:
-                xl = pd.ExcelFile(config_filepath, engine="openpyxl")
-            except Exception as e:
-                raise ValueError(f"Unable to read file '{config_filepath}'") from e
-            sheet_names += xl.sheet_names
-
-    use_trna = trnaseq_file is not None
-    use_mrna = mrnaseq_file is not None
-    use_scrna = scrnaseq_file is not None
-    use_proteins = proteomics_file is not None
-
-    counts = Counter(sheet_names)
-    sheet_names = sorted(set(sheet_names))
-    logger.info("Beginning to merge data within contexts")
-    dict_list = {}
-
-    max_inputs = max(counts.values())
-    min_inputs = min(counts.values())
+    num_sources = sum(1 for source in [trna_matrix, mrna_matrix, scrna_matrix, proteomic_matrix] if source is not None)
 
     if merge_zfpkm_distribution:
-        logger.debug("Using zFPKM distribution for merging")
-        _combine_zscores(
-            working_dir=config.result_dir.as_posix(),
-            context_names=sheet_names,
-            global_use_mrna=use_mrna,
-            global_use_trna=use_trna,
-            global_use_scrna=use_scrna,
-            global_use_proteins=use_proteins,
+        _new_combine_zscores(
+            context_name=context_name,
+            input_matrices=_InputMatrices(
+                trna=trna_matrix,
+                mrna=mrna_matrix,
+                scrna=scrna_matrix,
+                proteomics=proteomic_matrix,
+            ),
+            batch_names=_BatchNames(
+                trna=[_BatchEntry(batch_num=n, sample_names=s) for n, s in trna_batches.items()],
+                mrna=[_BatchEntry(batch_num=n, sample_names=s) for n, s in mrna_batches.items()],
+                scrna=[_BatchEntry(batch_num=n, sample_names=s) for n, s in scrna_batches.items()],
+                proteomics=[_BatchEntry(batch_num=n, sample_names=s) for n, s in proteomic_batches.items()],
+            ),
+            source_weights=_SourceWeights(
+                trna=trna_weight,
+                mrna=mrna_weight,
+                scrna=scrna_weight,
+                proteomics=proteomic_weight,
+            ),
+            output_filepaths=_OutputCombinedSourceFilepath(
+                trna=output_trna_activity_filepath,
+                mrna=output_mrna_activity_filepath,
+                scrna=output_scrna_activity_filepath,
+                proteomics=output_proteomic_activity_filepath,
+            ),
+            output_figure_dirpath=output_figure_dirpath,
+            output_final_model_scores=output_final_model_scores_filepath,
             keep_gene_scores=keep_gene_score,
-            global_trna_weight=tweight,
-            global_mrna_weight=mweight,
-            global_scrna_weight=sweight,
-            global_protein_weight=pweight,
+            weighted_z_floor=weighted_z_floor,
+            weighted_z_ceiling=weighted_z_ceiling,
         )
 
-    for context_name in sheet_names:
-        num_sources = counts[context_name]
-        match adjust_method:
-            case AdjustmentMethod.PROGRESSIVE:
-                adjusted_expression_requirement = (num_sources - min_inputs) + expression_requirement
-            case AdjustmentMethod.REGRESSIVE:
-                adjusted_expression_requirement = expression_requirement - (max_inputs - num_sources)
-            case AdjustmentMethod.FLAT:
-                adjusted_expression_requirement = expression_requirement
-            case _:
-                adjusted_expression_requirement = int(
-                    custom_df.iloc[custom_df["context"] == context_name, "req"].iloc[0]
-                )
+    # the more data sources available, the higher the expression requirement for the gene
+    if adjust_method == AdjustmentMethod.PROGRESSIVE:
+        adjusted_expression_requirement = (num_sources - minimum_source_expression) + expression_requirement
+    # the more data sources available, the lower the expression requirement for the gene
+    elif adjust_method == AdjustmentMethod.REGRESSIVE:
+        # we use a hardcoded 4 here because that is the maximum number of contexts available
+        # (trna, mrna, scrna, and proteomics is 4 sources)
+        adjusted_expression_requirement = expression_requirement - (4 - num_sources)
+    elif adjust_method == AdjustmentMethod.FLAT:
+        adjusted_expression_requirement = expression_requirement
 
-        if adjusted_expression_requirement != expression_requirement:
-            logger.debug(
-                f"Expression requirement of '{expression_requirement}' adjusted to "
-                f"'{adjusted_expression_requirement}' using '{adjust_method.value}' adjustment method "
-                f"for '{context_name}'."
-            )
-
-        if adjusted_expression_requirement > num_sources:
-            logger.warning(
-                f"Expression requirement for {context_name} was calculated to be greater "
-                f"than max number of input data sources. "
-                f"Will be force changed to {num_sources} to prevent output from having 0 active genes. "
-                f"Consider lowering the expression requirement or changing the adjustment method."
-            )
-            adjusted_expression_requirement = num_sources
-
-        if adjusted_expression_requirement < 1:  # never allow expression requirement to be less than one
-            logger.warning(
-                f"Expression requirement for {context_name} was calculated to be less than 1. "
-                "Will be changed to 1 to prevent output from having 0 active genes. "
-            )
-            adjusted_expression_requirement = 1
-
-        files_dict = await _merge_xomics(
-            context_name,
-            expression_requirement=adjusted_expression_requirement,
-            proteomics_file=proteomics_file,
-            trnaseq_file=trnaseq_file,
-            mrnaseq_file=mrnaseq_file,
-            scrnaseq_file=scrnaseq_file,
-            no_hc=no_hc,
-            no_na=no_na,
+    if adjusted_expression_requirement != expression_requirement:
+        logger.debug(
+            f"Expression requirement of '{expression_requirement}' adjusted to "
+            f"'{adjusted_expression_requirement}' using '{adjust_method.value}' adjustment method "
+            f"for '{context_name}'."
         )
 
-        dict_list |= files_dict
+    if adjusted_expression_requirement > num_sources:
+        logger.warning(
+            f"Expression requirement for {context_name} was calculated to be greater "
+            f"than max number of input data sources. "
+            f"Will be force changed to {num_sources} to prevent output from having 0 active genes. "
+            f"Consider lowering the expression requirement or changing the adjustment method."
+        )
+        adjusted_expression_requirement = num_sources
 
-    files_json = config.result_dir / "step1_results_files.json"
-    files_json.parent.mkdir(parents=True, exist_ok=True)
-    with files_json.open("w") as f:
-        json.dump(dict_list, f)  # type: ignore
+    if adjusted_expression_requirement < 1:  # never allow expression requirement to be less than one
+        logger.warning(
+            f"Expression requirement for {context_name} was calculated to be less than 1. "
+            "Will be changed to 1 to prevent output from having 0 active genes. "
+        )
+        adjusted_expression_requirement = 1
+
+    await _new_merge_xomics(
+        context_name=context_name,
+        expression_requirement=adjusted_expression_requirement,
+        trna_boolean_matrix=trna_boolean_matrix,
+        mrna_boolean_matrix=mrna_boolean_matrix,
+        scrna_boolean_matrix=scrna_boolean_matrix,
+        proteomic_boolean_matrix=proteomic_boolean_matrix,
+        output_merged_filepath=output_merge_activity_filepath,
+        output_gene_activity_filepath=output_final_model_scores_filepath,
+        output_transcriptomic_details_filepath=output_transcriptomic_details_filepath,
+        taxon_id=taxon_id,
+        force_activate_high_confidence=force_activate_high_confidence,
+        adjust_for_missing_sources=adjust_for_missing_sources,
+    )
+
+
 
     return
 
