@@ -9,7 +9,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from como import graph
+from como.graph import z_score_distribution as graph_zscore_distribution
 from como.utils import _num_rows
 
 
@@ -103,7 +103,7 @@ def _combine_batch_zdistro(
     if len(stack_df["source"].unique()) > 10:
         stack_df = stack_df[stack_df["source"] == "combined"]
 
-    graph.z_score_distribution(
+    graph_zscore_distribution(
         stack_df,
         title=f"Combined Z-score Distribution for {context_name} - batch #{batch_num}",
         output_png_filepath=output_png_filepath,
@@ -160,7 +160,7 @@ def _combine_context_zdistro(
             )
         ]
     )
-    graph.z_score_distribution(
+    graph_zscore_distribution(
         df=stack_df,
         title=f"Combined Z-score Distribution for {context_name} - batch #{batch_num}",
         output_png_filepath=output_png_filepath,
@@ -233,7 +233,7 @@ def _combine_omics_zdistros(
         ]
     )
 
-    graph.z_score_distribution(
+    graph_zscore_distribution(
         df=stack_df,
         title=f"Combined Omics Z-score Distribution for {context}",
         output_png_filepath=output_png_filepath,
