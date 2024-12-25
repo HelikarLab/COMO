@@ -469,7 +469,7 @@ async def merge_xomics(  # noqa: C901
     adjust_for_na: bool = False,
     merge_zfpkm_distribution: bool = False,
     weighted_z_floor: int = -6,
-    weighted_z_ceiling: int = -6,
+    weighted_z_ceiling: int = 6,
 ):
     """Merge expression tables of multiple sources (RNA-seq, proteomics) into one."""
     if expression_requirement < 1:
