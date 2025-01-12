@@ -116,7 +116,7 @@ def _set_boundaries(
     demand_rxns = [rxn.id for rxn in model.reactions if re.search("DM_", rxn.id)]
 
     # Allows all boundary reactions to be used if none are given
-    allow_all_boundary_rxns = not bound_rxns
+    allow_all_boundary_rxns = not boundary_reactions
 
     # close sinks and demands not in boundary reactions unless no boundary reactions were given
     if not allow_all_boundary_rxns:
@@ -129,12 +129,12 @@ def _set_boundaries(
             getattr(model.reactions, rxn).upper_bounds = upper_bounds[i] if rxn in boundary_reactions else 0
 
     # Reaction media
-    medium = model.medium  # get reaction media to modify
+    medium = model.medium
     for rxn in exchange_rxns:  # open exchanges from exchange file, close unspecified exchanges
         medium[rxn] = -float(lower_bounds[boundary_reactions.index(rxn)]) if rxn in boundary_reactions else 0.0
     model.medium = medium
 
-    return model, bound_rm_rxns
+    return model
 
 
 def _feasibility_test(model_cobra: cobra.Model, step: str):
