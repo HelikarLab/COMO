@@ -24,8 +24,7 @@ from como.utils import (
 )
 
 
-def _combine_batch_zdistro(
-    matrix: pd.DataFrame,
+async def _combine_z_distribution_for_batch(
     context_name: str,
     batch_num: int,
     output_png_filepath: Path,
@@ -73,8 +72,8 @@ def _combine_batch_zdistro(
     return weighted_matrix
 
 
-def _combine_context_zdistro(
     matrix: pd.DataFrame,
+async def _combine_z_distribution_for_source(
     context_name: str,
     batch_num: int,
     num_replicates: int,
@@ -203,7 +202,7 @@ def _combine_omics_zdistros(
     return combined_z_matrix
 
 
-def _combine_zscores(
+async def _begin_combining_distributions(
     context_name: str,
     input_matrices: _InputMatrices,
     batch_names: _BatchNames,
