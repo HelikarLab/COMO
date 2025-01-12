@@ -165,7 +165,7 @@ def _feasibility_test(model_cobra: cobra.Model, step: str):
     return incon_rxns, model_cobra_rm
 
 
-def _build_with_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
+def _build_with_gimme(cobra_model, s_matrix, lower_bounds, upper_bounds, idx_objective, expr_vector):
     # `Becker and Palsson (2008). Context-specific metabolic networks are
     # consistent with experiments. PLoS Comput. Biol. 4, e1000082.`
     properties = GIMMEProperties(
@@ -175,23 +175,23 @@ def _build_with_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector)
         preprocess=True,
         flux_threshold=0.9,
     )
-    algorithm = GIMME(s_matrix, lb, ub, properties)
+    algorithm = GIMME(s_matrix, lower_bounds, upper_bounds, properties)
     gene_activity = algorithm.run()
     context_cobra_model = cobra_model.copy()
-    r_ids = [r.id for r in context_cobra_model.reactions]
-    to_remove_ids = [r_ids[r] for r in np.where(gene_activity == 0)[0]]
+    reaction_ids = [r.id for r in context_cobra_model.reactions]
+    to_remove_ids = [reaction_ids[r] for r in np.where(gene_activity == 0)[0]]
 
     context_cobra_model.remove_reactions(to_remove_ids, True)
-    r_ids = [r.id for r in context_cobra_model.reactions]
     psol = pfba(context_cobra_model)  # noqa: F841
+    # reaction_ids = [r.id for r in context_cobra_model.reactions]
     # psol = context_cobra_model.optimize()
-    # to_remove_ids = [r_ids[r] for r in np.where(abs(psol.fluxes) < 1e-8)[0]]
+    # to_remove_ids = [reaction_ids[r] for r in np.where(abs(psol.fluxes) < 1e-8)[0]]
     # context_cobra_model.remove_reactions(to_remove_ids, True)
 
     return context_cobra_model
 
 
-def _build_with_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
+def _build_with_fastcore(cobra_model, s_matrix, lower_bounds, upper_bounds, exp_idx_list, solver):
     # 'Vlassis, Pacheco, Sauter (2014). Fast reconstruction of compact
     # context-specific metabolic network models. PLoS Comput. Biol. 10,
     # e1003424.'
@@ -202,7 +202,7 @@ def _build_with_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
     logger.debug("Creating feasible model")
     incon_rxns, cobra_model = _feasibility_test(cobra_model, "other")
     properties = FastcoreProperties(core=exp_idx_list, solver=solver)
-    algorithm = FASTcore(s_matrix, lb, ub, properties)
+    algorithm = FASTcore(s_matrix, lower_bounds, upper_bounds, properties)
     context_rxns = algorithm.fastcore()
     context_cobra_model = cobra_model.copy()
     r_ids = [r.id for r in context_cobra_model.reactions]
@@ -215,22 +215,22 @@ def _build_with_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
 def _build_with_imat(
     cobra_model: cobra.Model,
     s_matrix: npt.NDArray,
-    lb: Sequence[float],
-    ub: Sequence[float],
+    lower_bounds: Sequence[float],
+    upper_bounds: Sequence[float],
     expr_vector: npt.NDArray,
-    expr_thesh: tuple[float, float],
+    expr_thresh: tuple[float, float],
     force_gene_ids: Sequence[int],
     solver: str,
 ) -> (cobra.Model, pd.DataFrame):
     expr_vector = np.array(expr_vector)
     properties = IMATProperties(
         exp_vector=expr_vector,
-        exp_thresholds=expr_thesh,
+        exp_thresholds=expr_thresh,
         core=force_gene_ids,
         epsilon=0.01,
         solver=solver.upper(),
     )
-    algorithm = IMAT(s_matrix, np.array(lb), np.array(ub), properties)
+    algorithm = IMAT(s_matrix, np.array(lower_bounds), np.array(upper_bounds), properties)
     context_rxns: npt.NDArray = algorithm.run()
     fluxes: pd.Series = algorithm.sol.to_series()
     context_cobra_model = cobra_model.copy()
@@ -249,7 +249,15 @@ def _build_with_imat(
     return context_cobra_model, flux_df
 
 
-def _build_with_tinit(cobra_model: cobra.Model, s_matrix, lb, ub, expr_vector, solver, idx_force) -> Model:
+def _build_with_tinit(
+    cobra_model: cobra.Model,
+    s_matrix,
+    lower_bounds,
+    upper_bounds,
+    expr_vector,
+    solver,
+    idx_force,
+) -> Model:
     properties = tINITProperties(
         reactions_scores=expr_vector,
         solver=solver,
@@ -258,10 +266,10 @@ def _build_with_tinit(cobra_model: cobra.Model, s_matrix, lb, ub, expr_vector, s
         allow_excretion=False,
         no_reverse_loops=True,
     )
-    algorithm = tINIT(s_matrix, lb, ub, properties)
+    algorithm = tINIT(s_matrix, lower_bounds, upper_bounds, properties)
     algorithm.preprocessing()
     algorithm.build_problem()
-    raise NotImplementedError("tINIT is not yet implemented")
+    _log_and_raise_error("tINIT is not yet implemented.", error=NotImplementedError, level=LogLevel.CRITICAL)
 
 
 def _map_expression_to_reaction(
