@@ -904,6 +904,33 @@ async def rnaseq_gen(
             "genes are counted with Unique Molecular Identifiers (UMIs). "
             f"Switching filtering technique from '{technique.value}' to '{FilteringTechnique.UMI.value}'."
         )
+        technique = FilteringTechnique.UMI
+
+    if isinstance(input_metadata_filepath_or_df, pd.DataFrame):
+        metadata_df = input_metadata_filepath_or_df
+    elif isinstance(input_metadata_filepath_or_df, Path):
+        if input_metadata_filepath_or_df.suffix not in {".xlsx", ".xls"}:
+            _log_and_raise_error(
+                (
+                    f"Expected an excel file with extension of '.xlsx' or '.xls', "
+                    f"got '{input_metadata_filepath_or_df.suffix}'."
+                ),
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
+        if not input_metadata_filepath_or_df.exists():
+            _log_and_raise_error(
+                f"Input metadata file not found! Searching for: '{input_metadata_filepath_or_df}'",
+                error=FileNotFoundError,
+                level=LogLevel.ERROR,
+            )
+
+        metadata_df = pd.read_excel(input_metadata_filepath_or_df)
+    else:
+        _log_and_raise_error(
+            f"Expected a pandas DataFrame or Path object as metadata, got '{type(input_metadata_filepath_or_df)}'",
+            error=TypeError,
+            level=LogLevel.ERROR,
         )
 
     logger.debug(f"Starting '{context_name}'")
