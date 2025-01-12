@@ -530,7 +530,8 @@ async def _create_gene_info_file(
         return conversion["entrez_gene_id"].dropna().tolist()
 
     logger.info(
-        "Fetching gene info (this may take 1-5 minutes depending on the number of genes and your internet connection)"
+        "Fetching gene info - "
+        "this can take up to 5 minutes depending on the number of genes and your internet connection"
     )
     genes = set(chain.from_iterable(await asyncio.gather(*[read_counts(f) for f in counts_matrix_filepaths])))
     gene_data = await MyGene(cache=cache).query(items=list(genes), taxon=taxon, scopes="entrezgene")
