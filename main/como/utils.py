@@ -155,7 +155,7 @@ async def _read_file(
 
     # StringIO is used if a CSV file is read using open() directly
     if isinstance(path, io.StringIO):
-        return pd.DataFrame(path, **kwargs)
+        return pd.read_csv(path, **kwargs)
 
     match path.suffix:
         case ".csv" | ".tsv":
