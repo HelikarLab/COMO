@@ -708,6 +708,17 @@ async def _process(
     bandwidth: int,
 ):
     """Save the results of the RNA-Seq tests to a CSV file."""
+    output_boolean_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    rnaseq_matrix: pd.DataFrame = await _read_file(rnaseq_matrix_filepath)
+    if rnaseq_matrix_filepath.suffix == ".h5ad":
+        conversion = await gene_symbol_to_ensembl_and_gene_id(
+            symbols=rnaseq_matrix["gene_symbol"].tolist(), taxon=taxon
+        )
+        conversion.reset_index(inplace=True)
+        rnaseq_matrix = rnaseq_matrix.merge(conversion, how="left", on="gene_symbol")
+        rnaseq_matrix.replace(to_replace=pd.NA, value="-")
+
     filtering_options = _FilteringOptions(
         replicate_ratio=replicate_ratio,
         batch_ratio=batch_ratio,
