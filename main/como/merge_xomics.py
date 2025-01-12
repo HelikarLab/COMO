@@ -471,13 +471,14 @@ async def _process(
         )
         adjusted_expression_requirement = 1
 
+    logger.debug(f"Final Expression Requirement: {adjusted_expression_requirement}")
     await _merge_xomics(
         context_name=context_name,
         expression_requirement=adjusted_expression_requirement,
-        trna_boolean_matrix=trna_boolean_matrix,
-        mrna_boolean_matrix=mrna_boolean_matrix,
-        scrna_boolean_matrix=scrna_boolean_matrix,
-        proteomic_boolean_matrix=proteomic_boolean_matrix,
+        trna_boolean_matrix=boolean_matrices.trna,
+        mrna_boolean_matrix=boolean_matrices.mrna,
+        scrna_boolean_matrix=boolean_matrices.scrna,
+        proteomic_boolean_matrix=boolean_matrices.proteomics,
         output_merged_filepath=output_merge_activity_filepath,
         output_gene_activity_filepath=output_final_model_scores_filepath,
         output_transcriptomic_details_filepath=output_transcriptomic_details_filepath,
