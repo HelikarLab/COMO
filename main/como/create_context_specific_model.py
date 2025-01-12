@@ -40,54 +40,6 @@ class _BuildResults(NamedTuple):
     infeasible_reactions: pd.DataFrame
 
 
-@dataclass
-class _Arguments:
-    """Arguments for creating a context specific model."""
-
-    context_name: str
-    reference_model: Path
-    active_genes_filepath: Path
-    objective: str
-    boundary_reactions_filepath: Path
-    exclude_reactions_filepath: Path
-    force_reactions_filepath: Path
-    recon_algorithm: Algorithm
-    solver: Solver
-    low_threshold: int
-    high_threshold: int
-    output_filetypes: list[str]
-
-    def __post_init__(self):
-        self.reference_model = Path(self.reference_model)
-        self.active_genes_filepath = Path(self.active_genes_filepath)
-        self.boundary_reactions_filepath = (
-            Path(self.boundary_reactions_filepath) if self.boundary_reactions_filepath is not None else None
-        )
-        self.exclude_reactions_filepath = (
-            Path(self.exclude_reactions_filepath) if self.exclude_reactions_filepath is not None else None
-        )
-        self.force_reactions_filepath = (
-            Path(self.force_reactions_filepath) if self.force_reactions_filepath is not None else None
-        )
-
-        if not self.reference_model.exists():
-            raise FileNotFoundError(f"Reference model not found at {self.reference_model}")
-        if not self.active_genes_filepath.exists():
-            raise FileNotFoundError(f"Active genes file not found at {self.active_genes_filepath}")
-        if self.boundary_reactions_filepath and not self.boundary_reactions_filepath.exists():
-            raise FileNotFoundError(f"Boundary reactions file not found at {self.boundary_reactions_filepath}")
-        if self.exclude_reactions_filepath and not self.exclude_reactions_filepath.exists():
-            raise FileNotFoundError(f"Exclude reactions file not found at {self.exclude_reactions_filepath}")
-        if self.force_reactions_filepath and not self.force_reactions_filepath.exists():
-            raise FileNotFoundError(f"Force reactions file not found at {self.force_reactions_filepath}")
-
-        if self.high_threshold < self.low_threshold:
-            raise ValueError(
-                f"Low threshold must be less than high threshold. "
-                f"Received low threshold: {self.low_threshold}, high threshold: {self.high_threshold}"
-            )
-
-
 def _correct_bracket(rule: str, name: str) -> str:
     """Correct GPR rules to format readable by."""
     rule_match = re.search(r"or|and", rule)
