@@ -64,9 +64,9 @@ def _correct_bracket(rule: str, name: str) -> str:
         elif len(left_name) > 0 and char == left_name[0]:
             new_right_rule.append(char)
             left_name = left_name[1:]
-    new_left_rule = "".join(new_right_rule)
+    new_left_rule = "".join(new_right_rule).strip()
     final_right_rule = "" if rule_match is None else _correct_bracket(right_rule, right_name)
-    return " ".join([new_left_rule, operator, final_right_rule])
+    return " ".join([new_left_rule, operator, final_right_rule]).strip()
 
 
 def _gene_rule_logical(gpr_expression: str, level: int = 0) -> str:
@@ -75,10 +75,10 @@ def _gene_rule_logical(gpr_expression: str, level: int = 0) -> str:
         loc_r = gpr_expression.index(")")
     except ValueError:
         if "and" in gpr_expression:
-            gpr_expression = gpr_expression.replace("and", ",")
+            gpr_expression = gpr_expression.replace(" and ", ", ")
             return "min{" + gpr_expression + "}"
         elif "or" in gpr_expression:
-            gpr_expression = gpr_expression.replace("or", ",")
+            gpr_expression = gpr_expression.replace(" or ", ", ")
             return "max{" + gpr_expression + "}"
         else:
             gpr_expression = gpr_expression.replace("[", "")
