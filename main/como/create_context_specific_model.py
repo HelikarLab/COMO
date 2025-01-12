@@ -104,11 +104,12 @@ def _gene_rule_logical(gpr_expression: str, level: int = 0) -> str:
     return expression_out
 
 
-
-def _set_boundaries(model: cobra.Model, bound_rxns: list, bound_lb, bound_ub) -> tuple[cobra.Model, list]:
-    all_rxns = model.reactions  # get all reactions
-    bound_rm_rxns = []
-
+def _set_boundaries(
+    model: cobra.Model,
+    boundary_reactions: list[str],
+    lower_bounds: list[float],
+    upper_bounds: list[float],
+) -> cobra.Model:
     # get boundary reactions
     exchange_rxns = [rxn.id for rxn in all_rxns if re.search("EX_", rxn.id)]
     sink_rxns = [rxn.id for rxn in all_rxns if re.search("sink_", rxn.id)]
