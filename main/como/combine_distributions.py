@@ -136,6 +136,8 @@ async def _combine_z_distribution_for_source(
         df=stack_df,
         title=f"Combined Z-score Distribution for {context_name} - batch #{batch_num}",
         output_png_filepath=output_png_filepath,
+
+    logger.trace(f"Found {_num_columns(merged_source_data) - 1} samples for context '{context_name}' to combine")
     values = merged_source_data.iloc[:, 1:].values
     mask = ~np.isnan(values)
     masked_values = np.where(mask, values, 0)  # Replace NaN with 0
@@ -146,6 +148,7 @@ async def _combine_z_distribution_for_source(
     denominator = np.sqrt(np.sum(weights**2, axis=1))
     weighted_matrix = numerator / denominator
     weighted_matrix = np.clip(weighted_matrix, weighted_z_floor, weighted_z_ceiling)
+    logger.trace("Finished combining z-distribution")
     merge_df = pd.concat([merged_source_data, pd.Series(weighted_matrix, name="combined")], axis=1)
     weighted_matrix = pd.DataFrame(
         {
