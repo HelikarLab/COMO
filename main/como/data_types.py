@@ -65,8 +65,16 @@ class FilteringTechnique(Enum):
 
 
 PATH_TYPE = str | Path
-RNA_TYPE = Literal["total", "mrna"]
-LOG_LEVEL = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+
+class LogLevel(Enum):
+    TRACE = 5
+    DEBUG = 10
+    INFO = 20
+    SUCCESS = 25
+    WARNING = 30
+    ERROR = 40
+    CRITICAL = 50
+
 
 class RNAType(Enum):
     TRNA = "total"
