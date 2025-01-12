@@ -291,3 +291,21 @@ def _set_up_logging(
     with contextlib.suppress(ValueError):
         logger.remove(0)
         logger.add(sink=location, level=level.value, format=formatting)
+
+
+def _log_and_raise_error(
+    message: str,
+    *,
+    error: type[BaseException],
+    level: LogLevel,
+) -> None:
+    caller = logger.opt(depth=1)
+    match level:
+        case LogLevel.ERROR:
+            caller.error(message)
+        case LogLevel.CRITICAL:
+            caller.critical(message)
+        case _:
+            raise ValueError(f"When raising an error, LogLevel.ERROR or LogLevel.CRITICAL must be used. Got: {level}")
+
+    raise error(message)
