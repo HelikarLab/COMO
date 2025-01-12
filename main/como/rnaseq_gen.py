@@ -655,11 +655,11 @@ def filter_counts(
 ) -> NamedMetrics:
     """Filter the count matrix based on the specified technique."""
     match technique:
-        case FilteringTechnique.cpm:
+        case FilteringTechnique.CPM:
             return cpm_filter(
                 context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep
             )
-        case FilteringTechnique.tpm:
+        case FilteringTechnique.TPM:
             return tpm_quantile_filter(metrics=metrics, filtering_options=filtering_options)
         case FilteringTechnique.zfpkm:
             return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calculate_fpkm=True)
@@ -787,7 +787,7 @@ async def rnaseq_gen(
     high_replicate_ratio: float = 1.0,
     batch_ratio: float = 0.5,
     high_batch_ratio: float = 1.0,
-    technique: FilteringTechnique | str = FilteringTechnique.tpm,
+    technique: FilteringTechnique | str = FilteringTechnique.ZFPKM,
     zfpkm_peak_height: float = 0.02,
     zfpkm_peak_distance: float = 1.0,
     zfpkm_bandwidth: int = 1,
@@ -830,18 +830,18 @@ async def rnaseq_gen(
     )
 
     match technique:
-        case FilteringTechnique.tpm:
+        case FilteringTechnique.TPM:
             cutoff = cutoff or 25
             if cutoff < 1 or cutoff > 100:
                 raise ValueError("Quantile must be between 1 - 100")
 
-        case FilteringTechnique.cpm:
+        case FilteringTechnique.CPM:
             if cutoff and cutoff < 0:
                 raise ValueError("Cutoff must be greater than 0")
             elif cutoff:
                 cutoff = "default"
 
-        case FilteringTechnique.zfpkm:
+        case FilteringTechnique.ZFPKM | FilteringTechnique.UMI:
             cutoff = cutoff or -3
         case FilteringTechnique.umi:
             pass
@@ -851,8 +851,8 @@ async def rnaseq_gen(
     if not input_rnaseq_filepath.exists():
         raise FileNotFoundError(f"Input RNA-seq file not found! Searching for: '{input_rnaseq_filepath}'")
 
-    if prep == RNAPrepMethod.SCRNA:
         technique = FilteringTechnique.umi
+    if prep == RNAType.SCRNA and technique.value.lower() != FilteringTechnique.UMI.value.lower():
         logger.warning(
             "Single cell filtration does not normalize and assumes "
             "gene counts are counted with Unique Molecular Identifiers (UMIs). "
