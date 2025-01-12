@@ -25,6 +25,11 @@ class RNAPrepMethod(Enum):
             case _:
                 possible_values = [t.value for t in RNAPrepMethod]
                 raise ValueError(f"Filtering technique must be one of {possible_values}; got: {value}")
+class Algorithm(Enum):
+    GIMME = "GIMME"
+    FASTCORE = "FASTCORE"
+    IMAT = "IMAT"
+    TINIT = "TINIT"
 
 
 class FilteringTechnique(Enum):

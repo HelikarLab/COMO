@@ -23,27 +23,6 @@ from loguru import logger
 __all__ = ["Compartments", "split_gene_expression_data", "stringlist_to_list", "suppress_stdout"]
 
 
-class Algorithm(Enum):
-    GIMME = "GIMME"
-    FASTCORE = "FASTCORE"
-    IMAT = "IMAT"
-    TINIT = "TINIT"
-
-    @staticmethod
-    def from_string(value: str) -> Algorithm:
-        match value.lower():
-            case "gimme":
-                return Algorithm.GIMME
-            case "fastcore":
-                return Algorithm.FASTCORE
-            case "imat":
-                return Algorithm.IMAT
-            case "tinit":
-                return Algorithm.TINIT
-            case _:
-                raise ValueError(f"Unknown solver: {value}")
-
-
 class Compartments:
     """Convert from compartment "long-hand" to "short-hand".
 
