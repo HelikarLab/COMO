@@ -272,7 +272,7 @@ def _build_with_tinit(
     _log_and_raise_error("tINIT is not yet implemented.", error=NotImplementedError, level=LogLevel.CRITICAL)
 
 
-def _map_expression_to_reaction(
+async def _map_expression_to_reaction(
     model_cobra,
     gene_expression_file,
     recon_algorithm: Algorithm,
