@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import math
 import multiprocessing
+import sys
 import time
 from collections import namedtuple
+from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import partial
-from multiprocessing.pool import Pool
+from io import TextIOWrapper
 from pathlib import Path
 from typing import Callable, NamedTuple
 
@@ -18,16 +18,17 @@ import plotly.graph_objs as go
 import scanpy as sc
 import sklearn
 import sklearn.neighbors
-from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol
+from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
 from pandas import DataFrame
 from plotly.subplots import make_subplots
 from scipy.signal import find_peaks
 from sklearn.neighbors import KernelDensity
 
-from como.data_types import FilteringTechnique, RNAPrepMethod
+from como.data_types import FilteringTechnique, LogLevel, PeakIdentificationParameters, RNAType
 from como.migrations import gene_info_migrations
 from como.project import Config
+from como.utils import _log_and_raise_error, _num_columns, _read_file, _set_up_logging
 
 
 class _FilteringOptions(NamedTuple):
