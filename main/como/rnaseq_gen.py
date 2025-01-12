@@ -502,7 +502,7 @@ def cpm_filter(
     context_name: str,
     metrics: NamedMetrics,
     filtering_options: _FilteringOptions,
-    prep: RNAPrepMethod,
+    prep: RNAType,
 ) -> NamedMetrics:
     """Apply Counts Per Million (CPM) filtering to the count matrix for a given sample."""
     config = Config()
@@ -632,7 +632,7 @@ def filter_counts(
     metrics: NamedMetrics,
     technique: FilteringTechnique,
     filtering_options: _FilteringOptions,
-    prep: RNAPrepMethod,
+    prep: RNAType,
 ) -> NamedMetrics:
     """Filter the count matrix based on the specified technique."""
     match technique:
@@ -655,7 +655,7 @@ async def _save_rnaseq_tests(
     rnaseq_matrix: pd.DataFrame,
     metadata_df: pd.DataFrame,
     gene_info_df: pd.DataFrame,
-    prep: RNAPrepMethod,
+    prep: RNAType,
     taxon: int,
     replicate_ratio: float,
     batch_ratio: float,
@@ -753,7 +753,7 @@ async def rnaseq_gen(
     context_name: str,
     input_rnaseq_filepath: Path,
     input_gene_info_filepath: Path,
-    prep: RNAPrepMethod,
+    prep: RNAType,
     taxon_id: int,
     output_boolean_activity_filepath: Path,
     output_zscore_normalization_filepath: Path,
