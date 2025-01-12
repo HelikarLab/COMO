@@ -341,6 +341,51 @@ async def _merge_xomics(
     return {context_name: output_gene_activity_filepath.as_posix()}
 
 
+async def _update_missing_data(input_matrices: _InputMatrices, taxon_id: int) -> _InputMatrices:
+    logger.trace("Updating missing genomic data")
+    matrix_keys: dict[str, list[pd.DataFrame]] = {
+        "trna": [input_matrices.trna],
+        "mrna": [input_matrices.mrna],
+        "scrna": [input_matrices.scrna],
+        "proteomics": [input_matrices.proteomics],
+    }
+    logger.trace(f"Gathering missing data for data sources: {','.join(key for key in matrix_keys if key is not None)}")
+    # fmt: off
+    results = await asyncio.gather(
+        *[
+            # Using 'is not None' is required because the truth value of a Dataframe is ambiguous
+            get_missing_gene_data(values=input_matrices.trna, taxon_id=taxon_id) if input_matrices.trna is not None else asyncio.sleep(0),  # noqa: E501
+            get_missing_gene_data(values=input_matrices.mrna, taxon_id=taxon_id) if input_matrices.mrna is not None else asyncio.sleep(0),  # noqa: E501
+            get_missing_gene_data(values=input_matrices.scrna, taxon_id=taxon_id) if input_matrices.scrna is not None else asyncio.sleep(0),  # noqa: E501
+            get_missing_gene_data(values=input_matrices.proteomics, taxon_id=taxon_id) if input_matrices.proteomics is not None else asyncio.sleep(0),  # noqa: E501
+        ]
+    )
+    # fmt: on
+    for i, key in enumerate(matrix_keys):
+        matrix_keys[key].append(results[i])
+
+    for matrix_name, (matrix, conversion) in matrix_keys.items():
+        matrix: pd.DataFrame
+        if matrix is not None:
+            # fmt: off
+            existing_data = (
+                "gene_symbol" if "gene_symbol" in matrix
+                else "entrez_gene_id" if "entrez_gene_id" in matrix
+                else "ensembl_gene_id"
+            )
+            # fmt: on
+            logger.trace(f"Merging conversion data for {matrix_name}, existing id column is: {existing_data}")
+            input_matrices[matrix_name] = (
+                input_matrices[matrix_name]
+                .merge(conversion, how="left", on=[existing_data])
+                .dropna()
+                .reset_index(drop=True)
+            )
+
+    logger.debug("Updated missing genomic data")
+    return input_matrices
+
+
 async def _process(
     *,
     context_name: str,
