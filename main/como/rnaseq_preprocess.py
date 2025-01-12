@@ -536,7 +536,7 @@ async def _create_gene_info_file(
     gene_data = await MyGene(cache=cache).query(items=list(genes), taxon=taxon, scopes="entrezgene")
     gene_info: pd.DataFrame = pd.DataFrame(
         data=None,
-        columns=pd.Index(data=["ensembl_gene_id", "gene_symbol", "entrez_gene_id", "start_position", "end_position"]),
+        columns=pd.Index(data=["ensembl_gene_id", "gene_symbol", "entrez_gene_id", "size"]),
         index=pd.Index(data=range(len(gene_data))),
     )
     for i, data in enumerate(gene_data):
@@ -545,15 +545,14 @@ async def _create_gene_info_file(
             ensembl_ids = ensembl_ids[0]
 
         start_pos = data.get("genomic_pos.start", 0)
-        start_pos = sum(start_pos) / len(start_pos) if isinstance(start_pos, list) else start_pos
+        start_pos: int = int(sum(start_pos) / len(start_pos)) if isinstance(start_pos, list) else int(start_pos)
         end_pos = data.get("genomic_pos.end", 0)
-        end_pos = sum(end_pos) / len(end_pos) if isinstance(end_pos, list) else end_pos
+        end_pos: int = int(sum(end_pos) / len(end_pos)) if isinstance(end_pos, list) else int(end_pos)
 
         gene_info.at[i, "gene_symbol"] = data.get("symbol", "-")
         gene_info.at[i, "entrez_gene_id"] = data.get("entrezgene", "-")
         gene_info.at[i, "ensembl_gene_id"] = ensembl_ids
-        gene_info.at[i, "start_position"] = start_pos
-        gene_info.at[i, "end_position"] = end_pos
+        gene_info.at[i, "size"] = end_pos - start_pos
 
     gene_info = gene_info[
         (
@@ -562,8 +561,6 @@ async def _create_gene_info_file(
             & (gene_info["gene_symbol"] != "-")
         )
     ]
-    gene_info["size"] = gene_info["end_position"].astype(int) - gene_info["start_position"].astype(int)
-    gene_info.drop(columns=["start_position", "end_position"], inplace=True)
     gene_info.sort_values(by="ensembl_gene_id", inplace=True)
     gene_info.to_csv(output_filepath, index=False)
     logger.success(f"Gene Info file written at '{output_filepath}'")
