@@ -149,7 +149,7 @@ async def _read_file(
     if not path:
         return None
 
-    if not path.exists():
+    if isinstance(path, Path) and not path.exists():
         logger.critical(f"File {path} does not exist")
         raise FileNotFoundError(f"File {path} does not exist")
 
