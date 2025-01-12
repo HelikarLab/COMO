@@ -583,17 +583,26 @@ async def merge_xomics(  # noqa: C901
                 proteomic_matrix_or_filepath,
             ]
         )
+    source_data = {
+        SourceTypes.TRNA: (trna_matrix_or_filepath, trna_boolean_matrix_or_filepath, trna_metadata_filepath_or_df, output_trna_activity_filepath),  # noqa: E501
+        SourceTypes.MRNA: (mrna_matrix_or_filepath, mrna_boolean_matrix_or_filepath, mrna_metadata_filepath_or_df, output_mrna_activity_filepath),  # noqa: E501
+        SourceTypes.SCRNA: (scrna_matrix_or_filepath, scrna_boolean_matrix_or_filepath, scrna_metadata_filepath_or_df, output_scrna_activity_filepath),  # noqa: E501
+        SourceTypes.PROTEOMICS: (proteomic_matrix_or_filepath, proteomic_boolean_matrix_or_filepath, proteomic_metadata_filepath_or_df, output_proteomic_activity_filepath),  # noqa: E501
+    }
+    # fmt: on
+    for source in source_data:
+        _validate_source_arguments(source, source_data[source])
 
     if all(
         file is None
-        for file in [
+        for file in (
             trna_matrix_or_filepath,
             mrna_matrix_or_filepath,
             scrna_matrix_or_filepath,
             proteomic_matrix_or_filepath,
-        ]
+        )
     ):
-        raise ValueError("No data was passed!")
+        _log_and_raise_error("No data was passed!", error=ValueError, level=LogLevel.ERROR)
 
     if adjust_method not in AdjustmentMethod:
         raise ValueError(f"Adjustment method must be one of {AdjustmentMethod}; got: {adjust_method}")
