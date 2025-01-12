@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import argparse
-import ast
 import collections
 import re
+import sys
 from collections.abc import Sequence
-from dataclasses import dataclass
-from enum import Enum
+from io import TextIOWrapper
 from pathlib import Path
 from typing import NamedTuple
 
@@ -21,9 +19,6 @@ from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
 from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.imat import IMAT, IMATProperties
 from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
-
-from como.project import Config
-from como.utils import Algorithm, Compartments, split_gene_expression_data, stringlist_to_list
 
 
 class Solver(Enum):
