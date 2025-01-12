@@ -508,6 +508,31 @@ def _build_batches(
             batch_names[source.value].append(_BatchEntry(batch_num=batch_num, sample_names=study_sample_names))
             logger.debug(f"Found {len(study_sample_names)} sample names for study '{study}', batch number {batch_num}")
     return batch_names
+
+
+def _validate_source_arguments(
+    source: SourceTypes,
+    *args,
+) -> None:
+    """Validate arguments for each source are valid.
+
+    If at least one input item is provided, validate that all required items are also present.
+
+    :param matrix_or_filepath: The gene count matrix or filepath
+    :param boolean_matrix_or_filepath: The boolean matrix of gene activities
+    :param metadata_filepath_or_df: Dataframe or filepath to sample metadata
+    :param output_activity_filepath: Output filepath location
+    :param source: Source type
+
+    """
+    if any(i for i in args) and not all(i for i in args):
+        _log_and_raise_error(
+            f"Must specify all or none of '{source.value}' arguments",
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
+
+
 async def merge_xomics(  # noqa: C901
     context_name: str,
     trna_matrix_or_filepath: Path | pd.DataFrame | None,
