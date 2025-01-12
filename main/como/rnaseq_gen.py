@@ -594,7 +594,15 @@ def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
     return metrics
 
 
-def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions, calculate_fpkm: bool) -> NamedMetrics:
+def zfpkm_filter(
+    *,
+    metrics: NamedMetrics,
+    filtering_options: _FilteringOptions,
+    calculate_fpkm: bool,
+    force_zfpkm_plot: bool,
+    peak_parameters: PeakIdentificationParameters,
+    bandwidth: int,
+) -> NamedMetrics:
     """Apply zFPKM filtering to the FPKM matrix for a given sample."""
     min_sample_expression = filtering_options.replicate_ratio
     high_confidence_sample_expression = filtering_options.high_replicate_ratio
@@ -605,12 +613,19 @@ def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions,
     for metric in metrics.values():
         # if fpkm was not calculated, the normalization matrix will be empty; collect the count matrix instead
         matrix = metric.count_matrix if metric.normalization_matrix.empty else metric.normalization_matrix
-        matrix = matrix[matrix.sum(axis=1) > 0]  # remove rows (genes) that have no counts
+        matrix = matrix[matrix.sum(axis=1) > 0]  # remove rows (genes) that have no counts across all samples
 
         minimums = matrix == 0
-        results, zfpkm_df = zfpkm_transform(matrix)
+        results, zfpkm_df = zfpkm_transform(matrix, peak_parameters=peak_parameters, bandwidth=bandwidth)
         zfpkm_df[minimums] = -4
-        zfpkm_plot(results)
+
+        if len(results) > 10 and not force_zfpkm_plot:
+            logger.warning(
+                "Not plotting zFPKM results because more than 10 plots would be created. "
+                "If you would like to plot them anyway, set 'force_zfpkm_plot' to True"
+            )
+        else:
+            zfpkm_plot(results)
 
         # determine which genes are expressed
         min_samples = round(min_sample_expression * len(zfpkm_df.columns))
