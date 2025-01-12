@@ -97,21 +97,10 @@ async def _combine_z_distribution_for_source(
     weighted_z_floor: int = -6,
     weighted_z_ceiling: int = 6,
 ):
-    def weighted_z(
-        x: npt.NDArray[float],
-        n_reps: int,
-        floor: int,
-        ceiling: int,
-    ) -> npt.NDArray[float]:
-        na_values = np.where(np.isnan(x))[0]
-        if len(na_values) > 0:
-            x = np.delete(x, na_values)
-            n_reps = np.delete(n_reps, na_values)
-        weights = n_reps / np.sum(n_reps)
-        numerator = np.sum(weights * x)
-        denominator = np.sqrt(np.sum(weights**2))
-        result = numerator / denominator
-        return np.clip(result, floor, ceiling)
+    if _num_columns(merged_source_data) <= 2:
+        logger.warning("A single source exists, returning matrix as-is because no additional combining can be done")
+        merged_source_data.columns = ["ensembl_gene_id", "combine_z"]
+        return merged_source_data
 
     if _num_rows(matrix) < 2:
         matrix.columns = ["entrez_gene_id", "combine_z"]
@@ -141,6 +130,22 @@ async def _combine_z_distribution_for_source(
         df=stack_df,
         title=f"Combined Z-score Distribution for {context_name} - batch #{batch_num}",
         output_png_filepath=output_png_filepath,
+    values = merged_source_data.iloc[:, 1:].values
+    mask = ~np.isnan(values)
+    masked_values = np.where(mask, values, 0)  # Replace NaN with 0
+    masked_num_replicates = np.where(mask, num_replicates, 0)
+
+    weights = masked_num_replicates / np.sum(masked_num_replicates, axis=1, keepdims=True)
+    numerator = np.sum(weights * masked_values, axis=1)
+    denominator = np.sqrt(np.sum(weights**2, axis=1))
+    weighted_matrix = numerator / denominator
+    weighted_matrix = np.clip(weighted_matrix, weighted_z_floor, weighted_z_ceiling)
+    merge_df = pd.concat([merged_source_data, pd.Series(weighted_matrix, name="combined")], axis=1)
+    weighted_matrix = pd.DataFrame(
+        {
+            "ensembl_gene_id": merged_source_data["ensembl_gene_id"],
+            "combine_z": weighted_matrix,
+        }
     )
     return weighted_matrix
 
