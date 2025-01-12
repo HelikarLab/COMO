@@ -806,15 +806,6 @@ async def _process(
     logger.success(f"Wrote boolean matrix to {output_boolean_activity_filepath}")
 
 
-async def _create_metadata_df(path: Path) -> pd.DataFrame:
-    if path.suffix not in {".xls", ".xlsx"}:
-        raise ValueError(
-            f"Expected an excel file with extension of '.xlsx' or '.xls', got '{path.suffix}'. "
-            f"Attempted to process: {path}"
-        )
-    return pd.read_excel(path)
-
-
 async def rnaseq_gen(
     context_name: str,
     input_rnaseq_filepath: Path,
