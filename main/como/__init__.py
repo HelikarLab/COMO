@@ -1,11 +1,6 @@
-import pandas as pd
-
-from como.project import Config
 from como.utils import stringlist_to_list
+from como.data_types import LogLevel, FilteringTechnique, AdjustmentMethod, Solver
 
-__all__ = ["stringlist_to_list", "Config"]
+
+__all__ = ["stringlist_to_list", "LogLevel", "FilteringTechnique", "AdjustmentMethod", "Solver"]
 __version__ = "1.11.1"
-
-
-def return_placeholder_data() -> pd.DataFrame:
-    return pd.DataFrame(data=0, index=pd.Index(data=[0], name="entrez_gene_id"), columns=["expressed", "top"])

@@ -277,3 +277,6 @@ def _num_rows(item: pd.DataFrame | npt.NDArray) -> int:
 
 def _num_columns(item: pd.DataFrame | npt.NDArray) -> int:
     return item.shape[0]
+def return_placeholder_data() -> pd.DataFrame:
+    return pd.DataFrame(data=0, index=pd.Index(data=[0], name="entrez_gene_id"), columns=["expressed", "top"])
+
