@@ -934,12 +934,6 @@ async def rnaseq_gen(
         )
 
     logger.debug(f"Starting '{context_name}'")
-    output_boolean_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
-    metadata_df = (
-        input_metadata_filepath_or_df
-        if isinstance(input_metadata_filepath_or_df, pd.DataFrame)
-        else await _create_metadata_df(input_metadata_filepath_or_df)
-    )
     await _process(
         context_name=context_name,
         rnaseq_matrix_filepath=input_rnaseq_filepath,
