@@ -111,9 +111,9 @@ def _set_boundaries(
     upper_bounds: list[float],
 ) -> cobra.Model:
     # get boundary reactions
-    exchange_rxns = [rxn.id for rxn in all_rxns if re.search("EX_", rxn.id)]
-    sink_rxns = [rxn.id for rxn in all_rxns if re.search("sink_", rxn.id)]
-    demand_rxns = [rxn.id for rxn in all_rxns if re.search("DM_", rxn.id)]
+    exchange_rxns = [rxn.id for rxn in model.reactions if re.search("EX_", rxn.id)]
+    sink_rxns = [rxn.id for rxn in model.reactions if re.search("sink_", rxn.id)]
+    demand_rxns = [rxn.id for rxn in model.reactions if re.search("DM_", rxn.id)]
 
     # Allows all boundary reactions to be used if none are given
     allow_all_boundary_rxns = not bound_rxns
