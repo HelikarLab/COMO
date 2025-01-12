@@ -121,7 +121,7 @@ async def _combine_z_distribution_for_source(
     weighted_matrix = numerator / denominator
     weighted_matrix = np.clip(weighted_matrix, weighted_z_floor, weighted_z_ceiling)
     logger.trace("Finished combining z-distribution")
-    merge_df = pd.concat([merged_source_data, pd.Series(weighted_matrix, name="combined")], axis=1)
+    # merge_df = pd.concat([merged_source_data, pd.Series(weighted_matrix, name="combined")], axis=1)
     weighted_matrix = pd.DataFrame(
         {
             "ensembl_gene_id": merged_source_data["ensembl_gene_id"],
@@ -129,13 +129,13 @@ async def _combine_z_distribution_for_source(
         }
     )
 
-    stack_df = pd.melt(
-        merge_df,
-        id_vars=["ensembl_gene_id"],
-        value_vars=merge_df.columns[1:],  # all other columns are values
-        var_name="source",
-        value_name="zscore",
-    )
+    # stack_df = pd.melt(
+    #     merge_df,
+    #     id_vars=["ensembl_gene_id"],
+    #     value_vars=merge_df.columns[1:],  # all other columns are values
+    #     var_name="source",
+    #     value_name="zscore",
+    # )
     # graph_zscore_distribution(
     #     df=stack_df,
     #     title=f"Combined Z-score Distribution for {context_name}",
