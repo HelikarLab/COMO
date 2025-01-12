@@ -357,7 +357,8 @@ async def _create_config_df(  # noqa: C901
             _log_and_raise_error(
                 (
                     f"\n\nFilename of '{gene_count_filename}' is not valid. "
-                    f"Should be 'contextName_SXRYrZ.tab', where X is the study/batch number, Y is the replicate number, "
+                    f"Should be 'contextName_SXRYrZ.tab', "
+                    f"where X is the study/batch number, Y is the replicate number, "
                     f"and Z is the run number."
                     "\n\nIf not a multi-run sample, exclude 'rZ' from the filename."
                 ),
