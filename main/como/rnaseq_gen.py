@@ -164,11 +164,12 @@ async def _build_matrix_results(
     :param taxon: The NCBI Taxon ID
     :return: A dataclass `ReadMatrixResults`
     """
+    matrix.dropna(inplace=True)
     conversion = await ensembl_to_gene_id_and_symbol(ids=matrix["ensembl_gene_id"].tolist(), taxon=taxon)
     conversion["ensembl_gene_id"] = conversion["ensembl_gene_id"].str.split(",")
     conversion = conversion.explode("ensembl_gene_id")
     conversion.reset_index(inplace=True, drop=True)
-    matrix = matrix.merge(conversion, on="ensembl_gene_id", how="left")
+    matrix = matrix.merge(conversion, on=["ensembl_gene_id", "entrez_gene_id", "gene_symbol"], how="left")
 
     # Only include Entrez and Ensembl Gene IDs that are present in `gene_info`
     matrix["entrez_gene_id"] = matrix["entrez_gene_id"].str.split("//")
