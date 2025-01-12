@@ -825,6 +825,8 @@ async def rnaseq_gen(
     zfpkm_bandwidth: int = 1,
     cutoff: int | float | None = None,
     force_zfpkm_plot: bool = False,
+    log_level: LogLevel = LogLevel.INFO,
+    log_location: str | TextIOWrapper = sys.stderr,
 ) -> None:
     """Generate a list of active and high-confidence genes from a gene count matrix.
 
@@ -857,10 +859,9 @@ async def rnaseq_gen(
     :param log_location: The location to write logs to
     :return: None
     """
-    technique = (
-        FilteringTechnique.from_string(str(technique.lower())) if isinstance(technique, (str, int)) else technique
-    )
+    _set_up_logging(level=log_level, location=log_location)
 
+    technique = FilteringTechnique(technique) if isinstance(technique, str) else technique
     match technique:
         case FilteringTechnique.TPM:
             cutoff = cutoff or 25
