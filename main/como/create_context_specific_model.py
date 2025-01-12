@@ -20,29 +20,8 @@ from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.imat import IMAT, IMATProperties
 from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
 
-
-class Solver(Enum):
-    """Solver used to seed context specific model."""
-
-    GLPK = "GLPK"
-    GUROBI = "GUROBI"
-    SCIPY = "SCIPY"
-    GLPK_EXACT = "GLPK_EXACT"
-
-    @staticmethod
-    def from_string(value: str) -> Solver:
-        """Convert string to Solver enum."""
-        match value.lower():
-            case "glpk":
-                return Solver.GLPK
-            case "gurobi":
-                return Solver.GUROBI
-            case "scipy":
-                return Solver.SCIPY
-            case "glpk_exact":
-                return Solver.GLPK_EXACT
-            case _:
-                raise ValueError(f"Unknown solver: {value}")
+from como.data_types import Algorithm, CobraCompartments, LogLevel, Solver
+from como.utils import _log_and_raise_error, _read_file, _set_up_logging, split_gene_expression_data
 
 
 class _BoundaryReactions(NamedTuple):
