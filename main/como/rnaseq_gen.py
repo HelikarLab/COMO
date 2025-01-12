@@ -527,6 +527,7 @@ def cpm_filter(
         counts_per_million: pd.DataFrame = (counts / library_size) * 1_000_000
         counts_per_million.insert(0, "entrez_gene_ids", pd.Series(entrez_ids))
         logger.debug(f"Writing CPM matrix to {output_filepath}")
+        counts_per_million.dropna(inplace=True)
         counts_per_million.to_csv(output_filepath, index=False)
 
         # TODO: Counts per million is adding ~61,500 columns (equal to the number of genes) for some reason.
