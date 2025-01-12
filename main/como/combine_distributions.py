@@ -76,12 +76,12 @@ async def _combine_z_distribution_for_batch(
     if len(stack_df["source"].unique()) > 10:
         stack_df = stack_df[stack_df["source"] == "combined"]
 
-    graph_zscore_distribution(
-        stack_df,
-        title=f"Combined Z-score Distribution for {context_name} - batch #{batch.batch_num}",
-        output_filepath=output_figure_dirpath
-        / f"{context_name}_{source.value}_batch{batch.batch_num}_combined_zscore_distribution.pdf",
-    )
+    # graph_zscore_distribution(
+    #     stack_df,
+    #     title=f"Combined Z-score Distribution for {context_name} - batch #{batch.batch_num}",
+    #     output_filepath=output_figure_dirpath
+    #     / f"{context_name}_{source.value}_batch{batch.batch_num}_combined_zscore_distribution.pdf",
+    # )
 
     weighted_matrix.columns = ["ensembl_gene_id", batch.batch_num]
     weighted_matrix.to_csv(output_combined_matrix_filepath, index=False)
@@ -102,8 +102,6 @@ async def _combine_z_distribution_for_source(
         merged_source_data.columns = ["ensembl_gene_id", "combine_z"]
         return merged_source_data
 
-    print(f"Making directory for '{output_combined_matrix_filepath.parent}'")
-    print(f"Making directory for '{output_figure_filepath.parent}'")
     await asyncio.gather(
         *[
             aiofiles.os.makedirs(output_combined_matrix_filepath.parent.as_posix(), exist_ok=True),
@@ -138,6 +136,11 @@ async def _combine_z_distribution_for_source(
         var_name="source",
         value_name="zscore",
     )
+    # graph_zscore_distribution(
+    #     df=stack_df,
+    #     title=f"Combined Z-score Distribution for {context_name}",
+    #     output_filepath=output_figure_filepath,
+    # )
     return weighted_matrix
 
 
@@ -184,25 +187,27 @@ def _combine_z_distribution_for_context(
         }
     )
 
-    stack_df = pd.concat(
-        [
-            pd.DataFrame(
-                {
-                    "ensembl_gene_id": merge_df["ensembl_gene_id"],
-                    "zscore": merge_df[col].astype(float),
-                    "source": col,
-                }
-            )
-            for col in merge_df.columns[1:]
-        ]
+    stack_df = pd.melt(
+        z_matrix,
+        id_vars=["ensembl_gene_id"],
+        value_vars=z_matrix.columns[1:],
+        var_name="source",
+        value_name="zscore",
     )
-
-    graph_zscore_distribution(
-        df=stack_df,
-        title=f"Combined Omics Z-score Distribution for {context}",
-        output_png_filepath=output_png_filepath,
+    combined_df = pd.DataFrame(
+        {
+            "ensembl_gene_id": z_matrix["ensembl_gene_id"],
+            "zscore": combined_z_matrix,
+            "source": "combined",
+        }
     )
-    return combined_z_matrix
+    stack_df = pd.concat([stack_df, combined_df])
+    # graph_zscore_distribution(
+    #     df=stack_df,
+    #     title=f"Combined Z-score Distribution for {context}",
+    #     output_filepath=output_graph_filepath,
+    # )
+    return combined_z_matrix_df
 
 
 async def _begin_combining_distributions(
