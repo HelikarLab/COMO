@@ -124,6 +124,12 @@ async def _combine_z_distribution_for_source(
                 {"ensembl_gene_id": merge_df["ensembl_gene_id"], "zscore": merge_df[col].astype(float), "source": col}
                 for col in merge_df.columns[1:]
             )
+    print(f"Making directory for '{output_combined_matrix_filepath.parent}'")
+    print(f"Making directory for '{output_figure_filepath.parent}'")
+    await asyncio.gather(
+        *[
+            aiofiles.os.makedirs(output_combined_matrix_filepath.parent.as_posix(), exist_ok=True),
+            aiofiles.os.makedirs(output_figure_filepath.parent.as_posix(), exist_ok=True),
         ]
     )
     graph_zscore_distribution(
