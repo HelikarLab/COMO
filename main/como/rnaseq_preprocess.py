@@ -17,7 +17,7 @@ from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol
 from loguru import logger
 
 from como.data_types import PATH_TYPE, LogLevel, RNAType
-from como.utils import _listify, _read_file, _set_up_logging
+from como.utils import _listify, _log_and_raise_error, _read_file, _set_up_logging
 
 
 @dataclass
@@ -36,7 +36,11 @@ class _STARinformation:
     @classmethod
     async def build_from_tab(cls, filepath: Path) -> _STARinformation:
         if filepath.suffix != ".tab":
-            raise ValueError(f"Building STAR information requires a '.tab' file; received: '{filepath}'")
+            _log_and_raise_error(
+                f"Building STAR information requires a '.tab' file; received: '{filepath}'",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
 
         async with aiofiles.open(filepath) as i_stream:
             unmapped = await i_stream.readline()
@@ -90,25 +94,41 @@ class _StudyMetrics:
         self.__sample_names = [f.stem for f in self.count_files]
 
         if len(self.count_files) != len(self.strand_files):
-            raise ValueError(
-                f"Unequal number of count files and strand files for study '{self.study_name}'. "
-                f"Found {len(self.count_files)} count files and {len(self.strand_files)} strand files."
+            _log_and_raise_error(
+                (
+                    f"Unequal number of count files and strand files for study '{self.study_name}'. "
+                    f"Found {len(self.count_files)} count files and {len(self.strand_files)} strand files."
+                ),
+                error=ValueError,
+                level=LogLevel.ERROR,
             )
 
         if self.num_samples != len(self.count_files):
-            raise ValueError(
-                f"Unequal number of samples and count files for study '{self.study_name}'. "
-                f"Found {self.num_samples} samples and {len(self.count_files)} count files."
+            _log_and_raise_error(
+                (
+                    f"Unequal number of samples and count files for study '{self.study_name}'. "
+                    f"Found {self.num_samples} samples and {len(self.count_files)} count files."
+                ),
+                error=ValueError,
+                level=LogLevel.ERROR,
             )
 
         if self.num_samples != len(self.strand_files):
-            raise ValueError(
-                f"Unequal number of samples and strand files for study '{self.study_name}'. "
-                f"Found {self.num_samples} samples and {len(self.strand_files)} strand files."
+            _log_and_raise_error(
+                (
+                    f"Unequal number of samples and strand files for study '{self.study_name}'. "
+                    f"Found {self.num_samples} samples and {len(self.strand_files)} strand files."
+                ),
+                error=ValueError,
+                level=LogLevel.ERROR,
             )
 
         if self.__num_samples == 1:
-            raise ValueError(f"Only one sample exists for study {self.study_name}. Provide at least two samples")
+            _log_and_raise_error(
+                f"Only one sample exists for study {self.study_name}. Provide at least two samples",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
 
         self.count_files.sort()
         self.strand_files.sort()
@@ -127,10 +147,14 @@ def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
     strandedness_directories: list[Path] = sorted([p for p in strand_dir.glob("*") if not p.name.startswith(".")])
 
     if len(gene_counts_directories) != len(strandedness_directories):
-        raise ValueError(
-            f"Unequal number of gene count directories and strandedness directories. "
-            f"Found {len(gene_counts_directories)} gene count directories and {len(strandedness_directories)} strandedness directories."  # noqa: E501
-            f"\nGene count directory: {gene_count_dir}\nStrandedness directory: {strand_dir}"
+        _log_and_raise_error(
+            (
+                f"Unequal number of gene count directories and strandedness directories. "
+                f"Found {len(gene_counts_directories)} gene count directories and {len(strandedness_directories)} strandedness directories."  # noqa: E501
+                f"\nGene count directory: {gene_count_dir}\nStrandedness directory: {strand_dir}"
+            ),
+            error=ValueError,
+            level=LogLevel.ERROR,
         )
 
     # For each study, collect gene count files, fragment files, insert size files, layouts, and strandedness information
@@ -139,9 +163,15 @@ def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
         count_files = list(gene_dir.glob("*.tab"))
         strand_files = list(strand_dir.glob("*.txt"))
         if len(count_files) == 0:
-            raise ValueError(f"No count files found for study '{gene_dir.stem}'.")
+            _log_and_raise_error(
+                f"No count files found for study '{gene_dir.stem}'.", error=ValueError, level=LogLevel.ERROR
+            )
         if len(strand_files) == 0:
-            raise ValueError(f"No strandedness files found for study '{gene_dir.stem}'.")
+            _log_and_raise_error(
+                f"No strandedness files found for study '{gene_dir.stem}'.",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
 
         study_metrics.append(
             _StudyMetrics(
@@ -160,9 +190,13 @@ async def _process_first_multirun_sample(strand_file: Path, all_counts_files: li
         strand_information = strand_file.read_text().rstrip("\n").lower()
 
         if strand_information not in ("none", "first_read_transcription_strand", "second_read_transcription_strand"):
-            raise ValueError(
-                f"Unrecognized Strand Information: {strand_information}; "
-                f"expected 'none', 'first_read_transcription_strand', or 'second_read_transcription_strand'"
+            _log_and_raise_error(
+                (
+                    f"Unrecognized Strand Information: {strand_information}; "
+                    f"expected 'none', 'first_read_transcription_strand', or 'second_read_transcription_strand'"
+                ),
+                error=ValueError,
+                level=LogLevel.ERROR,
             )
 
         if strand_information == "none":
@@ -191,9 +225,13 @@ async def _process_standard_replicate(counts_file: Path, strand_file: Path, samp
     strand_information = strand_file.read_text().rstrip("\n").lower()
 
     if strand_information not in ("none", "first_read_transcription_strand", "second_read_transcription_strand"):
-        raise ValueError(
-            f"Unrecognized Strand Information: {strand_information}; "
-            f"expected 'none', 'first_read_transcription_strand', or 'second_read_transcription_strand'"
+        _log_and_raise_error(
+            (
+                f"Unrecognized Strand Information: {strand_information}; "
+                f"expected 'none', 'first_read_transcription_strand', or 'second_read_transcription_strand'"
+            ),
+            error=ValueError,
+            level=LogLevel.ERROR,
         )
 
     if strand_information == "none":
@@ -306,7 +344,9 @@ async def _create_config_df(  # noqa: C901
     preparation_method: list[str] = []
 
     if len(gene_counts_files) == 0:
-        raise FileNotFoundError(f"No gene count files found in '{gene_counts_dir}'.")
+        _log_and_raise_error(
+            f"No gene count files found in '{gene_counts_dir}'.", error=FileNotFoundError, level=LogLevel.ERROR
+        )
 
     for gene_count_filename in sorted(gene_counts_files):
         # Match S___R___r___
@@ -314,11 +354,15 @@ async def _create_config_df(  # noqa: C901
         # (?:r\d{1,3})? optionally matches a "r" followed by three digits
         label = re.findall(r"S\d{1,3}R\d{1,3}(?:r\d{1,3})?", gene_count_filename.as_posix())[0]
         if not label:
-            raise ValueError(
-                f"\n\nFilename of '{gene_count_filename}' is not valid. "
-                f"Should be 'contextName_SXRYrZ.tab', where X is the study/batch number, Y is the replicate number, "
-                f"and Z is the run number."
-                "\n\nIf not a multi-run sample, exclude 'rZ' from the filename."
+            _log_and_raise_error(
+                (
+                    f"\n\nFilename of '{gene_count_filename}' is not valid. "
+                    f"Should be 'contextName_SXRYrZ.tab', where X is the study/batch number, Y is the replicate number, "
+                    f"and Z is the run number."
+                    "\n\nIf not a multi-run sample, exclude 'rZ' from the filename."
+                ),
+                error=ValueError,
+                level=LogLevel.ERROR,
             )
 
         study_number = re.findall(r"S\d{1,3}", label)[0]
@@ -355,9 +399,13 @@ async def _create_config_df(  # noqa: C901
             with layout_files[0].open("r") as file:
                 layout = file.read().strip()
         elif len(layout_files) > 1:
-            raise ValueError(
-                f"Multiple matching layout files for {label}, "
-                f"make sure there is only one copy for each replicate in COMO_input"
+            _log_and_raise_error(
+                (
+                    f"Multiple matching layout files for {label}, "
+                    f"make sure there is only one copy for each replicate in COMO_input"
+                ),
+                error=ValueError,
+                level=LogLevel.ERROR,
             )
 
         strand = "UNKNOWN"
@@ -371,9 +419,13 @@ async def _create_config_df(  # noqa: C901
             with strand_files[0].open("r") as file:
                 strand = file.read().strip()
         elif len(strand_files) > 1:
-            raise ValueError(
-                f"Multiple matching strandedness files for {label}, "
-                f"make sure there is only one copy for each replicate in COMO_input"
+            _log_and_raise_error(
+                (
+                    f"Multiple matching strandedness files for {label}, "
+                    f"make sure there is only one copy for each replicate in COMO_input"
+                ),
+                error=ValueError,
+                level=LogLevel.ERROR,
             )
 
         prep = "total"
@@ -383,11 +435,19 @@ async def _create_config_df(  # noqa: C901
             with prep_files[0].open("r") as file:
                 prep = file.read().strip().lower()
                 if prep not in ["total", "mrna"]:
-                    raise ValueError(f"Prep method must be either 'total' or 'mrna' for {label}")
+                    _log_and_raise_error(
+                        f"Prep method must be either 'total' or 'mrna' for {label}",
+                        error=ValueError,
+                        level=LogLevel.ERROR,
+                    )
         elif len(prep_files) > 1:
-            raise ValueError(
-                f"Multiple matching prep files for {label}, "
-                f"make sure there is only one copy for each replicate in COMO_input"
+            _log_and_raise_error(
+                (
+                    f"Multiple matching prep files for {label}, "
+                    f"make sure there is only one copy for each replicate in COMO_input"
+                ),
+                error=ValueError,
+                level=LogLevel.ERROR,
             )
 
         mean_fragment_size = 100
@@ -417,9 +477,13 @@ async def _create_config_df(  # noqa: C901
 
                     mean_fragment_size = sum(mean_fragment_sizes * library_sizes) / sum(library_sizes)
         elif len(frag_files) > 1:
-            raise ValueError(
-                f"Multiple matching fragment files for {label}, "
-                f"make sure there is only one copy for each replicate in COMO_input"
+            _log_and_raise_error(
+                (
+                    f"Multiple matching fragment files for {label}, "
+                    f"make sure there is only one copy for each replicate in COMO_input"
+                ),
+                error=ValueError,
+                level=LogLevel.ERROR,
             )
 
         sample_names.append(f"{context_name}_{study_number}{rep_number}")
