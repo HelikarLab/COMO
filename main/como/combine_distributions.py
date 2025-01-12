@@ -257,12 +257,39 @@ async def _begin_combining_distributions(
             merged_batch_results = (
                 df if merged_batch_results.empty else merged_batch_results.merge(df, on="ensembl_gene_id", how="outer")
             )
-            zscore_results.append(_CombineOmicsInput(z_score_matrix=combine_batches_zscore, type=source, weight=weight))  # type: ignore
-            combine_batches_zscore.to_csv(output_filepath, index=False)
 
-    combined_z_omics = _combine_omics_zdistros(
+        merged_source_results: pd.DataFrame = await _combine_z_distribution_for_source(
+            merged_source_data=merged_batch_results,
+            context_name=context_name,
+            num_replicates=sum(batch.num_samples for batch in batch_names[source.value]),
+            output_combined_matrix_filepath=(
+                output_filepaths[source.value].parent
+                / f"{context_name}_{source.value}_combined_zscore_distribution.csv"
+            ),
+            output_figure_filepath=(
+                output_figure_dirpath / f"{context_name}_{source.value}_combined_zscore_distribution.pdf"
+            ),
+            weighted_z_floor=weighted_z_floor,
+            weighted_z_ceiling=weighted_z_ceiling,
+        )
+        z_score_results.append(
+            _CombineOmicsInput(
+                z_score_matrix=merged_source_results,
+                type=source,
+                weight=source_weights[source.value],
+            )
+        )
+        merged_source_results.to_csv(output_filepaths[source.value])
+        logger.success(
+            f"Wrote z-scores for source '{source.value}' "
+            f"in context '{context_name}' to '{output_filepaths[source.value]}'"
+        )
+
+    logger.trace(f"Combining z-score distributions for all sources in context '{context_name}'")
+    merged_context_results = _combine_z_distribution_for_context(
         context=context_name,
-        zscore_results=zscore_results,
-        output_png_filepath=output_figure_dirpath / f"{context_name}_combined_omics_distribution.png",
+        zscore_results=z_score_results,
+        output_graph_filepath=output_figure_dirpath / f"{context_name}_combined_omics_distribution.pdf",
     )
-    combined_z_omics.to_csv(output_final_model_scores, index=False)
+    merged_context_results.to_csv(output_final_model_scores, index=False)
+    logger.success(f"Finished combining z-scores for context '{context_name}'")
