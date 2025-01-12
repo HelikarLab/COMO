@@ -389,22 +389,10 @@ async def _update_missing_data(input_matrices: _InputMatrices, taxon_id: int) ->
 async def _process(
     *,
     context_name: str,
-    trna_matrix: pd.DataFrame | None,
-    mrna_matrix: pd.DataFrame | None,
-    scrna_matrix: pd.DataFrame | None,
-    proteomic_matrix: pd.DataFrame | None,
-    trna_boolean_matrix: pd.DataFrame | None,
-    mrna_boolean_matrix: pd.DataFrame | None,
-    scrna_boolean_matrix: pd.DataFrame | None,
-    proteomic_boolean_matrix: pd.DataFrame | None,
-    trna_batches: dict[int, list[str]],
-    mrna_batches: dict[int, list[str]],
-    scrna_batches: dict[int, list[str]],
-    proteomic_batches: dict[int, list[str]],
-    trna_weight: int,
-    mrna_weight: int,
-    scrna_weight: int,
-    proteomic_weight: int,
+    input_matrices: _InputMatrices,
+    boolean_matrices: _InputMatrices,
+    batch_names: _BatchNames,
+    source_weights: _SourceWeights,
     taxon_id: int,
     minimum_source_expression: int,
     expression_requirement: int,
@@ -416,10 +404,7 @@ async def _process(
     adjust_for_missing_sources: bool,
     output_merge_activity_filepath: Path,
     output_transcriptomic_details_filepath: Path,
-    output_trna_activity_filepath: Path | None,
-    output_mrna_activity_filepath: Path | None,
-    output_scrna_activity_filepath: Path | None,
-    output_proteomic_activity_filepath: Path | None,
+    output_activity_filepaths: _OutputCombinedSourceFilepath,
     output_final_model_scores_filepath: Path,
     output_figure_dirpath: Path | None,
 ):
@@ -592,68 +577,81 @@ async def merge_xomics(  # noqa: C901
     if output_figure_dirpath:
         output_figure_dirpath.mkdir(parents=True, exist_ok=True)
 
-    # fmt: off
-    trna_matrix: pd.DataFrame | None = (
-        pd.read_csv(trna_matrix_or_filepath) if isinstance(trna_matrix_or_filepath, Path)
-        else trna_matrix_or_filepath if isinstance(trna_matrix_or_filepath, pd.DataFrame)
-        else None
-    )
-    mrna_matrix: pd.DataFrame | None = (
-        pd.read_csv(mrna_matrix_or_filepath) if isinstance(mrna_matrix_or_filepath, Path)
-        else mrna_matrix_or_filepath if isinstance(mrna_matrix_or_filepath, pd.DataFrame)
-        else None
-    )
-    scrna_matrix: pd.DataFrame | None = (
-        pd.read_csv(scrna_matrix_or_filepath) if isinstance(scrna_matrix_or_filepath, Path)
-        else scrna_matrix_or_filepath if isinstance(scrna_matrix_or_filepath, pd.DataFrame)
-        else None
-    )
-    proteomic_matrix: pd.DataFrame | None = (
-        pd.read_csv(proteomic_matrix_or_filepath) if isinstance(proteomic_matrix_or_filepath, Path)
-        else proteomic_matrix_or_filepath if isinstance(proteomic_matrix_or_filepath, pd.DataFrame)
-        else None
+    # Build trna items
+    trna_matrix: pd.DataFrame | None
+    trna_boolean_matrix: pd.DataFrame | None
+    trna_metadata: pd.DataFrame | None
+    trna_matrix, trna_boolean_matrix, trna_metadata = await asyncio.gather(
+        *[
+            _read_file(trna_matrix_or_filepath),
+            _read_file(trna_boolean_matrix_or_filepath),
+            _read_file(trna_metadata_filepath_or_df),
+        ]
     )
 
-    trna_boolean_matrix: pd.DataFrame | None = (
-        pd.read_csv(trna_boolean_matrix_or_filepath) if isinstance(trna_boolean_matrix_or_filepath, Path)
-        else trna_boolean_matrix_or_filepath if isinstance(trna_boolean_matrix_or_filepath, pd.DataFrame)
-        else None
+    # Build mrna items
+    mrna_matrix: pd.DataFrame | None
+    mrna_boolean_matrix: pd.DataFrame | None
+    mrna_metadata: pd.DataFrame | None
+    mrna_matrix, mrna_boolean_matrix, mrna_metadata = await asyncio.gather(
+        *[
+            _read_file(mrna_matrix_or_filepath),
+            _read_file(mrna_boolean_matrix_or_filepath),
+            _read_file(mrna_metadata_filepath_or_df),
+        ]
     )
-    mrna_boolean_matrix: pd.DataFrame | None = (
-        pd.read_csv(mrna_boolean_matrix_or_filepath) if isinstance(mrna_boolean_matrix_or_filepath, Path)
-        else mrna_boolean_matrix_or_filepath if isinstance(mrna_boolean_matrix_or_filepath, pd.DataFrame)
-        else None
+
+    # build scrna items
+    scrna_matrix: pd.DataFrame | None
+    scrna_boolean_matrix: pd.DataFrame | None
+    scrna_metadata: pd.DataFrame | None
+    scrna_matrix, scrna_boolean_matrix, scrna_metadata = await asyncio.gather(
+        *[
+            _read_file(scrna_matrix_or_filepath),
+            _read_file(scrna_boolean_matrix_or_filepath),
+            _read_file(scrna_metadata_filepath_or_df),
+        ]
     )
-    scrna_boolean_matrix: pd.DataFrame | None = (
-        pd.read_csv(scrna_boolean_matrix_or_filepath) if isinstance(scrna_boolean_matrix_or_filepath, Path)
-        else scrna_boolean_matrix_or_filepath if isinstance(scrna_boolean_matrix_or_filepath, pd.DataFrame)
-        else None
+
+    # build proteomic items
+    proteomic_matrix: pd.DataFrame | None
+    proteomic_boolean_matrix: pd.DataFrame | None
+    proteomic_metadata: pd.DataFrame | None
+    proteomic_matrix, proteomic_boolean_matrix, proteomic_metadata = await asyncio.gather(
+        *[
+            _read_file(proteomic_matrix_or_filepath),
+            _read_file(proteomic_boolean_matrix_or_filepath),
+            _read_file(proteomic_metadata_filepath_or_df),
+        ]
     )
-    proteomic_boolean_matrix: pd.DataFrame | None = (
-        pd.read_csv(proteomic_boolean_matrix_or_filepath) if isinstance(proteomic_boolean_matrix_or_filepath, Path)
-        else proteomic_boolean_matrix_or_filepath if isinstance(proteomic_boolean_matrix_or_filepath, pd.DataFrame)
-        else None
+
+    source_weights = _SourceWeights(trna=trna_weight, mrna=mrna_weight, scrna=scrna_weight, proteomics=proteomic_weight)
+    input_matrices = _InputMatrices(trna=trna_matrix, mrna=mrna_matrix, scrna=scrna_matrix, proteomics=proteomic_matrix)
+    boolean_matrices = _InputMatrices(
+        trna=trna_boolean_matrix,
+        mrna=mrna_boolean_matrix,
+        scrna=scrna_boolean_matrix,
+        proteomics=proteomic_boolean_matrix,
     )
-    # fmt: on
+    output_activity_filepaths = _OutputCombinedSourceFilepath(
+        trna=output_trna_activity_filepath,
+        mrna=output_mrna_activity_filepath,
+        scrna=output_scrna_activity_filepath,
+        proteomics=output_proteomic_activity_filepath,
+    )
+    batch_names = _build_batches(
+        trna_metadata=trna_metadata,
+        mrna_metadata=mrna_metadata,
+        scrna_metadata=scrna_metadata,
+        proteomic_metadata=proteomic_metadata,
+    )
 
     await _process(
         context_name=context_name,
-        trna_matrix=trna_matrix,
-        mrna_matrix=mrna_matrix,
-        scrna_matrix=scrna_matrix,
-        proteomic_matrix=proteomic_matrix,
-        trna_boolean_matrix=trna_boolean_matrix,
-        mrna_boolean_matrix=mrna_boolean_matrix,
-        scrna_boolean_matrix=scrna_boolean_matrix,
-        proteomic_boolean_matrix=proteomic_boolean_matrix,
-        trna_batches=trna_batches,
-        mrna_batches=mrna_batches,
-        scrna_batches=scrna_batches,
-        proteomic_batches=proteomic_batches,
-        trna_weight=trna_weight,
-        mrna_weight=mrna_weight,
-        scrna_weight=scrna_weight,
-        proteomic_weight=proteomic_weight,
+        input_matrices=input_matrices,
+        boolean_matrices=boolean_matrices,
+        source_weights=source_weights,
+        batch_names=batch_names,
         taxon_id=taxon_id,
         minimum_source_expression=minimum_source_expression,
         expression_requirement=expression_requirement,
@@ -663,12 +661,9 @@ async def merge_xomics(  # noqa: C901
         merge_zfpkm_distribution=merge_zfpkm_distribution,
         force_activate_high_confidence=force_activate_high_confidence,
         adjust_for_missing_sources=adjust_for_na,
+        output_activity_filepaths=output_activity_filepaths,
         output_merge_activity_filepath=output_merge_activity_filepath,
         output_transcriptomic_details_filepath=output_transcriptomic_details_filepath,
-        output_trna_activity_filepath=output_trna_activity_filepath,
-        output_mrna_activity_filepath=output_mrna_activity_filepath,
-        output_scrna_activity_filepath=output_scrna_activity_filepath,
-        output_proteomic_activity_filepath=output_proteomic_activity_filepath,
         output_final_model_scores_filepath=output_final_model_scores_filepath,
         output_figure_dirpath=output_figure_dirpath,
     )
