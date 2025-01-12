@@ -598,7 +598,29 @@ async def merge_xomics(  # noqa: C901
         _log_and_raise_error("No data was passed!", error=ValueError, level=LogLevel.ERROR)
 
     if adjust_method not in AdjustmentMethod:
-        raise ValueError(f"Adjustment method must be one of {AdjustmentMethod}; got: {adjust_method}")
+        _log_and_raise_error(
+            f"Adjustment method must be one of {AdjustmentMethod}; got: {adjust_method}",
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
+
+    if expression_requirement < 1:
+        logger.warning(
+            f"Expression requirement must be at least 1! Setting to the minimum of 1 now. Got: {expression_requirement}"
+        )
+        expression_requirement = 1
+
+    if expression_requirement is None:
+        expression_requirement = sum(
+            test is not None
+            for test in (
+                trna_matrix_or_filepath,
+                mrna_matrix_or_filepath,
+                scrna_matrix_or_filepath,
+                proteomic_matrix_or_filepath,
+            )
+        )
+        logger.debug(f"Expression requirement not specified; setting to {expression_requirement}")
 
     output_final_model_scores_filepath.parent.mkdir(parents=True, exist_ok=True)
     if output_merge_activity_filepath:
