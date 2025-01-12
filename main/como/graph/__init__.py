@@ -1,11 +1,9 @@
 from pathlib import Path
-from loguru import logger
+
 import pandas as pd
-from matplotlib import pyplot as plt
 import seaborn as sns
-
-
-__all__ = ["z_score_distribution"]
+from loguru import logger
+from matplotlib import pyplot as plt
 
 
 def z_score_distribution(
@@ -13,12 +11,20 @@ def z_score_distribution(
     title: str,
     output_filepath: Path,
 ):
+    """Graph a z-score distribution.
+
+    :param df: The z-score data to graph
+    :param title: Title to add to graph
+    :param output_filepath: Output PNG filepath location
+    :return: None
+    """
     if output_filepath.suffix not in {".png", ".pdf", ".svg"}:
         logger.warning(
-            f"Expected .png, .pdf, or .svg suffix for output_png_filepath, got {output_filepath.suffix}. Defaulting to .pdf"
+            f"Expected .png, .pdf, or .svg suffix for output_png_filepath, got {output_filepath.suffix}. "
+            f"Defaulting to .pdf"
         )
         output_filepath = output_filepath.with_suffix(".pdf")
-    logger.trace(f"Graphing z-score distribution")
+    logger.trace("Graphing z-score distribution")
     output_filepath.parent.mkdir(parents=True, exist_ok=True)
     output_filepath.unlink(missing_ok=True)
 

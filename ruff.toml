@@ -1,6 +1,5 @@
 line-length = 120
 extend-include = ["docs/**/*.py", "tests/**/*.py", "**/*.ipynb"]
-exclude = ["__init__.py"]
 
 [format]
 quote-style = "double"
@@ -46,6 +45,7 @@ ignore = [
     "D101",     # allow undocumented public class
     "D102",     # allow undocumented class method
     "D103",     # allow undocumented public method definitions
+    "D104",     # allow undocumented public package
     "F811",     # allow redefinition of variables, required for pytest fixtures
     "S101",     # allow use of `assert` in test files
 ]
