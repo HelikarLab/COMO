@@ -41,7 +41,17 @@ async def _combine_z_distribution_for_batch(
         ]
     )
 
-    if _num_rows(matrix) < 2:
+    logger.trace(
+        f"Combining z-score distributions: batch #{batch.batch_num}, "
+        f"samples: {len(batch.sample_names)}, "
+        f"source: '{source.value}', "
+        f"context: '{context_name}'"
+    )
+    if _num_columns(matrix) < 2:
+        logger.trace(
+            f"A single sample exists for batch '{batch.batch_num}'. "
+            f"Returning as-is because no additional combining can be done"
+        )
         return matrix
 
     weighted_matrix = np.apply_along_axis(
