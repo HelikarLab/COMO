@@ -802,7 +802,7 @@ async def _process(
     logger.success(f"Wrote boolean matrix to {output_boolean_activity_filepath}")
 
 
-async def rnaseq_gen(
+async def rnaseq_gen(  # noqa: C901
     context_name: str,
     input_rnaseq_filepath: Path,
     input_gene_info_filepath: Path,

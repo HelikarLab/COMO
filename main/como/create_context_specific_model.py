@@ -313,7 +313,7 @@ async def _map_expression_to_reaction(
             error_count += 1
 
     logger.debug(f"Mapped gene expression to reactions, found {error_count} error(s).")
-    expr_vector = np.array(list(reaction_expression.values()), dtype=float)
+    # expr_vector = np.array(list(reaction_expression.values()), dtype=float)
 
     return reaction_expression
 
