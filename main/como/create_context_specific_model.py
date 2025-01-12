@@ -104,14 +104,6 @@ def _gene_rule_logical(gpr_expression: str, level: int = 0) -> str:
     return expression_out
 
 
-def _gene_rule_evaluable(expression_in: str) -> str:
-    """Make expression rule evaluable."""
-    gene_reaction_by_rule = _gene_rule_logical(expression_in)
-    gene_reaction_by_rule = gene_reaction_by_rule.replace("{", "(")
-    gene_reaction_by_rule = gene_reaction_by_rule.replace("}", ")")
-
-    return gene_reaction_by_rule
-
 
 def _set_boundaries(model: cobra.Model, bound_rxns: list, bound_lb, bound_ub) -> tuple[cobra.Model, list]:
     all_rxns = model.reactions  # get all reactions
