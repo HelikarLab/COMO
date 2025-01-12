@@ -130,6 +130,14 @@ async def _combine_z_distribution_for_source(
             "combine_z": weighted_matrix,
         }
     )
+
+    stack_df = pd.melt(
+        merge_df,
+        id_vars=["ensembl_gene_id"],
+        value_vars=merge_df.columns[1:],  # all other columns are values
+        var_name="source",
+        value_name="zscore",
+    )
     return weighted_matrix
 
 
