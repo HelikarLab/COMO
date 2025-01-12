@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from enum import Enum
+import asyncio
+import sys
+from io import TextIOWrapper
 from pathlib import Path
 
 import numpy as np
@@ -8,17 +10,22 @@ import pandas as pd
 from fast_bioservices.biothings.mygene import MyGene
 from loguru import logger
 
-from como import return_placeholder_data
 from como.combine_distributions import (
+    _begin_combining_distributions,
+)
+from como.data_types import (
+    AdjustmentMethod,
+    LogLevel,
+    RNAType,
+    SourceTypes,
     _BatchEntry,
     _BatchNames,
-    _combine_zscores,
     _InputMatrices,
     _OutputCombinedSourceFilepath,
     _SourceWeights,
 )
-from como.data_types import RNAPrepMethod
 from como.project import Config
+from como.utils import _log_and_raise_error, _read_file, _set_up_logging, get_missing_gene_data, return_placeholder_data
 
 
 class _MergedHeaderNames:
