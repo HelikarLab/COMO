@@ -4,6 +4,13 @@ from enum import Enum
 from pathlib import Path
 from typing import Literal
 
+PATH_TYPE = str | Path
+LOG_FORMAT = (
+    "<green>{time:YYYY-MM-DD HH:mm:ss}</> | "
+    "<level>{level:<8}</> | "
+    "<cyan>{name}</>:<cyan>{line}</> - <level>{message}</>"
+)
+
 
 class RNAPrepMethod(Enum):
     TOTAL = "total"
