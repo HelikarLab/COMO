@@ -7,8 +7,9 @@ from pathlib import Path
 
 from loguru import logger
 
-from . import Crux, FTPManager
-from .FileInformation import FileInformation
+from como.data_types import LogLevel
+from como.proteomics import Crux, FileInformation, FTPManager
+from como.utils import _log_and_raise_error
 
 
 class ArgParseFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
@@ -308,14 +309,17 @@ def parse_args() -> argparse.Namespace:
 
     # Validte the input file exists
     if not Path(args.input_csv).is_file():
-        raise FileNotFoundError(f"Input file {args.input} does not exist!")
+        _log_and_raise_error(f"Input file {args.input} does not exist!", error=FileNotFoundError, level=LogLevel.ERROR)
 
     if args.core_count == "all":
         args.core_count = os.cpu_count()
     elif not str(args.core_count).isdigit():
-        raise ValueError(
-            f"Invalid option '{args.core_count}' for option '--cores'. Enter an integer or 'all' to use all cores"
+        _log_and_raise_error(
+            f"Invalid option '{args.core_count}' for option '--cores'. Enter an integer or 'all' to use all cores",
+            error=ValueError,
+            level=LogLevel.ERROR,
         )
+
     else:
         args.core_count = int(args.core_count)
         if args.core_count > os.cpu_count():
