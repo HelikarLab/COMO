@@ -23,67 +23,6 @@ from loguru import logger
 __all__ = ["Compartments", "split_gene_expression_data", "stringlist_to_list", "suppress_stdout"]
 
 
-class Compartments:
-    """Convert from compartment "long-hand" to "short-hand".
-
-    Shorthand from: https://cobrapy.readthedocs.io/en/latest/_modules/cobra/medium/annotations.html
-
-    "Extracellular" -> "e"
-    "golgi" -> "g"
-    """
-
-    SHORTHAND: ClassVar[dict[str, list[str]]] = {
-        "ce": ["cell envelope"],
-        "c": [
-            "cytoplasm",
-            "cytosol",
-            "default",
-            "in",
-            "intra cellular",
-            "intracellular",
-            "intracellular region",
-            "intracellular space",
-        ],
-        "er": ["endoplasmic reticulum"],
-        "erm": ["endoplasmic reticulum membrane"],
-        "e": [
-            "extracellular",
-            "extraorganism",
-            "out",
-            "extracellular space",
-            "extra organism",
-            "extra cellular",
-            "extra-organism",
-            "external",
-            "external medium",
-        ],
-        "f": ["flagellum", "bacterial-type flagellum"],
-        "g": ["golgi", "golgi apparatus"],
-        "gm": ["golgi membrane"],
-        "h": ["chloroplast"],
-        "l": ["lysosome"],
-        "im": ["mitochondrial intermembrane space"],
-        "mm": ["mitochondrial membrane"],
-        "m": ["mitochondrion", "mitochondria"],
-        "n": ["nucleus"],
-        "p": ["periplasm", "periplasmic space"],
-        "x": ["peroxisome", "glyoxysome"],
-        "u": ["thylakoid"],
-        "vm": ["vacuolar membrane"],
-        "v": ["vacuole"],
-        "w": ["cell wall"],
-        "s": ["eyespot", "eyespot apparatus", "stigma"],
-    }
-
-    _REVERSE_LOOKUP: ClassVar[dict[str, list[str]]] = {
-        value.lower(): key for key, values in SHORTHAND.items() for value in values
-    }
-
-    @classmethod
-    def get(cls, longhand: str) -> str | None:
-        """Get the short-hand compartment name from the long-hand name."""
-        return cls._REVERSE_LOOKUP.get(longhand.lower(), None)
-
 
 def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
     """Convert a string from the command line into a Python list.
