@@ -7,7 +7,8 @@ from typing import Any
 
 import numpy as np
 
-from como.utils import stringlist_to_list
+from como.data_types import LogLevel
+from como.utils import _log_and_raise_error, stringlist_to_list
 
 
 @dataclass
@@ -34,43 +35,81 @@ class _Arguments:
             self.seed = np.random.randint(0, 100_000)
 
         if (isdigit(self.min_active_count) and int(self.min_active_count) < 0) or self.min_active_count != "default":
-            raise ValueError("--min-count must be either 'default' or an integer > 0")
+            _log_and_raise_error(
+                "min_active_count must be either 'default' or an integer > 0", error=ValueError, level=LogLevel.ERROR
+            )
 
         if (isdigit(self.quantile) and 0 > int(self.quantile) > 100) or self.quantile != "default":
-            raise ValueError("--quantile must be either 'default' or an integer between 0 and 100")
+            _log_and_raise_error(
+                "quantile must be either 'default' or an integer between 0 and 100",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
 
         if (isdigit(self.replicate_ratio) and 0 > self.replicate_ratio > 1.0) or self.replicate_ratio != "default":
-            raise ValueError("--rep-ratio must be either 'default' or a float between 0 and 1")
+            _log_and_raise_error(
+                "--rep-ratio must be either 'default' or a float between 0 and 1",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
 
         if (isdigit(self.batch_ratio) and 0 > self.batch_ratio > 1.0) or self.batch_ratio != "default":
-            raise ValueError("--batch-ratio must be either 'default' or a float between 0 and 1")
+            _log_and_raise_error(
+                "--batch-ratio must be either 'default' or a float between 0 and 1",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
 
         if self.filtering_technique.lower() not in {"quantile", "tpm", "cpm", "zfpkm"}:
-            raise ValueError("--technique must be either 'quantile', 'tpm', 'cpm', 'zfpkm'")
+            _log_and_raise_error(
+                "--technique must be either 'quantile', 'tpm', 'cpm', 'zfpkm'",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
 
         if self.filtering_technique.lower() == "tpm":
             self.filtering_technique = "quantile"
 
         if self.cluster_algorithm.lower() not in {"mca", "umap"}:
-            raise ValueError("--clust_algo must be either 'mca', 'umap'")
+            _log_and_raise_error(
+                "--clust_algo must be either 'mca', 'umap'",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
 
         if 0 > self.min_distance > 1.0:
-            raise ValueError("--min_dist must be a float between 0 and 1")
+            _log_and_raise_error(
+                "--min_dist must be a float between 0 and 1",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
 
         if (
             isdigit(self.num_replicate_neighbors) and self.num_replicate_neighbors < 1
         ) or self.num_replicate_neighbors != "default":
-            raise ValueError("--n-neighbors-rep must be either 'default' or an integer > 1")
+            _log_and_raise_error(
+                "--n-neighbors-rep must be either 'default' or an integer > 1",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
 
         if (
             isdigit(self.num_batch_neighbors) and self.num_batch_neighbors < 1
         ) or self.num_batch_neighbors != "default":
-            raise ValueError("--n-neighbors-batch must be either 'default' or an integer > 1")
+            _log_and_raise_error(
+                "--n-neighbors-batch must be either 'default' or an integer > 1",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
 
         if (
             isdigit(self.num_context_neighbors) and self.num_context_neighbors < 1
         ) or self.num_context_neighbors != "default":
-            raise ValueError("--n-neighbors-context must be either 'default' or an integer > 1")
+            _log_and_raise_error(
+                "--n-neighbors-context must be either 'default' or an integer > 1",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
 
 
 def _parse_args() -> _Arguments:
