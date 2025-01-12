@@ -17,7 +17,7 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Strip Notebook Output
-        run: uv run jupyter nbconvert --clear-output --inplace "main/COMO.ipynb"
+        run: uv run --python 3.10 jupyter nbconvert --clear-output --inplace "main/COMO.ipynb"
 
       - name: Format Python Imports
         uses: astral-sh/ruff-action@v2
