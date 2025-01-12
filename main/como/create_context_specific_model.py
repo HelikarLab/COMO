@@ -121,25 +121,18 @@ def _set_boundaries(
     # close sinks and demands not in boundary reactions unless no boundary reactions were given
     if not allow_all_boundary_rxns:
         for i, rxn in enumerate(sink_rxns):  # set sinks to 0
-            if rxn not in bound_rxns:  # only allow sink accumulation
-                getattr(model.reactions, rxn).lower_bounds = 0
-                getattr(model.reactions, rxn).upper_bounds = 1000
-            else:  # set from file
-                getattr(model.reactions, rxn).lower_bounds = bound_lb[i]
-                getattr(model.reactions, rxn).upper_bounds = bound_ub[i]
+            getattr(model.reactions, rxn).lower_bounds = lower_bounds[i] if rxn in boundary_reactions else 0
+            getattr(model.reactions, rxn).upper_bounds = upper_bounds[i] if rxn in boundary_reactions else 1000
 
         for i, rxn in enumerate(demand_rxns):
             getattr(model.reactions, rxn).lower_bounds = 0
-            getattr(model.reactions, rxn).upper_bounds = bound_ub[i] if rxn in bound_rxns else 0
+            getattr(model.reactions, rxn).upper_bounds = upper_bounds[i] if rxn in boundary_reactions else 0
 
     # Reaction media
     medium = model.medium  # get reaction media to modify
     for rxn in exchange_rxns:  # open exchanges from exchange file, close unspecified exchanges
-        if rxn not in bound_rxns:
-            medium[rxn] = 0.0
-        else:
-            medium[rxn] = -float(bound_lb[bound_rxns.index(rxn)])
-    model.medium = medium  # set new media
+        medium[rxn] = -float(lower_bounds[boundary_reactions.index(rxn)]) if rxn in boundary_reactions else 0.0
+    model.medium = medium
 
     return model, bound_rm_rxns
 
