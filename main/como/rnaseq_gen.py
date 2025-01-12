@@ -866,23 +866,38 @@ async def rnaseq_gen(
         case FilteringTechnique.TPM:
             cutoff = cutoff or 25
             if cutoff < 1 or cutoff > 100:
-                raise ValueError("Quantile must be between 1 - 100")
+                _log_and_raise_error(
+                    "Quantile must be between 1 - 100",
+                    error=ValueError,
+                    level=LogLevel.ERROR,
+                )
 
         case FilteringTechnique.CPM:
             if cutoff and cutoff < 0:
-                raise ValueError("Cutoff must be greater than 0")
+                _log_and_raise_error(
+                    "Cutoff must be greater than or equal to 0",
+                    error=ValueError,
+                    level=LogLevel.ERROR,
+                )
             elif cutoff:
                 cutoff = "default"
 
         case FilteringTechnique.ZFPKM | FilteringTechnique.UMI:
             cutoff = cutoff or -3
         case _:
-            raise ValueError(f"Technique must be one of {FilteringTechnique}")
+            _log_and_raise_error(
+                f"Technique must be one of {','.join(FilteringTechnique)}. Got: {technique.value}",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
 
     if not input_rnaseq_filepath.exists():
-        raise FileNotFoundError(f"Input RNA-seq file not found! Searching for: '{input_rnaseq_filepath}'")
+        _log_and_raise_error(
+            f"Input RNA-seq file not found! Searching for: '{input_rnaseq_filepath}'",
+            error=FileNotFoundError,
+            level=LogLevel.ERROR,
+        )
 
-        technique = FilteringTechnique.umi
     if prep == RNAType.SCRNA and technique.value.lower() != FilteringTechnique.UMI.value.lower():
         logger.warning(
             "Single cell filtration does not normalize and assumes "
