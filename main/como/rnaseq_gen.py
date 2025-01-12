@@ -278,7 +278,12 @@ def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
     return metrics
 
 
-def _zfpkm_calculation(row: pd.Series, kernel: KernelDensity, peak_parameters: tuple[float, float]) -> _ZFPKMResult:
+# def _zfpkm_calculation(row: pd.Series, kernel: KernelDensity, peak_parameters: tuple[float, float]) -> _ZFPKMResult:
+def _zfpkm_calculation(
+    column: pd.Series,
+    peak_parameters: PeakIdentificationParameters,
+    bandwidth: int = 0.5,
+) -> _ZFPKMResult:
     """Log2 Transformations.
 
     Stabilize the variance in the data to make the distribution more symmetric; this is helpful for Gaussian fitting
