@@ -324,7 +324,7 @@ def _zfpkm_calculation(
         - Higher zFPKM values indicate higher expression levels relative to the "inactive" peak
         - A zFPKM value of 0 represents the mean of the "inactive" distribution
         - Research shows that a zFPKM value of -3 or greater can be used as
-            a threshold for calling a gene as "expressed"
+            a threshold for calling a gene as "active" and/or "expressed"
             : https://doi.org/10.1186/1471-2164-14-778
     """
     row_log2: npt.NDArray = np.log2(row + 1)
