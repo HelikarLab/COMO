@@ -155,11 +155,9 @@ def _combine_z_distribution_for_context(
         logger.trace(
             f"Only 1 source exists for '{context}', returning dataframe as-is becuase no data exists to combine"
         )
-        if _num_rows(z_matrix) > 2
-        else z_matrix.iloc[:, 1:].values
-    ).ravel()
-    merge_df = pd.concat([z_matrix, pd.Series(combined_z_matrix, name="combined")], axis=1)
-    combined_z_matrix = pd.DataFrame(
+        z_matrix.columns = ["ensembl_gene_id", "combine_z"]
+        return z_matrix
+
     values = z_matrix.iloc[:, 1:].values
     weights = np.array([r.weight for r in zscore_results])
     mask = ~np.isnan(values)
