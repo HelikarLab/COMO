@@ -54,13 +54,6 @@ async def _combine_z_distribution_for_batch(
         )
         return matrix
 
-    weighted_matrix = np.apply_along_axis(
-        weighted_z,
-        axis=1,
-        arr=matrix.iloc[:, 1:].values,
-        floor=weighted_z_floor,
-        ceiling=weighted_z_ceiling,
-    )
     values = matrix.iloc[:, 1:].values
     weighted_matrix = np.sum(values, axis=1) / np.sqrt(values.shape[1])
     weighted_matrix = np.clip(weighted_matrix, weighted_z_floor, weighted_z_ceiling).astype(np.int8)
