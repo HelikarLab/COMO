@@ -372,44 +372,43 @@ def zfpkm_transform(
         f"zFPKM transforming {len(fpkm_df.columns)} sample(s) "
         f"containing {len(fpkm_df):,} genes(s) using {cores} core(s)"
     )
+    logger.debug(f"Will update every {update_per_step:,} steps (~{update_every_percent:.1%} of {total_samples:,})")
 
-    with Pool(processes=cores) as pool:
-        kernel = KernelDensity(kernel="gaussian", bandwidth=bandwidth)
-        chunksize = int(math.ceil(len(fpkm_df.columns) / (4 * cores)))
-        partial_func = partial(_zfpkm_calculation, kernel=kernel, peak_parameters=peak_parameters)
-        chunk_time = time.time()
-        start_time = time.time()
-        log_padding = len(str(f"{total_rows:,}"))
+    chunk_time = time.time()
+    start_time = time.time()
+    log_padding = len(str(f"{total_samples:,}"))
+    zfpkm_series: list[pd.Series | None] = [None] * total_samples
+    results: dict[str, _ZFPKMResult] = {}
 
-        zfpkm_series: list[pd.Series | None] = [None] * total_rows
-        results: dict[str, _ZFPKMResult] = {}
-        result: _ZFPKMResult
-        for i, result in enumerate(
-            pool.imap(
-                partial_func,
-                (row for _, row in fpkm_df.iterrows()),
-                chunksize=chunksize,
+    with ProcessPoolExecutor(max_workers=cores) as pool:
+        futures: list[Future[_ZFPKMResult]] = [
+            pool.submit(
+                _zfpkm_calculation,
+                column=fpkm_df[column],
+                peak_parameters=peak_parameters,
+                bandwidth=bandwidth,
             )
-        ):
+            for column in fpkm_df
+        ]
+        for i, future in enumerate(as_completed(futures)):
+            result = future.result()
             key = str(result.zfpkm.name)
             results[key] = result
             zfpkm_series[i] = result.zfpkm
 
-            # show updates every X% and at the end, but skip on first iteration
-            if i != 0 and (i % update_per_step == 0 or i >= total_rows):
+            if i != 0 and ((i + 1) % update_per_step == 0 or (i + 1) == total_samples):
                 current_time = time.time()
                 chunk = current_time - chunk_time
                 total_time = current_time - start_time
-                chunk_num = f"{i:,}"
+                chunk_num = f"{i + 1:,}"
                 logger.debug(
-                    f"Processed {chunk_num:>{log_padding}} of {total_rows:,} - "
+                    f"Processed {chunk_num:>{log_padding}} of {total_samples:,} - "
                     f"chunk took {chunk:.1f} seconds - "
                     f"running for {total_time:.1f} seconds"
                 )
                 chunk_time = current_time
 
-    zfpkm_df = pd.concat(zfpkm_series, axis=1)
-
+    zfpkm_df = pd.DataFrame({series.name: series for series in zfpkm_series}, index=fpkm_df.index)
     return results, zfpkm_df
 
 
