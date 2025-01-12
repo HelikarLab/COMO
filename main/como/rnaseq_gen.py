@@ -443,8 +443,8 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
         )
     mega_df = pd.concat(to_concat, ignore_index=True)
     mega_df.columns = pd.Series(data=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
-
     mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")
+
     subplot_titles = list(results.keys()) if subplot_titles else None
     fig = make_subplots(
         rows=len(results),
