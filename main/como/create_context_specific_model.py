@@ -283,17 +283,18 @@ async def _map_expression_to_reaction(
 
     These rules should be defined in the general genome-scale metabolic model
     """
-    expression_data = pd.read_csv(gene_expression_file)
-    gene_expressions = split_gene_expression_data(expression_data, recon_algorithm=recon_algorithm)
-    expression_rxns = collections.OrderedDict()
+    gene_activity = split_gene_expression_data(await _read_file(gene_expression_file), recon_algorithm=recon_algorithm)
+    reaction_expression = collections.OrderedDict()
 
-    unknown_val = 1
-    if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT}:
-        unknown_val = np.mean([low_thresh, high_thresh])  # put unknowns in mid bin
-    elif recon_algorithm == Algorithm.GIMME:
-        unknown_val = -1
-    elif recon_algorithm == Algorithm.FASTCORE:
-        unknown_val = 0
+    # fmt: off
+    # Define a default expression value if a gene ID is not found
+    default_expression = (
+        np.mean([low_thresh, high_thresh]) if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT}
+        else -1 if recon_algorithm in {Algorithm.GIMME}
+        else 0 if recon_algorithm in {Algorithm.FASTCORE}
+        else 1
+    )
+    # fmt: on
 
     error_count = 0
     for rxn in model_cobra.reactions:
