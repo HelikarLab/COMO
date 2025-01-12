@@ -34,6 +34,7 @@ select = [
 ignore = [
     "D100",     # allow undocumented public module definitions
     "D101",     # allow undocumented public class
+    "D104",     # allow undocumented public package
     "D203",     # do not require one blank line before class docstring
     "D213",     # first docstring line should be on the second line
     "TRY003",   # allow exception messages outside the `Exception` class
