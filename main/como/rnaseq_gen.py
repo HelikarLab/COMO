@@ -63,7 +63,11 @@ class _StudyMetrics:
     def __post_init__(self):
         for layout in self.layout:
             if layout not in LayoutMethod:
-                raise ValueError(f"Layout must be 'paired-end' or 'single-end'; got: {layout}")
+                _log_and_raise_error(
+                    f"Layout must be 'paired-end' or 'single-end'; got: {layout}",
+                    error=ValueError,
+                    level=LogLevel.ERROR,
+                )
 
     @property
     def normalization_matrix(self) -> pd.DataFrame:
@@ -133,29 +137,17 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
     :return: A NumPy array of the filtered data.
     """
     if not isinstance(data, (pd.DataFrame, npt.NDArray)):
-        raise TypeError("Unsupported data type. Must be a Pandas DataFrame or a NumPy array.")
+        _log_and_raise_error(
+            f"Unsupported data type. Must be a Pandas DataFrame or a NumPy array, got '{type(data)}'",
+            error=TypeError,
+            level=LogLevel.CRITICAL,
+        )
 
     return (
         data.apply(filter_func, axis=1).values
         if isinstance(data, pd.DataFrame)
         else np.apply_along_axis(filter_func, axis=1, arr=data)
     )
-
-
-async def _read_counts(path: Path) -> pd.DataFrame:
-    if path.suffix not in {".csv", ".h5ad"}:
-        raise ValueError(f"Unknown file extension '{path.suffix}'. Valid options are '.csv' or '.h5ad'.")
-
-    matrix: pd.DataFrame
-    if path.suffix == ".csv":
-        logger.debug(f"Reading CSV file at '{path}'")
-        matrix = pd.read_csv(path, header=0)
-    elif path.suffix == ".h5ad":
-        logger.debug(f"Reading h5ad file at '{path}'")
-        # Make sample names the columns and gene data the index
-        matrix = sc.read_h5ad(path).to_df().T
-
-    return matrix
 
 
 async def _build_matrix_results(
