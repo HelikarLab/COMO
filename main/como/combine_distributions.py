@@ -102,28 +102,6 @@ async def _combine_z_distribution_for_source(
         merged_source_data.columns = ["ensembl_gene_id", "combine_z"]
         return merged_source_data
 
-    if _num_rows(matrix) < 2:
-        matrix.columns = ["entrez_gene_id", "combine_z"]
-        return matrix
-
-    weighted_matrix = np.apply_along_axis(
-        weighted_z,
-        axis=1,
-        arr=matrix.iloc[:, 1:].values,
-        n_reps=num_replicates,
-        floor=weighted_z_floor,
-        ceiling=weighted_z_ceiling,
-    )
-    merge_df = pd.concat([matrix, pd.Series(weighted_matrix, name="combined")], axis=1)
-    weighted_matrix = pd.DataFrame(
-        {"ensembl_gene_id": matrix["ensembl_gene_id"].astype(str), "combine_z": weighted_matrix}
-    )
-    stack_df = pd.concat(
-        [
-            pd.DataFrame(
-                {"ensembl_gene_id": merge_df["ensembl_gene_id"], "zscore": merge_df[col].astype(float), "source": col}
-                for col in merge_df.columns[1:]
-            )
     print(f"Making directory for '{output_combined_matrix_filepath.parent}'")
     print(f"Making directory for '{output_figure_filepath.parent}'")
     await asyncio.gather(
@@ -132,10 +110,6 @@ async def _combine_z_distribution_for_source(
             aiofiles.os.makedirs(output_figure_filepath.parent.as_posix(), exist_ok=True),
         ]
     )
-    graph_zscore_distribution(
-        df=stack_df,
-        title=f"Combined Z-score Distribution for {context_name} - batch #{batch_num}",
-        output_png_filepath=output_png_filepath,
 
     logger.trace(f"Found {_num_columns(merged_source_data) - 1} samples for context '{context_name}' to combine")
     values = merged_source_data.iloc[:, 1:].values
