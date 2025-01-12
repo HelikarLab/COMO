@@ -61,7 +61,7 @@ async def _combine_z_distribution_for_batch(
     merge_df = pd.concat([matrix, pd.Series(weighted_matrix, name="combined")], axis=1)
     weighted_matrix = pd.DataFrame(
         {
-            "ensembl_gene_id": matrix["ensembl_gene_id"].astype(str),
+            "ensembl_gene_id": matrix["ensembl_gene_id"],
             "combine_z": weighted_matrix,
         },
     )
