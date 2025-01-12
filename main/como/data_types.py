@@ -68,6 +68,12 @@ PATH_TYPE = str | Path
 RNA_TYPE = Literal["total", "mrna"]
 LOG_LEVEL = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
+class RNAType(Enum):
+    TRNA = "total"
+    MRNA = "mrna"
+    SCRNA = "scrna"
+
+
 class CobraCompartments:
     """Convert from compartment "long-hand" to "short-hand".
 
