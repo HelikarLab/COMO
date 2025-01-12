@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import re
 import sys
 from dataclasses import dataclass, field
@@ -13,13 +12,12 @@ from typing import Literal
 import aiofiles
 import numpy as np
 import pandas as pd
-import scanpy as sc
 from fast_bioservices.biothings.mygene import MyGene
 from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
 
-from como.data_types import LOG_LEVEL, PATH_TYPE, RNA_TYPE, RNAPrepMethod
-from como.utils import _listify
+from como.data_types import PATH_TYPE, LogLevel, RNAType
+from como.utils import _listify, _read_file, _set_up_logging
 
 
 @dataclass
