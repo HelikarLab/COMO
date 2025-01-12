@@ -308,6 +308,7 @@ async def _write_counts_matrix(
     final_matrix = final_matrix[["ensembl_gene_id", *rna_specific_sample_names]]
 
     output_counts_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
+    final_matrix.dropna(inplace=True)
     final_matrix.to_csv(output_counts_matrix_filepath, index=False)
     logger.success(f"Wrote gene count matrix for '{rna.value}' RNA at '{output_counts_matrix_filepath}'")
     return final_matrix
