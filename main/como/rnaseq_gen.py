@@ -351,8 +351,8 @@ def _zfpkm_calculation(
 
 def zfpkm_transform(
     fpkm_df: pd.DataFrame,
-    bandwidth: int = 0.5,
-    peak_parameters: tuple[float, float] = (0.02, 1.0),
+    peak_parameters: PeakIdentificationParameters,
+    bandwidth: int,
     update_every_percent: float = 0.1,
 ) -> tuple[dict[str, _ZFPKMResult], DataFrame]:
     """Perform zFPKM calculation/transformation."""
