@@ -153,15 +153,44 @@ async def _read_file(
         logger.critical(f"File {path} does not exist")
         raise FileNotFoundError(f"File {path} does not exist")
 
+    # StringIO is used if a CSV file is read using open() directly
+    if isinstance(path, io.StringIO):
+        return pd.DataFrame(path, **kwargs)
 
-async def convert_gene_data(values: list[str], taxon_id: int | str | Taxon) -> pd.DataFrame:
-    gene_type = await determine_gene_type(values)
-    if all(v == "gene_symbol" for v in gene_type.values()):
-        return await gene_symbol_to_ensembl_and_gene_id(values, taxon=taxon_id)
-    elif all(v == "ensembl_gene_id" for v in gene_type.values()):
-        return await ensembl_to_gene_id_and_symbol(ids=values, taxon=taxon_id)
-    elif all(v == "entrez_gene_id" for v in gene_type.values()):
-        return await gene_id_to_ensembl_and_gene_symbol(ids=values, taxon=taxon_id)
+    match path.suffix:
+        case ".csv" | ".tsv":
+            kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")
+            async with aiofiles.open(path) as f:
+                content = await f.read()
+                return pd.read_csv(io.StringIO(content), **kwargs)
+        case ".xlsx" | ".xls":
+            loop = asyncio.get_running_loop()
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                # pass kwargs as args
+                func = functools.partial(pd.read_excel, **kwargs)
+                return await loop.run_in_executor(pool, func, path)
+        case ".h5ad":
+            loop = asyncio.get_running_loop()
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                func = functools.partial(sc.read_h5ad, **kwargs)
+                adata: sc.AnnData = await loop.run_in_executor(pool, func, path)
+
+            if h5ad_as_df:
+                df = adata.to_df().T
+                df.index.name = "gene_symbol"
+                df.reset_index(inplace=True)
+                return df
+            return adata
+        case _:
+            logger.critical(
+                f"Unknown file extension '{path.suffix}'. Valid options are '.tsv', '.csv', '.xlsx', '.xls', or '.h5ad'"
+            )
+            raise ValueError(
+                f"Unknown file extension '{path.suffix}'. "
+                f"Valid options are '.tsv', '.csv', '.xlsx', '.xls', or '.h5ad'."
+            )
+
+
     else:
         raise ValueError("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
 
