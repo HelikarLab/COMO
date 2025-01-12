@@ -453,15 +453,34 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
         vertical_spacing=min(0.05, (1 / (len(results) - 1))),
     )
 
-    for i, (name, group) in enumerate(mega_df.groupby("sample_name"), start=1):
-        fig.add_trace(
-            trace=go.Scatter(x=group["log2fpkm"], y=group["density"], mode="lines", name=name, legendgroup=name),
-            row=i,
-            col=1,
-        )
-        fig.update_xaxes(title_text="log2(FPKM)", range=[plot_xfloor, max(group["log2fpkm"].tolist())], row=i, col=1)
+    for i, sample_name in enumerate(results, start=1):
+        sample_data = mega_df[mega_df["sample_name"] == sample_name]
+        traces = []
+        for source_type in sample_data["source"].unique():
+            group = sample_data[sample_data["source"] == source_type]
+            traces.append(
+                go.Scatter(
+                    x=group["log2fpkm"],
+                    y=group["density"],
+                    mode="lines",
+                    name=source_type,
+                    legendgroup=source_type,
+                )
+            )
+        fig.add_traces(traces, rows=i, cols=1)
+        fig.update_xaxes(title_text="log2(FPKM)", range=[plot_xfloor, sample_data["log2fpkm"].max()], row=i, col=1)
         fig.update_yaxes(title_text="density [scaled]", row=i, col=1)
         fig.update_layout(legend_tracegroupgap=0)
+
+    # for i, (name, group) in enumerate(mega_df.groupby("sample_name"), start=1):
+    #     fig.add_trace(
+    #         trace=go.Scatter(x=group["log2fpkm"], y=group["density"], mode="lines", name=name, legendgroup=name),
+    #         row=i,
+    #         col=1,
+    #     )
+    #     fig.update_xaxes(title_text="log2(FPKM)", range=[plot_xfloor, max(group["log2fpkm"].tolist())], row=i, col=1)
+    #     fig.update_yaxes(title_text="density [scaled]", row=i, col=1)
+    #     fig.update_layout(legend_tracegroupgap=0)
 
     fig.update_layout(height=600 * len(results), width=1000, title_text="zFPKM Plots", showlegend=True)
     fig.write_image("zfpkm_plot.png")
