@@ -488,6 +488,26 @@ async def _process(
     )
 
 
+def _build_batches(
+    trna_metadata: pd.DataFrame | None,
+    mrna_metadata: pd.DataFrame | None,
+    scrna_metadata: pd.DataFrame | None,
+    proteomic_metadata: pd.DataFrame | None,
+) -> _BatchNames:
+    batch_names = _BatchNames(**{source.name.lower(): [] for source in SourceTypes})
+    for source, metadata in zip(SourceTypes, [trna_metadata, mrna_metadata, scrna_metadata, proteomic_metadata]):
+        source: SourceTypes
+        metadata: pd.DataFrame
+        if metadata is None:
+            logger.trace(f"Metadata for source '{source.value}' is None, skipping")
+            continue
+
+        metadata: pd.DataFrame  # Re-assign type to assist in type hinting
+        for batch_num, study in enumerate(sorted(metadata["study"].unique()), start=1):
+            study_sample_names = metadata[metadata["study"] == study]["sample_name"].tolist()
+            batch_names[source.value].append(_BatchEntry(batch_num=batch_num, sample_names=study_sample_names))
+            logger.debug(f"Found {len(study_sample_names)} sample names for study '{study}', batch number {batch_num}")
+    return batch_names
 async def merge_xomics(  # noqa: C901
     context_name: str,
     trna_matrix_or_filepath: Path | pd.DataFrame | None,
