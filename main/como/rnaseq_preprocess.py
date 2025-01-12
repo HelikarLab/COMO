@@ -671,7 +671,9 @@ async def rnaseq_preprocess(
     _set_up_logging(level=log_level, location=log_location)
 
     output_gene_info_filepath = output_gene_info_filepath.resolve()
-    como_context_dir = como_context_dir.resolve()
+
+    if como_context_dir:
+        como_context_dir = como_context_dir.resolve()
     input_matrix_filepath = [i.resolve() for i in _listify(input_matrix_filepath)] if input_matrix_filepath else None
     output_trna_metadata_filepath = (
         output_trna_metadata_filepath.resolve() if output_trna_metadata_filepath else output_trna_metadata_filepath
