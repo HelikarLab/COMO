@@ -661,12 +661,31 @@ def filter_counts(
             )
         case FilteringTechnique.TPM:
             return tpm_quantile_filter(metrics=metrics, filtering_options=filtering_options)
-        case FilteringTechnique.zfpkm:
-            return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calculate_fpkm=True)
-        case FilteringTechnique.umi:
-            return zfpkm_filter(metrics=metrics, filtering_options=filtering_options, calculate_fpkm=False)
+        case FilteringTechnique.ZFPKM:
+            return zfpkm_filter(
+                metrics=metrics,
+                filtering_options=filtering_options,
+                calculate_fpkm=True,
+                force_zfpkm_plot=force_zfpkm_plot,
+                peak_parameters=peak_parameters,
+                bandwidth=bandwidth,
+            )
+        case FilteringTechnique.UMI:
+            # UMI filtering is the same as zFPKM filtering without calculating FPKM
+            return zfpkm_filter(
+                metrics=metrics,
+                filtering_options=filtering_options,
+                calculate_fpkm=False,
+                force_zfpkm_plot=force_zfpkm_plot,
+                peak_parameters=peak_parameters,
+                bandwidth=bandwidth,
+            )
         case _:
-            raise ValueError(f"Technique must be one of {FilteringTechnique}")
+            _log_and_raise_error(
+                f"Technique must be one of {FilteringTechnique}, got '{technique.value}'",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
 
 
 async def _save_rnaseq_tests(
@@ -760,7 +779,8 @@ async def _save_rnaseq_tests(
 
     boolean_matrix.to_csv(output_boolean_activity_filepath, index=False)
     logger.info(
-        f"{context_name} - Found {expressed_count} expressed and {high_confidence_count} confidently expressed genes"
+        f"{context_name} - Found {expressed_count} expressed genes, "
+        f"{high_confidence_count} of which are confidently expressed"
     )
     logger.success(f"Wrote boolean matrix to {output_boolean_activity_filepath}")
 
@@ -843,8 +863,6 @@ async def rnaseq_gen(
 
         case FilteringTechnique.ZFPKM | FilteringTechnique.UMI:
             cutoff = cutoff or -3
-        case FilteringTechnique.umi:
-            pass
         case _:
             raise ValueError(f"Technique must be one of {FilteringTechnique}")
 
@@ -855,8 +873,9 @@ async def rnaseq_gen(
     if prep == RNAType.SCRNA and technique.value.lower() != FilteringTechnique.UMI.value.lower():
         logger.warning(
             "Single cell filtration does not normalize and assumes "
-            "gene counts are counted with Unique Molecular Identifiers (UMIs). "
-            "Setting filtering technique to UMI now."
+            "genes are counted with Unique Molecular Identifiers (UMIs). "
+            f"Switching filtering technique from '{technique.value}' to '{FilteringTechnique.UMI.value}'."
+        )
         )
 
     logger.debug(f"Starting '{context_name}'")
