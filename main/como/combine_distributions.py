@@ -89,10 +89,11 @@ async def _combine_z_distribution_for_batch(
 
 
 async def _combine_z_distribution_for_source(
+    merged_source_data: pd.DataFrame,
     context_name: str,
-    batch_num: int,
     num_replicates: int,
-    output_png_filepath: Path,
+    output_combined_matrix_filepath: Path,
+    output_figure_filepath: Path,
     weighted_z_floor: int = -6,
     weighted_z_ceiling: int = 6,
 ):
