@@ -140,47 +140,37 @@ def _combine_z_distribution_for_context(
     weighted_z_floor: int = -6,
     weighted_z_ceiling: int = 6,
 ):
-    def weighted_z(
-        x: npt.NDArray[float],
-        weights,
-        floor: int,
-        ceiling: int,
-    ):
-        na_values = np.where(np.isnan(x))[0]
-        if len(na_values) > 0:
-            x = np.delete(x, na_values)
-            weights = np.delete(weights, na_values)
-        weights = weights / np.sum(weights)
-        numerator = np.sum(weights * x)
-        denominator = np.sqrt(np.sum(weights**2))
-        result = numerator / denominator
-        return np.clip(result, floor, ceiling)
 
-    z_matrix = pd.DataFrame()
-    for result in zscore_results:
-        result.z_score_matrix.columns = ["ensembl_gene_id", result.type]
-        z_matrix = (
-            result.z_score_matrix
-            if z_matrix.empty
-            else pd.merge(z_matrix, result.z_score_matrix, on="ensembl_gene_id", how="outer")
+    z_matrices = [
+        res.z_score_matrix.set_index("ensembl_gene_id").rename(
+            columns={col: res.type.value for col in res.z_score_matrix.columns[1:]}
         )
-
-    combined_z_matrix = (
-        np.apply_along_axis(
-            weighted_z,
-            axis=1,
-            arr=z_matrix.iloc[:, 1:].values,
-            weights=[r.weight for r in zscore_results],
-            floor=weighted_z_floor,
-            ceiling=weighted_z_ceiling,
+        for res in zscore_results
+    ]
+    z_matrix = pd.concat(z_matrices, axis=1, join="outer").reset_index()
+    if _num_columns(z_matrix) <= 1:
+        logger.trace(
+            f"Only 1 source exists for '{context}', returning dataframe as-is becuase no data exists to combine"
         )
         if _num_rows(z_matrix) > 2
         else z_matrix.iloc[:, 1:].values
     ).ravel()
     merge_df = pd.concat([z_matrix, pd.Series(combined_z_matrix, name="combined")], axis=1)
     combined_z_matrix = pd.DataFrame(
+    values = z_matrix.iloc[:, 1:].values
+    weights = np.array([r.weight for r in zscore_results])
+    mask = ~np.isnan(values)
+    masked_values = np.where(mask, values, 0)
+    masked_weights = np.where(mask, weights, 0)
+
+    normalized_weights = masked_weights / np.sum(masked_weights, axis=1, keepdims=True)
+    numerator = np.sum(normalized_weights * masked_values, axis=1)
+    denominator = np.sqrt(np.sum(normalized_weights**2, axis=1))
+    combined_z_matrix = numerator / denominator
+    combined_z_matrix = np.clip(combined_z_matrix, weighted_z_floor, weighted_z_ceiling)
+    combined_z_matrix_df = pd.DataFrame(
         {
-            "ensembl_gene_id": z_matrix["ensembl_gene_id"].astype(str),
+            "ensembl_gene_id": z_matrix["ensembl_gene_id"],
             "combine_z": combined_z_matrix,
         }
     )
