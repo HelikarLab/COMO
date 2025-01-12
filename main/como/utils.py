@@ -191,8 +191,31 @@ async def _read_file(
             )
 
 
+async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int | str | Taxon) -> pd.DataFrame:
+    if isinstance(values, list):
+        gene_type = await determine_gene_type(values)
+        if all(v == "gene_symbol" for v in gene_type.values()):
+            return await gene_symbol_to_ensembl_and_gene_id(values, taxon=taxon_id)
+        elif all(v == "ensembl_gene_id" for v in gene_type.values()):
+            return await ensembl_to_gene_id_and_symbol(ids=values, taxon=taxon_id)
+        elif all(v == "entrez_gene_id" for v in gene_type.values()):
+            return await gene_id_to_ensembl_and_gene_symbol(ids=values, taxon=taxon_id)
+        else:
+            logger.critical("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
+            raise ValueError("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
     else:
-        raise ValueError("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
+        values: pd.DataFrame  # Re-define type to assist in type hinting
+        if "gene_symbol" in values:
+            return await get_missing_gene_data(values["gene_symbol"].tolist(), taxon_id=taxon_id)
+        elif "entrez_gene_id" in values:
+            return await get_missing_gene_data(values["entrez_gene_id"].tolist(), taxon_id=taxon_id)
+        elif "ensembl_gene_id" in values:
+            return await get_missing_gene_data(values["ensembl_gene_id"].tolist(), taxon_id=taxon_id)
+        else:
+            logger.critical("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
+            raise ValueError(
+                "Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix."
+            )
 
 
 def _listify(value):
