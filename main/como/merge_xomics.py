@@ -49,21 +49,6 @@ class _HighExpressionHeaderNames:
     PROTEOMICS = f"{_MergedHeaderNames.PROTEOMICS}_high"
 
 
-class AdjustmentMethod(Enum):
-    """Adjustment method for expression requirement based on differences in number of provided data source types."""
-
-    PROGRESSIVE = "progressive"
-    REGRESSIVE = "regressive"
-    FLAT = "flat"
-    CUSTOM = "custom"
-
-    @classmethod
-    def from_string(cls, value: str) -> AdjustmentMethod:
-        """Convert a string to an AdjustmentMethod enum."""
-        if value.lower() not in [t.value for t in cls]:
-            raise ValueError(f"Adjustment method must be one of {cls}; got: {value}")
-        return cls(value)
-
 
 def _load_rnaseq_tests(filename, context_name, prep_method: RNAPrepMethod) -> tuple[str, pd.DataFrame]:
     """Load rnaseq results."""
