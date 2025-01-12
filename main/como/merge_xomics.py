@@ -271,7 +271,7 @@ async def _merge_xomics(
     logger.debug(f"Starting to merge data sources for context '{context_name}'")
     expression_list: list[str] = []
     high_confidence_list: list[str] = []
-    merge_data = pd.DataFrame()
+    merge_data: pd.DataFrame = pd.DataFrame()
 
     for matrix, expressed_sourcetype, high_expressed_sourcetype in (
         (trna_boolean_matrix, _ExpressedHeaderNames.TRNASEQ, _HighExpressionHeaderNames.TRNASEQ),
@@ -328,12 +328,14 @@ async def _merge_xomics(
         logger.trace("Forcing high confidence genes")
         merge_data.loc[merge_data[high_confidence_list].sum(axis=1) > 0, "active"] = 1
 
+    merge_data.dropna(inplace=True)
     merge_data.to_csv(output_merged_filepath, index=False)
     logger.success(f"Saved merged data to {output_merged_filepath}")
 
     logger.debug(f"Generating transcriptomic details using {output_merged_filepath}")
     transcriptomic_details = await _get_transcriptmoic_details(merge_data, taxon_id=taxon_id)
     logger.debug(f"Saving transcriptomic details to {output_transcriptomic_details_filepath}")
+    transcriptomic_details.dropna(inplace=True)
     transcriptomic_details.to_csv(output_transcriptomic_details_filepath, index=False)
     logger.success(f"Saved transcriptomic details to {output_transcriptomic_details_filepath}")
     return {context_name: output_gene_activity_filepath.as_posix()}
