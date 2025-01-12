@@ -88,7 +88,7 @@ def split_gene_expression_data(
     single_gene_names = expression_data[~expression_data["entrez_gene_id"].astype(str).str.contains("//")]
     multiple_gene_names = expression_data[expression_data["entrez_gene_id"].astype(str).str.contains("//")]
     split_gene_names = multiple_gene_names.assign(
-        entrez_gene_id=multiple_gene_names["entrez_gene_id"].str.split("///")
+        entrez_gene_id=multiple_gene_names["entrez_gene_id"].astype(str).str.split("///")
     ).explode("entrez_gene_id")
 
     gene_expressions = pd.concat([single_gene_names, split_gene_names], axis=0, ignore_index=True)
