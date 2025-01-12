@@ -65,14 +65,13 @@ async def _combine_z_distribution_for_batch(
             "combine_z": weighted_matrix,
         },
     )
-
-    stack_df = pd.concat(
-        [
-            pd.DataFrame(
-                {"ensembl_gene_id": merge_df["ensembl_gene_id"], "zscore": merge_df[col].astype(float), "source": col}
-            )
-            for col in merge_df.columns[1:]
-        ]
+    stack_df = pd.melt(
+        merge_df,
+        id_vars=["ensembl_gene_id"],
+        # Get all columns except ensembl_gene_id
+        value_vars=[col for col in merge_df.columns if col not in GeneIdentifier._member_map_],
+        var_name="source",
+        value_name="zscore",
     )
     if len(stack_df["source"].unique()) > 10:
         stack_df = stack_df[stack_df["source"] == "combined"]
