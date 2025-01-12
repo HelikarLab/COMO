@@ -6,7 +6,6 @@ import sys
 from collections.abc import Sequence
 from io import TextIOWrapper
 from pathlib import Path
-from typing import NamedTuple
 
 import cobra
 import numpy as np
@@ -20,24 +19,8 @@ from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.imat import IMAT, IMATProperties
 from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
 
-from como.data_types import Algorithm, CobraCompartments, LogLevel, Solver
+from como.data_types import Algorithm, CobraCompartments, LogLevel, Solver, _BoundaryReactions, _BuildResults
 from como.utils import _log_and_raise_error, _read_file, _set_up_logging, split_gene_expression_data
-
-
-class _BoundaryReactions(NamedTuple):
-    """Boundary reactions to be used in the context specific model."""
-
-    reactions: list[str]
-    lower_bounds: list[float]
-    upper_bounds: list[float]
-
-
-class _BuildResults(NamedTuple):
-    """Results of building a context specific model."""
-
-    model: cobra.Model
-    expression_index_list: list[int]
-    infeasible_reactions: pd.DataFrame
 
 
 def _correct_bracket(rule: str, name: str) -> str:
@@ -492,12 +475,11 @@ async def _build_model(  # noqa: C901
             pd.DataFrame({"infeasible_reactions": inconsistent_reactions}),
             pd.DataFrame({"expressed_infeasible_reactions": infeasible_expression_reactions}),
             pd.DataFrame({"infeasible_force_reactions": infeasible_force_reactions}),
-            pd.DataFrame({"infeasible_context_reactions": []}),
+            pd.DataFrame({"infeasible_context_reactions": []}),  # Included to maintain legacy support
         ],
         ignore_index=True,
         axis=0,
     )
-    print(inconsistent_and_infeasible_reactions)
 
     return _BuildResults(
         model=context_model_cobra,

@@ -6,6 +6,7 @@ from enum import Enum
 from pathlib import Path
 from typing import ClassVar, NamedTuple
 
+import cobra
 import pandas as pd
 from loguru import logger
 
@@ -151,6 +152,22 @@ class CobraCompartments:
         """Get the long-hand compartment name from the short-hand name."""
         longhand = cls.SHORTHAND.get(shorthand.lower(), None)
         return longhand[0] if longhand else None
+
+
+class _BuildResults(NamedTuple):
+    """Results of building a context specific model."""
+
+    model: cobra.Model
+    expression_index_list: list[int]
+    infeasible_reactions: pd.DataFrame
+
+
+class _BoundaryReactions(NamedTuple):
+    """Boundary reactions to be used in the context specific model."""
+
+    reactions: list[str]
+    lower_bounds: list[float]
+    upper_bounds: list[float]
 
 
 @dataclass
