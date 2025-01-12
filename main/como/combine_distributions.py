@@ -26,10 +26,13 @@ from como.utils import (
 
 async def _combine_z_distribution_for_batch(
     context_name: str,
-    batch_num: int,
-    output_png_filepath: Path,
-    weighted_z_floor: int = -6,
-    weighted_z_ceiling: int = 6,
+    batch: _BatchEntry,
+    matrix: pd.DataFrame,
+    source: SourceTypes,
+    output_combined_matrix_filepath: Path,
+    output_figure_dirpath: Path,
+    weighted_z_floor: int,
+    weighted_z_ceiling: int,
 ) -> pd.DataFrame:
     def weighted_z(x: npt.NDArray[float], floor: int, ceiling: int) -> npt.NDArray[float]:
         result = np.sum(x) / np.sqrt(len(x))
