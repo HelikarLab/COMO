@@ -233,38 +233,46 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
     return metrics
 
 
-def _calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
+def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
     """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary."""  # noqa: E501
     for study in metrics:
         matrix_values = []
         for sample in range(metrics[study].num_samples):
             layout = metrics[study].layout[sample]
-            count_matrix: npt.NDArray = metrics[study].count_matrix.iloc[:, sample].values
-            gene_size = metrics[study].gene_sizes
-
-            count_matrix = count_matrix.astype(np.float32)
-            gene_size = gene_size.astype(np.float32)
+            count_matrix: npt.NDArray = metrics[study].count_matrix.iloc[:, sample].values.astype(np.float32)
+            gene_lengths = (
+                metrics[study].fragment_lengths[sample].astype(np.float32)
+                if layout == LayoutMethod.paired_end
+                else metrics[study].gene_sizes.astype(np.float32)
+            )
+            gene_lengths_kb = gene_lengths / 1000.0
 
             match layout:
                 case LayoutMethod.paired_end:  # FPKM
-                    mean_fragment_lengths = metrics[study].fragment_lengths[sample]
-                    # Ensure non-negative value
-                    effective_length = [max(1e-9, size - (mean_fragment_lengths + 1)) for size in gene_size]
-                    n = count_matrix.sum()
-                    fpkm = ((count_matrix + 1) * 1e9) / (np.array(effective_length) * n)
-                    matrix_values.append(fpkm)
+                    total_fragments = count_matrix.sum(axis=0)
+                    counts_per_million = total_fragments / scale
+                    fragments_per_kilobase = count_matrix / gene_lengths_kb[:, np.newaxis]
+                    fragments_per_kilobase_million = fragments_per_kilobase / counts_per_million
+                    matrix_values.append(fragments_per_kilobase_million)
                 case LayoutMethod.single_end:  # RPKM
-                    # Add a pseudocount before log to ensure log(0) does not happen
-                    rate = np.log(count_matrix + 1) - np.log(gene_size)
-                    exp_rate = np.exp(rate - np.log(np.sum(count_matrix)) + np.log(1e9))
-                    matrix_values.append(exp_rate)
+                    reads_per_kilobase = count_matrix / gene_lengths_kb[: np.newaxis]
+                    total_reads = count_matrix.sum(axis=0)
+                    counts_per_million = total_reads / scale
+                    reads_per_kilobase_million = reads_per_kilobase / counts_per_million
+                    matrix_values.append(reads_per_kilobase_million)
                 case _:
-                    raise ValueError("Invalid normalization method specified")
+                    _log_and_raise_error(
+                        (
+                            f"Invalid normalization method specified ''. "
+                            f"Must be one of '{LayoutMethod.paired_end.value}' or '{LayoutMethod.single_end.value}'."
+                        ),
+                        error=ValueError,
+                        level=LogLevel.ERROR,
+                    )
 
         fpkm_matrix = pd.DataFrame(matrix_values).T  # Transpose is needed because values were appended as rows
         fpkm_matrix = fpkm_matrix[~pd.isna(fpkm_matrix)]
         metrics[study].normalization_matrix = fpkm_matrix
-
         metrics[study].normalization_matrix.columns = metrics[study].count_matrix.columns
 
     return metrics
