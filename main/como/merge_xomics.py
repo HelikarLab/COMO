@@ -107,8 +107,7 @@ def _merge_logical_table(df: pd.DataFrame):
     :return: pandas dataframe of merged table
     """
     # step 1: get all plural ENTREZ_GENE_IDs in the input table, extract unique IDs
-
-    df.dropna(axis=0, subset=["entrez_gene_id"], inplace=True)
+    df.dropna(subset=["entrez_gene_id"], inplace=True)
     df["entrez_gene_id"] = df["entrez_gene_id"].astype(str).str.replace(" /// ", "//").astype(str)
 
     id_list: list[str] = df.loc[
