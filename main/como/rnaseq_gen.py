@@ -649,6 +649,9 @@ def filter_counts(
     technique: FilteringTechnique,
     filtering_options: _FilteringOptions,
     prep: RNAType,
+    force_zfpkm_plot: bool,
+    peak_parameters: PeakIdentificationParameters,
+    bandwidth: int,
 ) -> NamedMetrics:
     """Filter the count matrix based on the specified technique."""
     match technique:
@@ -679,8 +682,11 @@ async def _save_rnaseq_tests(
     high_batch_ratio: float,
     technique: FilteringTechnique,
     cut_off: int | float,
+    force_zfpkm_plot: bool,
     output_boolean_activity_filepath: Path,
     output_zscore_normalization_filepath: Path,
+    peak_parameters: PeakIdentificationParameters,
+    bandwidth: int,
 ):
     """Save the results of the RNA-Seq tests to a CSV file."""
     filtering_options = _FilteringOptions(
@@ -706,6 +712,9 @@ async def _save_rnaseq_tests(
         technique=technique,
         filtering_options=filtering_options,
         prep=prep,
+        force_zfpkm_plot=force_zfpkm_plot,
+        peak_parameters=peak_parameters,
+        bandwidth=bandwidth,
     )
 
     merged_zscore_df = pd.DataFrame()
@@ -779,7 +788,11 @@ async def rnaseq_gen(
     batch_ratio: float = 0.5,
     high_batch_ratio: float = 1.0,
     technique: FilteringTechnique | str = FilteringTechnique.tpm,
+    zfpkm_peak_height: float = 0.02,
+    zfpkm_peak_distance: float = 1.0,
+    zfpkm_bandwidth: int = 1,
     cutoff: int | float | None = None,
+    force_zfpkm_plot: bool = False,
 ) -> None:
     """Generate a list of active and high-confidence genes from a gene count matrix.
 
@@ -803,7 +816,13 @@ async def rnaseq_gen(
     :param high_batch_ratio: The percentage of batches that a gene must
         appear in for a gene to be marked "highly confident" in its expression
     :param technique: The filtering technique to use
+    :param zfpkm_peak_height: The height of the zFPKM peak
+    :param zfpkm_peak_distance: The distance of the zFPKM peak
+    :param zfpkm_bandwidth: The bandwidth of the zFPKM
     :param cutoff: The cutoff value to use for the provided filtering technique
+    :param force_zfpkm_plot: If too many samples exist, should plotting be done anyway?
+    :param log_level: The level of logging to output
+    :param log_location: The location to write logs to
     :return: None
     """
     technique = (
