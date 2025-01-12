@@ -753,12 +753,12 @@ async def _process(
     for metric in metrics.values():
         expressed_genes.extend(metric.entrez_gene_ids)
         top_genes.extend(metric.high_confidence_entrez_gene_ids)
-        if metric.normalization_matrix is not None:
+        if not metric.normalization_matrix.empty:
             merged_zscore_df = (
-                metric.normalization_matrix
+                metric.z_score_matrix
                 if merged_zscore_df.empty
                 else pd.concat(
-                    [merged_zscore_df, metric.normalization_matrix],
+                    [merged_zscore_df, metric.z_score_matrix],
                     axis=1,
                 )
             )
