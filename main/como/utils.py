@@ -282,3 +282,12 @@ def _num_columns(item: pd.DataFrame | npt.NDArray) -> int:
 def return_placeholder_data() -> pd.DataFrame:
     return pd.DataFrame(data=0, index=pd.Index(data=[0], name="entrez_gene_id"), columns=["expressed", "top"])
 
+
+def _set_up_logging(
+    level: LogLevel,
+    location: str | TextIOWrapper,
+    formatting: str = LOG_FORMAT,
+):
+    with contextlib.suppress(ValueError):
+        logger.remove(0)
+        logger.add(sink=location, level=level.value, format=formatting)
