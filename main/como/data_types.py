@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+from dataclasses import dataclass, field, fields
 from enum import Enum
 from pathlib import Path
-from typing import Literal
+from typing import ClassVar, NamedTuple
+
+import pandas as pd
+from loguru import logger
 
 PATH_TYPE = str | Path
 LOG_FORMAT = (
@@ -12,26 +17,15 @@ LOG_FORMAT = (
 )
 
 
-class RNAPrepMethod(Enum):
-    TOTAL = "total"
-    MRNA = "mrna"
-    SCRNA = "scrna"
+class AdjustmentMethod(Enum):
+    """Adjustment method for expression requirement based on differences in number of provided data source types."""
 
-    @staticmethod
-    def from_string(value: str) -> RNAPrepMethod:
-        """Build a preparation method object from a string."""
-        match_value = "".join(c for c in value if c.isascii()).lower()
+    PROGRESSIVE = "progressive"
+    REGRESSIVE = "regressive"
+    FLAT = "flat"
+    CUSTOM = "custom"
 
-        match match_value:
-            case "total" | "trna":
-                return RNAPrepMethod.TOTAL
-            case "mrna":
-                return RNAPrepMethod.MRNA
-            case "scrna":
-                return RNAPrepMethod.SCRNA
-            case _:
-                possible_values = [t.value for t in RNAPrepMethod]
-                raise ValueError(f"Filtering technique must be one of {possible_values}; got: {value}")
+
 class Algorithm(Enum):
     GIMME = "GIMME"
     FASTCORE = "FASTCORE"
@@ -42,27 +36,16 @@ class Algorithm(Enum):
 class FilteringTechnique(Enum):
     """RNA sequencing filtering capabilities."""
 
-    cpm = "cpm"
-    zfpkm = "zfpkm"
-    tpm = "quantile"
-    umi = "umi"
+    CPM = "cpm"
+    ZFPKM = "zfpkm"
+    TPM = "quantile"
+    UMI = "umi"
 
-    @staticmethod
-    def from_string(value: str) -> FilteringTechnique:
-        """Create a filtering technique object from a string."""
-        match value.lower():
-            case "cpm":
-                return FilteringTechnique.cpm
-            case "zfpkm":
-                return FilteringTechnique.zfpkm
-            case "quantile":
-                return FilteringTechnique.tpm
-            case "umi":
-                return FilteringTechnique.umi
-            case _:
-                possible_values = [t.value for t in FilteringTechnique]
-                raise ValueError(f"Got a filtering technique of '{value}'; should be one of: {possible_values}")
 
+class GeneIdentifier(Enum):
+    ENSEMBL_GENE_ID = "ensembl_gene_id"
+    ENTREZ_GENE_ID = "entrez_gene_id"
+    GENE_SYMBOL = "gene_symbol"
 
 
 class LogLevel(Enum):
@@ -75,10 +58,31 @@ class LogLevel(Enum):
     CRITICAL = 50
 
 
+class PeakIdentificationParameters(NamedTuple):
+    height: float
+    distance: float
+
+
 class RNAType(Enum):
     TRNA = "total"
     MRNA = "mrna"
     SCRNA = "scrna"
+
+
+class Solver(Enum):
+    """Solver used to seed context specific model."""
+
+    GLPK = "GLPK"
+    GUROBI = "GUROBI"
+    SCIPY = "SCIPY"
+    GLPK_EXACT = "GLPK_EXACT"
+
+
+class SourceTypes(Enum):
+    TRNA = "trna"
+    MRNA = "mrna"
+    SCRNA = "scrna"
+    PROTEOMICS = "proteomics"
 
 
 class CobraCompartments:
@@ -148,3 +152,94 @@ class CobraCompartments:
         longhand = cls.SHORTHAND.get(shorthand.lower(), None)
         return longhand[0] if longhand else None
 
+
+@dataclass
+class _BatchEntry:
+    batch_num: int
+    sample_names: list[str]
+    _num_samples: int = field(init=False)
+
+    def __post_init__(self):
+        self._num_samples = len(self.sample_names)
+
+    @property
+    def num_samples(self):
+        return self._num_samples
+
+
+@dataclass
+class _CombineOmicsInput:
+    z_score_matrix: pd.DataFrame
+    type: SourceTypes
+    weight: int
+
+
+class _BaseDataType:
+    """Base class for common data types."""
+
+    def __getitem__(self, value: str):
+        """Access matrices using square bracket notation (e.g., `input_matrices['total_rna']`).
+
+        :param value: The name of the matrix to get ('trna', 'mrna', 'scrna', 'proteomics')
+        :returns: The DataFrame if it exists, None otherwise.
+        """
+        self._validate_attribute(value)
+        return getattr(self, value)
+
+    def __setitem__(self, key, value):
+        """Set matrices using square bracket notation (e.g., `input_matrices['total_rna'] = new_df`).
+
+        :param key: The key to set
+        :param value: The new value
+        """
+        self._validate_attribute(key)
+        setattr(self, key, value)
+
+    def _validate_attribute(self, key):
+        if key not in {i.value for i in SourceTypes._member_map_.values()}:
+            # Unable to use como.utils._log_and_raise_error becuase it results in a circular import
+            message = f"{key} is not a valid attribute of {SourceTypes.__name__}; got '{key}'"
+            logger.warning(message)
+            raise ValueError(message)
+
+    def __iter__(self) -> Iterator[tuple[SourceTypes, pd.DataFrame | None]]:
+        """Iterate over matrix fields and their names.
+
+        Yields:
+            A tuple containing (matrix_name, matrix_dataframe).
+
+        """
+        for field_ in fields(self):
+            yield SourceTypes(field_.name), getattr(self, field_.name)
+
+
+@dataclass
+class _BatchNames(_BaseDataType):
+    trna: list[_BatchEntry]
+    mrna: list[_BatchEntry]
+    scrna: list[_BatchEntry]
+    proteomics: list[_BatchEntry]
+
+
+@dataclass
+class _InputMatrices(_BaseDataType):
+    trna: pd.DataFrame | None = None
+    mrna: pd.DataFrame | None = None
+    scrna: pd.DataFrame | None = None
+    proteomics: pd.DataFrame | None = None
+
+
+@dataclass
+class _OutputCombinedSourceFilepath(_BaseDataType):
+    trna: Path | None
+    mrna: Path | None
+    scrna: Path | None
+    proteomics: Path | None
+
+
+@dataclass
+class _SourceWeights(_BaseDataType):
+    trna: int
+    mrna: int
+    scrna: int
+    proteomics: int
