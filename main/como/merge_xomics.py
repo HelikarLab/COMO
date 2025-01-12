@@ -410,34 +410,21 @@ async def _process(
 ):
     """Merge different data sources for each context type."""
     num_sources = sum(1 for source in [trna_matrix, mrna_matrix, scrna_matrix, proteomic_matrix] if source is not None)
+    logger.trace(
+        f"Settings: Min Expression: {minimum_source_expression}, Expression Requirement: {expression_requirement}, "
+        f"Weighted Z-Score Floor: {weighted_z_floor}, Weighted Z-Score Ceiling: {weighted_z_ceiling}, "
+        f"Adjust Method: {adjust_method.value}, Merge Z-Scores: {merge_zfpkm_distribution}, "
+        f"Force High Confidence: {force_activate_high_confidence}, Adjust for Missing: {adjust_for_missing_sources}"
+    )
 
     if merge_zfpkm_distribution:
-        _combine_zscores(
+        logger.trace("Merging Z-Scores")
+        await _begin_combining_distributions(
             context_name=context_name,
-            input_matrices=_InputMatrices(
-                trna=trna_matrix,
-                mrna=mrna_matrix,
-                scrna=scrna_matrix,
-                proteomics=proteomic_matrix,
-            ),
-            batch_names=_BatchNames(
-                trna=[_BatchEntry(batch_num=n, sample_names=s) for n, s in trna_batches.items()],
-                mrna=[_BatchEntry(batch_num=n, sample_names=s) for n, s in mrna_batches.items()],
-                scrna=[_BatchEntry(batch_num=n, sample_names=s) for n, s in scrna_batches.items()],
-                proteomics=[_BatchEntry(batch_num=n, sample_names=s) for n, s in proteomic_batches.items()],
-            ),
-            source_weights=_SourceWeights(
-                trna=trna_weight,
-                mrna=mrna_weight,
-                scrna=scrna_weight,
-                proteomics=proteomic_weight,
-            ),
-            output_filepaths=_OutputCombinedSourceFilepath(
-                trna=output_trna_activity_filepath,
-                mrna=output_mrna_activity_filepath,
-                scrna=output_scrna_activity_filepath,
-                proteomics=output_proteomic_activity_filepath,
-            ),
+            input_matrices=input_matrices,
+            batch_names=batch_names,
+            source_weights=source_weights,
+            output_filepaths=output_activity_filepaths,
             output_figure_dirpath=output_figure_dirpath,
             output_final_model_scores=output_final_model_scores_filepath,
             weighted_z_floor=weighted_z_floor,
