@@ -540,7 +540,7 @@ async def _create_gene_info_file(
         index=pd.Index(data=range(len(gene_data))),
     )
     for i, data in enumerate(gene_data):
-        ensembl_ids = data.get("ensembl.gene", "-")
+        ensembl_ids = data.get("genomic_pos.ensemblgene", "-")
         if isinstance(ensembl_ids, list):
             ensembl_ids = ensembl_ids[0]
 
