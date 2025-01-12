@@ -411,7 +411,7 @@ def zfpkm_transform(
     return results, zfpkm_df
 
 
-def zfpkm_plot(results, *, output_png_filepath: Path, plot_xfloor: int = -4, subplot_titles: bool = True):
+def zfpkm_plot(results, *, output_png_filepath: Path, plot_xfloor: int = -4):
     """Plot the log2(FPKM) density and fitted Gaussian for each sample.
 
     :param results: A dictionary of intermediate results from zfpkm_transform.
@@ -612,8 +612,11 @@ def zfpkm_filter(
             )
         else:
             if output_png_filepath is None:
-                _log_and_raise_error("Output zFPKM PNG filepath is None.", error=ValueError, level=LogLevel.ERROR)
-            zfpkm_plot(results, output_png_filepath=output_png_filepath)
+                logger.critical("Output zFPKM PNG filepath is None, set a path to plot zFPKM graphs")
+            else:
+                output_png_filepath.parent.mkdir(parents=True, exist_ok=True)
+                output_png_filepath.unlink(missing_ok=True)
+                zfpkm_plot(results, output_png_filepath=output_png_filepath)
 
         # determine which genes are expressed
         min_samples = round(min_sample_expression * len(zfpkm_df.columns))
