@@ -1,7 +1,9 @@
 from pathlib import Path
 from loguru import logger
 import pandas as pd
-import plotly.express as px
+from matplotlib import pyplot as plt
+import seaborn as sns
+
 
 __all__ = ["z_score_distribution"]
 
@@ -9,27 +11,34 @@ __all__ = ["z_score_distribution"]
 def z_score_distribution(
     df: pd.DataFrame,
     title: str,
-    output_png_filepath: Path,
+    output_filepath: Path,
 ):
-    if not output_png_filepath.suffix == ".png":
+    if output_filepath.suffix not in {".png", ".pdf", ".svg"}:
         logger.warning(
-            f"Expected .png suffix for output_png_filepath, got {output_png_filepath.suffix}. Defaulting to .png"
+            f"Expected .png, .pdf, or .svg suffix for output_png_filepath, got {output_filepath.suffix}. Defaulting to .pdf"
         )
-        output_png_filepath = output_png_filepath.with_suffix(".png")
+        output_filepath = output_filepath.with_suffix(".pdf")
+    logger.trace(f"Graphing z-score distribution")
+    output_filepath.parent.mkdir(parents=True, exist_ok=True)
+    output_filepath.unlink(missing_ok=True)
 
-    fig = px.histogram(
-        df,
-        x="zscore",
-        color="source",
-        nbins=100,
-        marginal="rug",
-        title=title,
-    )
+    plt.figure(figsize=(10, 6))
 
-    fig.update_layout(xaxis_title="Z-score", yaxis_title="Frequency", font={"family": "sans-serif", "size": 12})
+    if len(df["source"].unique()) == 1:
+        ax = sns.histplot(df, x="zscore", bins=100, kde=True)
+        sns.rugplot(df, x="zscore", ax=ax)
+    else:
+        sns.histplot(df, x="zscore", hue="source", bins=100, kde=True, element="step")
+        plt.legend(loc="upper right", frameon=False, title=None)
 
-    # Simplified plot for many sources (optional)
-    if len(df["source"].unique()) > 10:
-        fig.update_layout(showlegend=False)
-
-    fig.write_image(output_png_filepath)
+    plt.title(title)
+    plt.xlabel("Z-score")
+    plt.ylabel("Frequency")
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.gca().spines["top"].set_visible(False)
+    plt.gca().spines["right"].set_visible(False)
+    plt.tight_layout()
+    plt.savefig(output_filepath)
+    plt.close()
+    logger.success(f"Saved z-score distribution graph to '{output_filepath}'")
