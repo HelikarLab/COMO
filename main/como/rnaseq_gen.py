@@ -938,7 +938,7 @@ async def rnaseq_gen(
         context_name=context_name,
         rnaseq_matrix_filepath=input_rnaseq_filepath,
         metadata_df=metadata_df,
-        gene_info_df=pd.read_csv(input_gene_info_filepath),
+        gene_info_df=await _read_file(input_gene_info_filepath),
         prep=prep,
         taxon=taxon_id,
         replicate_ratio=replicate_ratio,
@@ -947,6 +947,9 @@ async def rnaseq_gen(
         high_batch_ratio=high_batch_ratio,
         technique=technique,
         cut_off=cutoff,
+        force_zfpkm_plot=force_zfpkm_plot,
         output_boolean_activity_filepath=output_boolean_activity_filepath,
         output_zscore_normalization_filepath=output_zscore_normalization_filepath,
+        peak_parameters=PeakIdentificationParameters(height=zfpkm_peak_height, distance=zfpkm_peak_distance),
+        bandwidth=zfpkm_bandwidth,
     )
