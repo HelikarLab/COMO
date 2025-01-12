@@ -130,40 +130,28 @@ async def _format_determination(
     return cohersion
 
 
-async def _async_read_csv(path: Path, **kwargs) -> pd.DataFrame:
-    """Asynchronously reads a CSV file and returns a pandas DataFrame.
+async def _read_file(
+    path: Path | io.StringIO | None,
+    h5ad_as_df: bool = True,
+    **kwargs,
+) -> pd.DataFrame | sc.AnnData | None:
+    """Asynchronously read a filepath and return a pandas DataFrame.
+
+    If the provided path is None, None will also be returned.
+    None may be provided to this function so that `asyncio.gather` can safely be used on all sources
+        (trna, mrna, scrna, proteomics) without needing to check if the user has provided those sources
 
     :param path: The path to read from
-    :param kwargs: Additional arguments to pass to pandas.read_csv
-    :return: A pandas DataFrame
+    :param kwargs: Additional arguments to pass to pandas.read_csv, pandas.read_excel,
+        or scanpy.read_h5ad, depending on the filepath provided
+    :return: None, or a pandas DataFrame or AnnData
     """
+    if not path:
+        return None
+
     if not path.exists():
+        logger.critical(f"File {path} does not exist")
         raise FileNotFoundError(f"File {path} does not exist")
-    if path.suffix not in {".csv", ".tsv"}:
-        raise ValueError(f"File {path} is not a CSV file")
-
-    kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")
-    async with aiofiles.open(path) as f:
-        content = await f.read()
-        return pd.read_csv(io.StringIO(content), **kwargs)
-
-
-async def _async_read_excel(path: Path, **kwargs) -> pd.DataFrame:
-    """Asynchronously reads an Excel file and returns a pandas DataFrame.
-
-    :param path: The path to read from
-    :param kwargs: Additional arguments to pass to pandas.read_excel
-    :return: A pandas DataFrame
-    """
-    if not path.exists():
-        raise FileNotFoundError(f"File {path} does not exist")
-    if path.suffix not in {".xls", ".xlsx"}:
-        raise ValueError(f"File {path} is not an Excel file")
-
-    async with aiofiles.open(path, "rb") as f:
-        content = await f.read()
-        return pd.read_excel(io.StringIO(content.decode()), **kwargs)
-
 
 def is_notebook() -> bool:
     """Check if the current environment is a Jupyter Notebook.
