@@ -71,21 +71,24 @@ async def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tu
         )
 
     match prep_method:
-        case RNAPrepMethod.TOTAL:
-            filename = f"rnaseq_total_{context_name}.csv"
-        case RNAPrepMethod.MRNA:
-            filename = f"rnaseq_mrna_{context_name}.csv"
-        case RNAPrepMethod.SCRNA:
-            filename = f"rnaseq_scrna_{context_name}.csv"
+        case RNAType.TRNA:
+            filename = f"{RNAType.TRNA.value}_{context_name}.csv"
+        case RNAType.MRNA:
+            filename = f"{RNAType.MRNA.value}_{context_name}.csv"
+        case RNAType.SCRNA:
+            filename = f"{RNAType.SCRNA.value}_{context_name}.csv"
         case _:
-            raise ValueError(
-                f"Unsupported RNA-seq library type: {prep_method.value}. "
-                f"Must be an option defined in 'RNASeqPreparationMethod'."
+            _log_and_raise_error(
+                f"Unsupported RNA-seq library type: {prep_method.value}. Must be one of {', '.join(RNAType)}.",
+                error=ValueError,
+                level=LogLevel.ERROR,
             )
 
     save_filepath = config.result_dir / context_name / prep_method.value / filename
     if save_filepath.exists():
+        logger.debug(f"Loading RNA-seq data from: {save_filepath}")
         data = pd.read_csv(save_filepath, index_col="entrez_gene_id")
+        logger.success(f"Successfully loaded RNA-seq data from: {save_filepath}")
         return context_name, data
 
     else:
