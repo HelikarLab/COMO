@@ -81,7 +81,7 @@ def _gene_rule_logical(gpr_expression: str, level: int = 0) -> str:
         inner_string = inner_string.replace("[", "")
         inner_string = inner_string.replace("]", "")
 
-    expression_out = f"{gpr_expression[:loc_l]}{inner_string}{gpr_expression[loc_r + 1:]}"
+    expression_out = f"{gpr_expression[:loc_l]}{inner_string}{gpr_expression[loc_r + 1 :]}"
     expression_out = _gene_rule_logical(expression_out, level + 1)
 
     return expression_out
