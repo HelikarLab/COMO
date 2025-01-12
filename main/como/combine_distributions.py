@@ -34,9 +34,6 @@ async def _combine_z_distribution_for_batch(
     weighted_z_floor: int,
     weighted_z_ceiling: int,
 ) -> pd.DataFrame:
-    def weighted_z(x: npt.NDArray[float], floor: int, ceiling: int) -> npt.NDArray[float]:
-        result = np.sum(x) / np.sqrt(len(x))
-        return np.clip(result, floor, ceiling)
 
     if _num_rows(matrix) < 2:
         return matrix
@@ -48,6 +45,10 @@ async def _combine_z_distribution_for_batch(
         floor=weighted_z_floor,
         ceiling=weighted_z_ceiling,
     )
+    values = matrix.iloc[:, 1:].values
+    weighted_matrix = np.sum(values, axis=1) / np.sqrt(values.shape[1])
+    weighted_matrix = np.clip(weighted_matrix, weighted_z_floor, weighted_z_ceiling).astype(np.int8)
+
     merge_df = pd.concat([matrix, pd.Series(weighted_matrix, name="combined")], axis=1)
     weighted_matrix = pd.DataFrame(
         {
