@@ -20,8 +20,8 @@ from fast_bioservices.pipeline import (
 )
 from loguru import logger
 
-__all__ = ["Compartments", "split_gene_expression_data", "stringlist_to_list", "suppress_stdout"]
 
+__all__ = ["split_gene_expression_data", "stringlist_to_list", "suppress_stdout"]
 
 
 def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
