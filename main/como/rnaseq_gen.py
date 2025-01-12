@@ -690,7 +690,7 @@ def filter_counts(
 
 async def _process(
     context_name: str,
-    rnaseq_matrix: pd.DataFrame,
+    rnaseq_matrix_filepath: Path,
     metadata_df: pd.DataFrame,
     gene_info_df: pd.DataFrame,
     prep: RNAType,
@@ -887,7 +887,7 @@ async def rnaseq_gen(
     )
     await _process(
         context_name=context_name,
-        rnaseq_matrix=await _read_counts(input_rnaseq_filepath),
+        rnaseq_matrix_filepath=input_rnaseq_filepath,
         metadata_df=metadata_df,
         gene_info_df=pd.read_csv(input_gene_info_filepath),
         prep=prep,
