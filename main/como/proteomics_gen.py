@@ -21,7 +21,11 @@ def process_proteomics_data(path: Path) -> pd.DataFrame:
     # Preprocess data, drop na, duplicate ';' in symbol,
     matrix: pd.DataFrame = pd.read_csv(path)
     if "gene_symbol" not in matrix.columns:
-        raise ValueError("No gene_symbol column found in proteomics data.")
+        _log_and_raise_error(
+            "No gene_symbol column found in proteomics data.",
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
 
     matrix["gene_symbol"] = matrix["gene_symbol"].astype(str)
     matrix.dropna(subset=["gene_symbol"], inplace=True)
@@ -130,7 +134,9 @@ def load_proteomics_tests(filename, context_name):
 
     inquiry_full_path = config.data_dir / "config_sheets" / filename
     if not inquiry_full_path.exists():
-        raise FileNotFoundError(f"Error: file not found {inquiry_full_path}")
+        _log_and_raise_error(
+            f"Error: file not found {inquiry_full_path}", error=FileNotFoundError, level=LogLevel.ERROR
+        )
 
     filename = f"Proteomics_{context_name}.csv"
     full_save_filepath = config.result_dir / context_name / "proteomics" / filename
@@ -164,17 +170,37 @@ async def proteomics_gen(
 ):
     """Generate proteomics data."""
     if not config_filepath.exists():
-        raise FileNotFoundError(f"Config file not found at {config_filepath}")
+        _log_and_raise_error(
+            f"Config file not found at {config_filepath}",
+            error=FileNotFoundError,
+            level=LogLevel.ERROR,
+        )
     if config_filepath.suffix not in (".xlsx", ".xls"):
-        raise FileNotFoundError(f"Config file must be an xlsx or xls file at {config_filepath}")
+        _log_and_raise_error(
+            f"Config file must be an xlsx or xls file at {config_filepath}",
+            error=FileNotFoundError,
+            level=LogLevel.ERROR,
+        )
 
     if not matrix_filepath.exists():
-        raise FileNotFoundError(f"Matrix file not found at {matrix_filepath}")
+        _log_and_raise_error(
+            f"Matrix file not found at {matrix_filepath}",
+            error=FileNotFoundError,
+            level=LogLevel.ERROR,
+        )
     if matrix_filepath.suffix not in {".csv"}:
-        raise FileNotFoundError(f"Matrix file must be a csv file at {matrix_filepath}")
+        _log_and_raise_error(
+            f"Matrix file must be a csv file at {matrix_filepath}",
+            error=FileNotFoundError,
+            level=LogLevel.ERROR,
+        )
 
     if quantile < 0 or quantile > 100:
-        raise ValueError("Quantile must be an integer from 0 to 100")
+        _log_and_raise_error(
+            "Quantile must be an integer from 0 to 100",
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
     quantile /= 100
 
     config_df = pd.read_excel(config_filepath, sheet_name=context_name)
