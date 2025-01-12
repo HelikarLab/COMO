@@ -78,8 +78,9 @@ async def _combine_z_distribution_for_batch(
 
     graph_zscore_distribution(
         stack_df,
-        title=f"Combined Z-score Distribution for {context_name} - batch #{batch_num}",
-        output_png_filepath=output_png_filepath,
+        title=f"Combined Z-score Distribution for {context_name} - batch #{batch.batch_num}",
+        output_filepath=output_figure_dirpath
+        / f"{context_name}_{source.value}_batch{batch.batch_num}_combined_zscore_distribution.pdf",
     )
     return weighted_matrix
 
