@@ -22,6 +22,9 @@ dependencies = [
     "scipy>=1.7.3",
     "seaborn>=0.13.2",
     "setuptools<60.0",
+    # Statsmodels >= 0.14 is required for python 3.12+
+    "statsmodels>=0.13.0",
+    "statsmodels>=0.14.0; python_version >= '3.12'",
     "troppo@git+https://github.com/JoshLoecker/troppo@master",
 ]
 
@@ -60,3 +63,11 @@ tag_format = "$version"
 version_scheme = "semver2"
 version_provider = "pep621"
 update_changelog_on_bump = true
+
+[tool.uv.sources]
+como = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "como",
+]
