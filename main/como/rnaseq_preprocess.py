@@ -667,13 +667,7 @@ async def rnaseq_preprocess(
     :param log_level: The logging level
     :param log_location: The logging location
     """
-    with contextlib.suppress(ValueError):
-        logger.remove(0)
-        logger.add(
-            sink=log_location,
-            level=log_level,
-            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",  # noqa: E501
-        )
+    _set_up_logging(level=log_level, location=log_location)
 
     output_gene_info_filepath = output_gene_info_filepath.resolve()
     como_context_dir = como_context_dir.resolve()
