@@ -11,17 +11,16 @@ from io import TextIOWrapper
 from pathlib import Path
 from typing import Callable, NamedTuple
 
+import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-import plotly.graph_objs as go
-import scanpy as sc
+import seaborn as sns
 import sklearn
 import sklearn.neighbors
 from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
 from pandas import DataFrame
-from plotly.subplots import make_subplots
 from scipy.signal import find_peaks
 from sklearn.neighbors import KernelDensity
 
@@ -412,10 +411,11 @@ def zfpkm_transform(
     return results, zfpkm_df
 
 
-def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
+def zfpkm_plot(results, *, output_png_filepath: Path, plot_xfloor: int = -4, subplot_titles: bool = True):
     """Plot the log2(FPKM) density and fitted Gaussian for each sample.
 
     :param results: A dictionary of intermediate results from zfpkm_transform.
+    :param output_png_filepath: Output filepath location
     :param: subplot_titles: Whether to display facet titles (sample names).
     :param plot_xfloor: Lower limit for the x-axis.
     :param subplot_titles: Whether to display facet titles (sample names).
@@ -445,45 +445,30 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
     mega_df.columns = pd.Series(data=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
     mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")
 
-    subplot_titles = list(results.keys()) if subplot_titles else None
-    fig = make_subplots(
-        rows=len(results),
-        cols=1,
-        subplot_titles=subplot_titles,
-        vertical_spacing=min(0.05, (1 / (len(results) - 1))),
-    )
+    fig, axes = plt.subplot(len(results), 1, figsize=(8, 4 * len(results)))
+    if len(results) == 1:
+        axes = [axes]
 
     for i, sample_name in enumerate(results, start=1):
         sample_data = mega_df[mega_df["sample_name"] == sample_name]
-        traces = []
+        axis = axes[i]
+
         for source_type in sample_data["source"].unique():
             group = sample_data[sample_data["source"] == source_type]
-            traces.append(
-                go.Scatter(
-                    x=group["log2fpkm"],
-                    y=group["density"],
-                    mode="lines",
-                    name=source_type,
-                    legendgroup=source_type,
-                )
-            )
-        fig.add_traces(traces, rows=i, cols=1)
-        fig.update_xaxes(title_text="log2(FPKM)", range=[plot_xfloor, sample_data["log2fpkm"].max()], row=i, col=1)
-        fig.update_yaxes(title_text="density [scaled]", row=i, col=1)
-        fig.update_layout(legend_tracegroupgap=0)
+            sns.lineplot(data=group, x="log2fpkm", y="density", label=source_type, ax=axis)
 
-    # for i, (name, group) in enumerate(mega_df.groupby("sample_name"), start=1):
-    #     fig.add_trace(
-    #         trace=go.Scatter(x=group["log2fpkm"], y=group["density"], mode="lines", name=name, legendgroup=name),
-    #         row=i,
-    #         col=1,
-    #     )
-    #     fig.update_xaxes(title_text="log2(FPKM)", range=[plot_xfloor, max(group["log2fpkm"].tolist())], row=i, col=1)
-    #     fig.update_yaxes(title_text="density [scaled]", row=i, col=1)
-    #     fig.update_layout(legend_tracegroupgap=0)
+        axis.set_xlim(plot_xfloor, sample_data["log2fpkm"].max())
+        axis.set_xlabel("log2(FPKM)")
+        axis.set_ylabel("density [scaled]")
+        axis.legend(title="Source")
 
-    fig.update_layout(height=600 * len(results), width=1000, title_text="zFPKM Plots", showlegend=True)
-    fig.write_image("zfpkm_plot.png")
+    plt.tight_layout()
+    if output_png_filepath.suffix != ".png":
+        logger.warning(
+            f"Output filepath did not end in '.png', setting to '.png' now. Got: '{output_png_filepath.suffix}'"
+        )
+        output_png_filepath = output_png_filepath.with_suffix(".png")
+    plt.savefig(output_png_filepath)
 
 
 def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
@@ -602,6 +587,7 @@ def zfpkm_filter(
     force_zfpkm_plot: bool,
     peak_parameters: PeakIdentificationParameters,
     bandwidth: int,
+    output_png_filepath: Path | None,
 ) -> NamedMetrics:
     """Apply zFPKM filtering to the FPKM matrix for a given sample."""
     min_sample_expression = filtering_options.replicate_ratio
@@ -625,7 +611,9 @@ def zfpkm_filter(
                 "If you would like to plot them anyway, set 'force_zfpkm_plot' to True"
             )
         else:
-            zfpkm_plot(results)
+            if output_png_filepath is None:
+                _log_and_raise_error("Output zFPKM PNG filepath is None.", error=ValueError, level=LogLevel.ERROR)
+            zfpkm_plot(results, output_png_filepath=output_png_filepath)
 
         # determine which genes are expressed
         min_samples = round(min_sample_expression * len(zfpkm_df.columns))
@@ -652,6 +640,7 @@ def filter_counts(
     force_zfpkm_plot: bool,
     peak_parameters: PeakIdentificationParameters,
     bandwidth: int,
+    output_png_filepath: Path | None = None,
 ) -> NamedMetrics:
     """Filter the count matrix based on the specified technique."""
     match technique:
@@ -669,6 +658,7 @@ def filter_counts(
                 force_zfpkm_plot=force_zfpkm_plot,
                 peak_parameters=peak_parameters,
                 bandwidth=bandwidth,
+                output_png_filepath=output_png_filepath,
             )
         case FilteringTechnique.UMI:
             # UMI filtering is the same as zFPKM filtering without calculating FPKM
@@ -679,6 +669,7 @@ def filter_counts(
                 force_zfpkm_plot=force_zfpkm_plot,
                 peak_parameters=peak_parameters,
                 bandwidth=bandwidth,
+                output_png_filepath=output_png_filepath,
             )
         case _:
             _log_and_raise_error(
@@ -702,10 +693,11 @@ async def _process(
     technique: FilteringTechnique,
     cut_off: int | float,
     force_zfpkm_plot: bool,
-    output_boolean_activity_filepath: Path,
-    output_zscore_normalization_filepath: Path,
     peak_parameters: PeakIdentificationParameters,
     bandwidth: int,
+    output_boolean_activity_filepath: Path,
+    output_zscore_normalization_filepath: Path,
+    output_zfpkm_png_filepath: Path | None,
 ):
     """Save the results of the RNA-Seq tests to a CSV file."""
     output_boolean_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -745,6 +737,7 @@ async def _process(
         force_zfpkm_plot=force_zfpkm_plot,
         peak_parameters=peak_parameters,
         bandwidth=bandwidth,
+        output_png_filepath=output_zfpkm_png_filepath,
     )
 
     merged_zscore_df = pd.DataFrame()
@@ -827,6 +820,7 @@ async def rnaseq_gen(
     force_zfpkm_plot: bool = False,
     log_level: LogLevel = LogLevel.INFO,
     log_location: str | TextIOWrapper = sys.stderr,
+    output_zfpkm_png_filepath: Path | None = None,
 ) -> None:
     """Generate a list of active and high-confidence genes from a gene count matrix.
 
@@ -857,6 +851,7 @@ async def rnaseq_gen(
     :param force_zfpkm_plot: If too many samples exist, should plotting be done anyway?
     :param log_level: The level of logging to output
     :param log_location: The location to write logs to
+    :param output_zfpkm_png_filepath: Optional filepath to save zFPKM plots
     :return: None
     """
     _set_up_logging(level=log_level, location=log_location)
@@ -948,8 +943,9 @@ async def rnaseq_gen(
         technique=technique,
         cut_off=cutoff,
         force_zfpkm_plot=force_zfpkm_plot,
-        output_boolean_activity_filepath=output_boolean_activity_filepath,
-        output_zscore_normalization_filepath=output_zscore_normalization_filepath,
         peak_parameters=PeakIdentificationParameters(height=zfpkm_peak_height, distance=zfpkm_peak_distance),
         bandwidth=zfpkm_bandwidth,
+        output_boolean_activity_filepath=output_boolean_activity_filepath,
+        output_zscore_normalization_filepath=output_zscore_normalization_filepath,
+        output_zfpkm_png_filepath=output_zfpkm_png_filepath,
     )
