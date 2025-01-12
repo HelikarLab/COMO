@@ -54,8 +54,7 @@ class _STARinformation:
             num_ambiguous = [int(i) for i in ambiguous.rstrip("\n").split("\t")[1:]]
             remainder = await i_stream.read()
 
-        string_io = StringIO(remainder)
-        df = pd.read_csv(string_io, sep="\t", header=None)
+        df = await _read_file(StringIO(remainder), sep="\t", header=None)
         df.columns = [
             "ensembl_gene_id",
             "unstranded_rna_counts",
