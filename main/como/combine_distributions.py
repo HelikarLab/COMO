@@ -140,6 +140,9 @@ def _combine_z_distribution_for_context(
     weighted_z_floor: int = -6,
     weighted_z_ceiling: int = 6,
 ):
+    if not zscore_results:
+        logger.warning("No zscore results exist, returning empty dataframe")
+        return pd.DataFrame({"ensembl_gene_id": [], "combine_z": []})
 
     z_matrices = [
         res.z_score_matrix.set_index("ensembl_gene_id").rename(
