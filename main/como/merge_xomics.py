@@ -49,9 +49,10 @@ class _HighExpressionHeaderNames:
     PROTEOMICS = f"{_MergedHeaderNames.PROTEOMICS}_high"
 
 
-
-def _load_rnaseq_tests(filename, context_name, prep_method: RNAPrepMethod) -> tuple[str, pd.DataFrame]:
+# TODO: If function is no longer needed, remove?
+async def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tuple[str, pd.DataFrame]:
     """Load rnaseq results."""
+    logger.debug(f"Loading data for context '{context_name}' using preparation method '{prep_method.value}'")
     config = Config()
 
     def load_dummy_dict():
@@ -62,8 +63,12 @@ def _load_rnaseq_tests(filename, context_name, prep_method: RNAPrepMethod) -> tu
         return load_dummy_dict()
 
     inquiry_full_path = config.data_dir / "config_sheets" / filename
-    if not inquiry_full_path.exists():  # check that config file exist (isn't needed to load, but helps user)
-        raise FileNotFoundError(f"Error: Config file not found at {inquiry_full_path}")
+    if not inquiry_full_path.exists():
+        _log_and_raise_error(
+            f"Config file not found at {inquiry_full_path}",
+            error=FileNotFoundError,
+            level=LogLevel.ERROR,
+        )
 
     match prep_method:
         case RNAPrepMethod.TOTAL:
