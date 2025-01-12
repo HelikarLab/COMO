@@ -213,71 +213,41 @@ async def _begin_combining_distributions(
     weighted_z_floor: int = -6,
     weighted_z_ceiling: int = 6,
 ):
+    logger.info(f"Starting to combine z-scores for context '{context_name}'")
     output_figure_dirpath.mkdir(parents=True, exist_ok=True)
-    source_name: list[str] = ["totalrna", "mrna", "scrna", "proteomics"]
-    zscore_results: list[_CombineOmicsInput] = []
-    for matrix, source in zip(input_matrices, source_name):
-        matrix: pd.DataFrame | None = pd.read_csv(matrix) if isinstance(matrix, Path) else matrix
 
-        if matrix is not None:
-            if source == "totalrna":
-                batch_data = batch_names.trna
-                weight = source_weights.trna
-                output_filepath = output_filepaths.trna
-            elif source == "mrna":
-                batch_data = batch_names.mrna
-                weight = source_weights.mrna
-                output_filepath = output_filepaths.mrna
-            elif source == "scrna":
-                batch_data = batch_names.scrna
-                weight = source_weights.scrna
-                output_filepath = output_filepaths.scrna
-            elif source == "proteomics":
-                batch_data = batch_names.proteomics
-                weight = source_weights.proteomics
-                output_filepath = output_filepaths.proteomics
-            else:
-                raise ValueError(f"Invalid source; got '{source}', expected one of '{','.join(source_name)}'")
+    z_score_results: list[_CombineOmicsInput] = []
+    for source, matrix in input_matrices:
+        if matrix is None:
+            logger.trace(f"Source '{source.value}' is None, skipping")
+            continue
+        if source not in SourceTypes:
+            logger.critical(f"Invalid source; got '{source.value}', expected 'trna', 'mrna', 'scrna', or 'proteomics'.")
+            raise ValueError("Invalid source")
 
-            replicate_count: list[int] = []
-            merge_z_data = pd.DataFrame()
-
-            batch: _BatchEntry
-            for batch in batch_data:
-                replicate_count.append(len(batch.sample_names))
-
-                batch_df: pd.DataFrame = matrix[["ensembl_gene_id", *batch.sample_names]]
-                # graph.z_score_distribution(
-                #     batch_df,
-                #     title=f"Z-Score Distribution for {context_name} - batch #{batch.batch_num} - {source}",
-                #     output_png_filepath=output_figure_dirpath
-                #     / f"{source}_batch{batch.batch_num}_zscore_distribution.png",
-                # )
-                combine_z_matrix: pd.DataFrame = _combine_batch_zdistro(
-                    matrix=batch_df,
+        batch_results = await asyncio.gather(
+            *[
+                _combine_z_distribution_for_batch(
                     context_name=context_name,
-                    batch_num=batch.batch_num,
-                    output_png_filepath=(
-                        output_figure_dirpath
-                        / f"combined_{source}_{context_name}_batch{batch.batch_num}_distribution.png"
+                    batch=batch,
+                    matrix=matrix[[GeneIdentifier.ENSEMBL_GENE_ID.value, *batch.sample_names]],
+                    source=source,
+                    output_combined_matrix_filepath=(
+                        output_filepaths[source.value].parent
+                        / f"{context_name}_{source.value}_batch{batch.batch_num}_combined_z_distribution_.csv"
                     ),
+                    output_figure_dirpath=output_figure_dirpath,
                     weighted_z_floor=weighted_z_floor,
                     weighted_z_ceiling=weighted_z_ceiling,
                 )
-                combine_z_matrix.columns = ["ensembl_gene_id", batch.batch_num]
-                merge_z_data = (
-                    combine_z_matrix
-                    if merge_z_data.empty
-                    else pd.merge(merge_z_data, combine_z_matrix, on="ensembl_gene_id", how="outer")
-                )
-            combine_batches_zscore = _combine_context_zdistro(
-                matrix=merge_z_data,
-                context_name=context_name,
-                batch_num=batch.batch_num,
-                num_replicates=sum(replicate_count),
-                output_png_filepath=output_figure_dirpath / f"totalrna_{context_name}_combined_distribution.png",
-                weighted_z_floor=weighted_z_floor,
-                weighted_z_ceiling=weighted_z_ceiling,
+                for batch in batch_names[source.value]
+            ]
+        )
+
+        merged_batch_results = pd.DataFrame()
+        for df in batch_results:
+            merged_batch_results = (
+                df if merged_batch_results.empty else merged_batch_results.merge(df, on="ensembl_gene_id", how="outer")
             )
             zscore_results.append(_CombineOmicsInput(z_score_matrix=combine_batches_zscore, type=source, weight=weight))  # type: ignore
             combine_batches_zscore.to_csv(output_filepath, index=False)
