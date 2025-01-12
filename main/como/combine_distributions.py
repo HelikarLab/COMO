@@ -133,10 +133,10 @@ async def _combine_z_distribution_for_source(
     return weighted_matrix
 
 
-def _combine_omics_zdistros(
+def _combine_z_distribution_for_context(
     context: str,
     zscore_results: list[_CombineOmicsInput],
-    output_png_filepath: Path,
+    output_graph_filepath: Path,
     weighted_z_floor: int = -6,
     weighted_z_ceiling: int = 6,
 ):
