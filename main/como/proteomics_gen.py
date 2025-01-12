@@ -167,8 +167,12 @@ async def proteomics_gen(
     high_confidence_replicate_ratio: float = 0.7,
     high_confidence_batch_ratio: float = 0.7,
     quantile: int = 25,
+    log_level: LogLevel = LogLevel.INFO,
+    log_location: str | TextIOWrapper = sys.stderr,
 ):
     """Generate proteomics data."""
+    _set_up_logging(level=log_level, location=log_location)
+
     if not config_filepath.exists():
         _log_and_raise_error(
             f"Config file not found at {config_filepath}",
