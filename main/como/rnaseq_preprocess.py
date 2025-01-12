@@ -562,6 +562,7 @@ async def _create_gene_info_file(
         )
     ]
     gene_info.sort_values(by="ensembl_gene_id", inplace=True)
+    gene_info.dropna(inplace=True)
     gene_info.to_csv(output_filepath, index=False)
     logger.success(f"Gene Info file written at '{output_filepath}'")
 
