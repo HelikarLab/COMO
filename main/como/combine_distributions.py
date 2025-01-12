@@ -34,6 +34,12 @@ async def _combine_z_distribution_for_batch(
     weighted_z_floor: int,
     weighted_z_ceiling: int,
 ) -> pd.DataFrame:
+    await asyncio.gather(
+        *[
+            aiofiles.os.makedirs(output_combined_matrix_filepath.parent.as_posix(), exist_ok=True),
+            aiofiles.os.makedirs(output_figure_dirpath.as_posix(), exist_ok=True),
+        ]
+    )
 
     if _num_rows(matrix) < 2:
         return matrix
