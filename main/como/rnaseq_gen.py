@@ -327,14 +327,12 @@ def _zfpkm_calculation(
             a threshold for calling a gene as "active" and/or "expressed"
             : https://doi.org/10.1186/1471-2164-14-778
     """
-    row_log2: npt.NDArray = np.log2(row + 1)
-    row_log2 = np.nan_to_num(row_log2, nan=0)
-    refit: KernelDensity = kernel.fit(row_log2.reshape(-1, 1))  # type: ignore
+    values = column.values
+    refit: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(values.reshape(-1, 1))  # type: ignore
 
-    # kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(row_log2.reshape(-1, 1))
-    x_range = np.linspace(row_log2.min(), row_log2.max(), 1000)
+    x_range = np.linspace(values.min(), values.max(), 2000)
     density = np.exp(refit.score_samples(x_range.reshape(-1, 1)))
-    peaks, _ = find_peaks(density, height=peak_parameters[0], distance=peak_parameters[1])
+    peaks, _ = find_peaks(density, height=peak_parameters.height, distance=peak_parameters.distance)
     peak_positions = x_range[peaks]
 
     mu = 0
@@ -344,9 +342,9 @@ def _zfpkm_calculation(
     if len(peaks) != 0:
         mu = peak_positions.max()
         max_fpkm = density[peaks[np.argmax(peak_positions)]]
-        u = row_log2[row_log2 > mu].mean()
+        u = values[values > mu].mean()
         stddev = (u - mu) * np.sqrt(np.pi / 2)
-    zfpkm = pd.Series((row_log2 - mu) / stddev, dtype=np.float32, name=row.name)
+    zfpkm = pd.Series((values - mu) / stddev, dtype=np.float32, name=column.name)
 
     return _ZFPKMResult(zfpkm=zfpkm, density=Density(x_range, density), mu=mu, std_dev=stddev, max_fpkm=max_fpkm)
 
@@ -365,13 +363,15 @@ def zfpkm_transform(
         )
         update_every_percent /= 100
 
-    total_rows = len(fpkm_df)
-    update_per_step: int = int(np.ceil(total_rows * update_every_percent))
-    cores = max(min(multiprocessing.cpu_count() - 2, total_rows), 1)  # Get at least 1 core and at most cpu_count() - 2
+    total_samples = _num_columns(fpkm_df)
+    update_per_step: int = int(np.ceil(total_samples * update_every_percent))
+
+    # Get at least 1 core and at most cpu_count() - 2
+    cores = max(min(multiprocessing.cpu_count() - 2, total_samples), 1)
     logger.debug(
-        f"zFPKM transforming {total_rows:,} gene(s) across {len(fpkm_df.columns)} sample(s) using {cores} cores"
+        f"zFPKM transforming {len(fpkm_df.columns)} sample(s) "
+        f"containing {len(fpkm_df):,} genes(s) using {cores} core(s)"
     )
-    logger.debug(f"Will update every {update_per_step:,} steps (~{update_every_percent:.1%} of {total_rows:,})")
 
     with Pool(processes=cores) as pool:
         kernel = KernelDensity(kernel="gaussian", bandwidth=bandwidth)
