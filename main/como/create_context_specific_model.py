@@ -276,9 +276,9 @@ async def _map_expression_to_reaction(
     model_cobra,
     gene_expression_file,
     recon_algorithm: Algorithm,
-    low_thresh=None,
-    high_thresh=None,
-):
+    low_thresh: float,
+    high_thresh: float,
+) -> collections.OrderedDict[str, int]:
     """Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules.
 
     These rules should be defined in the general genome-scale metabolic model
