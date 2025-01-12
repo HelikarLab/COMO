@@ -688,7 +688,7 @@ def filter_counts(
             )
 
 
-async def _save_rnaseq_tests(
+async def _process(
     context_name: str,
     rnaseq_matrix: pd.DataFrame,
     metadata_df: pd.DataFrame,
@@ -885,7 +885,7 @@ async def rnaseq_gen(
         if isinstance(input_metadata_filepath_or_df, pd.DataFrame)
         else await _create_metadata_df(input_metadata_filepath_or_df)
     )
-    await _save_rnaseq_tests(
+    await _process(
         context_name=context_name,
         rnaseq_matrix=await _read_counts(input_rnaseq_filepath),
         metadata_df=metadata_df,
