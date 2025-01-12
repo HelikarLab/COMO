@@ -120,6 +120,7 @@ def _merge_logical_table(df: pd.DataFrame):
     for i in multiple_entrez_ids:
         ids = i.split("//")
         id_list.extend(ids)
+        logger.trace(f"Processing multiple IDs {ids} for {i}")
 
         duplicate_rows = pd.DataFrame([])
         for j in ids:
@@ -129,14 +130,18 @@ def _merge_logical_table(df: pd.DataFrame):
 
         df = pd.concat([df, pd.DataFrame(duplicate_rows)], axis=0, ignore_index=True)
         df.drop(df[df["entrez_gene_id"] == i].index, inplace=True)
+    logger.trace(f"Shape after merging duplciated rows: {df.shape}")
 
     full_entrez_id_sets: set[str] = set()
     entrez_dups_list: list[list[str]] = []
     multi_entrez_index = list(range(len(multiple_entrez_ids)))
 
+    logger.trace("Starting to merge multiple entrez IDs")
     for i in range(len(multiple_entrez_ids)):
         if i not in multi_entrez_index:
             continue
+
+        logger.trace(f"Iterating through multi-entrez ids, index {i}")
 
         set1 = set(multiple_entrez_ids[i].split("//"))
         multi_entrez_index.remove(i)
@@ -153,14 +158,17 @@ def _merge_logical_table(df: pd.DataFrame):
         new_entrez_id = " /// ".join(sortlist)
         full_entrez_id_sets.add(new_entrez_id)
 
+    logger.debug(f"Finished merging multiple entrez IDs, found {len(full_entrez_id_sets)} sets")
     entrez_dups_list.extend(i.split(" /// ") for i in full_entrez_id_sets)
     entrez_dups_dict = dict(zip(full_entrez_id_sets, entrez_dups_list))
 
+    logger.trace("Replacing IDs in dataframe")
     for merged_entrez_id, entrez_dups_list in entrez_dups_dict.items():
         df["entrez_gene_id"].replace(to_replace=entrez_dups_list, value=merged_entrez_id, inplace=True)
 
     df = df.fillna(-1).groupby(level=0).max()
     df.replace(-1, np.nan, inplace=True)
+    logger.trace(f"Shape after merging: {df.shape}")
 
     # TODO: Test if this is working properly
     """
@@ -192,8 +200,10 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame, taxon_id: int) ->
     """
     # If _ExpressedHeaderNames.PROTEOMICS.value is in the dataframe, lower the required expression by 1
     # We are only trying to get details for transcriptomic data
+    logger.debug("Obtaining transcriptomic details")
     transcriptomic_df: pd.DataFrame = merged_df.copy()
     if _ExpressedHeaderNames.PROTEOMICS in merged_df.columns:
+        logger.trace("Proteomic data found, modifying required and total expression values")
         # Get the number of sources required for a gene to be marked "expressed"
         required_expression = merged_df["required"].iloc[0]
 
@@ -212,6 +222,7 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame, taxon_id: int) ->
             ],
             inplace=False,
         )
+        logger.trace(f"Modified transcriptomic dataframe: {transcriptomic_df.shape}")
 
         # Must recalculate TotalExpressed because proteomic data was removed
         # If the TotalExpressed column is less than the Required column, set active to 1, otherwise set it to 0
@@ -226,6 +237,7 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame, taxon_id: int) ->
         columns=["entrez_gene_id", "gene_symbol", "description", "gene_type"],
         index=list(range(len(transcriptomic_df))),
     )
+    logger.trace(f"Querying MyGene for details on {len(transcriptomic_df)} genes")
     for i, detail in enumerate(
         await my_gene.query(
             items=transcriptomic_df["entrez_gene_id"].tolist(),
@@ -237,6 +249,8 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame, taxon_id: int) ->
         gene_details.at[i, "gene_symbol"] = detail["symbol"]
         gene_details.at[i, "description"] = detail["name"]
         gene_details.at[i, "gene_type"] = detail["type_of_gene"]
+
+    logger.debug("Finished obtaining transcriptomic details")
     return gene_details
 
 
@@ -254,6 +268,7 @@ async def _merge_xomics(
     force_activate_high_confidence: bool = True,
     adjust_for_missing_sources: bool = False,
 ):
+    logger.debug(f"Starting to merge data sources for context '{context_name}'")
     expression_list: list[str] = []
     high_confidence_list: list[str] = []
     merge_data = pd.DataFrame()
@@ -265,6 +280,7 @@ async def _merge_xomics(
         (proteomic_boolean_matrix, _ExpressedHeaderNames.PROTEOMICS, _HighExpressionHeaderNames.PROTEOMICS),
     ):
         if matrix is None:
+            logger.trace(f"Skipping {expressed_sourcetype} because it's matrix does not exist")
             continue
 
         matrix: pd.DataFrame  # re-define type to assist in type hinting for IDEs
@@ -273,18 +289,22 @@ async def _merge_xomics(
         matrix.rename(columns={"expressed": expressed_sourcetype, "high": high_expressed_sourcetype}, inplace=True)
         merge_data = matrix if merge_data.empty else merge_data.merge(matrix, on="entrez_gene_id", how="outer")
 
+    logger.trace(f"Shape of merged data before merging logical tables: {merge_data.shape}")
     if merge_data.empty:
-        logger.critical(
+        logger.warning(
             f"No data is available for the '{context_name}' context. If this is intentional, ignore this error."
         )
         return {}
 
     merge_data = _merge_logical_table(merge_data)
+    logger.debug(f"Shape of merged data after merging logical table: {merge_data.shape}")
     num_sources = len(expression_list)
     merge_data["active"] = 0
     merge_data["required"] = 0
 
+    logger.trace(f"Number of data sources: {num_sources}")
     if adjust_for_missing_sources:  # Subtract 1 from requirement per missing source
+        logger.trace("Adjusting for missing data sources")
         merge_data.loc[:, "required"] = merge_data[expression_list].apply(
             lambda x: expression_requirement - (num_sources - x.count())
             if (expression_requirement - (num_sources - x.count()) > 0)
@@ -292,22 +312,30 @@ async def _merge_xomics(
             axis=1,
         )
     else:  # Do not adjust for missing sources
+        logger.trace("Not adjusting for missing data sources")
         merge_data.loc[:, "required"] = merge_data[expression_list].apply(
             lambda x: expression_requirement if (expression_requirement - (num_sources - x.count()) > 0) else 1, axis=1
         )
+    logger.trace("Created expression requirement column")
 
     # Count the number of sources each gene is active in
     # set to active in final output if we meet the adjusted expression requirement
     merge_data["total_expressed"] = merge_data[expression_list].sum(axis=1)
     merge_data.loc[merge_data["total_expressed"] >= merge_data["required"], "active"] = 1
+    logger.trace("Created total expression requirement column")
 
     if force_activate_high_confidence:  # If a gene is high-confidence in at least 1 data source, set it to active
+        logger.trace("Forcing high confidence genes")
         merge_data.loc[merge_data[high_confidence_list].sum(axis=1) > 0, "active"] = 1
 
     merge_data.to_csv(output_merged_filepath, index=False)
-    transcriptomic_details = await _get_transcriptmoic_details(merge_data, taxon_id=taxon_id)
-    transcriptomic_details.to_csv(output_transcriptomic_details_filepath, index=False)
+    logger.success(f"Saved merged data to {output_merged_filepath}")
 
+    logger.debug(f"Generating transcriptomic details using {output_merged_filepath}")
+    transcriptomic_details = await _get_transcriptmoic_details(merge_data, taxon_id=taxon_id)
+    logger.debug(f"Saving transcriptomic details to {output_transcriptomic_details_filepath}")
+    transcriptomic_details.to_csv(output_transcriptomic_details_filepath, index=False)
+    logger.success(f"Saved transcriptomic details to {output_transcriptomic_details_filepath}")
     return {context_name: output_gene_activity_filepath.as_posix()}
 
 
@@ -383,6 +411,7 @@ async def _process(
             weighted_z_floor=weighted_z_floor,
             weighted_z_ceiling=weighted_z_ceiling,
         )
+        logger.trace("Finished merging Z-Scores")
 
     # the more data sources available, the higher the expression requirement for the gene
     if adjust_method == AdjustmentMethod.PROGRESSIVE:
@@ -394,6 +423,7 @@ async def _process(
         adjusted_expression_requirement = expression_requirement - (4 - num_sources)
     elif adjust_method == AdjustmentMethod.FLAT:
         adjusted_expression_requirement = expression_requirement
+    logger.debug(f"Adjusted expression requirement: {adjusted_expression_requirement}")
 
     if adjusted_expression_requirement != expression_requirement:
         logger.debug(
