@@ -64,7 +64,6 @@ class FilteringTechnique(Enum):
                 raise ValueError(f"Got a filtering technique of '{value}'; should be one of: {possible_values}")
 
 
-PATH_TYPE = str | Path
 
 class LogLevel(Enum):
     TRACE = 5
