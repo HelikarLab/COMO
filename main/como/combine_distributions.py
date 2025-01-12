@@ -82,10 +82,12 @@ async def _combine_z_distribution_for_batch(
         output_filepath=output_figure_dirpath
         / f"{context_name}_{source.value}_batch{batch.batch_num}_combined_zscore_distribution.pdf",
     )
+
+    weighted_matrix.columns = ["ensembl_gene_id", batch.batch_num]
+    weighted_matrix.to_csv(output_combined_matrix_filepath, index=False)
     return weighted_matrix
 
 
-    matrix: pd.DataFrame,
 async def _combine_z_distribution_for_source(
     context_name: str,
     batch_num: int,
