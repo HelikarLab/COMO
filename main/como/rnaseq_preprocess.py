@@ -519,13 +519,15 @@ async def _create_gene_info_file(
     """
 
     async def read_counts(file: Path) -> list[str]:
-        data = await asyncio.to_thread(pd.read_csv if file.suffix == ".csv" else sc.read_h5ad, file)
-        conversion = (
-            await ensembl_to_gene_id_and_symbol(ids=data["ensembl_gene_id"].tolist(), taxon=taxon)
+        data = await _read_file(file, h5ad_as_df=False)
+        conversion = await (
+            ensembl_to_gene_id_and_symbol(ids=data["ensembl_gene_id"].tolist(), taxon=taxon)
             if isinstance(data, pd.DataFrame)
-            else await gene_symbol_to_ensembl_and_gene_id(symbols=data.var_names.tolist(), taxon=taxon)
+            else gene_symbol_to_ensembl_and_gene_id(symbols=data.var_names.tolist(), taxon=taxon)
         )
-        return conversion["entrez_gene_id"].tolist()
+
+        # Remove NA values from entrez_gene_id dataframe column
+        return conversion["entrez_gene_id"].dropna().tolist()
 
     logger.info(
         "Fetching gene info (this may take 1-5 minutes depending on the number of genes and your internet connection)"
