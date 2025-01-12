@@ -568,10 +568,14 @@ async def merge_xomics(  # noqa: C901
     merge_zfpkm_distribution: bool = False,
     weighted_z_floor: int = -6,
     weighted_z_ceiling: int = 6,
+    log_level: LogLevel = LogLevel.INFO,
+    log_location: str | TextIOWrapper = sys.stderr,
 ):
     """Merge expression tables of multiple sources (RNA-seq, proteomics) into one."""
     if expression_requirement < 1:
         raise ValueError("Expression requirement must be at least 1!")
+    _set_up_logging(level=log_level, location=log_location)
+    logger.info(f"Starting to merge all omics data for context: '{context_name}'")
 
     if expression_requirement is None:
         expression_requirement = sum(
