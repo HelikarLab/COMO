@@ -646,7 +646,7 @@ async def rnaseq_preprocess(
     output_trna_count_matrix_filepath: Path | None = None,
     output_mrna_count_matrix_filepath: Path | None = None,
     cache: bool = True,
-    log_level: LOG_LEVEL = "INFO",
+    log_level: LogLevel = LogLevel.INFO,
     log_location: str | TextIOWrapper = sys.stderr,
 ) -> None:
     """Preprocesses RNA-seq data for downstream analysis.
