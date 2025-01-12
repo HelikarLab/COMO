@@ -153,18 +153,6 @@ async def _read_file(
         logger.critical(f"File {path} does not exist")
         raise FileNotFoundError(f"File {path} does not exist")
 
-def is_notebook() -> bool:
-    """Check if the current environment is a Jupyter Notebook.
-
-    :returns: True if the current environment is a Jupyter Notebook, False otherwise.
-    """
-    try:
-        from IPython import get_ipython
-
-        return get_ipython() is not None
-    except ModuleNotFoundError:
-        return False
-
 
 async def convert_gene_data(values: list[str], taxon_id: int | str | Taxon) -> pd.DataFrame:
     gene_type = await determine_gene_type(values)
