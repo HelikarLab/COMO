@@ -762,9 +762,18 @@ async def _process(
                     axis=1,
                 )
             )
-    merged_zscore_df.index = pd.Series(entrez_gene_ids, name="entrez_gene_id")
-    merged_zscore_df.to_csv(output_zscore_normalization_filepath, index=True)
-    logger.success(f"Wrote z-score normalization matrix to {output_zscore_normalization_filepath}")
+
+    # If any of the normalization metrics are not empty, write the normalized metrics to disk
+    if not all(metric.normalization_matrix.empty for metric in metrics.values()):
+        merged_zscore_df.index = pd.Series(entrez_gene_ids, name="entrez_gene_id")
+        merged_zscore_df.dropna(inplace=True)
+        merged_zscore_df.to_csv(output_zscore_normalization_filepath, index=True)
+        logger.success(f"Wrote z-score normalization matrix to {output_zscore_normalization_filepath}")
+    else:
+        logger.warning(
+            "Not writing z-score normalization matrix because no normalization matrices exist. "
+            "This is expected if you are using UMI filtering."
+        )
 
     expression_frequency = pd.Series(expressed_genes).value_counts()
     expression_df = pd.DataFrame(
