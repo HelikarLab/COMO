@@ -409,13 +409,16 @@ async def _process(
     output_figure_dirpath: Path | None,
 ):
     """Merge different data sources for each context type."""
-    num_sources = sum(1 for source in [trna_matrix, mrna_matrix, scrna_matrix, proteomic_matrix] if source is not None)
     logger.trace(
         f"Settings: Min Expression: {minimum_source_expression}, Expression Requirement: {expression_requirement}, "
         f"Weighted Z-Score Floor: {weighted_z_floor}, Weighted Z-Score Ceiling: {weighted_z_ceiling}, "
         f"Adjust Method: {adjust_method.value}, Merge Z-Scores: {merge_zfpkm_distribution}, "
         f"Force High Confidence: {force_activate_high_confidence}, Adjust for Missing: {adjust_for_missing_sources}"
     )
+
+    # Collect missing genomic data for each of the input items in asynchronous parallel
+    input_matrices = await _update_missing_data(input_matrices, taxon_id)
+    logger.trace("Missing data updated")
 
     if merge_zfpkm_distribution:
         logger.trace("Merging Z-Scores")
@@ -433,6 +436,7 @@ async def _process(
         logger.trace("Finished merging Z-Scores")
 
     # the more data sources available, the higher the expression requirement for the gene
+    num_sources = sum(1 for source in input_matrices if source is not None)
     if adjust_method == AdjustmentMethod.PROGRESSIVE:
         adjusted_expression_requirement = (num_sources - minimum_source_expression) + expression_requirement
     # the more data sources available, the lower the expression requirement for the gene
