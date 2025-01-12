@@ -292,7 +292,7 @@ async def _write_counts_matrix(
     config_df: pd.DataFrame,
     como_context_dir: Path,
     output_counts_matrix_filepath: Path,
-    rna: RNA_TYPE,
+    rna: RNAType,
 ) -> pd.DataFrame:
     """Create a counts matrix file by reading gene counts table(s)."""
     study_metrics = _organize_gene_counts_files(data_dir=como_context_dir)
@@ -304,12 +304,12 @@ async def _write_counts_matrix(
     for count in counts:
         final_matrix = count if final_matrix.empty else pd.merge(final_matrix, count, on="ensembl_gene_id", how="outer")
 
-    rna_specific_sample_names = config_df.loc[config_df["library_prep"] == rna, "sample_name"].tolist()
+    rna_specific_sample_names = config_df.loc[config_df["library_prep"] == rna.value, "sample_name"].tolist()
     final_matrix = final_matrix[["ensembl_gene_id", *rna_specific_sample_names]]
 
     output_counts_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
     final_matrix.to_csv(output_counts_matrix_filepath, index=False)
-    logger.success(f"Wrote gene count matrix for '{rna}' RNA at '{output_counts_matrix_filepath}'")
+    logger.success(f"Wrote gene count matrix for '{rna.value}' RNA at '{output_counts_matrix_filepath}'")
     return final_matrix
 
 
@@ -450,7 +450,7 @@ async def _create_config_df(  # noqa: C901
             )
 
         mean_fragment_size = 100
-        if len(frag_files) == 0 and prep != RNAPrepMethod.TOTAL.value:
+        if len(frag_files) == 0 and prep != RNAType.TRNA.value:
             logger.warning(
                 f"No fragment file found for {label}, using '100'. "
                 "You should define this if you are going to use downstream zFPKM normalization"
@@ -571,7 +571,7 @@ async def _create_matrix_file(
     output_config_filepath: Path,
     como_context_dir: PATH_TYPE,
     output_counts_matrix_filepath: Path,
-    rna: RNA_TYPE,
+    rna: RNAType,
 ) -> None:
     config_df = await _create_config_df(context_name, como_context_dir=como_context_dir)
     await _write_counts_matrix(
@@ -581,7 +581,7 @@ async def _create_matrix_file(
         rna=rna,
     )
     with pd.ExcelWriter(output_config_filepath) as writer:
-        subset_config = config_df[config_df["library_prep"] == rna]
+        subset_config = config_df[config_df["library_prep"] == rna.value]
         subset_config.to_excel(writer, sheet_name=context_name, header=True, index=False)
 
 
@@ -597,11 +597,11 @@ async def _process(
     output_mrna_matrix_filepath: Path | None,
     cache: bool,
 ):
-    rna_types: list[tuple[RNA_TYPE, Path, Path]] = []
+    rna_types: list[tuple[RNAType, Path, Path]] = []
     if output_trna_config_filepath:
-        rna_types.append(("total", output_trna_config_filepath, output_trna_matrix_filepath))
+        rna_types.append((RNAType.trna, output_trna_config_filepath, output_trna_matrix_filepath))
     if output_mrna_config_filepath:
-        rna_types.append(("mrna", output_mrna_config_filepath, output_mrna_matrix_filepath))
+        rna_types.append((RNAType.mrna, output_mrna_config_filepath, output_mrna_matrix_filepath))
 
     # if provided, iterate through como-input specific directories
     tasks = []
