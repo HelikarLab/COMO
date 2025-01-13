@@ -123,11 +123,11 @@ async def _format_determination(
     :return: A pandas DataFrame
     """
     requested_output = [requested_output] if isinstance(requested_output, Output) else requested_output
-    cohersion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(
+    coercion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(
         columns=["Input Type"]
     )
-    cohersion.columns = pd.Index(["input_value", *[o.value.replace(" ", "_").lower() for o in requested_output]])
-    return cohersion
+    coercion.columns = pd.Index(["input_value", *[o.value.replace(" ", "_").lower() for o in requested_output]])
+    return coercion
 
 
 async def _read_file(
