@@ -39,7 +39,7 @@ class FilteringTechnique(Enum):
 
     CPM = "cpm"
     ZFPKM = "zfpkm"
-    TPM = "quantile"
+    TPM = "tpm"
     UMI = "umi"
 
 
