@@ -59,11 +59,6 @@ class LogLevel(Enum):
     CRITICAL = 50
 
 
-class PeakIdentificationParameters(NamedTuple):
-    height: float
-    distance: float
-
-
 class RNAType(Enum):
     TRNA = "total"
     MRNA = "mrna"
@@ -84,6 +79,11 @@ class SourceTypes(Enum):
     MRNA = "mrna"
     SCRNA = "scrna"
     PROTEOMICS = "proteomics"
+
+
+class PeakIdentificationParameters(NamedTuple):
+    height: float
+    distance: float
 
 
 class CobraCompartments:
