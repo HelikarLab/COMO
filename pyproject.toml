@@ -7,7 +7,6 @@ name = "COMO"
 dynamic = ["version"]
 requires-python = ">=3.10,<3.13"
 dependencies = [
-    "aiofiles>=24.1.0",
     "aioftp>=0.23.1",
     "cobamp@git+https://github.com/JoshLoecker/cobamp@master",
     "cobra>=0.28.0",
@@ -22,7 +21,6 @@ dependencies = [
     "scipy>=1.7.3",
     "seaborn>=0.13.2",
     "setuptools<60.0",
-    # Statsmodels >= 0.14 is required for python 3.12+
     "statsmodels>=0.13.0",
     "statsmodels>=0.14.0; python_version >= '3.12'",
     "troppo@git+https://github.com/JoshLoecker/troppo@master",

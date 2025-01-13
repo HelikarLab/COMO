@@ -427,7 +427,6 @@ name = "como"
 version = "1.11.1"
 source = { editable = "." }
 dependencies = [
-    { name = "aiofiles" },
     { name = "aioftp" },
     { name = "cobamp" },
     { name = "cobra" },
@@ -471,7 +470,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiofiles", specifier = ">=24.1.0" },
     { name = "aioftp", specifier = ">=0.23.1" },
     { name = "cobamp", git = "https://github.com/JoshLoecker/cobamp?rev=master" },
     { name = "cobra", specifier = ">=0.28.0" },
