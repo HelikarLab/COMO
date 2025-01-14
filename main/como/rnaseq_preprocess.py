@@ -602,9 +602,9 @@ async def _process(
 ):
     rna_types: list[tuple[RNAType, Path, Path]] = []
     if output_trna_config_filepath:
-        rna_types.append((RNAType.trna, output_trna_config_filepath, output_trna_matrix_filepath))
+        rna_types.append((RNAType.TRNA, output_trna_config_filepath, output_trna_matrix_filepath))
     if output_mrna_config_filepath:
-        rna_types.append((RNAType.mrna, output_mrna_config_filepath, output_mrna_matrix_filepath))
+        rna_types.append((RNAType.MRNA, output_mrna_config_filepath, output_mrna_matrix_filepath))
 
     # if provided, iterate through como-input specific directories
     tasks = []
