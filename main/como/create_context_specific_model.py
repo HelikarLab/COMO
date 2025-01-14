@@ -678,6 +678,28 @@ async def create_context_specific_model(  # noqa: C901
             )
         force_rxns = df["abbreviation"].tolist()
 
+    # Test that gurobi is using a valid license file
+    if solver == Solver.GUROBI:
+        # test if gurobi is available
+        try:
+            import gurobipy as gp
+        except ImportError as e:
+            logger.error(
+                "The gurobi solver requires the gurobipy package to be installed. "
+                "Please install gurobipy and try again. "
+                "This can be done by installing the 'gurobi' optional dependency."
+            )
+            raise ImportError from e
+
+        env = gp.Env()
+        if env.getParam("WLSACCESSID") == "" or env.getParam("WLSSECRET") == "":
+            logger.critical(
+                "You have requested to use the Gurobi solver but license information cannot be found. "
+                "COMO will continue, but it is HIGHLY unlikely the resulting model will be valid."
+            )
+        # remove gurobi-related information, it is no longer required
+        del env, gp
+
     logger.info(f"Creating '{context_name}' model using '{algorithm.value}' reconstruction and '{solver.value}' solver")
     build_results: _BuildResults = await _build_model(
         general_model_file=reference_model,
