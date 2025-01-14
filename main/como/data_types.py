@@ -57,6 +57,7 @@ class LogLevel(Enum):
     WARNING = 30
     ERROR = 40
     CRITICAL = 50
+    NONE = 100
 
 
 class RNAType(Enum):
