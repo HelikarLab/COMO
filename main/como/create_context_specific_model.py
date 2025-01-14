@@ -547,20 +547,21 @@ async def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
     )
 
 
-async def _write_model_to_disk(
-    model: cobra.Model,
-    output_directory: Path,
-    context_name: str,
-    output_filetypes: list[str],
-    algorithm: Algorithm,
-) -> None:
-    output_directory.mkdir(parents=True, exist_ok=True)
-    if "mat" in output_filetypes:
-        cobra.io.save_matlab_model(model, (output_directory / f"{context_name}_SpecificModel_{algorithm.value}.mat"))
-    if "json" in output_filetypes:
-        cobra.io.save_json_model(model, (output_directory / f"{context_name}_SpecificModel_{algorithm.value}.json"))
-    if "xml" in output_filetypes:
-        cobra.io.write_sbml_model(model, (output_directory / f"{context_name}_SpecificModel_{algorithm.value}.xml"))
+def _write_model_to_disk(context_name: str, model: cobra.Model, output_filepaths: list[Path]) -> None:
+    for path in output_filepaths:
+        if path.suffix == ".mat":
+            cobra.io.save_matlab_model(model=model, file_name=path)
+        elif path.suffix == ".json":
+            cobra.io.save_json_model(model=model, filename=path, pretty=True)
+        elif path.suffix in {".sbml", ".xml"}:
+            cobra.io.write_sbml_model(cobra_model=model, filename=path)
+        else:
+            _log_and_raise_error(
+                f"Invalid output model filetype. Should be one of .xml, .sbml, .mat, or .json. Got '{path.suffix}'",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
+        logger.success(f"Saved metabolic model for context '{context_name}' to '{path}'")
 
 
 async def create_context_specific_model(  # noqa: C901
@@ -568,8 +569,8 @@ async def create_context_specific_model(  # noqa: C901
     reference_model: Path,
     active_genes_filepath: Path,
     output_infeasible_reactions_filepath: Path,
-    output_model_dirpath: Path,
     output_flux_result_filepath: Path,
+    output_model_filepaths: Path | list[Path],
     output_filetypes: list[str] | None = None,
     output_fastcore_expression_index_filepath: Path | None = None,
     objective: str = "biomass_reaction",
@@ -585,6 +586,23 @@ async def create_context_specific_model(  # noqa: C901
 ):
     """Create a context-specific model using the provided data."""
     _set_up_logging(level=log_level, location=log_location)
+    output_model_filepaths = (
+        [output_model_filepaths] if isinstance(output_model_filepaths, Path) else output_model_filepaths
+    )
+    for path in output_model_filepaths:
+        if path.suffix not in {".mat", ".xml", ".sbml", ".json"}:
+            _log_and_raise_error(
+                f"Invalid output model filetype. Should be one of .xml, .sbml, .mat, or .json. Got '{path.suffix}'",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
+    if len(output_model_filepaths) != len(output_model_filepaths):
+        _log_and_raise_error(
+            "The number of output model filepaths must be the same as the number of output flux result filepaths",
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
+
     if not reference_model.exists():
         _log_and_raise_error(
             f"Reference model not found at {reference_model}",
@@ -685,15 +703,7 @@ async def create_context_specific_model(  # noqa: C901
         fastcore_df.dropna(inplace=True)
         fastcore_df.to_csv(output_fastcore_expression_index_filepath, index=False)
 
-    await _write_model_to_disk(
-        model=build_results.model,
-        output_directory=output_model_dirpath,
-        context_name=context_name,
-        output_filetypes=output_filetypes,
-        algorithm=algorithm,
-    )
-
-    logger.success(f"Saved metabolic model for context '{context_name}' to {output_model_dirpath}")
+    _write_model_to_disk(context_name=context_name, model=build_results.model, output_filepaths=output_model_filepaths)
     logger.debug(f"Number of Genes: {len(build_results.model.genes):,}")
     logger.debug(f"Number of Metabolites: {len(build_results.model.metabolites):,}")
     logger.debug(f"Number of Reactions: {len(build_results.model.reactions):,}")
