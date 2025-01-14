@@ -3,16 +3,13 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import functools
-import inspect
 import io
 import sys
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Union
 
-import aiofiles
 import numpy.typing as npt
 import pandas as pd
 import scanpy as sc
@@ -160,21 +157,13 @@ async def _read_file(
     match path.suffix:
         case ".csv" | ".tsv":
             kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")
-            async with aiofiles.open(path) as f:
-                content = await f.read()
+            with path.open("r") as i_stream:
+                content = i_stream.read()
                 return pd.read_csv(io.StringIO(content), **kwargs)
         case ".xlsx" | ".xls":
-            loop = asyncio.get_running_loop()
-            with ThreadPoolExecutor(max_workers=1) as pool:
-                # pass kwargs as args
-                func = functools.partial(pd.read_excel, **kwargs)
-                return await loop.run_in_executor(pool, func, path)
+            return pd.read_excel(path, **kwargs)
         case ".h5ad":
-            loop = asyncio.get_running_loop()
-            with ThreadPoolExecutor(max_workers=1) as pool:
-                func = functools.partial(sc.read_h5ad, **kwargs)
-                adata: sc.AnnData = await loop.run_in_executor(pool, func, path)
-
+            adata: sc.AnnData = sc.read_h5ad(path, **kwargs)
             if h5ad_as_df:
                 df = adata.to_df().T
                 df.index.name = "gene_symbol"
