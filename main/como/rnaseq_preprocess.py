@@ -702,7 +702,6 @@ async def rnaseq_preprocess(
         else output_mrna_count_matrix_filepath
     )
 
-    input_matrix_filepath = _listify(input_matrix_filepath)
     await _process(
         context_name=context_name,
         taxon=taxon,
