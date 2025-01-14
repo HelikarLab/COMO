@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-import aiofiles.os
 import numpy as np
 import pandas as pd
 from loguru import logger
@@ -34,12 +33,8 @@ async def _combine_z_distribution_for_batch(
     weighted_z_floor: int,
     weighted_z_ceiling: int,
 ) -> pd.DataFrame:
-    await asyncio.gather(
-        *[
-            aiofiles.os.makedirs(output_combined_matrix_filepath.parent.as_posix(), exist_ok=True),
-            aiofiles.os.makedirs(output_figure_dirpath.as_posix(), exist_ok=True),
-        ]
-    )
+    output_combined_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
+    output_figure_dirpath.mkdir(parents=True, exist_ok=True)
 
     logger.trace(
         f"Combining z-score distributions: batch #{batch.batch_num}, "
@@ -102,12 +97,8 @@ async def _combine_z_distribution_for_source(
         merged_source_data.columns = ["ensembl_gene_id", "combine_z"]
         return merged_source_data
 
-    await asyncio.gather(
-        *[
-            aiofiles.os.makedirs(output_combined_matrix_filepath.parent.as_posix(), exist_ok=True),
-            aiofiles.os.makedirs(output_figure_filepath.parent.as_posix(), exist_ok=True),
-        ]
-    )
+    output_combined_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
+    output_figure_filepath.parent.mkdir(parents=True, exist_ok=True)
 
     logger.trace(f"Found {_num_columns(merged_source_data) - 1} samples for context '{context_name}' to combine")
     values = merged_source_data.iloc[:, 1:].values
