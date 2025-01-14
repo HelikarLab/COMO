@@ -10,7 +10,6 @@ from itertools import chain
 from pathlib import Path
 from typing import Literal
 
-import aiofiles
 import numpy as np
 import pandas as pd
 from fast_bioservices.biothings.mygene import MyGene
@@ -43,17 +42,21 @@ class _STARinformation:
                 level=LogLevel.ERROR,
             )
 
-        async with aiofiles.open(filepath) as i_stream:
-            unmapped = await i_stream.readline()
-            multimapping = await i_stream.readline()
-            no_feature = await i_stream.readline()
-            ambiguous = await i_stream.readline()
+        with filepath.open("r") as i_stream:
+            unmapped, multimapping, no_feature, ambiguous = await asyncio.gather(
+                *[
+                    asyncio.to_thread(i_stream.readline),
+                    asyncio.to_thread(i_stream.readline),
+                    asyncio.to_thread(i_stream.readline),
+                    asyncio.to_thread(i_stream.readline),
+                ]
+            )
 
             num_unmapped = [int(i) for i in unmapped.rstrip("\n").split("\t")[1:]]
             num_multimapping = [int(i) for i in multimapping.rstrip("\n").split("\t")[1:]]
             num_no_feature = [int(i) for i in no_feature.rstrip("\n").split("\t")[1:]]
             num_ambiguous = [int(i) for i in ambiguous.rstrip("\n").split("\t")[1:]]
-            remainder = await i_stream.read()
+            remainder = await asyncio.to_thread(i_stream.read)
 
         df = await _read_file(StringIO(remainder), sep="\t", header=None)
         df.columns = [
