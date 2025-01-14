@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 import sys
 from dataclasses import dataclass, field
@@ -521,11 +522,16 @@ async def _create_gene_info_file(
 
     async def read_counts(file: Path) -> list[str]:
         data = await _read_file(file, h5ad_as_df=False)
-        conversion = await (
-            ensembl_to_gene_id_and_symbol(ids=data["ensembl_gene_id"].tolist(), taxon=taxon)
-            if isinstance(data, pd.DataFrame)
-            else gene_symbol_to_ensembl_and_gene_id(symbols=data.var_names.tolist(), taxon=taxon)
-        )
+
+        try:
+            conversion = await (
+                ensembl_to_gene_id_and_symbol(ids=data["ensembl_gene_id"].tolist(), taxon=taxon)
+                if isinstance(data, pd.DataFrame)
+                else gene_symbol_to_ensembl_and_gene_id(symbols=data.var_names.tolist(), taxon=taxon)
+            )
+        except json.JSONDecodeError:
+            logger.warning(f"Got a JSON decode error for file '{counts_matrix_filepaths}', exiting")
+            exit()
 
         # Remove NA values from entrez_gene_id dataframe column
         return conversion["entrez_gene_id"].dropna().tolist()
