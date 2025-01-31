@@ -549,6 +549,7 @@ async def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
 
 def _write_model_to_disk(context_name: str, model: cobra.Model, output_filepaths: list[Path]) -> None:
     for path in output_filepaths:
+        path.parent.mkdir(parents=True, exist_ok=True)
         if path.suffix == ".mat":
             cobra.io.save_matlab_model(model=model, file_name=path)
         elif path.suffix == ".json":
