@@ -36,7 +36,9 @@ class _Arguments:
 
         if (isdigit(self.min_active_count) and int(self.min_active_count) < 0) or self.min_active_count != "default":
             _log_and_raise_error(
-                "min_active_count must be either 'default' or an integer > 0", error=ValueError, level=LogLevel.ERROR
+                "min_active_count must be either 'default' or an integer > 0",
+                error=ValueError,
+                level=LogLevel.ERROR,
             )
 
         if (isdigit(self.quantile) and 0 > int(self.quantile) > 100) or self.quantile != "default":
