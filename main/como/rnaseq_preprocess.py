@@ -533,8 +533,11 @@ async def _create_gene_info_file(
                 else gene_symbol_to_ensembl_and_gene_id(symbols=data.var_names.tolist(), taxon=taxon)
             )
         except json.JSONDecodeError:
-            logger.warning(f"Got a JSON decode error for file '{counts_matrix_filepaths}', exiting")
-            exit()
+            _log_and_raise_error(
+                f"Got a JSO decode error for file '{counts_matrix_filepaths}'",
+                error=ValueError,
+                level=LogLevel.CRITICAL,
+            )
 
         # Remove NA values from entrez_gene_id dataframe column
         return conversion["entrez_gene_id"].dropna().tolist()
