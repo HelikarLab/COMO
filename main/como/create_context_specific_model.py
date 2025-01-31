@@ -508,7 +508,7 @@ async def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
     df: pd.DataFrame = await _create_df(path)
     for column in df.columns:
         if column not in [
-            "boundary",
+            "reaction",
             "abbreviation",
             "compartment",
             "minimum reaction rate",
@@ -524,7 +524,7 @@ async def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
             )
 
     reactions: list[str] = [""] * len(df)
-    boundary_type: list[str] = df["boundary"].tolist()
+    boundary_type: list[str] = df["reaction"].tolist()
     reaction_abbreviation: list[str] = df["abbreviation"].astype(str).tolist()
     reaction_compartment: list[str] = df["compartment"].astype(str).tolist()
     boundary_map = {"exchange": "EX", "demand": "DM", "sink": "SK"}
