@@ -172,7 +172,7 @@ def _gene_rule_logical(gpr_expression: str, level: int = 0) -> str:
         inner_string = inner_string.replace("[", "")
         inner_string = inner_string.replace("]", "")
 
-    expression_out = f"{gpr_expression[:loc_l]}{inner_string}{gpr_expression[loc_r + 1:]}"
+    expression_out = f"{gpr_expression[:loc_l]}{inner_string}{gpr_expression[loc_r + 1 :]}"
     expression_out = _gene_rule_logical(expression_out, level + 1)
 
     return expression_out
@@ -384,7 +384,7 @@ def _map_expression_to_reaction(
             continue
         for gid in gene_ids:
             if gid in gene_expressions.index:
-                rep_val = f' {gene_expressions.at[gid, "active"]} '
+                rep_val = f" {gene_expressions.at[gid, 'active']} "
             else:
                 rep_val = f" {unknown_val!s} "
             gene_reaction_rule = f" {gene_reaction_rule} "  # pad white space to prevent gene matches inside floats
