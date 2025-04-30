@@ -136,7 +136,7 @@ def protein_transform_main(abundance_df: pd.DataFrame | str | Path, out_dir: str
     output_figure_directory.mkdir(parents=True, exist_ok=True)
 
     abundance_df: pd.DataFrame = (
-        pd.read_csv(abundance_df) if isinstance(abundance_df, (str, Path)) else abundance_df.fillna(0)
+        pd.read_csv(abundance_df) if isinstance(abundance_df, str | Path) else abundance_df.fillna(0)
     )
     abundance_df = abundance_df[np.isfinite(abundance_df).all(axis=1)]  # Remove +/- infinity values
     z_transform: ZResult = z_score_calc(abundance_df, min_thresh=0)

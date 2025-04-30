@@ -157,7 +157,7 @@ async def rnaseq_gen(
     """
     if isinstance(technique, str):
         technique = FilteringTechnique(technique.lower())
-    if isinstance(taxon_id, (str, int)):
+    if isinstance(taxon_id, str | int):
         taxon_id = Taxon.from_string(str(taxon_id))
 
     match technique:

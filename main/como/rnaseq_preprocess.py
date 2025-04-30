@@ -147,7 +147,7 @@ def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
 
     # For each study, collect gene count files, fragment files, insert size files, layouts, and strandedness information
     study_metrics: list[_StudyMetrics] = []
-    for gene_dir, strand_dir in zip(gene_counts_directories, strandedness_directories):
+    for gene_dir, strand_dir in zip(gene_counts_directories, strandedness_directories, strict=True):
         if gene_dir.stem != strand_dir.stem:
             raise ValueError(
                 f"Gene directory name of '{gene_dir.stem}' does not match stranded directory name of '{strand_dir.stem}'"  # noqa: E501

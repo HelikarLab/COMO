@@ -5,12 +5,13 @@ import math
 import multiprocessing
 import time
 from collections import namedtuple
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import partial
 from multiprocessing.pool import Pool
 from pathlib import Path
-from typing import Callable, NamedTuple
+from typing import NamedTuple
 
 import numpy as np
 import numpy.typing as npt
@@ -418,13 +419,12 @@ def zfpkm_transform(
     cores = multiprocessing.cpu_count() - 2
     logger.debug(f"Processing {total:,} samples through zFPKM transform using {cores} cores")
     logger.debug(
-        f"Will update every {update_per_step:,} steps as this is approximately "
-        f"{update_every_percent:.1%} of {total:,}"
+        f"Will update every {update_per_step:,} steps as this is approximately {update_every_percent:.1%} of {total:,}"
     )
 
     with Pool(processes=cores) as pool:
         kernel = KernelDensity(kernel="gaussian", bandwidth=bandwidth)
-        chunksize = int(math.ceil(len(fpkm_df.columns) / (4 * cores)))
+        chunksize = math.ceil(len(fpkm_df.columns) / (4 * cores))
         partial_func = partial(_zfpkm_calculation, kernel=kernel, peak_parameters=peak_parameters)
         chunk_time = time.time()
         start_time = time.time()
@@ -606,13 +606,15 @@ def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
         top_genes: npt.NDArray[bool] = genefilter(boolean_expression, top_func)
 
         # Only keep `entrez_gene_ids` that pass `min_genes`
-        metric.entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, min_genes) if keep]
-        metric.gene_sizes = [gene for gene, keep in zip(gene_size, min_genes) if keep]
+        metric.entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, min_genes, strict=True) if keep]
+        metric.gene_sizes = [gene for gene, keep in zip(gene_size, min_genes, strict=True) if keep]
         metric.count_matrix = metric.count_matrix.iloc[min_genes, :]
         metric.normalization_matrix = metrics[sample].normalization_matrix.iloc[min_genes, :]
 
-        keep_top_genes = [gene for gene, keep in zip(entrez_ids, top_genes) if keep]
-        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, keep_top_genes) if keep]
+        keep_top_genes = [gene for gene, keep in zip(entrez_ids, top_genes, strict=True) if keep]
+        metric.high_confidence_entrez_gene_ids = [
+            gene for gene, keep in zip(entrez_ids, keep_top_genes, strict=True) if keep
+        ]
 
     metrics = calculate_z_score(metrics)
 
@@ -649,13 +651,15 @@ def zfpkm_filter(
         min_samples = round(min_sample_expression * len(zfpkm_df.columns))
         min_func = k_over_a(min_samples, cut_off)
         min_genes: npt.NDArray[bool] = genefilter(zfpkm_df, min_func)
-        metric.entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, min_genes) if keep]
+        metric.entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, min_genes, strict=True) if keep]
 
         # determine which genes are confidently expressed
         top_samples = round(high_confidence_sample_expression * len(zfpkm_df.columns))
         top_func = k_over_a(top_samples, cut_off)
         top_genes: npt.NDArray[bool] = genefilter(zfpkm_df, top_func)
-        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, top_genes) if keep]
+        metric.high_confidence_entrez_gene_ids = [
+            gene for gene, keep in zip(metric.entrez_gene_ids, top_genes, strict=True) if keep
+        ]
 
     return metrics
 

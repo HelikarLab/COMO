@@ -194,7 +194,7 @@ def _merge_logical_table(df: pd.DataFrame):
         full_entrez_id_sets.add(new_entrez_id)
 
     entrez_dups_list.extend(i.split(" /// ") for i in full_entrez_id_sets)
-    entrez_dups_dict = dict(zip(full_entrez_id_sets, entrez_dups_list))
+    entrez_dups_dict = dict(zip(full_entrez_id_sets, entrez_dups_list, strict=True))
 
     for merged_entrez_id, entrez_dups_list in entrez_dups_dict.items():
         df["entrez_gene_id"].replace(to_replace=entrez_dups_list, value=merged_entrez_id, inplace=True)
