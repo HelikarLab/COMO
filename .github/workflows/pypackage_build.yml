@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         operating-system: [macos-latest, ubuntu-latest, windows-latest]
-        python-version: [ 3.10, 3.11, 3.12, 3.13 ]
+        python-version: [ "3.10", "3.11", '3.12', "3.13" ]
 
     name: Build Python Package (${{ matrix.operating-system }}, Python ${{ matrix.python-version }})
     runs-on: ${{ matrix.operating-system }}
