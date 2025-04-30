@@ -15,8 +15,8 @@ jobs:
   build:
     strategy:
       matrix:
-        operating-system: [macos-latest, ubuntu-latest, windows-latest]
-        python-version: [ "3.10", "3.11", '3.12', "3.13" ]
+        operating-system: [ macos-latest, ubuntu-latest, windows-latest ]
+        python-version: [ "3.10", "3.11", "3.12", "3.13" ]
 
     name: Build Python Package (${{ matrix.operating-system }}, Python ${{ matrix.python-version }})
     runs-on: ${{ matrix.operating-system }}
@@ -48,7 +48,7 @@ jobs:
     strategy:
       matrix:
         python-version: [ 3.10, 3.11, 3.12, 3.13 ]
-        operating-system: [macos-latest, windows-latest, ubuntu-latest]
+        operating-system: [ macos-latest, windows-latest, ubuntu-latest ]
 
     name: Publish to GitHub Packages
     runs-on: ubuntu-latest
