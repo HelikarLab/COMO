@@ -453,11 +453,11 @@ def zfpkm_plot(results, *, output_png_filepath: Path, plot_xfloor: int = -4):
     mega_df.columns = pd.Series(data=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
     mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")
 
-    fig, axes = plt.subplot(len(results), 1, figsize=(8, 4 * len(results)))
+    fig, axes = plt.subplots(nrows=len(results), ncols=1, figsize=(8, 4 * len(results)))
     if len(results) == 1:
         axes = [axes]
 
-    for i, sample_name in enumerate(results, start=1):
+    for i, sample_name in enumerate(results):
         sample_data = mega_df[mega_df["sample_name"] == sample_name]
         axis = axes[i]
 
@@ -472,9 +472,7 @@ def zfpkm_plot(results, *, output_png_filepath: Path, plot_xfloor: int = -4):
 
     plt.tight_layout()
     if output_png_filepath.suffix != ".png":
-        logger.warning(
-            f"Output filepath did not end in '.png', setting to '.png' now. Got: '{output_png_filepath.suffix}'"
-        )
+        logger.warning(f"Output filepath did not end in '.png', setting to '.png' now. Got: '{output_png_filepath.suffix}'")
         output_png_filepath = output_png_filepath.with_suffix(".png")
     plt.savefig(output_png_filepath)
 
@@ -483,9 +481,7 @@ def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
     """Calculate the z-score for each sample in the metrics dictionary."""
     for sample in metrics:
         log_matrix = np.log(metrics[sample].normalization_matrix)
-        z_matrix = pd.DataFrame(
-            data=sklearn.preprocessing.scale(log_matrix, axis=1), columns=metrics[sample].sample_names
-        )
+        z_matrix = pd.DataFrame(data=sklearn.preprocessing.scale(log_matrix, axis=1), columns=metrics[sample].sample_names)
         metrics[sample].z_score_matrix = z_matrix
     return metrics
 
