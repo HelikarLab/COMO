@@ -178,10 +178,7 @@ def _build_with_fastcore(cobra_model, s_matrix, lower_bounds, upper_bounds, exp_
     # 'Vlassis, Pacheco, Sauter (2014). Fast reconstruction of compact
     # context-specific metabolic network models. PLoS Comput. Biol. 10,
     # e1003424.'
-    logger.warning(
-        "Fastcore requires a flux consistant model is used as refererence, "
-        "to achieve this fastcc is required which is NOT reproducible."
-    )
+    logger.warning("Fastcore requires a flux consistant model is used as refererence, to achieve this fastcc is required which is NOT reproducible.")
     logger.debug("Creating feasible model")
     incon_rxns, cobra_model = _feasibility_test(cobra_model, "other")
     properties = FastcoreProperties(core=exp_idx_list, solver=solver)
@@ -358,7 +355,6 @@ async def _build_model(  # noqa: C901
     reference_model.objective = {getattr(reference_model.reactions, objective): 1}
     if objective not in force_reactions:
         force_reactions.append(objective)
-
     reference_model = _set_boundaries(reference_model, boundary_reactions, lower_bounds, upper_bounds)
     reference_model.solver = solver.lower()
 
@@ -587,9 +583,7 @@ async def create_context_specific_model(  # noqa: C901
 ):
     """Create a context-specific model using the provided data."""
     _set_up_logging(level=log_level, location=log_location)
-    output_model_filepaths = (
-        [output_model_filepaths] if isinstance(output_model_filepaths, Path) else output_model_filepaths
-    )
+    output_model_filepaths = [output_model_filepaths] if isinstance(output_model_filepaths, Path) else output_model_filepaths
     for path in output_model_filepaths:
         if path.suffix not in {".mat", ".xml", ".sbml", ".json"}:
             _log_and_raise_error(
