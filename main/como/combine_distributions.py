@@ -43,10 +43,7 @@ async def _combine_z_distribution_for_batch(
         f"context: '{context_name}'"
     )
     if _num_columns(matrix) < 2:
-        logger.trace(
-            f"A single sample exists for batch '{batch.batch_num}'. "
-            f"Returning as-is because no additional combining can be done"
-        )
+        logger.trace(f"A single sample exists for batch '{batch.batch_num}'. Returning as-is because no additional combining can be done")
         return matrix
 
     values = matrix.iloc[:, 1:].values
@@ -147,16 +144,12 @@ def _combine_z_distribution_for_context(
         return pd.DataFrame({"ensembl_gene_id": [], "combine_z": []})
 
     z_matrices = [
-        res.z_score_matrix.set_index("ensembl_gene_id").rename(
-            columns={col: res.type.value for col in res.z_score_matrix.columns[1:]}
-        )
+        res.z_score_matrix.set_index("ensembl_gene_id").rename(columns={col: res.type.value for col in res.z_score_matrix.columns[1:]})
         for res in zscore_results
     ]
     z_matrix = pd.concat(z_matrices, axis=1, join="outer").reset_index()
     if _num_columns(z_matrix) <= 1:
-        logger.trace(
-            f"Only 1 source exists for '{context}', returning dataframe as-is becuase no data exists to combine"
-        )
+        logger.trace(f"Only 1 source exists for '{context}', returning dataframe as-is becuase no data exists to combine")
         z_matrix.columns = ["ensembl_gene_id", "combine_z"]
         return z_matrix
 
@@ -232,8 +225,7 @@ async def _begin_combining_distributions(
                     matrix=matrix[[GeneIdentifier.ENSEMBL_GENE_ID.value, *batch.sample_names]],
                     source=source,
                     output_combined_matrix_filepath=(
-                        output_filepaths[source.value].parent
-                        / f"{context_name}_{source.value}_batch{batch.batch_num}_combined_z_distribution_.csv"
+                        output_filepaths[source.value].parent / f"{context_name}_{source.value}_batch{batch.batch_num}_combined_z_distribution_.csv"
                     ),
                     output_figure_dirpath=output_figure_dirpath,
                     weighted_z_floor=weighted_z_floor,
@@ -245,21 +237,16 @@ async def _begin_combining_distributions(
 
         merged_batch_results = pd.DataFrame()
         for df in batch_results:
-            merged_batch_results = (
-                df if merged_batch_results.empty else merged_batch_results.merge(df, on="ensembl_gene_id", how="outer")
-            )
+            merged_batch_results = df if merged_batch_results.empty else merged_batch_results.merge(df, on="ensembl_gene_id", how="outer")
 
         merged_source_results: pd.DataFrame = await _combine_z_distribution_for_source(
             merged_source_data=merged_batch_results,
             context_name=context_name,
             num_replicates=sum(batch.num_samples for batch in batch_names[source.value]),
             output_combined_matrix_filepath=(
-                output_filepaths[source.value].parent
-                / f"{context_name}_{source.value}_combined_zscore_distribution.csv"
+                output_filepaths[source.value].parent / f"{context_name}_{source.value}_combined_zscore_distribution.csv"
             ),
-            output_figure_filepath=(
-                output_figure_dirpath / f"{context_name}_{source.value}_combined_zscore_distribution.pdf"
-            ),
+            output_figure_filepath=(output_figure_dirpath / f"{context_name}_{source.value}_combined_zscore_distribution.pdf"),
             weighted_z_floor=weighted_z_floor,
             weighted_z_ceiling=weighted_z_ceiling,
         )
@@ -271,10 +258,7 @@ async def _begin_combining_distributions(
             )
         )
         merged_source_results.to_csv(output_filepaths[source.value])
-        logger.success(
-            f"Wrote z-scores for source '{source.value}' "
-            f"in context '{context_name}' to '{output_filepaths[source.value]}'"
-        )
+        logger.success(f"Wrote z-scores for source '{source.value}' in context '{context_name}' to '{output_filepaths[source.value]}'")
 
     logger.trace(f"Combining z-score distributions for all sources in context '{context_name}'")
     merged_context_results = _combine_z_distribution_for_context(
