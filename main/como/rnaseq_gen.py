@@ -164,7 +164,22 @@ async def _build_matrix_results(
     conversion["ensembl_gene_id"] = conversion["ensembl_gene_id"].str.split(",")
     conversion = conversion.explode("ensembl_gene_id")
     conversion.reset_index(inplace=True, drop=True)
-    matrix = matrix.merge(conversion, on=["ensembl_gene_id", "entrez_gene_id", "gene_symbol"], how="left")
+
+    merge_on = []
+    if "ensembl_gene_id" in matrix.columns and "ensembl_gene_id" in conversion.columns:
+        merge_on.append("ensembl_gene_id")
+    if "entrez_gene_id" in matrix.columns and "entrez_gene_id" in conversion.columns:
+        merge_on.append("entrez_gene_id")
+    if "gene_symbol" in matrix.columns and "gene_symbol" in conversion.columns:
+        merge_on.append("gene_symbol")
+
+    if not merge_on:
+        _log_and_raise_error(
+            "No columns to merge on. Tested 'ensembl_gene_id', 'entrez_gene_id', and 'gene_symbol'. Please check your input files.",
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
+    matrix = matrix.merge(conversion, on=merge_on, how="left")
 
     # Only include Entrez and Ensembl Gene IDs that are present in `gene_info`
     matrix["entrez_gene_id"] = matrix["entrez_gene_id"].str.split("//")
@@ -734,15 +749,6 @@ async def _process(
     for metric in metrics.values():
         expressed_genes.extend(metric.entrez_gene_ids)
         top_genes.extend(metric.high_confidence_entrez_gene_ids)
-        if not metric.normalization_matrix.empty:
-            merged_zscore_df = (
-                metric.z_score_matrix
-                if merged_zscore_df.empty
-                else pd.concat(
-                    [merged_zscore_df, metric.z_score_matrix],
-                    axis=1,
-                )
-            )
 
         merged_zscore_df = (
             metric.z_score_matrix
