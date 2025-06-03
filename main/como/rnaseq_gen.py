@@ -552,12 +552,8 @@ def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
         top_samples = round(n_top * len(tpm_matrix.columns))
 
         tpm_quantile = tpm_matrix[tpm_matrix > 0]
-        quantile_cutoff = np.quantile(
-            a=tpm_quantile.values, q=1 - (cut_off / 100), axis=0
-        )  # Compute quantile across columns
-        boolean_expression = pd.DataFrame(
-            data=tpm_matrix > quantile_cutoff, index=tpm_matrix.index, columns=tpm_matrix.columns
-        ).astype(int)
+        quantile_cutoff = np.quantile(a=tpm_quantile.values, q=1 - (cut_off / 100), axis=0)  # Compute quantile across columns
+        boolean_expression = pd.DataFrame(data=tpm_matrix > quantile_cutoff, index=tpm_matrix.index, columns=tpm_matrix.columns).astype(int)
 
         min_func = k_over_a(min_samples, 0.9)
         top_func = k_over_a(top_samples, 0.9)
@@ -648,9 +644,7 @@ def filter_counts(
     """Filter the count matrix based on the specified technique."""
     match technique:
         case FilteringTechnique.CPM:
-            return cpm_filter(
-                context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep
-            )
+            return cpm_filter(context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep)
         case FilteringTechnique.TPM:
             return tpm_quantile_filter(metrics=metrics, filtering_options=filtering_options)
         case FilteringTechnique.ZFPKM:
@@ -707,9 +701,7 @@ async def _process(
 
     rnaseq_matrix: pd.DataFrame = await _read_file(rnaseq_matrix_filepath)
     if rnaseq_matrix_filepath.suffix == ".h5ad":
-        conversion = await gene_symbol_to_ensembl_and_gene_id(
-            symbols=rnaseq_matrix["gene_symbol"].tolist(), taxon=taxon
-        )
+        conversion = await gene_symbol_to_ensembl_and_gene_id(symbols=rnaseq_matrix["gene_symbol"].tolist(), taxon=taxon)
         conversion.reset_index(inplace=True)
         rnaseq_matrix = rnaseq_matrix.merge(conversion, how="left", on="gene_symbol")
         rnaseq_matrix.replace(to_replace=pd.NA, value="-")
@@ -728,6 +720,7 @@ async def _process(
         metadata_df=metadata_df,
         taxon=taxon,
     )
+
     metrics = read_counts_results.metrics
     entrez_gene_ids = read_counts_results.entrez_gene_ids
 
@@ -772,9 +765,7 @@ async def _process(
         )
 
     expression_frequency = pd.Series(expressed_genes).value_counts()
-    expression_df = pd.DataFrame(
-        {"entrez_gene_id": expression_frequency.index, "frequency": expression_frequency.values}
-    )
+    expression_df = pd.DataFrame({"entrez_gene_id": expression_frequency.index, "frequency": expression_frequency.values})
     expression_df["prop"] = expression_df["frequency"] / len(metrics)
     expression_df = expression_df[expression_df["prop"] >= filtering_options.batch_ratio]
 
