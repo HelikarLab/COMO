@@ -45,7 +45,7 @@ class LayoutMethod(Enum):
     single_end = "single-end"
 
 
-@dataclass
+@dataclass(slots=True)
 class _StudyMetrics:
     study: str
     num_samples: int
@@ -118,7 +118,7 @@ def k_over_a(k: int, a: float) -> Callable[[npt.NDArray], bool]:
     :param k: The minimum number of times the sum of elements must be greater than or equal to A.
     :param a: The value to compare the sum of elements to.
     :return: A function that accepts a NumPy array to perform the actual filtering
-    """  # noqa: E501
+    """
 
     def filter_func(row: npt.NDArray) -> bool:
         return np.sum(row >= a) >= k
@@ -142,11 +142,7 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
             level=LogLevel.CRITICAL,
         )
 
-    return (
-        data.apply(filter_func, axis=1).values
-        if isinstance(data, pd.DataFrame)
-        else np.apply_along_axis(filter_func, axis=1, arr=data)
-    )
+    return data.apply(filter_func, axis=1).values if isinstance(data, pd.DataFrame) else np.apply_along_axis(filter_func, axis=1, arr=data)
 
 
 async def _build_matrix_results(
@@ -233,7 +229,7 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
 
 
 def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
-    """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary."""  # noqa: E501
+    """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary."""
     for study in metrics:
         matrix_values = []
         for sample in range(metrics[study].num_samples):
@@ -277,7 +273,6 @@ def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
     return metrics
 
 
-# def _zfpkm_calculation(row: pd.Series, kernel: KernelDensity, peak_parameters: tuple[float, float]) -> _ZFPKMResult:
 def _zfpkm_calculation(
     column: pd.Series,
     peak_parameters: PeakIdentificationParameters,
@@ -356,10 +351,7 @@ def zfpkm_transform(
 ) -> tuple[dict[str, _ZFPKMResult], DataFrame]:
     """Perform zFPKM calculation/transformation."""
     if update_every_percent > 1:
-        logger.warning(
-            f"update_every_percent should be a decimal value between 0 and 1; got: {update_every_percent} - "
-            f"will convert to percentage"
-        )
+        logger.warning(f"update_every_percent should be a decimal value between 0 and 1; got: {update_every_percent} - will convert to percentage")
         update_every_percent /= 100
 
     total_samples = _num_columns(fpkm_df)
@@ -367,16 +359,13 @@ def zfpkm_transform(
 
     # Get at least 1 core and at most cpu_count() - 2
     cores = max(min(multiprocessing.cpu_count() - 2, total_samples), 1)
-    logger.debug(
-        f"zFPKM transforming {len(fpkm_df.columns)} sample(s) "
-        f"containing {len(fpkm_df):,} genes(s) using {cores} core(s)"
-    )
+    logger.debug(f"zFPKM transforming {len(fpkm_df.columns)} sample(s) containing {len(fpkm_df):,} genes(s) using {cores} core(s)")
     logger.debug(f"Will update every {update_per_step:,} steps (~{update_every_percent:.1%} of {total_samples:,})")
 
     chunk_time = time.time()
     start_time = time.time()
     log_padding = len(str(f"{total_samples:,}"))
-    zfpkm_series: list[pd.Series | None] = [None] * total_samples
+    zfpkm_series: list[pd.Series] = []
     results: dict[str, _ZFPKMResult] = {}
 
     with ProcessPoolExecutor(max_workers=cores) as pool:
@@ -393,7 +382,7 @@ def zfpkm_transform(
             result = future.result()
             key = str(result.zfpkm.name)
             results[key] = result
-            zfpkm_series[i] = result.zfpkm
+            zfpkm_series.append(result.zfpkm)
 
             if i != 0 and ((i + 1) % update_per_step == 0 or (i + 1) == total_samples):
                 current_time = time.time()
@@ -522,11 +511,7 @@ def cpm_filter(
         top_samples = round(n_top * len(counts.columns))  # noqa: F841
         test_bools = pd.DataFrame({"entrez_gene_ids": entrez_ids})
         for i in range(len(counts_per_million.columns)):
-            cutoff = (
-                10e6 / (np.median(np.sum(counts[:, i])))
-                if cut_off == "default"
-                else (1e6 * cut_off) / np.median(np.sum(counts[:, i]))
-            )
+            cutoff = 10e6 / (np.median(np.sum(counts[:, i]))) if cut_off == "default" else (1e6 * cut_off) / np.median(np.sum(counts[:, i]))
             test_bools = test_bools.merge(counts_per_million[counts_per_million.iloc[:, i] > cutoff])
 
     return metrics
@@ -595,28 +580,28 @@ def zfpkm_filter(
     cut_off = filtering_options.cut_off
     metrics = _calculate_fpkm(metrics) if calculate_fpkm else metrics
 
-    metric: _StudyMetrics
     for metric in metrics.values():
+        metric: _StudyMetrics
         # if fpkm was not calculated, the normalization matrix will be empty; collect the count matrix instead
         matrix = metric.count_matrix if metric.normalization_matrix.empty else metric.normalization_matrix
         matrix = matrix[matrix.sum(axis=1) > 0]  # remove rows (genes) that have no counts across all samples
 
-        minimums = matrix == 0
         results, zfpkm_df = zfpkm_transform(matrix, peak_parameters=peak_parameters, bandwidth=bandwidth)
-        zfpkm_df[minimums] = -4
+        zfpkm_df[(matrix == 0) | (zfpkm_df.isna())] = -4
 
         if len(results) > 10 and not force_zfpkm_plot:
             logger.warning(
                 "Not plotting zFPKM results because more than 10 plots would be created. "
                 "If you would like to plot them anyway, set 'force_zfpkm_plot' to True"
             )
+        elif output_png_filepath is None:
+            logger.critical("Output zFPKM PNG filepath is None, set a path to plot zFPKM graphs")
         else:
-            if output_png_filepath is None:
-                logger.critical("Output zFPKM PNG filepath is None, set a path to plot zFPKM graphs")
-            else:
-                output_png_filepath.parent.mkdir(parents=True, exist_ok=True)
-                output_png_filepath.unlink(missing_ok=True)
-                zfpkm_plot(results, output_png_filepath=output_png_filepath)
+            output_png_filepath.parent.mkdir(parents=True, exist_ok=True)
+            output_png_filepath.unlink(missing_ok=True)
+            zfpkm_plot(results, output_png_filepath=output_png_filepath)
+
+        metric.z_score_matrix = zfpkm_df
 
         # determine which genes are expressed
         min_samples = round(min_sample_expression * len(zfpkm_df.columns))
@@ -759,16 +744,25 @@ async def _process(
                 )
             )
 
+        merged_zscore_df = (
+            metric.z_score_matrix
+            if merged_zscore_df.empty
+            else merged_zscore_df.merge(
+                metric.z_score_matrix,
+                how="outer",
+                left_index=True,
+                right_index=True,
+            )
+        )
+    merged_zscore_df[merged_zscore_df.isna()] = -4
+
     # If any of the normalization metrics are not empty, write the normalized metrics to disk
     if not all(metric.normalization_matrix.empty for metric in metrics.values()):
-        merged_zscore_df.index = pd.Series(entrez_gene_ids, name="entrez_gene_id")
-        merged_zscore_df.dropna(inplace=True)
         merged_zscore_df.to_csv(output_zscore_normalization_filepath, index=True)
         logger.success(f"Wrote z-score normalization matrix to {output_zscore_normalization_filepath}")
     else:
         logger.warning(
-            "Not writing z-score normalization matrix because no normalization matrices exist. "
-            "This is expected if you are using UMI filtering."
+            "Not writing z-score normalization matrix because no normalization matrices exist. This is expected if you are using UMI filtering."
         )
 
     expression_frequency = pd.Series(expressed_genes).value_counts()
@@ -791,14 +785,11 @@ async def _process(
             boolean_matrix.loc[gene, "high"] = 1
 
     expressed_count = len(boolean_matrix[boolean_matrix["expressed"] == 1])
-    high_confidence_count = len(boolean_matrix[boolean_matrix["high"] == 1]) - expressed_count
+    high_confidence_count = len(boolean_matrix[boolean_matrix["high"] == 1])
 
     boolean_matrix.dropna(subset="entrez_gene_id", inplace=True)
     boolean_matrix.to_csv(output_boolean_activity_filepath, index=False)
-    logger.info(
-        f"{context_name} - Found {expressed_count} expressed genes, "
-        f"{high_confidence_count} of which are confidently expressed"
-    )
+    logger.info(f"{context_name} - Found {expressed_count} expressed genes, {high_confidence_count} of which are confidently expressed")
     logger.success(f"Wrote boolean matrix to {output_boolean_activity_filepath}")
 
 
@@ -909,10 +900,7 @@ async def rnaseq_gen(  # noqa: C901
     elif isinstance(input_metadata_filepath_or_df, Path):
         if input_metadata_filepath_or_df.suffix not in {".xlsx", ".xls"}:
             _log_and_raise_error(
-                (
-                    f"Expected an excel file with extension of '.xlsx' or '.xls', "
-                    f"got '{input_metadata_filepath_or_df.suffix}'."
-                ),
+                f"Expected an excel file with extension of '.xlsx' or '.xls', got '{input_metadata_filepath_or_df.suffix}'.",
                 error=ValueError,
                 level=LogLevel.ERROR,
             )
