@@ -47,20 +47,14 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
     new_list: list[str] = stringlist.strip("[]").replace("'", "").replace(" ", "").split(",")
 
     # Show a warning if more than one item is present in the list (this means we are using the old method)
-    logger.critical(
-        "DeprecationWarning: Please use the new method of providing context names, "
-        "i.e. --output-filetypes 'type1 type2 type3'."
-    )
+    logger.critical("DeprecationWarning: Please use the new method of providing context names, i.e. --output-filetypes 'type1 type2 type3'.")
     logger.critical(
         "If you are using COMO, this can be done by setting the 'context_names' variable to a "
         "simple string separated by spaces. Here are a few examples!"
     )
     logger.critical("context_names = 'cellType1 cellType2 cellType3'")
     logger.critical("output_filetypes = 'output1 output2 output3'")
-    logger.critical(
-        "\nYour current method of passing context names will be removed in the future. "
-        "Update your variables above accordingly!\n\n"
-    )
+    logger.critical("\nYour current method of passing context names will be removed in the future. Update your variables above accordingly!\n\n")
 
     return new_list
 
@@ -84,9 +78,9 @@ def split_gene_expression_data(
     expression_data = expression_data[["entrez_gene_id", "active"]]
     single_gene_names = expression_data[~expression_data["entrez_gene_id"].astype(str).str.contains("//")]
     multiple_gene_names = expression_data[expression_data["entrez_gene_id"].astype(str).str.contains("//")]
-    split_gene_names = multiple_gene_names.assign(
-        entrez_gene_id=multiple_gene_names["entrez_gene_id"].astype(str).str.split("///")
-    ).explode("entrez_gene_id")
+    split_gene_names = multiple_gene_names.assign(entrez_gene_id=multiple_gene_names["entrez_gene_id"].astype(str).str.split("///")).explode(
+        "entrez_gene_id"
+    )
 
     gene_expressions = pd.concat([single_gene_names, split_gene_names], axis=0, ignore_index=True)
     if entrez_as_index:
@@ -120,9 +114,7 @@ async def _format_determination(
     :return: A pandas DataFrame
     """
     requested_output = [requested_output] if isinstance(requested_output, Output) else requested_output
-    coercion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(
-        columns=["Input Type"]
-    )
+    coercion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(columns=["Input Type"])
     coercion.columns = pd.Index(["input_value", *[o.value.replace(" ", "_").lower() for o in requested_output]])
     return coercion
 
@@ -147,16 +139,16 @@ async def _read_file(
         return None
 
     if isinstance(path, Path) and not path.exists():
-        logger.critical(f"File {path} does not exist")
-        raise FileNotFoundError(f"File {path} does not exist")
+        _log_and_raise_error(f"File {path} does not exist", error=FileNotFoundError, level=LogLevel.CRITICAL)
 
     # StringIO is used if a CSV file is read using open() directly
     if isinstance(path, io.StringIO):
         return pd.read_csv(path, **kwargs)
 
     match path.suffix:
-        case ".csv" | ".tsv":
-            kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")
+        case ".csv" | ".tsv" | ".txt":
+            if "sep" not in kwargs:
+                kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")
             with path.open("r") as i_stream:
                 content = i_stream.read()
                 return pd.read_csv(io.StringIO(content), **kwargs)
@@ -171,13 +163,12 @@ async def _read_file(
                 return df
             return adata
         case _:
-            logger.critical(
-                f"Unknown file extension '{path.suffix}'. Valid options are '.tsv', '.csv', '.xlsx', '.xls', or '.h5ad'"
+            _log_and_raise_error(
+                f"Unknown file extension '{path.suffix}'. Valid options are '.tsv', '.csv', '.xlsx', '.xls', or '.h5ad'",
+                error=ValueError,
+                level=LogLevel.CRITICAL,
             )
-            raise ValueError(
-                f"Unknown file extension '{path.suffix}'. "
-                f"Valid options are '.tsv', '.csv', '.xlsx', '.xls', or '.h5ad'."
-            )
+            return None
 
 
 async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int | str | Taxon) -> pd.DataFrame:
@@ -202,9 +193,7 @@ async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int 
             return await get_missing_gene_data(values["ensembl_gene_id"].tolist(), taxon_id=taxon_id)
         else:
             logger.critical("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
-            raise ValueError(
-                "Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix."
-            )
+            raise ValueError("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
 
 
 def _listify(value):
@@ -225,10 +214,12 @@ def return_placeholder_data() -> pd.DataFrame:
 
 
 def _set_up_logging(
-    level: LogLevel,
+    level: LogLevel | str,
     location: str | TextIOWrapper,
     formatting: str = LOG_FORMAT,
 ):
+    if isinstance(level, str):
+        level = LogLevel[level.upper()]
     with contextlib.suppress(ValueError):
         logger.remove(0)
         logger.add(sink=location, level=level.value, format=formatting)
