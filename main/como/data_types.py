@@ -11,11 +11,7 @@ import pandas as pd
 from loguru import logger
 
 PATH_TYPE = str | Path
-LOG_FORMAT = (
-    "<green>{time:YYYY-MM-DD HH:mm:ss}</> | "
-    "<level>{level:<8}</> | "
-    "<cyan>{name}</>:<cyan>{line}</> - <level>{message}</>"
-)
+LOG_FORMAT = "<green>{time:YYYY-MM-DD HH:mm:ss}</> | <level>{level:<8}</> | <cyan>{name}</>:<cyan>{line}</> - <level>{message}</>"
 
 
 class AdjustmentMethod(Enum):
@@ -139,9 +135,7 @@ class CobraCompartments:
         "s": ["eyespot", "eyespot apparatus", "stigma"],
     }
 
-    _REVERSE_LOOKUP: ClassVar[dict[str, list[str]]] = {
-        value.lower(): key for key, values in SHORTHAND.items() for value in values
-    }
+    _REVERSE_LOOKUP: ClassVar[dict[str, list[str]]] = {value.lower(): key for key, values in SHORTHAND.items() for value in values}
 
     @classmethod
     def get_shorthand(cls, longhand: str) -> str | None:

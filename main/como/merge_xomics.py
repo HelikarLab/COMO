@@ -110,9 +110,7 @@ def _merge_logical_table(df: pd.DataFrame):
     df.dropna(subset=["entrez_gene_id"], inplace=True)
     df["entrez_gene_id"] = df["entrez_gene_id"].astype(str).str.replace(" /// ", "//").astype(str)
 
-    id_list: list[str] = df.loc[
-        ~df["entrez_gene_id"].str.contains("//"), "entrez_gene_id"
-    ].tolist()  # Collect "single" ids, like "123"
+    id_list: list[str] = df.loc[~df["entrez_gene_id"].str.contains("//"), "entrez_gene_id"].tolist()  # Collect "single" ids, like "123"
     multiple_entrez_ids: list[str] = df.loc[
         df["entrez_gene_id"].str.contains("//"), "entrez_gene_id"
     ].tolist()  # Collect "double" ids, like "123//456"
@@ -291,9 +289,7 @@ async def _merge_xomics(
 
     logger.trace(f"Shape of merged data before merging logical tables: {merge_data.shape}")
     if merge_data.empty:
-        logger.warning(
-            f"No data is available for the '{context_name}' context. If this is intentional, ignore this error."
-        )
+        logger.warning(f"No data is available for the '{context_name}' context. If this is intentional, ignore this error.")
         return {}
 
     merge_data = _merge_logical_table(merge_data)
@@ -306,9 +302,7 @@ async def _merge_xomics(
     if adjust_for_missing_sources:  # Subtract 1 from requirement per missing source
         logger.trace("Adjusting for missing data sources")
         merge_data.loc[:, "required"] = merge_data[expression_list].apply(
-            lambda x: expression_requirement - (num_sources - x.count())
-            if (expression_requirement - (num_sources - x.count()) > 0)
-            else 1,
+            lambda x: expression_requirement - (num_sources - x.count()) if (expression_requirement - (num_sources - x.count()) > 0) else 1,
             axis=1,
         )
     else:  # Do not adjust for missing sources
@@ -376,10 +370,7 @@ async def _update_missing_data(input_matrices: _InputMatrices, taxon_id: int) ->
             # fmt: on
             logger.trace(f"Merging conversion data for {matrix_name}, existing id column is: {existing_data}")
             input_matrices[matrix_name] = (
-                input_matrices[matrix_name]
-                .merge(conversion, how="left", on=[existing_data])
-                .dropna()
-                .reset_index(drop=True)
+                input_matrices[matrix_name].merge(conversion, how="left", on=[existing_data]).dropna().reset_index(drop=True)
             )
 
     logger.debug("Updated missing genomic data")
@@ -605,9 +596,7 @@ async def merge_xomics(  # noqa: C901
         )
 
     if expression_requirement < 1:
-        logger.warning(
-            f"Expression requirement must be at least 1! Setting to the minimum of 1 now. Got: {expression_requirement}"
-        )
+        logger.warning(f"Expression requirement must be at least 1! Setting to the minimum of 1 now. Got: {expression_requirement}")
         expression_requirement = 1
 
     if expression_requirement is None:

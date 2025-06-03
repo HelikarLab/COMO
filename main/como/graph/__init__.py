@@ -19,10 +19,7 @@ def z_score_distribution(
     :return: None
     """
     if output_filepath.suffix not in {".png", ".pdf", ".svg"}:
-        logger.warning(
-            f"Expected .png, .pdf, or .svg suffix for output_png_filepath, got {output_filepath.suffix}. "
-            f"Defaulting to .pdf"
-        )
+        logger.warning(f"Expected .png, .pdf, or .svg suffix for output_png_filepath, got {output_filepath.suffix}. Defaulting to .pdf")
         output_filepath = output_filepath.with_suffix(".pdf")
     logger.trace("Graphing z-score distribution")
     output_filepath.parent.mkdir(parents=True, exist_ok=True)
