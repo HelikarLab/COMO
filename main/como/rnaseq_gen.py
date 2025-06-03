@@ -246,7 +246,7 @@ def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
         matrix_values = []
         for sample in range(metrics[study].num_samples):
             layout = metrics[study].layout[sample]
-            count_matrix: npt.NDArray = metrics[study].count_matrix.iloc[:, sample].values.astype(np.float32)
+            count_matrix: pd.DataFrame = metrics[study].count_matrix.iloc[:, sample].values.astype(np.float32)
             gene_lengths = (
                 metrics[study].fragment_lengths[sample].astype(np.float32)
                 if layout == LayoutMethod.paired_end
@@ -257,12 +257,15 @@ def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
             match layout:
                 case LayoutMethod.paired_end:  # FPKM
                     total_fragments = count_matrix.sum(axis=0)
-                    counts_per_million = total_fragments / scale
-                    fragments_per_kilobase = count_matrix / gene_lengths_kb[:, np.newaxis]
-                    fragments_per_kilobase_million = fragments_per_kilobase / counts_per_million
+                    if total_fragments == 0:
+                        fragments_per_kilobase_million = np.nan
+                    else:
+                        counts_per_million = total_fragments / scale
+                        fragments_per_kilobase = count_matrix / gene_lengths_kb
+                        fragments_per_kilobase_million = fragments_per_kilobase / counts_per_million
                     matrix_values.append(fragments_per_kilobase_million)
                 case LayoutMethod.single_end:  # RPKM
-                    reads_per_kilobase = count_matrix / gene_lengths_kb[: np.newaxis]
+                    reads_per_kilobase = count_matrix / gene_lengths_kb
                     total_reads = count_matrix.sum(axis=0)
                     counts_per_million = total_reads / scale
                     reads_per_kilobase_million = reads_per_kilobase / counts_per_million
@@ -277,7 +280,11 @@ def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
                         level=LogLevel.ERROR,
                     )
 
-        fpkm_matrix = pd.DataFrame(matrix_values).T  # Transpose is needed because values were appended as rows
+        # Transpose is needed because values were appended as rows
+        fpkm_matrix = pd.DataFrame(matrix_values).T
+        fpkm_matrix.index = metrics[study].count_matrix.index
+        fpkm_matrix.columns = metrics[study].sample_names
+
         fpkm_matrix = fpkm_matrix[~pd.isna(fpkm_matrix)]
         metrics[study].normalization_matrix = fpkm_matrix
         metrics[study].normalization_matrix.columns = metrics[study].count_matrix.columns
