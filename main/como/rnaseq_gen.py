@@ -229,15 +229,12 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
     for sample in metrics:
         count_matrix = metrics[sample].count_matrix
 
-        gene_sizes = metrics[sample].gene_sizes
+        gene_sizes = pd.Series(metrics[sample].gene_sizes, index=count_matrix.index)
+        adjusted_counts = count_matrix.add(1e-6)
 
-        tpm_matrix = pd.DataFrame(data=None, index=count_matrix.index, columns=count_matrix.columns)
-        for i in range(len(count_matrix.columns)):
-            values: pd.Series = count_matrix.iloc[:, i] + 1  # Add 1 to prevent division by 0
-            rate = np.log(values.tolist()) - np.log(gene_sizes)
-            denominator = np.log(np.sum(np.exp(rate)))
-            tpm_value = np.exp(rate - denominator + np.log(1e6))
-            tpm_matrix.iloc[:, i] = tpm_value
+        tpm_matrix = adjusted_counts.divide(gene_sizes, axis=0)  # (count + 1) / gene_length
+        tpm_matrix = tpm_matrix.div(tpm_matrix.sum(axis=0), axis=1)  # normalize by total
+        tpm_matrix = tpm_matrix.mul(1e6)  # scale to per-million
         metrics[sample].normalization_matrix = tpm_matrix
 
     return metrics
