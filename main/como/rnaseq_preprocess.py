@@ -141,8 +141,39 @@ class _StudyMetrics:
         self.__sample_names.sort()
 
 
+@dataclass(slots=True)
+class SampleConfiguration:
+    sample_name: str
+    fragment_length: float
+    layout: str
+    strand: str
+    study: str
+    library_prep: str
+
+
+async def _read_text(path: Path | None, *, default: str, lower: bool = False) -> str:
+    if path is None:
+        return default
+    async with aiofiles.open(path) as f:
+        txt = (await f.read()).strip()
+    return txt.lower() if lower else txt
+
+
 def _sample_name_from_filepath(file: Path) -> str:
     return re.search(r".+_S\d+R\d+", file.stem).group()
+
+
+def _require_one(paths: list[Path], kind: Literal["layout", "strand", "preparation", "fragment"], label: str) -> Path | None:
+    if len(paths) == 1:
+        return paths[0]
+    if len(paths) == 0:
+        return None
+    _log_and_raise_error(
+        f"Multiple matching {kind} files for {label}, make sure there is only one copy for each replicate in COMO_input",
+        error=ValueError,
+        level=LogLevel.ERROR,
+    )
+    return None  # explicit return None to satisfy type-check
 
 
 def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
@@ -156,7 +187,7 @@ def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
         _log_and_raise_error(
             (
                 f"Unequal number of gene count directories and strandedness directories. "
-                f"Found {len(gene_counts_directories)} gene count directories and {len(strandedness_directories)} strandedness directories."  # noqa: E501
+                f"Found {len(gene_counts_directories)} gene count directories and {len(strandedness_directories)} strandedness directories."
                 f"\nGene count directory: {gene_count_dir}\nStrandedness directory: {strand_dir}"
             ),
             error=ValueError,
@@ -210,11 +241,7 @@ async def _process_first_multirun_sample(strand_file: Path, all_counts_files: li
 
         run_counts = star_information.count_matrix[["ensembl_gene_id", strand_information]]
         run_counts.columns = pd.Index(["ensembl_gene_id", "counts"])
-        sample_count = (
-            run_counts
-            if sample_count.empty
-            else sample_count.merge(run_counts, on=["ensembl_gene_id", "counts"], how="outer")
-        )
+        sample_count = run_counts if sample_count.empty else sample_count.merge(run_counts, on=["ensembl_gene_id", "counts"], how="outer")
 
     # Set na values to 0
     sample_count = sample_count.fillna(value="0")
@@ -336,182 +363,253 @@ async def _create_config_df(  # noqa: C901
     The configuration file created is based on the gene counts matrix.
      If using zFPKM normalization technique, mean fragment lengths will be fetched
     """
-    gene_counts_dir = como_context_dir / gene_count_dirname
-    layout_dir = como_context_dir / layout_dirname
-    strandedness_dir = como_context_dir / strandedness_dirname
-    fragment_sizes_dir = como_context_dir / fragment_sizes_dirname
-    prep_method_dir = como_context_dir / prep_method_dirname
-
-    gene_counts_files = list(gene_counts_dir.rglob("*.tab"))
-    sample_names: list[str] = []
-    fragment_lengths: list[int | float] = []
-    layouts: list[str] = []
-    strands: list[str] = []
-    groups: list[str] = []
-    preparation_method: list[str] = []
-
-    if len(gene_counts_files) == 0:
+    label_regex: Final = re.compile(r"(?P<study>S\d{1,3})(?P<rep>R\d{1,3})(?:(?P<run>r\d{1,3}))?")
+    gene_counts: list[Path] = list((como_context_dir / gene_count_dirname).rglob("*.tab"))
+    if not gene_counts:
         _log_and_raise_error(
-            f"No gene count files found in '{gene_counts_dir}'.", error=FileNotFoundError, level=LogLevel.ERROR
+            f"No gene count files found in '{gene_count_dirname}'",
+            error=FileNotFoundError,
+            level=LogLevel.ERROR,
         )
 
-    for gene_count_filename in sorted(gene_counts_files):
-        # Match S___R___r___
-        # \d{1,3} matches 1-3 digits
-        # (?:r\d{1,3})? optionally matches a "r" followed by three digits
-        label = re.findall(r"S\d{1,3}R\d{1,3}(?:r\d{1,3})?", gene_count_filename.as_posix())[0]
-        if not label:
+    auxillary_directories = {
+        "layout": como_context_dir / layout_dirname,
+        "strand": como_context_dir / strandedness_dirname,
+        "fragment": como_context_dir / fragment_sizes_dirname,
+        "prep": como_context_dir / prep_method_dirname,
+    }
+    aux_lookup: dict[str, dict[str, Path]] = {kind: {} for kind in auxillary_directories}
+    for kind, root in auxillary_directories.items():
+        kind: str
+        root: Path
+        for p in root.rglob("*"):
+            if p.is_file():
+                m = label_regex.search(p.stem)
+                if m:
+                    aux_lookup[kind][m.group(0)] = p
+
+    rows: list[SampleConfiguration] = []
+    for gene_count_path in sorted(gene_counts):
+        m = label_regex.search(gene_count_path.as_posix())
+        if not m:
             _log_and_raise_error(
-                (
-                    f"\n\nFilename of '{gene_count_filename}' is not valid. "
-                    f"Should be 'contextName_SXRYrZ.tab', "
-                    f"where X is the study/batch number, Y is the replicate number, "
-                    f"and Z is the run number."
-                    "\n\nIf not a multi-run sample, exclude 'rZ' from the filename."
-                ),
+                f"Filename '{gene_count_path.name}' does not match contextName_SXRYrZ.tab pattern",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
+        label = m.group(0)
+        study_number = m["study"]
+        rep_number = m["rep"]
+        sample_id = f"{context_name}_{study_number}{rep_number}"
+
+        layout_path = _require_one([aux_lookup["layout"].get(label)], "layout", label)
+        strand_path = _require_one([aux_lookup["strand"].get(label)], "strand", label)
+        prep_path = _require_one([aux_lookup["prep"].get(label)], "preparation", label)
+
+        layout, strand, prep = await asyncio.gather(
+            *[
+                _read_text(layout_path, default="UNKNOWN"),
+                _read_text(strand_path, default="UNKNOWN"),
+                _read_text(prep_path, default="total", lower=True),
+            ],
+        )
+        if prep not in {"total", "mrna"}:
+            _log_and_raise_error(
+                f"Prep method must be 'total' or 'mrna' (got '{prep}') for {label}",
                 error=ValueError,
                 level=LogLevel.ERROR,
             )
 
-        study_number = re.findall(r"S\d{1,3}", label)[0]
-        rep_number = re.findall(r"R\d{1,3}", label)[0]
-        run_number = re.findall(r"r\d{1,3}", label)
-
-        multi_flag = 0
-        if len(run_number) > 0:
-            if run_number[0] != "r1":
-                continue
-            label_glob = f"{study_number}{rep_number}r*"  # S__R__r*
-            runs = [run for run in gene_counts_files if re.search(label_glob, run.as_posix())]
-            multi_flag = 1
-            frag_files = []
-
-            for run in runs:
-                run_number = re.findall(r"R\d{1,3}", run.as_posix())[0]
-                replicate = re.findall(r"r\d{1,3}", run.as_posix())[0]
-                frag_filename = "".join([context_name, "_", study_number, run_number, replicate, "_fragment_size.txt"])
-                frag_files.append(como_context_dir / fragment_sizes_dirname / study_number / frag_filename)
-
-        layout_files: list[Path] = list(layout_dir.rglob(f"{context_name}_{label}_layout.txt"))
-        strand_files: list[Path] = list(strandedness_dir.rglob(f"{context_name}_{label}_strandedness.txt"))
-        frag_files: list[Path] = list(fragment_sizes_dir.rglob(f"{context_name}_{label}_fragment_size.txt"))
-        prep_files: list[Path] = list(prep_method_dir.rglob(f"{context_name}_{label}_prep_method.txt"))
-
-        layout = "UNKNOWN"
-        if len(layout_files) == 0:
-            logger.warning(
-                f"No layout file found for {label}, writing as 'UNKNOWN', "
-                f"this should be defined if you are using zFPKM or downstream 'rnaseq_gen.py' will not run"
+        fragment_label = f"{context_name}_{label}_fragment_size.txt"
+        frag_paths = [p for p in aux_lookup["fragment"].values() if p.name == fragment_label]
+        if not frag_paths and prep != RNAType.TRNA.value:
+            logger.warning(f"No fragment file for '{label}'; defaulting to 100 bp (needed for zFPKM).")
+            mean_frag = 100.0
+        elif len(frag_paths) == 1 and layout == "single-end":
+            mean_frag = 0.0
+        else:  # 1-N files, paired end
+            dfs: list[pd.DataFrame] = await asyncio.gather(*[_read_file(f, sep="\t", on_bad_lines="skip") for f in frag_paths])
+            for df in dfs:
+                df["meanxcount"] = df["frag_mean"] * df["frag_count"]
+                counts = np.array([df["frag_count"].sum() for df in dfs])
+                means = np.array([(df["meanxcount"] / df["frag_count"].sum()).sum() for df in dfs])
+                mean_frag = float(np.average(means, weights=counts))
+        rows.append(
+            SampleConfiguration(
+                sample_name=sample_id,
+                fragment_length=mean_frag,
+                layout=layout,
+                strand=strand,
+                study=study_number,
+                library_prep=prep,
             )
-        elif len(layout_files) == 1:
-            with layout_files[0].open("r") as file:
-                layout = file.read().strip()
-        elif len(layout_files) > 1:
-            _log_and_raise_error(
-                (
-                    f"Multiple matching layout files for {label}, "
-                    f"make sure there is only one copy for each replicate in COMO_input"
-                ),
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+        )
 
-        strand = "UNKNOWN"
-        if len(strand_files) == 0:
-            logger.warning(
-                f"No strandedness file found for {label}, writing as 'UNKNOWN'. "
-                f"This will not interfere with the analysis since you have already set rnaseq_preprocess.py to "
-                f"infer the strandedness when writing the counts matrix"
-            )
-        elif len(strand_files) == 1:
-            with strand_files[0].open("r") as file:
-                strand = file.read().strip()
-        elif len(strand_files) > 1:
-            _log_and_raise_error(
-                (
-                    f"Multiple matching strandedness files for {label}, "
-                    f"make sure there is only one copy for each replicate in COMO_input"
-                ),
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+    df = pd.DataFrame.from_records([asdict(r) for r in rows]).sort_values("sample_name", ignore_index=True)
+    return df
 
-        prep = "total"
-        if len(prep_files) == 0:
-            logger.warning(f"No prep file found for {label}, assuming 'total', as in 'Total RNA' library preparation")
-        elif len(prep_files) == 1:
-            with prep_files[0].open("r") as file:
-                prep = file.read().strip().lower()
-                if prep not in ["total", "mrna"]:
-                    _log_and_raise_error(
-                        f"Prep method must be either 'total' or 'mrna' for {label}",
-                        error=ValueError,
-                        level=LogLevel.ERROR,
-                    )
-        elif len(prep_files) > 1:
-            _log_and_raise_error(
-                (
-                    f"Multiple matching prep files for {label}, "
-                    f"make sure there is only one copy for each replicate in COMO_input"
-                ),
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
-
-        mean_fragment_size = 100
-        if len(frag_files) == 0 and prep != RNAType.TRNA.value:
-            logger.warning(
-                f"No fragment file found for {label}, using '100'. "
-                "You should define this if you are going to use downstream zFPKM normalization"
-            )
-        elif len(frag_files) == 1:
-            if layout == "single-end":
-                mean_fragment_size = 0
-            else:
-                if not multi_flag:
-                    frag_df = pd.read_table(frag_files[0], low_memory=False)
-                    frag_df["meanxcount"] = frag_df["frag_mean"] * frag_df["frag_count"]
-                    mean_fragment_size = sum(frag_df["meanxcount"] / sum(frag_df["frag_count"]))
-
-                else:
-                    mean_fragment_sizes = np.array([])
-                    library_sizes = np.array([])
-                    for ff in frag_files:
-                        frag_df = pd.read_table(ff, low_memory=False, sep="\t", on_bad_lines="skip")
-                        frag_df["meanxcount"] = frag_df["frag_mean"] * frag_df["frag_count"]
-                        mean_fragment_size = sum(frag_df["meanxcount"] / sum(frag_df["frag_count"]))
-                        mean_fragment_sizes = np.append(mean_fragment_sizes, mean_fragment_size)
-                        library_sizes = np.append(library_sizes, sum(frag_df["frag_count"]))
-
-                    mean_fragment_size = sum(mean_fragment_sizes * library_sizes) / sum(library_sizes)
-        elif len(frag_files) > 1:
-            _log_and_raise_error(
-                (
-                    f"Multiple matching fragment files for {label}, "
-                    f"make sure there is only one copy for each replicate in COMO_input"
-                ),
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
-
-        sample_names.append(f"{context_name}_{study_number}{rep_number}")
-        fragment_lengths.append(mean_fragment_size)
-        layouts.append(layout)
-        strands.append(strand)
-        groups.append(study_number)
-        preparation_method.append(prep)
-
-    out_df = pd.DataFrame(
-        {
-            "sample_name": sample_names,
-            "fragment_length": fragment_lengths,
-            "layout": layouts,
-            "strand": strands,
-            "study": groups,
-            "library_prep": preparation_method,
-        }
-    ).sort_values("sample_name")
-    return out_df
+    # 6-3-25: Intentionally left commented-out code to test its replacement
+    # gene_counts_dir = como_context_dir / gene_count_dirname
+    # layout_dir = como_context_dir / layout_dirname
+    # strandedness_dir = como_context_dir / strandedness_dirname
+    # fragment_sizes_dir = como_context_dir / fragment_sizes_dirname
+    # prep_method_dir = como_context_dir / prep_method_dirname
+    #
+    # gene_counts_files = list(gene_counts_dir.rglob("*.tab"))
+    # sample_names: list[str] = []
+    # fragment_lengths: list[int | float] = []
+    # layouts: list[str] = []
+    # strands: list[str] = []
+    # groups: list[str] = []
+    # preparation_method: list[str] = []
+    #
+    # if len(gene_counts_files) == 0:
+    #     _log_and_raise_error(f"No gene count files found in '{gene_counts_dir}'.", error=FileNotFoundError, level=LogLevel.ERROR)
+    #
+    # for gene_count_filename in sorted(gene_counts_files):
+    #     # Match S___R___r___
+    #     # \d{1,3} matches 1-3 digits
+    #     # (?:r\d{1,3})? optionally matches a "r" followed by three digits
+    #     label = re.findall(r"S\d{1,3}R\d{1,3}(?:r\d{1,3})?", gene_count_filename.as_posix())[0]
+    #     if not label:
+    #         _log_and_raise_error(
+    #             (
+    #                 f"\n\nFilename of '{gene_count_filename}' is not valid. "
+    #                 f"Should be 'contextName_SXRYrZ.tab', "
+    #                 f"where X is the study/batch number, Y is the replicate number, "
+    #                 f"and Z is the run number."
+    #                 "\n\nIf not a multi-run sample, exclude 'rZ' from the filename."
+    #             ),
+    #             error=ValueError,
+    #             level=LogLevel.ERROR,
+    #         )
+    #
+    #     study_number = re.findall(r"S\d{1,3}", label)[0]
+    #     rep_number = re.findall(r"R\d{1,3}", label)[0]
+    #     run_number = re.findall(r"r\d{1,3}", label)
+    #
+    #     multi_flag = 0
+    #     if len(run_number) > 0:
+    #         if run_number[0] != "r1":
+    #             continue
+    #         label_glob = f"{study_number}{rep_number}r*"  # S__R__r*
+    #         runs = [run for run in gene_counts_files if re.search(label_glob, run.as_posix())]
+    #         multi_flag = 1
+    #         frag_files = []
+    #
+    #         for run in runs:
+    #             run_number = re.findall(r"R\d{1,3}", run.as_posix())[0]
+    #             replicate = re.findall(r"r\d{1,3}", run.as_posix())[0]
+    #             frag_filename = "".join([context_name, "_", study_number, run_number, replicate, "_fragment_size.txt"])
+    #             frag_files.append(como_context_dir / fragment_sizes_dirname / study_number / frag_filename)
+    #
+    #     layout_files: list[Path] = list(layout_dir.rglob(f"{context_name}_{label}_layout.txt"))
+    #     strand_files: list[Path] = list(strandedness_dir.rglob(f"{context_name}_{label}_strandedness.txt"))
+    #     frag_files: list[Path] = list(fragment_sizes_dir.rglob(f"{context_name}_{label}_fragment_size.txt"))
+    #     prep_files: list[Path] = list(prep_method_dir.rglob(f"{context_name}_{label}_prep_method.txt"))
+    #
+    #     layout = "UNKNOWN"
+    #     if len(layout_files) == 0:
+    #         logger.warning(
+    #             f"No layout file found for {label}, writing as 'UNKNOWN', "
+    #             f"this should be defined if you are using zFPKM or downstream 'rnaseq_gen.py' will not run"
+    #         )
+    #     elif len(layout_files) == 1:
+    #         with layout_files[0].open("r") as file:
+    #             layout = file.read().strip()
+    #     elif len(layout_files) > 1:
+    #         _log_and_raise_error(
+    #             f"Multiple matching layout files for {label}, make sure there is only one copy for each replicate in COMO_input",
+    #             error=ValueError,
+    #             level=LogLevel.ERROR,
+    #         )
+    #
+    #     strand = "UNKNOWN"
+    #     if len(strand_files) == 0:
+    #         logger.warning(
+    #             f"No strandedness file found for {label}, writing as 'UNKNOWN'. "
+    #             f"This will not interfere with the analysis since you have already set rnaseq_preprocess.py to "
+    #             f"infer the strandedness when writing the counts matrix"
+    #         )
+    #     elif len(strand_files) == 1:
+    #         with strand_files[0].open("r") as file:
+    #             strand = file.read().strip()
+    #     elif len(strand_files) > 1:
+    #         _log_and_raise_error(
+    #             f"Multiple matching strandedness files for {label}, make sure there is only one copy for each replicate in COMO_input",
+    #             error=ValueError,
+    #             level=LogLevel.ERROR,
+    #         )
+    #
+    #     prep = "total"
+    #     if len(prep_files) == 0:
+    #         logger.warning(f"No prep file found for {label}, assuming 'total', as in 'Total RNA' library preparation")
+    #     elif len(prep_files) == 1:
+    #         with prep_files[0].open("r") as file:
+    #             prep = file.read().strip().lower()
+    #             if prep not in ["total", "mrna"]:
+    #                 _log_and_raise_error(
+    #                     f"Prep method must be either 'total' or 'mrna' for {label}",
+    #                     error=ValueError,
+    #                     level=LogLevel.ERROR,
+    #                 )
+    #     elif len(prep_files) > 1:
+    #         _log_and_raise_error(
+    #             f"Multiple matching prep files for {label}, make sure there is only one copy for each replicate in COMO_input",
+    #             error=ValueError,
+    #             level=LogLevel.ERROR,
+    #         )
+    #
+    #     mean_fragment_size = 100
+    #     if len(frag_files) == 0 and prep != RNAType.TRNA.value:
+    #         logger.warning(
+    #             f"No fragment file found for {label}, using '100'. You should define this if you are going to use downstream zFPKM normalization"
+    #         )
+    #     elif len(frag_files) == 1:
+    #         if layout == "single-end":
+    #             mean_fragment_size = 0
+    #         else:
+    #             if not multi_flag:
+    #                 frag_df = pd.read_table(frag_files[0], low_memory=False)
+    #                 frag_df["meanxcount"] = frag_df["frag_mean"] * frag_df["frag_count"]
+    #                 mean_fragment_size = sum(frag_df["meanxcount"] / sum(frag_df["frag_count"]))
+    #
+    #             else:
+    #                 mean_fragment_sizes = np.array([])
+    #                 library_sizes = np.array([])
+    #                 for ff in frag_files:
+    #                     frag_df = pd.read_table(ff, low_memory=False, sep="\t", on_bad_lines="skip")
+    #                     frag_df["meanxcount"] = frag_df["frag_mean"] * frag_df["frag_count"]
+    #                     mean_fragment_size = sum(frag_df["meanxcount"] / sum(frag_df["frag_count"]))
+    #                     mean_fragment_sizes = np.append(mean_fragment_sizes, mean_fragment_size)
+    #                     library_sizes = np.append(library_sizes, sum(frag_df["frag_count"]))
+    #
+    #                 mean_fragment_size = sum(mean_fragment_sizes * library_sizes) / sum(library_sizes)
+    #     elif len(frag_files) > 1:
+    #         _log_and_raise_error(
+    #             f"Multiple matching fragment files for {label}, make sure there is only one copy for each replicate in COMO_input",
+    #             error=ValueError,
+    #             level=LogLevel.ERROR,
+    #         )
+    #
+    #     sample_names.append(f"{context_name}_{study_number}{rep_number}")
+    #     fragment_lengths.append(mean_fragment_size)
+    #     layouts.append(layout)
+    #     strands.append(strand)
+    #     groups.append(study_number)
+    #     preparation_method.append(prep)
+    #
+    # out_df = pd.DataFrame(
+    #     {
+    #         "sample_name": sample_names,
+    #         "fragment_length": fragment_lengths,
+    #         "layout": layouts,
+    #         "strand": strands,
+    #         "study": groups,
+    #         "library_prep": preparation_method,
+    #     }
+    # ).sort_values("sample_name")
+    # return out_df
 
 
 async def _create_gene_info_file(
@@ -584,7 +682,7 @@ async def _create_gene_info_file(
     logger.success(f"Gene Info file written at '{output_filepath}'")
 
 
-async def _create_matrix_file(
+async def _process_como_input(
     context_name: str,
     output_config_filepath: Path,
     como_context_dir: PATH_TYPE,
@@ -626,7 +724,7 @@ async def _process(
     for rna, output_config_filepath, output_matrix_filepath in rna_types:
         tasks.append(
             asyncio.create_task(
-                _create_matrix_file(
+                _process_como_input(
                     context_name=context_name,
                     output_config_filepath=output_config_filepath,
                     como_context_dir=como_context_dir,
@@ -639,12 +737,15 @@ async def _process(
     await asyncio.gather(*tasks)
 
     # create the gene info filepath based on provided data
+
+    input_files = []
+    if input_matrix_filepath:
+        input_files.extend(input_matrix_filepath)
+    output_trna_matrix_filepath and input_files.append(output_trna_matrix_filepath)
+    output_mrna_matrix_filepath and input_files.append(output_mrna_matrix_filepath)
+
     await _create_gene_info_file(
-        counts_matrix_filepaths=[
-            f
-            for f in [*input_matrix_filepath, output_trna_matrix_filepath, output_mrna_matrix_filepath]
-            if f is not None
-        ],
+        counts_matrix_filepaths=input_files,
         output_filepath=output_gene_info_filepath,
         taxon=taxon,
         cache=cache,
@@ -662,7 +763,7 @@ async def rnaseq_preprocess(
     output_trna_count_matrix_filepath: Path | None = None,
     output_mrna_count_matrix_filepath: Path | None = None,
     cache: bool = True,
-    log_level: LogLevel = LogLevel.INFO,
+    log_level: LogLevel | str = LogLevel.INFO,
     log_location: str | TextIOWrapper = sys.stderr,
 ) -> None:
     """Preprocesses RNA-seq data for downstream analysis.
@@ -691,22 +792,10 @@ async def rnaseq_preprocess(
     if como_context_dir:
         como_context_dir = como_context_dir.resolve()
     input_matrix_filepath = [i.resolve() for i in _listify(input_matrix_filepath)] if input_matrix_filepath else None
-    output_trna_metadata_filepath = (
-        output_trna_metadata_filepath.resolve() if output_trna_metadata_filepath else output_trna_metadata_filepath
-    )
-    output_mrna_metadata_filepath = (
-        output_mrna_metadata_filepath.resolve() if output_mrna_metadata_filepath else output_mrna_metadata_filepath
-    )
-    output_trna_count_matrix_filepath = (
-        output_trna_count_matrix_filepath.resolve()
-        if output_trna_count_matrix_filepath
-        else output_trna_count_matrix_filepath
-    )
-    output_mrna_count_matrix_filepath = (
-        output_mrna_count_matrix_filepath.resolve()
-        if output_mrna_count_matrix_filepath
-        else output_mrna_count_matrix_filepath
-    )
+    output_trna_metadata_filepath = output_trna_metadata_filepath.resolve() if output_trna_metadata_filepath else None
+    output_mrna_metadata_filepath = output_mrna_metadata_filepath.resolve() if output_mrna_metadata_filepath else None
+    output_trna_count_matrix_filepath = output_trna_count_matrix_filepath.resolve() if output_trna_count_matrix_filepath else None
+    output_mrna_count_matrix_filepath = output_mrna_count_matrix_filepath.resolve() if output_mrna_count_matrix_filepath else None
 
     await _process(
         context_name=context_name,
