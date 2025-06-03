@@ -200,9 +200,7 @@ def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
         count_files = list(gene_dir.glob("*.tab"))
         strand_files = list(strand_dir.glob("*.txt"))
         if len(count_files) == 0:
-            _log_and_raise_error(
-                f"No count files found for study '{gene_dir.stem}'.", error=ValueError, level=LogLevel.ERROR
-            )
+            _log_and_raise_error(f"No count files found for study '{gene_dir.stem}'.", error=ValueError, level=LogLevel.ERROR)
         if len(strand_files) == 0:
             _log_and_raise_error(
                 f"No strandedness files found for study '{gene_dir.stem}'.",
@@ -330,9 +328,7 @@ async def _write_counts_matrix(
 ) -> pd.DataFrame:
     """Create a counts matrix file by reading gene counts table(s)."""
     study_metrics = _organize_gene_counts_files(data_dir=como_context_dir)
-    counts: list[pd.DataFrame] = await asyncio.gather(
-        *[_create_sample_counts_matrix(metric) for metric in study_metrics]
-    )
+    counts: list[pd.DataFrame] = await asyncio.gather(*[_create_sample_counts_matrix(metric) for metric in study_metrics])
 
     final_matrix = pd.DataFrame()
     for count in counts:
@@ -666,13 +662,7 @@ async def _create_gene_info_file(
         gene_info.at[i, "ensembl_gene_id"] = ensembl_ids
         gene_info.at[i, "size"] = end_pos - start_pos
 
-    gene_info = gene_info[
-        (
-            (gene_info["entrez_gene_id"] != "-")
-            & (gene_info["ensembl_gene_id"] != "-")
-            & (gene_info["gene_symbol"] != "-")
-        )
-    ]
+    gene_info = gene_info[((gene_info["entrez_gene_id"] != "-") & (gene_info["ensembl_gene_id"] != "-") & (gene_info["gene_symbol"] != "-"))]
     gene_info.sort_values(by="ensembl_gene_id", inplace=True)
     gene_info.dropna(inplace=True)
     gene_info.to_csv(output_filepath, index=False)
