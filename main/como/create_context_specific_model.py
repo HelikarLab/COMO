@@ -253,7 +253,7 @@ def _build_with_tinit(
 
 
 async def _map_expression_to_reaction(
-    model_cobra,
+    reference_model,
     gene_expression_file,
     recon_algorithm: Algorithm,
     low_thresh: float,
@@ -277,7 +277,7 @@ async def _map_expression_to_reaction(
     # fmt: on
 
     error_count = 0
-    for rxn in model_cobra.reactions:
+    for rxn in reference_model.reactions:
         rxn: cobra.Reaction
         gene_reaction_rule = _correct_bracket(rxn.gene_reaction_rule, rxn.gene_name_reaction_rule)
         if gene_reaction_rule == "":
@@ -352,7 +352,6 @@ async def _build_model(  # noqa: C901
                 level=LogLevel.ERROR,
             )
 
-    reference_model.objective = {getattr(reference_model.reactions, objective): 1}
     if objective not in force_reactions:
         force_reactions.append(objective)
     reference_model = _set_boundaries(reference_model, boundary_reactions, lower_bounds, upper_bounds)
