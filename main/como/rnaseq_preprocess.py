@@ -4,12 +4,13 @@ import asyncio
 import json
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from io import StringIO, TextIOWrapper
 from itertools import chain
 from pathlib import Path
-from typing import Literal
+from typing import Final, Literal
 
+import aiofiles
 import numpy as np
 import pandas as pd
 from fast_bioservices.biothings.mygene import MyGene
@@ -41,16 +42,18 @@ class _STARinformation:
                 error=ValueError,
                 level=LogLevel.ERROR,
             )
+        if not filepath.exists():
+            _log_and_raise_error(
+                f"Unable to find the .tab file '{filepath}'",
+                error=FileNotFoundError,
+                level=LogLevel.ERROR,
+            )
 
         with filepath.open("r") as i_stream:
-            unmapped, multimapping, no_feature, ambiguous = await asyncio.gather(
-                *[
-                    asyncio.to_thread(i_stream.readline),
-                    asyncio.to_thread(i_stream.readline),
-                    asyncio.to_thread(i_stream.readline),
-                    asyncio.to_thread(i_stream.readline),
-                ]
-            )
+            unmapped = i_stream.readline()
+            multimapping = i_stream.readline()
+            no_feature = i_stream.readline()
+            ambiguous = i_stream.readline()
 
             num_unmapped = [int(i) for i in unmapped.rstrip("\n").split("\t")[1:]]
             num_multimapping = [int(i) for i in multimapping.rstrip("\n").split("\t")[1:]]
