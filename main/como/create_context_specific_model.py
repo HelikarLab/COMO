@@ -279,31 +279,22 @@ async def _map_expression_to_reaction(
     error_count = 0
     for rxn in reference_model.reactions:
         rxn: cobra.Reaction
-        gene_reaction_rule = _correct_bracket(rxn.gene_reaction_rule, rxn.gene_name_reaction_rule)
+
+        gene_reaction_rule = rxn.gene_reaction_rule
         if gene_reaction_rule == "":
             continue
 
-        gene_ids = re.findall(r"\d+", gene_reaction_rule)
+        gene_ids = set(re.findall(r"\d+", gene_reaction_rule))
         reaction_expression[rxn.id] = default_expression
         for gene_id in gene_ids:
-            activity = (
-                f"{gene_activity.at[gene_id, 'active']}"
-                if gene_id in gene_activity.index
-                else f"{default_expression!s}"
-            )
+            activity = f"{gene_activity.at[gene_id, 'active']}" if gene_id in gene_activity.index else f"{default_expression!s}"
             # replace gene_id with activity, using optional whitespace before and after the gene id
             # Do not replace the whitespace (if it exists) before and after the gene ID
-            gene_reaction_rule = re.sub(
-                pattern=rf"(?<!\S){gene_id}(?!\S)",
-                repl=activity,
-                string=gene_reaction_rule,
-                count=1,
-            )
+            gene_reaction_rule = re.sub(pattern=rf"\b{gene_id}\b", repl=activity, string=gene_reaction_rule)
 
         try:
             # We are using eval here because ast.literal_eval is unable to process an evaluable such as `max(-4, -4)`
-            # This isn't ideal, but ultimately the only other option is writing and maintaining a custom parsing engine,
-            #   which is too much work to do.
+            # This isn't ideal, but ultimately the only other option is writing and maintaining a custom parsing engine, which is too much work
             evaluable_gene_rule = _gene_rule_logical(gene_reaction_rule).replace("{", "(").replace("}", ")")
             reaction_expression[rxn.id] = eval(evaluable_gene_rule)  # noqa: S307
         except ValueError:
