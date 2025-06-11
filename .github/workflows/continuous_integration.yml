@@ -41,7 +41,7 @@ jobs:
           args: "format main/COMO.ipynb"
 
       - name: Commit Changes
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v6
         with:
           commit_message: "style: format code, Jupyter Notebook(s), and Python imports with `ruff`"
           file_pattern: "main/como/*.py"
