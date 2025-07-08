@@ -1,5 +1,5 @@
 ## This is a fast leak test originally written in MATLAB.
-# source code: https://github.com/opencobra/cobratoolbox/blob/master/src/reconstruction/modelGeneration/fastLeakTest.m
+# source code: https://github.com/opencobra/cobratoolbox/blob/950f40cff4256d738fc8421a6ecfe91e084f46dd/src/reconstruction/modelGeneration/fastLeakTest.m
 
 ## INPUT
 # model: model structure
