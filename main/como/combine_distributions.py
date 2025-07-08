@@ -144,10 +144,14 @@ def _combine_z_distribution_for_context(
         return pd.DataFrame({"ensembl_gene_id": [], "combine_z": []})
 
     z_matrices = [
-        res.z_score_matrix.set_index("ensembl_gene_id").rename(columns={col: res.type.value for col in res.z_score_matrix.columns[1:]})
-        for res in zscore_results
+        result.z_score_matrix.set_index("ensembl_gene_id").rename(columns=dict.fromkeys(result.z_score_matrix.columns[1:], result.type.value))
+        for result in zscore_results
     ]
-    z_matrix = pd.concat(z_matrices, axis=1, join="outer").reset_index()
+    z_matrix = pd.DataFrame()
+    for matrix in z_matrices:
+        z_matrix = z_matrix.merge(right=matrix, left_index=True, right_index=True, how="outer") if not z_matrix.empty else matrix
+    z_matrix = z_matrix.reset_index(drop=False)
+    # z_matrix = pd.concat(z_matrices, axis=1, join="outer").reset_index()
     if _num_columns(z_matrix) <= 1:
         logger.trace(f"Only 1 source exists for '{context}', returning dataframe as-is becuase no data exists to combine")
         z_matrix.columns = ["ensembl_gene_id", "combine_z"]
@@ -257,7 +261,7 @@ async def _begin_combining_distributions(
                 weight=source_weights[source.value],
             )
         )
-        merged_source_results.to_csv(output_filepaths[source.value])
+        merged_source_results.to_csv(output_filepaths[source.value], index=False)
         logger.success(f"Wrote z-scores for source '{source.value}' in context '{context_name}' to '{output_filepaths[source.value]}'")
 
     logger.trace(f"Combining z-score distributions for all sources in context '{context_name}'")
