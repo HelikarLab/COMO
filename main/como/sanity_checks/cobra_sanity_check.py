@@ -20,6 +20,7 @@ import os
 import re
 import sys
 import warnings
+from pathlib import Path
 
 import cobra
 import numpy as np
@@ -31,10 +32,21 @@ from scipy.sparse import csc_matrix
 from como.sanity_checks import fastLeakTest
 
 
-def preprocess():
+def ensure_metabolite_exists(model: cobra.Model, met_id: str, name: str, compartment: str):
+    if met_id in model.metabolites:
+        return model.metabolites.get_by_id(met_id)
+    else:
+        met = Metabolite(id=met_id, name=name, compartment=compartment)
+        model.add_metabolites([met])
+        return met
+
+
+def preprocess(model_path: Path):
     ## EQUIPMENT SETUP ##
     # Load data
-    model_path = "/Users/satominakamura/Desktop/Dr.Helikar Lab/HealthyNaiveB.xml"  # Path to XML file
+    if not model_path.exists():
+        raise FileNotFoundError(f"File {model_path} does not exist")
+
     model: cobra.Model = cobra.io.read_sbml_model(model_path)
 
     # Change solver if necessary
@@ -62,19 +74,12 @@ def preprocess():
         print("Adding DM_atp[c] manually.")
 
         # Make sure ATP, ADP, H2O, H+ and Pi exist or are added
-        def ensure_met(met_id, name, compartment):
-            if met_id in model.metabolites:
-                return model.metabolites.get_by_id(met_id)
-            else:
-                met = Metabolite(id=met_id, name=name, compartment=compartment)
-                model.add_metabolites([met])
-                return met
 
-        atp = ensure_met("atp_c", "ATP", "c")
-        adp = ensure_met("adp_c", "ADP", "c")
-        pi = ensure_met("pi_c", "Phosphate", "c")
-        h2o = ensure_met("h2o_c", "H2O", "c")
-        h = ensure_met("h_c", "Proton", "c")
+        atp = ensure_metabolite_exists("atp_c", "ATP", "c")
+        adp = ensure_metabolite_exists("adp_c", "ADP", "c")
+        pi = ensure_metabolite_exists("pi_c", "Phosphate", "c")
+        h2o = ensure_metabolite_exists("h2o_c", "H2O", "c")
+        h = ensure_metabolite_exists("h_c", "Proton", "c")
 
         atp_hydrolysis = Reaction("DM_atp[c]")
         atp_hydrolysis.name = "ATP maintenance reaction"
@@ -163,7 +168,7 @@ def preprocess():
     return model_closed_original, selExc
 
 
-def main(model_closed, selExc):
+def run_sanity_checks(model_closed: cobra.Model, selExc: list[str]):
     TableChecks = []
     tol = 1e-6
 
@@ -364,8 +369,9 @@ def main(model_closed, selExc):
 
 if __name__ == "__main__":
     # Baseline of the healthy B cell model
+    model_path = Path("/Users/satominakamura/Desktop/Dr.Helikar Lab/HealthyNaiveB.xml")  # Path to XML file
     # model_path = "/Users/satominakamura/Desktop/Dr.Helikar Lab/Recon3DModel_301.mat"  # Path to mat file (healthy human metabolism) from Recon3D
     # model: cobra.Model = cobra.io.read_sbml_model(model_path)
 
-    model_closed, selExc = preprocess()
-    main(model_closed, selExc)
+    model_closed, selExc = preprocess(model_path)
+    run_sanity_checks(model_closed, selExc)
