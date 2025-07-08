@@ -346,6 +346,7 @@ async def _build_model(  # noqa: C901
     if objective not in force_reactions:
         force_reactions.append(objective)
     reference_model = _set_boundaries(reference_model, boundary_reactions, lower_bounds, upper_bounds)
+    reference_model.objective = objective
     reference_model.solver = solver.lower()
 
     # check number of unsolvable reactions for reference model under media assumptions
