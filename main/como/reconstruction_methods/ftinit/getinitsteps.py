@@ -40,6 +40,10 @@
 # Usage: steps = getINITSteps(metsToIgnore, series)
 ###----------------------------------------------------CODE----------------------------------------------------###
 import inspect
+import numpy as np
+
+from reconstruction_methods.ftinit.initstepsdesc import INITStepsDesc
+
 
 def get_initsteps(metsToIgnore, series):
     sig = inspect.signature(get_initsteps)
@@ -61,6 +65,13 @@ def get_initsteps(metsToIgnore, series):
 # and 0.0004 of that is a very small number.
 # With this first step, the rough value of the objective function will be estimated, which will generate
 # an absolute MIPGap limit that is much larger for the second iteration.
+        steps = [INITStepsDesc(False, False, 'ignore', [1,1,1,1,1,1,1,0], metsToIgnore, params, [[10],[20]]),
+        INITStepsDesc(False, False, 'essential', [1,0,0,0,1,0,0,0], metsToIgnore, paramsStep3, [[10],[10],[20]])]
+
+    elif:
+
+
+
 
 
 
