@@ -9,39 +9,34 @@ Need to be reworked. Learn about defining class in MATLAB and translating that i
 
 
 class INITStepsDesc:
-    def __init__(self, *args, posRevOff_, AllowMetSecr_, howToUsePrevResults_, rxnsToIgnoreMask_, metsToIgnore_, MILPParams_, absMIPGaps_):
-        if len(args) > 0:
-            self.PosRevOff = posRevOff_
-        else:
-            self.PosRevOff = False
+    def __init__(
+        self,
+        posRevOff_=False,
+        allowMetSecr_=False,
+        howToUsePrevResults_="essential",
+        rxnsToIgnoreMasks_=None,
+        metsToIgnore_=None,
+        MILPParams_=None,
+        absMIPGaps_=10,
+    ):
+        self.PosRevOff_ = posRevOff_
+        self.AllowMetSecr = allowMetSecr_
+        self.HowToUsePrevResults_ = howToUsePrevResults_
 
-        if len(args) > 1:
-            self.AllowMetSecr = AllowMetSecr_
+        if rxnsToIgnoreMasks_ is not None:
+            self.RxnsToIgnoreMasks_ = rxnsToIgnoreMasks_
         else:
-            self.AllowMetSecr = False
+            self.RxnsToIgnoreMasks_ = np.array([[1], [0], [0], [0], [0], [0], [0], [0]])
 
-        if len(args) > 2:
-            self.HowToUsePrevResults = howToUsePrevResults_
-        else:
-            self.HowToUsePrevResults = "essential"
-
-        if len(args) > 3:
-            self.RxnsToIgnoreMask = rxnsToIgnoreMask_
-        else:
-            self.RxnsToIgnoreMask = np.array([[1], [0], [0], [0], [0], [0], [0], [0]])
-
-        if len(args) > 4:
+        if metsToIgnore_ is not None:
             self.MetsToIgnore = metsToIgnore_
         else:
-            self.MetsToIgnore = np.array([[0], [0], [0], [0], [0], [0], [0]])
+            self.MetsToIgnore = np.array([[1], [0], [0], [0], [0], [0], [0], [0]])
 
-        if len(args) > 5:
+        if MILPParams_ is not None:
             self.MILPParams = MILPParams_
         else:
             params = {"MIPGap": 0.0004, "TimeLimit": 5000}
-            self.MILPParams = params
+            self.MILPParams = [params]  # mimic cell array of struct
 
-        if len(args) > 6:
-            self.AbsMIPGaps = absMIPGaps_
-        else:
-            self.AbsMIPGaps = 10
+        self.AbsMIPGaps = absMIPGaps_
