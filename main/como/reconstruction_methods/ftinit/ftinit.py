@@ -99,7 +99,10 @@
 
 import inspect
 import numpy as np
+from jupyter_server.auth import passwd
 from networkx.classes import is_empty
+from numpy.ma.extras import unique
+from xlrd.formula import num2strg
 
 
 def run_ftinit(prepData, tissue, celltype, hpaData, transcrData, metabolomicsData, INITSteps, removeGenes, useScoreForTasks, paramsFT, verbose):
@@ -120,5 +123,68 @@ def run_ftinit(prepData, tissue, celltype, hpaData, transcrData, metabolomicsDat
         paramsFT = []
     if num_args < 11:
         verbose = False
+
+    # Handle detected mets:
+    # Prevviously, this was handled by giving a bonus for secreting those metabolites, but that doesn't work since
+    # the metabolite secretion and uptake can be lost when we merge linearly dependent reaction.
+    # Instead, we need to figure out which reactions either produce or take up the mets.
+    # We then give a bonus if any of them carry flux.
+    # To simplify things, we focus on reactions that produce the metabolite (since there must be once such reaction).
+    # It is still a bit complicated though. In this step, we focus on identifying producer reactions. We further reason
+    # that the direction doesn't matter - we can force one of these reactions in any direction - if it becomes a
+    # consumer,it will automatically force another producer on as well (otherwise we'll have a net consumption).
+
+    if is_empty(metabolomicsData):
+        if len(unique(metabolomicsData.upper())) != len(metabolomicsData):
+            print('Metabolomics contains the same metabolite  multiple times')
+        #! [rewrite later] metData = false(numel(metabolomicsData), length(prepData.minModel.rxns)) # one row per metabolite that is a boolean vector
+
+        while i < len(metabolomicsData):
+            # Get the matching sets
+            # metSel =
+            # prodRxnsSel =
+            # # convert the production rxns from refModel to minModel
+            # prepData.groupIds
+            #! [figure this part later]
+        metData = sparse(metData)
+    else:
+        metData = []
+
+    # Get rxn scores and adapt them to the minimized model
+    """
+    origRxnScores =
+    origRxnScores =
+    origRxnScores =
+    
+    rxnsTurnedOn = 
+    fluxes = 
+    
+    rxnsToIgnoreLastStep = [[1],[1],[1],[1],[1],[1],[1],[1]]
+    """
+
+    # We assume that all essential rxns are irrev - this is taken care of in prepINITMode. We then use an initial flux "
+    # from last run" of 0.1 for all reactions. This is used for knowing what flux should be forced through an essential rxn.
+
+    #! have to figure out what 'ones' does in matlab
+    fluxes = ones(len(prepData.minModel.rxns)) * 0.1
+
+    for initStep in INITSteps:
+        print(f'ftINIT: Running step {num2strg(initStep)}')
+        stp = INITSteps(initStep)
+
+        #! [rewrite] if any ((rxnsToIgnoreLastStep - stp.RxnsToIgnoreMask) < 0
+            print('RxnsToIgnoreMask may not cover rxns not covered in previous steps, but the other way is fine.')
+        rxnsToIgnoreLastStep = stp.RxnsToIgnoreMask
+
+        mm = prepData.minModel
+
+        if is_empty(stp.MetsToIgnore):
+            pass
+    # Set up the reaction scores and essential rxns
+    """
+    Code comes here
+    """
+    # Handle the results from previous steps ('ignore', 'exclude', 'essential')
+
 
 
