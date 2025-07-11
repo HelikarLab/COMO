@@ -8,7 +8,7 @@ Need to be reworked. Learn about defining class in MATLAB and translating that i
 """
 
 
-class INITStepsDesc:
+class INITStepDesc:
     def __init__(
         self,
         posRevOff_=False,
