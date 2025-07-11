@@ -40,38 +40,74 @@
 # Usage: steps = getINITSteps(metsToIgnore, series)
 ###----------------------------------------------------CODE----------------------------------------------------###
 import inspect
-import numpy as np
 
-from reconstruction_methods.ftinit.initstepsdesc import INITStepsDesc
+from reconstruction_methods.ftinit.initstepdesc import INITStepDesc
 
 
-def get_initsteps(metsToIgnore, series):
-    sig = inspect.signature(get_initsteps)
+def get_initstep(metsToIgnore, series):
+    sig = inspect.signature(get_initstep)
     num_args = len(sig.parameters)
 
     if num_args < 1:
         metsToIgnore = []
-    if num_args < 2
-        series = '1+1'
+    if num_args < 2:
+        series = "1+1"
 
     if str(series) == series:
-        params1 = {'MIPGap':0.0004,'TimeLimit':120}
-        params2 = {'MIPGap':0.0030,'TimeLimit':5000}
-        params = [params1 , params2]
-        params3 = {'MIPGap':0.0004,'TimeLimit':5}
-        paramsStep3 = [params3 , params1 , params2]
+        params1 = {"MIPGap": 0.0004, "TimeLimit": 120}
+        params2 = {"MIPGap": 0.0030, "TimeLimit": 5000}
+        params = [params1, params2]
+        params3 = {"MIPGap": 0.0004, "TimeLimit": 5}
+        paramsStep3 = [params3, params1, params2]
 
-# The paramsStep3 involves a quick first run . The objective value is often small in the third step (~800),
-# and 0.0004 of that is a very small number.
-# With this first step, the rough value of the objective function will be estimated, which will generate
-# an absolute MIPGap limit that is much larger for the second iteration.
-        steps = [INITStepsDesc(False, False, 'ignore', [1,1,1,1,1,1,1,0], metsToIgnore, params, [[10],[20]]),
-        INITStepsDesc(False, False, 'essential', [1,0,0,0,1,0,0,0], metsToIgnore, paramsStep3, [[10],[10],[20]])]
+        # The paramsStep3 involves a quick first run . The objective value is often small in the third step (~800),
+        # and 0.0004 of that is a very small number.
+        # With this first step, the rough value of the objective function will be estimated, which will generate
+        # an absolute MIPGap limit that is much larger for the second iteration.
+        steps = [
+            INITStepDesc(False, False, "ignore", [1, 1, 1, 1, 1, 1, 1, 0], metsToIgnore, params, [[10], [20]]),
+            INITStepDesc(False, False, "essential", [1, 0, 0, 0, 1, 0, 0, 0], metsToIgnore, paramsStep3, [[10], [10], [20]]),
+        ]
+        return steps
 
-    elif:
+    elif str(series) == "2+1":
+        params1 = {"MIPGap": 0.0004, "TimeLimit": 120}
+        params2 = {"MIPGap": 0.0030, "TimeLimit": 5000}
+        params = [params1, params2]
+        params3 = {"MIPGap": 0.0004, "TimeLimit": 5}
+        paramsStep3 = [params3, params1, params2]
 
+        # The paramsStep3 involves a quick first run. The objective value is often small in the third step (~800), and 0.0004
+        # of the test is a very small number. With this first step, the rough value of the objective function will be estimated,
+        # which will generate an absolute MIPGap limit that is much larger for the second interation.
 
+        steps = [
+            INITStepDesc(True, True, "ignore", [1, 1, 1, 1, 1, 1, 1, 0], metsToIgnore, params, [[10], [20]]),
+            INITStepDesc(False, False, "essential", [1, 1, 1, 1, 1, 1, 1, 0], metsToIgnore, params, [[10], [20]]),
+            INITStepDesc(False, False, "essential", [1, 0, 0, 0, 1, 0, 0, 0], metsToIgnore, paramsStep3, [[10], [10], [20]]),
+        ]
+        return steps
 
+    elif str(series) == "1+0":  # joins step 1 and 2, skips step3
+        params1 = {"MIPGap": 0.0004, "TimeLimit": 120}
+        params2 = {"MIPGap": 0.0030, "TimeLimit": 5000}
+        params = [params1, params2]
+        steps = [INITStepDesc(False, False, "ignore", [1, 1, 1, 1, 1, 1, 1, 0], metsToIgnore, params, [[10], [20]])]
+        return steps
 
+    elif str(series) == "2+0":  # Skips step 3
+        params1 = {"MIPGap": 0.0004, "TimeLimit": 120}
+        params2 = {"MIPGap": 0.0030, "TimeLimit": 5000}
+        params = [params1, params2]
+        steps = [
+            INITStepDesc(True, True, "ignore", [1, 1, 1, 1, 1, 1, 1, 0], metsToIgnore, params, [[10], [20]]),
+            INITStepDesc(False, False, "essential", [1, 1, 1, 1, 1, 1, 1, 0], metsToIgnore, params, [[10], [20]]),
+        ]
+        return steps
+    elif str(series) == "full":  # Just one run, slow on large models, but this is the 'perfect' setup
+        params1 = {"MIPGap": 0.0004, "TimeLimit": 10000}
+        params = [params1]
+        steps = [INITStepDesc(False, False, "ignore", [0, 0, 0, 0, 0, 0, 0, 0], [], params)]
 
-
+    else:
+        print(f"Invalid series in getINITSteps: {series}")  # not sure what dispEM does exactly (not function found so far in the original code
