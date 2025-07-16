@@ -37,12 +37,15 @@
 # arrayScores scores for each of the genes in model if only taking arrayData into account. Genes which are not in the dataset(s) have -Inf as scores
 
 import inspect
-import numpy as np
-from jupyter_server.auth import passwd
+import math
+import re
+from collections import defaultdict
 
+import numpy as np
 from networkx.classes import is_empty
 from numpy.ma.extras import unique
 from plotly.utils import node_generator
+from scipy.sparse import csr_matrix
 from sympy.codegen.cfunctions import isnan
 
 
@@ -98,13 +101,7 @@ def score_complex_model(
 
     # This is so the code can ignore which combination of input data is used
     if not arrayData:
-        arrayData = {
-            "genes": [],
-            "tissues": [],
-            "celltypes": [],
-            "levels": [],
-            "threshold": []
-        }
+        arrayData = {"genes": [], "tissues": [], "celltypes": [], "levels": [], "threshold": []}
 
     # Initialize hpaData if empty
     if not hpaData:
@@ -117,7 +114,7 @@ def score_complex_model(
             "reliabilities": [],
             "gene2Level": [],
             "gene2Type": [],
-            "gene2Reliability": []
+            "gene2Reliability": [],
         }
 
     # Check that the tissue exists (case-insensitive)
@@ -133,7 +130,7 @@ def score_complex_model(
         # Check that both data types has cell type defined if that is to be used
         if "celltypes" not in hpaData.keys() or "celltypes" not in arrayData.keys():
             raise ValueError("Both hpaData and arrayData must contain cell type information if cell type is to be used")
-        if celltype.upper() not in hpaData["celltypes"].keys().upper() and celltype.upper() not in arrayData["celltypes"].keys().upper():
+        if celltype.upper() not in hpaData["celltypes"].upper() and celltype.upper() not in arrayData["celltypes"].keys().upper():
             raise ValueError("The cell type ma,e does not match")
 
     # Some preprocessing of the structures to increase efficiency
@@ -142,7 +139,7 @@ def score_complex_model(
 
     # If cell type is supplied, then only keep that cell type
     if celltype:
-        J_celltype = [ct.lower() != celltype.lower() for ct in hpaData.get("celltypes",[])]
+        J_celltype = [ct.lower() != celltype.lower() for ct in hpaData.get("celltypes", [])]
         J = [j or j_ct for j, j_ct in zip(J, J_celltype)]
 
     J_array = np.array(J)
@@ -153,21 +150,51 @@ def score_complex_model(
 
     for key in ["gene2Level", "gene2Type", "gene2Reliability"]:
         if key in hpaData and isinstance(hpaData[key], np.ndarray):
-            hpaData[key] = hpaData[key][:,~J_array]
+            hpaData[key] = hpaData[key][:, ~J_array]
 
     # Remove all genes from the structures that are not in model or that aren't measured in the tissue
-    if hpaData["genes"]: # This should not be necessary, but the summation is a 0x1 matrix and the other is []
-        pass
+    if hpaData["genes"]:  # Check if it is not empty
+        genes_array = np.array(hpaData["genes"])
+        gene_mask = np.isin(genes_array, model["genes"], invert=True)  # genes NOT in model.genes
 
+        level_mask = np.sum(hpaData["gene2Level"], axis=1) == 0  # genes with all zeros
+        I = gene_mask | level_mask  # combine both masks
+    else:
+        I = np.array([], dtype=bool)
 
+    # Remove from hpaData fields
+    if I.size > 0:
+        hpaData["genes"] = [g for g, keep in zip(hpaData["genes"], ~I)]
 
-    # If cell type is supplied, then only keep that cell type
-    if any(celltype):
-        pass
+        if "gene2Level" in hpaData:
+            hpaData["gene2Level"] = hpaData["gene2Level"][~I, :]
+        if "gene2Type" in hpaData:
+            hpaData["gene2Type"] = hpaData["gene2Type"][~I, :]
+        if "gene2Reliability" in hpaData:
+            hpaData["gene2Reliability"] = hpaData["gene2Reliability"][~I, :]
 
-    # Remove all genes from the structures that are not in model of that aren't measured in the tissue
-    pass
+    # Fine matching tissue (and optionally celltype)
+    tissue_mask = [t.lower() == tissue.lower() for t in arrayData["tissues"]]
 
+    if celltype:  # If specific celltype is supplied
+        tissue_mask = [tm and (ct.lower() == celltype.lower()) for tm, ct in zip(tissue_mask, arrayData["celltypes"])]
+
+    tissue_mask_np = np.array(tissue_mask)
+    I_coles = tissue_mask_np
+
+    # Create row mask: genes not in model or all NaN in matching tissue(s)
+    genes_array = np.array(arrayData["genes"])
+    not_in_model = np.isin(genes_array, model["genes"], invert=True)
+    no_expression = np.all(np.isnan(arrayData["levels"][:, I_coles]), axis=1)
+
+    J = not_in_model | no_expression
+
+    # Filter arrayData
+    arrayData["genes"] = [g for g, keep in zip(arrayData["genes"], ~J)]
+    arrayData["levels"] = arrayData["levels"][:, ~J]
+
+    if "threshold" in arrayData:
+        arrayData["threshold"] = [th for th, keep in zip(arrayData["threshold"], ~J)]
 
     # Calculate the scores for the arrayData. These scores are calculated for each genes from its fold change between
     # the tissue/celltype(s) in question and all other celltypes, or the threshold if supplied. This is a lower quality data
@@ -176,48 +203,143 @@ def score_complex_model(
     # for x > 1 and max(5*log(x),-5) for x < 1 in order to have negative scores for lower expressed genes and to scale
     # the scores to have somewhat lower weights than the HPA scores
 
-    tempArrayLevels = arrayData["levels"]
-    #tempArrayLevels(isnan(tempArrayLevels)) = 0
+    ###----------------Helper functions----------------###
 
-    if "threshold" in arrayData and arrayData["threshold"]:
-        pass
+    def scoreSimpleRule(rule, genes, gScores, isozymeScoring, complexScoring):
+        ruleGenes = re.findall(r"[^&|() ]+", rule)
+        geneInd = [genes.index(g) for g in ruleGenes if g in genes]
+        if not geneInd:
+            return np.nan
+        scores = gScores[geneInd]
+        method = isozymeScoring if "|" in rule else complexScoring
+
+        if method == "min":
+            return np.nanmin(scores)
+        elif method == "max":
+            return np.nanmax(scores)
+        elif method == "median":
+            return np.nanmedian(scores)
+        elif method == "average":
+            return np.nanmean(scores)
+        else:
+            raise ValueError("Invalid scoring method.")
+
+    def scoreComplexRule(rule, genes, gScores, isozymeScoring, comlexScoring):
+        search_phrases = [r"\([^&|() ]+( & [^&|() ]+)+\)", r"\([^&|() ]+( \| [^&|() ]+)+\)"]
+        subsets = []
+        c = 1
+        r_orig = rule
+        for _ in range(100):
+            for phrase in search_phrases:
+                new_subset = re.findall(phrase, rule)
+                if new_subset:
+                    subsets.extend(new_subset)
+                    for i, s in enumerate(new_subset):
+                        tag = f"#{c + i}#"
+                        rule = rule.replace(s, tag, 1)
+                    c += len(new_subset)
+            if rule == r_orig:
+                break
+            r_orig = rule
+        subsets.append(rule)
+
+        for i, sub in enumerate(subsets):
+            score = scoreSimpleRule(sub, genes, gScores, isozymeScoring, complexScoring)
+            gScores = np.append(gScores, score)
+            genes = genes + [f"#{i  + 1}#"]
+        return gScores[-1]
+
+    def find_nonzero(martrix):
+        coo = csr_matrix(martrix).tocoo()
+        return coo.row, coo.col, np.arange(len(coo.data))
+
+    def unique_with_index(lst):
+        seen = {}
+        out = []
+        index = []
+        for i, val in enumerate(lst):
+            if val not in seen:
+                seen[val] = len(out)
+                out.append(val)
+            index.append(seen[val])
+        return out, index
+
+    ###----------------Start of scoring logic----------------###
+
+    # Handle array data
+    tempArrayLevels = np.copy(arrayData["levels"])
+    tempArrayLevels[np.isnan(tempArrayLevels)] = 0
+
+    if "threshold" in arrayData and len(arrayData["threshold"]) > 0:
+        average = np.array(arrayData["threshold"])
     else:
-        pass
-    """
-    more code comes here
-    """
-    aScores(aScores > 0) = min(aScores(aScores > 0),10)
-    aScores(aScores < 0) = max(aScores(aScores < 0), -5)
-    aScores(isnan(aScores)) = -5 # NaNs occur when gene expression is zero across all tissues
+        average = np.sum(tempArrayLevels, axis=1) / np.sum(~np.isnan(tempArrayLevels), axis=1)
 
-    # Map the HPA levels to scores
-    """
-    more code comes here
-    """
+    I = arrayData["tissue_mask"]  # Precomputed mask for tissue/celltype of interest
 
-    # Assign gene scores, prioitizing HPA (protein) data over arrayData (RNA)
+    if multipleCellScoring.lower() == "max":
+        current = np.max(tempArrayLevels[:, I], axis=1)
+    else:
+        current = np.sum(tempArrayLevels[:, I], axis=1) / np.sum(~np.isnan(arrayData["levels"][:, I]), axis=1)
 
-    # To speed things up, only need to score each unique grRule once
+    if current.size > 0:
+        with np.errstate(divide="ignore", invalid="ignore"):
+            aScores = 5 * np.log(current / average)
+            aScores[np.isnan(aScores)] = -5
+        aScores[aScores > 0] = np.minimum(aScores[aScores > 0], 10)
+        aScores[aScores < 0] = np.maximum(aScores[aScores < 0], -5)
+    else:
+        aScores = np.array([])
 
-    # convert logic operators to symbols
+    # Map HPA levels to scores
+    level_names_upper = [s.upper() for s in hpaLevelScores["names"]]
+    hpa_levels_upper = [s.upper() for s in hpaData["levels"]]
+    J = [level_names_upper.index(x) if x in level_names_upper else -1 for x in hpa_levels_upper]
 
-    # score based on prescence/combination of & and | operators
+    if any(j == -1 for j in J):
+        raise ValueError("There are expression level categories that do not match to hpaLevelScores.")
 
-    # NaN reaction scores should be changed to the no-gene score
+    scores = np.array([hpaLevelScores["scores"][j] for j in J])
+    K, L, M = find_nonzero(hpaData["gene2Level"])
 
-    # re-map unique rule scores to model
+    shape = (len(hpaData["genes"]), len(hpaData["tissues"]))
+    sparse_scores = csr_matrix((scores[M], (K,L)), shape=shape)
 
+    if multipleCellScoring.lower() == "max":
+        hScores = np.max(sparse_scores.toarray(), axis=1)
+    else:
+        hScores = np.mean(sparse_scores.toarray(), axis=1)
 
-    # Score reactions with simple gene rules (those with all ANDs or all ORs)
+    # Assign scores to model.gees
+    geneScores = np.full(len(model["genes"]), np.nan)
+    hpaScores = np.full(len(model["genes"]), -np.inf)
+    arrayScores = np.full(len(model["genes"]), -np.inf)
 
+    for i, g in enumerate(model["genes"]):
+        if g in arrayData["genes"]:
+            j = arrayData["genes"].index(g)
+            geneScores[i] = aScores[j]
+            arrayScores[i] = aScores[j]
+        if g in hpaData["genes"]:
+            j = hpaData["genes"].index(g)
+            geneScores[i] = hScores[j]
+            hpaScores[i] = hScores[j]
 
-    # Score reactions with complex gene rules (those with both ANDs and ORs)
+    # Score unique grRules
+    uRules, rule_ind = unique_with_index(model["grRules"])
+    uScores = np.full(len(uRules), np.nan)
 
-    # Specify phrases to search for in hte grRule. These phrases will fine genes grouped by all ANDs (first phrase) or all ORs (second phrase)
+    uRules = [r.replace(" and ", " & ").replace(" or ", " | ") for r in uRules]
 
-    # initialize some variables
+    for i, rule in enumerate(uRules):
+        if not rule:
+            uScores[i] = noGeneScore
+        elif "&" in rule and "|" in rule:
+            uScores[i] = scoreComplexRule(rule, model["genes"], geneScores, isozymeScoring, complexScoring)
+        else:
+            uScores[i] = scoreSimpleRule(rule, model["genes"], geneScores, isozymeScoring, complexScoring)
 
+    uScores[np.isnan(uScores)] = noGeneScore
+    rxnScores = [uScores[i] for i in rule_ind]
 
-    # score each subset and append to gene list and gene scores
-
-    # the final subset score in the overall reaction score
+    ###----------------End of scoring logic----------------###
