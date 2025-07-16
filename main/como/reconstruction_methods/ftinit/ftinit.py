@@ -102,7 +102,11 @@ import numpy as np
 from jupyter_server.auth import passwd
 from networkx.classes import is_empty
 from numpy.ma.extras import unique
+from scipy.sparse import csr_matrix
 from xlrd.formula import num2strg
+
+from reconstruction_methods.ftinit.getinitsteps import get_initstep
+from reconstruction_methods.ftinit.score_complex_model import score_complex_model
 
 
 def run_ftinit(prepData, tissue, celltype, hpaData, transcrData, metabolomicsData, INITSteps, removeGenes, useScoreForTasks, paramsFT, verbose):
@@ -114,7 +118,7 @@ def run_ftinit(prepData, tissue, celltype, hpaData, transcrData, metabolomicsDat
     if num_args < 6:
         metabolomicsData = []
     if num_args < 7 or is_empty(INITSteps) :
-        INITSteps = getINITsteps([],'1+1')
+        INITSteps = get_initstep([],'1+1')
     if num_args < 8 or is_empty(removeGenes):
         removeGenes = True
     if num_args < 9 or is_empty(useScoreForTasks):
@@ -134,26 +138,53 @@ def run_ftinit(prepData, tissue, celltype, hpaData, transcrData, metabolomicsDat
     # that the direction doesn't matter - we can force one of these reactions in any direction - if it becomes a
     # consumer,it will automatically force another producer on as well (otherwise we'll have a net consumption).
 
-    if is_empty(metabolomicsData):
-        if len(unique(metabolomicsData.upper())) != len(metabolomicsData):
-            print('Metabolomics contains the same metabolite  multiple times')
-        #! [rewrite later] metData = false(numel(metabolomicsData), length(prepData.minModel.rxns)) # one row per metabolite that is a boolean vector
+    if metabolomicsData:
+        # Check for duplicates (case-insensitive)
+        if len(set(m.upper() for m in metabolomicsData)) != len(metabolomicsData):
+            raise ValueError("Metabolomics contains the same metabolite multiple times")
 
-        while i < len(metabolomicsData):
-            # Get the matching sets
-            # metSel =
-            # prodRxnsSel =
-            # # convert the production rxns from refModel to minModel
-            # prepData.groupIds
-            #! [figure this part later]
-        metData = sparse(metData)
+        num_mets = len(metabolomicsData)
+        num_rxns = len(prepData["minModel"]["rxns"])
+        metData = np.zeros((num_mets, num_rxns), dtype=bool)
+
+        for i, met_name in enumerate(metabolomicsData):
+            # Match metabolites in a case-insensitive way
+            metSel = np.array([name.upper()== met_name.upper() for name in prepData["refModel"]["metNames"]])
+
+            S = prepData["refModel"]["S"]
+            rev = np.array(prepData["refModel"]["rev"], dtype=bool)
+
+            prodRxnsSel = np.any(S[metSel, :] > 0, axis=0) | (np.any(S[metSel, :] < 0, axis=0) & rev)
+
+            # Map production reactions from refModel to minModel
+            ref_rxns = prepData["refModel"]["rxns"]
+            min_rxns = prepData["minModel"]["rxns"]
+            group_ids = prepData["groupIds"]
+
+            rxn_map = {rxn: idx for idx, rxn in enumerate(min_rxns)}
+            ia = [rxn_map[rxn] for rxn in ref_rxns if rxn in rxn_map]
+            ib = [ref_rxns.index(rxn) for rxn in ref_rxns if rxn in rxn_map]
+
+            grpIdsMerged = np.full(len(min_rxns), np.nan)
+            for m_idx, r_idx in zip(ia, ib):
+                grpIdsMerged[m_idx] = group_ids
+
+            groupIdsPos = np.unique(group_ids[prodRxnsSel])
+            groupIdsPos = groupIdsPos[groupIdsPos != 0]
+
+            posRxns = np.array(ref_rxns)[prodRxnsSel]
+            directMatch = np.isin(min_rxns, posRxns)
+
+            metData[i, :] = np.isin(grpIdsMerged, groupIdsPos) | directMatch
+
+        metData = csr_matrix(metData)
     else:
-        metData = []
+        metData = None
 
     # Get rxn scores and adapt them to the minimized model
     """
-    origRxnScores =
-    origRxnScores =
+    origRxnScores = score_complex_model(prepData.refModel, hpaData,transcrData,tissue,celltype)
+    origRxnScores = 
     origRxnScores =
     
     rxnsTurnedOn = 
