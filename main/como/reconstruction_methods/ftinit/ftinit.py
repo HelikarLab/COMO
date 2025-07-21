@@ -99,6 +99,7 @@
 
 import inspect
 import numpy as np
+from statistics import mean
 from certifi.core import where
 from jupyter_server.auth import passwd
 from networkx.classes import is_empty
@@ -335,6 +336,10 @@ def run_ftinit(prepData, tissue, celltype, hpaData, transcrData, metabolomicsDat
         unusedMets = initModel.mets(all(initModel.S == 0,2))
         initModel = removeMets(initModel, setdiff(unusedMets, prepDatap["essentialMetsForTasks"]))
 
+        # if printReport:
+        #     printScores(initModel, 'INIT model statistics', hpaData, transcrData, tissue, celltype)
+        #     printScores(removeReactions(cModel,setdiff(cModel.rxnsm rxnsToRem), True, True), 'Reactions deleted by INIT', hpaData, transcrData, tissue, celltype)
+
         # The full model has exchange reactions in it. ftINITFillGapsForAllTasks calls ftINITFillGaps, which automatically removes
         # exchange metabolites (because it assumes that the reactions are constrained when appropriate). In this case the uptakes/outputs
         # are retrieved from the task sheet instead. To prevent exchange reactions being used to fill gaps, they are deleted
@@ -383,6 +388,53 @@ def run_ftinit(prepData, tissue, celltype, hpaData, transcrData, metabolomicsDat
         # are removed - they can be removed in the init model if they were linearly merged with other reactions that were decided to be
         # removed from the model. We want to keep all exchange rxns to make syre the tasks can be performed also without manipulating the b vector
         # in the model (which is what is done in the gap-filling).
+
+        exchRxns = getExchangeRxns(prepData["refModel"])
+        deleteRxnsInINIT = setdiff(prepData["refModel"].rxns, union(union(initModel.rxns, addedRxnsForTasks), exchRxns))
+        outModel = removeReactions(prepData["refModel"], deleteRxnsInINIT, True) # we skip removing the genes for now, I'm not sure it is desireable
+
+        # If requested, attempt to remove negative-score genes from the model, depending on their role (isozyme or complex subunit)
+        # in each grRule. See the "removeLowScoreGenes" function for more details, and to adjust any default parameters therein.
+
+        if (removeGenes):
+            ~,geneScores = score_complex_model(outModel, hpaData, transcrData,tissue,celltype)
+            outModel = removeLowScoreGenes(outModel,geneScores)
+
+        model = outModel
+
+        # This is for printing a summary of a model
+
+        def printScores(model, name, hpaData, transcrData, tissue, celltype):
+            a,b = score_complex_model(model, hpaData, transcrData,tissue,celltype)
+            rxnS = mean(a)
+            geneS = mean(b,'omitnan')
+            print(f"{name}:\n")
+            print(f"\t {num2strg(sum(model.rxns))} reactions, {num2strg(sum(model.genes))} genes\n")
+            print(f"\tMean reaction score: {num2strg(rxnS)}\n")
+            print(f"\tMean gene score: {num2strg(geneS)}\n")
+            print(f"\tReactions with positive scores: {num2strg(100*sum(a>0)/sum(a!=0))}%\n")
+            return rxnS, geneS
+
+        def getRxnsFromPattern(rxnsToIgnorePattern, prepData):
+            rxns_to_ignore = np.zeros(len(prepData["toIgnoreExch"]), dtype=bool)
+            if rxns_to_ignore[0]:
+                rxns_to_ignore |= prepData["toIgnoreExch"]
+            if rxns_to_ignore[1]:
+                rxns_to_ignore |= prepData["toIgnoreImportRxns"]
+            if rxns_to_ignore[2]:
+                rxns_to_ignore |= prepData["toIgnoreSimpleTransp"]
+            if rxns_to_ignore[3]:
+                rxns_to_ignore |= prepData["toIgnoreAdvTransp"]
+            if rxns_to_ignore[4]:
+                rxns_to_ignore |= prepData["toIgnoreSpont"]
+            if rxns_to_ignore[5]:
+                rxns_to_ignore |= prepData["toIgnoreS"]
+            if rxns_to_ignore[6]:
+                rxns_to_ignore |= prepData["toIgnoreCustomRxns"]
+            if rxns_to_ignore[7]:
+                rxns_to_ignore |= prepData["toIgnoreAllWithoutGPRs"]
+            return rxns_to_ignore
+
 
 
 
