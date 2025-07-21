@@ -99,9 +99,11 @@
 
 import inspect
 import numpy as np
+from certifi.core import where
 from jupyter_server.auth import passwd
 from networkx.classes import is_empty
 from numpy.ma.extras import unique
+from rpy2.robjects.lib.dplyr import setdiff
 from scipy.sparse import csr_matrix
 from xlrd.formula import num2strg
 
@@ -182,16 +184,15 @@ def run_ftinit(prepData, tissue, celltype, hpaData, transcrData, metabolomicsDat
         metData = None
 
     # Get rxn scores and adapt them to the minimized model
-    """
-    origRxnScores = score_complex_model(prepData.refModel, hpaData,transcrData,tissue,celltype)
-    origRxnScores = 
-    origRxnScores =
-    
-    rxnsTurnedOn = 
-    fluxes = 
+    origRxnScores = score_complex_model(prepData["refModel"], hpaData, transcrData,tissue,celltype)
+    origRxnScores = np.where((origRxnScores > 0.1) & (origRxnScores <= 0), -0.1, origRxnScores)
+    origRxnScores = np.where((origRxnScores < 0.1) & (origRxnScores > 0), 0.1, origRxnScores)
+
+    # Initialize boolean array and flux array
+    rxnsTurnedOn = np.zeros(len(prepData["minModel"]["rxns"]), dtype=bool)
+    fluxes = np.zeros(len(prepData["minModel"]["rxns"]))
     
     rxnsToIgnoreLastStep = [[1],[1],[1],[1],[1],[1],[1],[1]]
-    """
 
     # We assume that all essential rxns are irrev - this is taken care of in prepINITMode. We then use an initial flux "
     # from last run" of 0.1 for all reactions. This is used for knowing what flux should be forced through an essential rxn.
@@ -209,13 +210,181 @@ def run_ftinit(prepData, tissue, celltype, hpaData, transcrData, metabolomicsDat
 
         mm = prepData.minModel
 
-        if is_empty(stp.MetsToIgnore):
-            pass
-    # Set up the reaction scores and essential rxns
-    """
-    Code comes here
-    """
-    # Handle the results from previous steps ('ignore', 'exclude', 'essential')
+        if "MetsToIgnore" in stp and stp["MetsToIgnore"] is not None:
+            simple_mets_info = stp["MetsToIgnore"].get("simpleMets", {})
+            if simple_mets_info:
+                mets_to_rem = np.isin(mm.metNames, simple_mets_info["mets"])
+                comps_to_keep = [i for i, c in enumerate(mm.comps) if c in simple_mets_info["compsToKeep"]]
+                comps_to_keep_set = set(comps_to_keep)
+                # Filter our metabolites that belong to compartments we want to keep
+                mets_to_rem = np.logical_and(
+                    mets_to_rem,
+                    ~np.isin(mm.metComps, comps_to_keep)
+                )
+                # Set corresponding rows in the stoichiometric matrix to zero
+                mm.S[mets_to_rem, :] = 0
+
+        # Set up the reaction scores and essential rxns
+        rxnToIgnore = getRxnsFromPattern(stp["RxnsToIgnoreMask"], prepData)
+        rxnScores = groupRxnScores(prepData["minModel"], origRxnScores, prepData["refModel"].rxns, prepData["groupIds"], rxnsToIgnore)
+
+        essentialRxns = prepData["essentialRxns"]
+        toRev = np.zeros(len(mm.rxns), dtype=bool)
+
+        # Handle results from previous steps
+        if stp["HowToUsePrevResults"] == "exclude":
+            rxnScores[rxnsTurnedOn] = 0
+        elif stp["HowToUsePrevResults"] == "essential":
+            rev = np.array(mm.rev) == 1
+            toRev = rxnsTurnedOn & rev & (fluxes < 0)
+            mm = reverseRxns(mm, [mm.rxns[i] for i, rev_it in enumerate(toRev) if rev_it])
+
+            # Then make reactions irreversible
+            mm.rev[rxnsTurnedOn] = 0
+            mm.lb[rxnsTurnedOn] = 0
+            essentialRxns = list(set(prepData["essentialRxns"] + [mm.rxns[i] for i, on in enumerate(rxnsTurnedOn) if on]))
+
+        # Prep to run MILP iterations
+        minGap = 1
+        first = True
+        success = False
+        fullMipRes = {}
+        for rn, params in enumerate(stp["MILPParams"]):
+            if "MIPGap" not in params:
+                params["MIPGap"] = 0.0004
+            if "TimeLimit" not in params:
+                params["TimeLimit"] = 5000
+
+            if not first:
+                # There is sometimes a problem with that the objective function becomes close to zero, which leads to that
+                # a small percentage of that (which is the MIPGap sent in) is very small and the MILP hence takes a lot of time to finish.
+                # We also therefore use an absolute MIP gap, converted to a percentage using the last value of the objective function.
+                last_abs_obj = abs(lastObjVal) if abs(lastObjVal) > 1e-12 else 1e-12 # Avoid divide-by-zero
+                params["MIPGap"] = min(max(params["MIPGap"], stp["AbsMIPGaps"][rn] / last_abs_obj), 1)
+                params["seed"] = 1234 # use another seed, may work better
+                if mipGap <= params["MIPGap"]:
+                    success = True
+                    break # we are done - this will not happen the first time
+                else:
+                    print(f"MipGap too high, trying with a different run. MipGap = {mipGap} New MIPGap Limit = {params[MIPGap]}")
+            first = False
+
+            try:
+                # The prodweight for metabolomics is currently set to 5 - 0.5 was default in the old version, which I deemed very small?
+                # There could be a need to specify this somewhere in the call at some point.
+                # This value has not been evaluated, but is assumed in the test cases - if changed, update the test case
+                startVals = fullMipRes.get("full", None)
+                result = ftINITInternalAlg(mm, rxnScores, metData, essentialRxns, 5, stp["AllowMetSecr"], stp["PosRevOff"], params, startVals, fluzes, verbose)
+
+                deletedRxnsInINTI1, metProduction, fullMipRes, rxnsTurnedOn1, fluxes1 = result
+
+                # Reverse flux direction for reactions we reversed
+                fluxes1[toRev] = -fluxes1[toRev]
+
+                mipGap = fullMipRes["mipGap"]
+                lastObjVal = fullMipRes["obj"]
+
+            except Exception as e:
+                mipGap = float("inf")
+                lastObjVal = float("inf") # we need to set something here, Ing leads to that this doesn't come into play
+
+            success = mipGap <= params["MIPGap"]
+
+        if not success:
+            raise RuntimeError(f"Failed to find good enough solution within the time frame. MIPGap: {mipGap}")
+
+        # Save rxnsTurnedOn and their fluxes for the next step
+        rxnsTurnedOn = rxnsTurnedOn | np.array(rxnsTurnedOn1, dtype=bool)
+
+        # The fluxes are a bit tricky - what if they change direction between the steps?
+        #  The fluxes are used to determine the direction in which reactions are forced on (to simplify the problem it is
+        # good if they are unidirectional).
+        # We use the following strategy:
+        # 1. Use the fluxes from the most recent step.
+        # 2. If any flux is very low there. (i.e. basically zero), use the flux from the previous steps
+        # This could in theory cause problems, but seems to work well practically
+        fluxesOld = fluxes
+        fluxes = np.array(fluxes1)
+        # make sure that all reactions that are on actually has a flux - otherwise
+        # things could go bad, since the flux will be set to essential in a random direction
+        # This sometimes happens for rxns with negative score - let's just accept that.
+        low_flux = np.abs(fluxes) < 1e-7
+        fluxes[low_flux] = fluxesOld[low_flux]
+
+        # get the essential reactions
+        essential = np.isin(prepData["minModel"].rxns, prepData["essentialRxns"])
+        # So, we only add reactions where the linearly merged scores are zero for all linearly dependent reactions
+        # (this cannot happen by chance, taken care of in the function groupRxnScores)
+        rxnsToIgn = rxnScores == 0
+        deletedRxnsInINITSel = ~np.isin(rxnsTurnedOn, rxnsToIgn, essential)
+        deletedRxnsInINIT = prepData["minModel"].rxns[deletedRxnsInINITSel]
+
+        # Here we need to figure out which original reactions (before the linear merge) that were removed. These are all
+        # reactions with the same group ids as the removed reactions.
+
+        """
+        rewrite the code below
+        """
+        groupIdsRemoved = prepData["groupIds"] in (prepData["refModel"].rxns, deletedRxnsInINIT)
+        groupIdsRemoved = where(groupIdsRemoved != 0)
+        rxnsToRem = union(prepData["refModel"].rxns[groupIdsRemoved], deletedRxnsInINIT)
+
+        initModel = removeReactions(prepData["refModel"], rxnsToRem,False,True)
+
+        # remove metabolites separately to avoid removing those needed for tasks
+        unusedMets = initModel.mets(all(initModel.S == 0,2))
+        initModel = removeMets(initModel, setdiff(unusedMets, prepDatap["essentialMetsForTasks"]))
+
+        # The full model has exchange reactions in it. ftINITFillGapsForAllTasks calls ftINITFillGaps, which automatically removes
+        # exchange metabolites (because it assumes that the reactions are constrained when appropriate). In this case the uptakes/outputs
+        # are retrieved from the task sheet instead. To prevent exchange reactions being used to fill gaps, they are deleted
+        # from the reference model here.
+        initModel["id"] = 'INITModel'
+
+        # If gaps in the model should be filled using a task list
+        if prepData["tasksStruct"]:
+            # Remove exchange reactions and reactions already included in the INIT model
+            # We changed strategy and instead include all rxns except the exchane rxns in the ref model
+            # But we do keep the exchange rxns that are essential.
+            # Let's test to remove all, that should work
+
+            # At this stage the model is fully connected and most of the gebes with good scores should have been included. The final gap-filling
+            # should take the scores of the genes into account, so that "rather bad" reactions are preferred to "very bad" reactions.
+            # However, reactions with positive scores will be included even if they are not connected in the current formation.
+            # Therefore, such reactions will have to be assigned a small negative score instead.
+            exchRxns = getExchangeRxns(prepData["refModel"])
+            refModelNoExc = removeReactions(prepData.refModelWithBM,exchRxns,False,True)
+            exchRxns = getExchangeRxns(initModel)
+            initModelNoExc = removeReactions(closeModel(initModel),exchRxns,False,True)
+
+            if useScoreForTasks:
+                # map the rxn scores to the model without exchange rxns
+                pass
+            else:
+                outModel, addedRxnMat = ftINITFillGapsForAllTasks(initModelNoExc,refModelNoExc,[],True,[],prepData["taskStruct"],paramsFT,verbose)
+            addedRxnsForTasks = refModelNoExc.rxns[addedRxnMat,2]
+        else:
+            outModel = initModel
+            addedRxnMat = []
+            addedRxnsForTasks = []
+
+
+        # The model can now perform all the tasks defined in the task list.
+        model = outModel
+
+        # At this stage the model will contain some exchange reactions but probably not all (and maybe zero). This can be inconvenient,
+        # so all exchange reactions from the reference model are added, except for those which involve metabolites that are not in the model.
+
+        # Start from the original model, and just remove the reactions that are no longer there (and keep exchange rxns).
+        # from the problem is not complete, it doesn't have GRPs etc.
+        # The logic below is a bit complicated. We identify the reactions that should be removed from the full model as reactions
+        # that have been removed in the init model except the ones that were added back. In addition, we make reactions that
+        # have been removed in the init model. except the ones that were added back. In addition, we make sure that no exchange rxns
+        # are removed - they can be removed in the init model if they were linearly merged with other reactions that were decided to be
+        # removed from the model. We want to keep all exchange rxns to make syre the tasks can be performed also without manipulating the b vector
+        # in the model (which is what is done in the gap-filling).
+
+
 
 
 
