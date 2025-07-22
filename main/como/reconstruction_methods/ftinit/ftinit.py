@@ -108,6 +108,7 @@ from rpy2.robjects.lib.dplyr import setdiff
 from scipy.sparse import csr_matrix
 from xlrd.formula import num2strg
 
+from reconstruction_methods.ftinit.ftinit_fill_gaps_for_all_tasks import ftinit_fill_gaps_for_all_tasks
 from reconstruction_methods.ftinit.getinitsteps import get_initstep
 from reconstruction_methods.ftinit.score_complex_model import score_complex_model
 
@@ -366,7 +367,7 @@ def run_ftinit(prepData, tissue, celltype, hpaData, transcrData, metabolomicsDat
                 # map the rxn scores to the model without exchange rxns
                 pass
             else:
-                outModel, addedRxnMat = ftINITFillGapsForAllTasks(initModelNoExc,refModelNoExc,[],True,[],prepData["taskStruct"],paramsFT,verbose)
+                outModel, addedRxnMat = ftinit_fill_gaps_for_all_tasks(initModelNoExc,refModelNoExc,[],True,[],prepData["taskStruct"],paramsFT,verbose)
             addedRxnsForTasks = refModelNoExc.rxns[addedRxnMat,2]
         else:
             outModel = initModel
