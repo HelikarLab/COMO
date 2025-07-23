@@ -276,7 +276,7 @@ def run_ftinit(prepData, tissue, celltype, hpaData, transcrData, metabolomicsDat
                 # There could be a need to specify this somewhere in the call at some point.
                 # This value has not been evaluated, but is assumed in the test cases - if changed, update the test case
                 startVals = fullMipRes.get("full", None)
-                result = ftINITInternalAlg(mm, rxnScores, metData, essentialRxns, 5, stp["AllowMetSecr"], stp["PosRevOff"], params, startVals, fluzes, verbose)
+                result = ftinit_internal_alg(mm, rxnScores, metData, essentialRxns, 5, stp["AllowMetSecr"], stp["PosRevOff"], params, startVals, fluzes, verbose)
 
                 deletedRxnsInINTI1, metProduction, fullMipRes, rxnsTurnedOn1, fluxes1 = result
 
