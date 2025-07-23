@@ -44,11 +44,12 @@ def ftinit_fill_gaps_for_all_tasks(model, ref_model, input_file, print_output, r
         ValueError("Only negative values are allowed in rxnScores")
     # Prepare the input models a little
     # REWRITE
-    # model.b=zeros(numel(model.mets),2);
-    # modelMets=upper(strcat(model.metNames,'[',model.comps(model.metComps),']'));
+    model.b = np.zeros((len(model.metabolites),2))
+    model_mets = [f"{met.name.upper()}[{met.compartment.upper()}" for met in model.metabolites]
 
     # This is the mets in the reference model. used if the tasks involve metabolites that doesn't exist in the model.
-    large_model_mets = (ref_model.metabolites).upper() + "[" + ref_model.metabolites.compartment + "]"
+    large_model_mets = [f"{met.name.upper()}[{met.compartment.upper()}]" for met in ref_model.metabolites]
+
     if not model["unconstrained"]:
         print(
             "Exchange metabolites should normally not be removed from the model when using checkTasks. Inputs and outputs are defined in the task file "
