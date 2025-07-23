@@ -133,7 +133,7 @@ def run_ftinit(prepData, tissue, celltype, hpaData, transcrData, metabolomicsDat
         verbose = False
 
     # Handle detected mets:
-    # Prevviously, this was handled by giving a bonus for secreting those metabolites, but that doesn't work since
+    # Previously, this was handled by giving a bonus for secreting those metabolites, but that doesn't work since
     # the metabolite secretion and uptake can be lost when we merge linearly dependent reaction.
     # Instead, we need to figure out which reactions either produce or take up the mets.
     # We then give a bonus if any of them carry flux.
