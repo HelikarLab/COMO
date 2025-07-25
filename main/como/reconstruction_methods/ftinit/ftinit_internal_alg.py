@@ -35,7 +35,67 @@
 # This function is the actual implementation of the algorithm. See ftINIT for a higher-level function for model reconstruction.
 
 import numpy as np
-from scipy.sparse import csr_matrix
+from scipy.optimize import Bounds, LinearConstraint, milp
+from scipy.sparse import csr_matrix, hstack, vstack
+from scipy.sparse import eye as speye
+
+####---------------------------------optimize_prob_scipy
+
+
+def optimize_prob_scipy(prob, params, verbose=False):
+    # SciPy implementation of the MILP solver
+
+    # Convert to dense arrays if needed
+    c = prob["c"].toarray().flatten() if hasattr(prob["c"], "toarray") else prob["c"]
+    A = prob["A"].toarray() if hasattr(prob["A"], "toarray") else prob["A"]
+
+    # Handle constraint senses (E=equality, L=<=, G>=)
+    if isinstance(prob["csense"], str):
+        # All constraints same type
+        if prob["csense"] == "E":
+            constraints = LinearConstraint(A, lb=prob["b"], ub=prob["b"])
+        elif prob["csense"] == "L":
+            constraints = LinearConstraint(A, lb=-np.inf, ub=prob["b"])
+        else:  # 'G'
+            constraints = LinearConstraint(A, lb=prob["b"], ub=np.inf)
+    else:
+        # Mixed constraints - process each type
+        constraints = []
+        for sense, row, b in zip(prob["csense"], A, prob["b"]):
+            if sense == "E":
+                constraints.append(LinearConstraint([row], lb=b, ub=b))
+            elif sense == "L":
+                constraints.append(LinearConstraint([row], lb=-np.inf, ub=b))
+            else:  # 'G'
+                constraints.append(LinearConstraint([row], lb=b, ub=np.inf))
+
+        # Combine constraints
+        if constraints:
+            constraints = sum(constraints[1:], constraints[0])
+
+    # Variable types (0:continuous, 1:integer)
+    integrality = np.where(np.array(prob["vartype"]) == "C", 0, 1)
+
+    # Bounds
+    bounds = Bounds(prob["lb"], prob["ub"])
+
+    # Solve
+    result = milp(
+        c=c,
+        constraints=constraints,
+        integrality=integrality,
+        bounds=bounds,
+        options={
+            "disp": verbose,
+            "presolve": True,
+            "time_limit": params.get("TimeLimit", None),
+            "node_limit": params.get("NodeLimit", None),
+            "tol": params.get("intTol", 1e-7),
+        },
+    )
+
+    # Format result to match expected structure
+    return {"x": result.x, "fun": result.fun, "status": result.status, "message": result.message, "success": result.success}
 
 
 def ftinit_internal_alg(model, rxn_scores, met_data, essential_rxns, prod_weight, allow_excretion, rem_pos_rev, params, start_vals, fluxes, verbose):
@@ -284,5 +344,279 @@ def ftinit_internal_alg(model, rxn_scores, met_data, essential_rxns, prod_weight
             csr_matrix((n_pos_rev, n_neg_irrev + n_neg_rev * vars_per_neg_rev + n_ess_rev * 6 + n_met_vars)),
         ]
     )
+
+    ni_rows = hstack(
+        [
+            s_eye[neg_irrev_rxns, :],
+            csr_matrix((n_neg_irrev, n_pos_irrev + n_pos_rev)),
+            speye(n_neg_irrev) * -100,
+            csr_matrix((n_neg_irrev, n_neg_rev + n_pos_irrev + n_pos_rev * 6)),
+            speye(n_neg_irrev),
+            csr_matrix((n_neg_irrev, n_neg_rev * vars_per_neg_rev + n_ess_rev * 6 + n_met_vars)),
+        ]
+    )
+
+    nr_rows1 = hstack(
+        [
+            s_eye[neg_rev_rxns, :],
+            csr_matrix((n_neg_rev, n_y_block + n_pos_irrev + n_pos_rev * 6 + n_neg_irrev)),
+            speye(n_neg_rev) * -1,
+            speye(n_neg_rev),
+            csr_matrix((n_neg_rev, n_neg_rev + n_ess_rev * 6 + n_met_vars)),
+        ]
+    )
+
+    nr_rows2 = hstack(
+        [
+            csr_matrix((n_neg_rev, n_rxns + n_pos_irrev + n_pos_rev + n_neg_irrev)),
+            speye(n_neg_rev) * -100,
+            csr_matrix((n_neg_rev, n_pos_irrev + n_pos_rev * 6 + n_neg_irrev)),
+            speye(n_neg_rev),
+            speye(n_neg_rev),
+            speye(n_neg_rev),
+            csr_matrix((n_neg_rev, n_ess_rev * 6 + n_met_vars)),
+        ]
+    )
+
+    nr_rows = vstack([nr_rows1, nr_rows2])
+
+    er_rows1 = hstack(
+        [
+            s_eye[ess_rev_rxns, :],
+            csr_matrix((n_ess_rev, n_y_block + n_pos_irrev + n_pos_rev * 6 + n_neg_irrev + n_neg_rev * vars_per_neg_rev)),
+            speye(n_ess_rev) * -1,
+            speye(n_ess_rev),
+            csr_matrix((n_ess_rev, n_ess_rev * 4 + n_met_vars)),
+        ]
+    )
+
+    er_rows2 = hstack(
+        [
+            csr_matrix((n_ess_rev, n_rxns + n_y_block + n_pos_irrev + n_pos_rev * 6 + n_neg_irrev + n_neg_rev * vars_per_neg_rev)),
+            speye(n_ess_rev),
+            speye(n_ess_rev),
+            speye(n_ess_rev) * -1,
+            csr_matrix((n_ess_rev, n_ess_rev * 3 + n_met_vars)),
+        ]
+    )
+
+    er_rows3 = hstack(
+        [
+            csr_matrix((n_ess_rev, n_rxns + n_y_block + n_pos_irrev + n_pos_rev * 6 + n_neg_irrev + n_neg_rev * vars_per_neg_rev)),
+            speye(n_ess_rev),
+            csr_matrix((n_ess_rev, n_ess_rev * 2)),
+            speye(n_ess_rev) * -100,
+            speye(n_ess_rev),
+            csr_matrix((n_ess_rev, n_ess_rev + n_met_vars)),
+        ]
+    )
+
+    er_rows4 = hstack(
+        [
+            csr_matrix((n_ess_rev, n_rxns + n_y_block + n_pos_irrev + n_pos_rev * 6 + n_neg_irrev + n_neg_rev * vars_per_neg_rev + n_ess_rev)),
+            speye(n_ess_rev),
+            csr_matrix((n_ess_rev, n_ess_rev)),
+            speye(n_ess_rev) * 100,
+            speye(n_ess_rev),
+            csr_matrix((n_ess_rev, n_ess_rev)),
+        ]
+    )
+
+    ##--------------------------------start of the mets--------------------------------##
+    if met_data is not None:
+        # Order of rxn "on" vars: Ypi Ypr Yni Ynr
+        srt_met_data = csr_matrix(np.hstack([met_data[:, pos_irrev_rxns], met_data[:, neg_irrev_rxns], met_data[:, neg_rev_rxns]]))
+
+        # First the setup for giving bonus if the met is included
+        met_rows1 = hstack(
+            [
+                csr_matrix((n_metabol_mets, n_rxns)),
+                -srt_met_data,
+                csr_matrix((n_metabol_mets, n_pos_irrev + n_pos_rev * 6 + n_neg_irrev + n_neg_rev * vars_per_neg_rev + n_ess_rev * 6)),
+                speye(n_metabol_mets),
+                speye(n_metabol_mets),
+                csr_matrix((n_metabol_mets, 4 * n_met_neg_rev + n_met_neg_irrev)),
+            ]
+        )
+
+        # Then negative rev
+        nr_eye = speye(n_neg_rev)
+
+        met_rows2 = hstack(
+            [
+                csr_matrix((n_met_neg_rev, n_rxns + n_y_block + n_pos_irrev + n_pos_rev * 6 + n_neg_irrev)),
+                nr_eye[met_neg_rev[neg_rev_rxns], :],
+                csr_matrix((n_met_neg_rev, n_neg_rev * (vars_per_neg_rev - 1) + n_ess_rev * 6 + n_metabol_mets * 2)),
+                speye(n_met_neg_rev) * -100,
+                speye(n_met_neg_rev),
+                csr_matrix((n_met_neg_rev, n_met_neg_rev * 2 + n_met_neg_irrev)),
+            ]
+        )
+
+        met_rows3 = hstack(
+            [
+                csr_matrix((n_met_neg_rev, n_rxns + n_y_block + n_pos_irrev + n_pos_rev * 6 + n_neg_irrev + n_neg_rev)),
+                nr_eye[met_neg_rev[neg_rev_rxns], :],
+                csr_matrix((n_met_neg_rev, n_neg_rev * (vars_per_neg_rev - 2) + n_ess_rev * 6 + n_metabol_mets * 2)),
+                speye(n_met_neg_rev) * 100,
+                csr_matrix((n_met_neg_rev, n_met_neg_rev)),
+                speye(n_met_neg_rev),
+                csr_matrix((n_met_neg_rev, n_met_neg_rev + n_met_neg_irrev)),
+            ]
+        )
+
+        met_rows4 = hstack(
+            [
+                csr_matrix((n_met_neg_rev, n_rxns + n_pos_irrev + n_pos_rev + n_neg_irrev)),
+                nr_eye[met_neg_rev[neg_rev_rxns], :] * -0.1,
+                csr_matrix((n_met_neg_rev, n_pos_irrev + n_pos_rev * 6 + n_neg_irrev)),
+                nr_eye[met_neg_rev[neg_rev_rxns], :],
+                nr_eye[met_neg_rev[neg_rev_rxns], :],
+                csr_matrix((n_met_neg_rev, n_neg_rev * (vars_per_neg_rev - 2) + n_ess_rev * 6 + n_metabol_mets * 2 + n_met_neg_rev * 3)),
+                speye(n_met_neg_rev) * -1,
+                csr_matrix((n_met_neg_rev, n_met_neg_irrev)),
+            ]
+        )
+
+        # Then negative irrev, i.e. flux -0.1*Yi -vnim == 0
+        ni_eye = speye(n_neg_irrev)
+        met_rows5 = hstack(
+            [
+                s_eye[met_neg_irrev, :],
+                csr_matrix((n_met_neg_irrev, n_pos_irrev + n_pos_rev)),
+                ni_eye[met_neg_irrev[neg_irrev_rxns], :] * -0.1,
+                csr_matrix(
+                    (
+                        n_met_neg_irrev,
+                        n_neg_rev
+                        + n_pos_irrev
+                        + n_pos_rev * 6
+                        + n_neg_irrev
+                        + n_neg_rev * vars_per_neg_rev
+                        + n_ess_rev * 6
+                        + n_metabol_mets * 2
+                        + 4 * n_met_neg_rev,
+                    )
+                ),
+                -speye(n_met_neg_irrev),
+            ]
+        )
+
+        met_rows = vstack([met_rows1, met_rows2, met_rows3, met_rows4, met_rows5])
+        met_var_c = np.concatenate([-np.ones(n_metabol_mets) * prod_weight, np.zeros(n_met_vars - n_metabol_mets)])
+
+        # Variable bounds and types
+        met_lb = np.concatenate(
+            [np.zeros(n_metabol_mets * 2 + 2 * n_met_neg_rev), -100 * np.ones(n_met_neg_rev), np.zeros(n_met_neg_rev + n_met_neg_irrev)]
+        )
+
+        met_ub = np.concatenate(
+            [np.ones(n_metabol_mets), np.inf * np.ones(n_metabol_mets), np.ones(n_met_neg_rev), np.inf * np.ones(3 * n_met_neg_rev + n_met_neg_irrev)]
+        )
+
+        met_var_type = np.concatenate(
+            [np.array(["C"] * (n_metabol_mets * 2)), np.array(["B"] * n_met_neg_rev), np.array(["C"] * (3 * n_met_neg_rev + n_met_neg_irrev))]
+        )
+
+    else:
+        met_rows = []
+        met_var_c = []
+        met_lb = []
+        met_ub = []
+        met_var_type = []
+
+    prob_a = vstack([s_row, pi_rows, pr_rows1, pr_rows2, pr_rows3, pr_rows4, ni_rows, nr_rows, er_rows1, er_rows2, er_rows3, er_rows4, met_rows])
+    prob_b = np.zeros(prob_a.shape[0])
+    prob_c = np.concatenate(
+        [
+            np.zeros(n_rxns),
+            -rxn_scores[pos_irrev_rxns],
+            -rxn_scores[pos_rev_rxns],
+            -rxn_scores[neg_irrev_rxns],
+            -rxn_scores[neg_rev_rxns],
+            np.zeros(n_pos_irrev + n_pos_rev * 6 + n_neg_irrev + n_neg_rev * vars_per_neg_rev + n_ess_rev * 6),
+            met_var_c,
+        ]
+    )
+    prob_lb = np.concatenate(
+        [
+            milp_model["lb"],
+            np.zeros(n_y_block + n_pos_irrev + 5 * n_pos_rev),
+            -100 * np.ones(n_pos_rev),
+            np.zeros(n_neg_irrev + n_neg_rev * vars_per_neg_rev + n_ess_rev * 2),
+            force_on_lim * np.ones(n_ess_rev),
+            np.zeros(2 * n_ess_rev),
+            -100 * np.ones(n_ess_rev),
+            met_lb,
+        ]
+    )
+    prob_lb[ess_irrev_rxns] = force_on_lim_ess[ess_irrev_rxns]  # force flux for the essential irreversible reactions
+
+    prob_ub = np.concatenate(
+        [
+            milp_model["ub"],
+            np.ones(n_y_block),
+            np.inf * np.ones(n_pos_irrev + n_pos_rev * 2),
+            -100 * np.ones(n_pos_rev),
+            np.inf * np.ones(3 * n_pos_rev + n_neg_irrev + vars_per_neg_rev * n_neg_rev + 3 * n_ess_rev),
+            np.ones(n_ess_rev),
+            np.inf * np.ones(2 * n_ess_rev),
+            met_ub,
+        ]
+    )
+    prob_var_type = np.concatenate(
+        [
+            np.array(["C"] * (n_rxns + n_pos_irrev + n_pos_rev)),
+            np.array(["B"] * (n_neg_irrev + n_neg_rev)),
+            np.array(["C"] * (n_pos_irrev + 2 * n_pos_rev)),
+            np.array(["B"] * n_pos_rev),
+            np.array(["C"] * (3 * n_pos_rev + n_neg_irrev + vars_per_neg_rev * n_neg_rev + 3 * n_ess_rev)),
+            np.array(["B"] * n_ess_rev),
+            np.array(["C"] * (2 * n_ess_rev)),
+            met_var_type,
+        ]
+    )
+
+    onoff_var_ind = np.arange(1, n_pos_irrev + n_pos_rev + n_neg_irrev + n_neg_rev + 1) + n_rxns
+    onoff_pos_irrev = onoff_var_ind[:n_pos_irrev]
+    onoff_pos_rev = onoff_var_ind[n_pos_irrev : n_pos_irrev + n_pos_rev]
+    onoff_neg_irrev = onoff_var_ind[n_pos_irrev + n_pos_rev : n_pos_irrev + n_pos_rev + n_neg_irrev]
+    onoff_neg_rev = onoff_var_ind[n_pos_irrev + n_pos_rev + n_neg_irrev :]
+    met_var_ind = np.arange(1, n_metabol_mets + 1) + (len(prob_var_type) - n_met_vars)
+
+    met_var_ind = np.arange(1, n_metabol_mets + 1) + (len(prob_var_type) - n_met_vars)
+    if params.get("allowExcretion", False):
+        prob_csense = np.concatenate([np.array(["L"] * len(milp_model["mets"])), np.array(["E"] * (len(prob_b) - len(milp_model["mets"])))]).tolist()
+    else:
+        prob_csense = "="
+    params["intTol"] = 10**-7  # This value is very important.
+    prob_osense = 1  # minimize
+    if "startVals" in params and params["startVals"] is not None:
+        prob_start = params["startVals"]  # This doesn't work...
+    res = optimize_prob_scipy(prob, params, verbose)
+
+    if not check_solution(res):
+        if res["origStat"] == "TIME_LIMIT":
+            em = "Time limit reached without finding a solution. Try increasing the TimeLimit parameter."
+        else:
+            em = "The problem is infeasible"
+        print(em)  # Replace dispEM with print for simplicity
+    # Get the on/off vals
+    onoff = np.ones(n_rxns_with_on_off)  # standard is on
+    onoff[pos_irrev_rxns] = res["full"][onoff_pos_irrev]
+    onoff[pos_rev_rxns] = res["full"][onoff_pos_rev]
+    onoff[neg_irrev_rxns] = res["full"][onoff_neg_irrev]
+    onoff[neg_rev_rxns] = res["full"][onoff_neg_rev]
+    onoff2 = np.zeros(n_rxns_with_on_off)  # standard is off
+    onoff2[pos_irrev_rxns] = res["full"][onoff_pos_irrev]
+    onoff2[pos_rev_rxns] = res["full"][onoff_pos_rev]
+    onoff2[neg_irrev_rxns] = res["full"][onoff_neg_irrev]
+    onoff2[neg_rev_rxns] = res["full"][onoff_neg_rev]
+    # Get all reactions used in the irreversible model
+    deleted_rxns = (onoff < 0.5) & (rxn_scores != 0)
+    turned_on_rxns = (onoff2 >= 0.5) & (rxn_scores != 0)
+    fluxes = res["full"][:n_rxns]
+    # Extract the met data
+    met_production = np.round(res["full"][met_var_ind]).astype(bool)
 
     return deleted_rxns, met_production, res, turned_on_rxns, fluxes
