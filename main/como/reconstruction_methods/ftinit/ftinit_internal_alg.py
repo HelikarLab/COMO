@@ -35,6 +35,7 @@
 # This function is the actual implementation of the algorithm. See ftINIT for a higher-level function for model reconstruction.
 
 import numpy as np
+from scipy.sparse import csr_matrix
 
 
 def ftinit_internal_alg(model, rxn_scores, met_data, essential_rxns, prod_weight, allow_excretion, rem_pos_rev, params, start_vals, fluxes, verbose):
@@ -212,5 +213,76 @@ def ftinit_internal_alg(model, rxn_scores, met_data, essential_rxns, prod_weight
     # S row
     # when forcing on essential rxns, use the flux value of the previous run (set to 0.1 the first time)
     # don't set it above 0.1, may starve something else out. leave a margin of 1% from  the last run.
+
+    force_on_lim = 0.1
+    force_on_lim_ess = np.minimum(np.abs(fluxes) * 0.99, 0.1)
+
+    vars_per_neg_rev = 3
+
+    # Figure out the number of variables needed for metabolomics
+    if met_data is not None:
+        n_met_vars = 2 * met_data.shape[0] + 4 * n_met_neg_rev + n_met_neg_irrev
+    else:
+        n_met_vars = 0
+
+    s_row = csr_matrix((n_mets, n_pos_irrev * 2 + n_pos_rev * 7 + n_neg_irrev * 2 + n_neg_rev * (1 + vars_per_neg_rev) + n_ess_rev * 6 + n_met_vars))
+    s_eye = speye(n_rxns)
+    n_y_block = n_pos_irrev + n_pos_rev + n_neg_irrev + n_neg_rev
+
+    pi_rows = hstack(
+        [
+            s_eye[pos_irrev_rxns, :],
+            speye(n_pos_irrev) * -force_on_lim,
+            csr_matrix((n_pos_irrev, n_pos_rev + n_neg_irrev + n_neg_rev)),
+            speye(n_pos_irrev) * -1,
+            csr_matrix((n_pos_irrev, n_ess_rev * 6 + n_neg_irrev + n_neg_rev * vars_per_neg_rev + n_ess_rev * 6 + n_met_vars)),
+        ]
+    )
+
+    pr_rows1 = hstack(
+        [
+            s_eye[pos_rev_rxns, :],
+            csr_matrix((n_pos_rev, n_y_block + n_pos_irrev)),
+            speye(n_pos_rev) * -1,
+            speye(n_pos_rev),
+            csr_matrix((n_pos_rev, n_pos_rev * 4 + n_neg_irrev + n_neg_rev * vars_per_neg_rev + n_ess_rev * 6 + n_met_vars)),
+        ]
+    )
+
+    pr_rows2 = hstack(
+        [
+            csr_matrix((n_pos_rev, n_rxns + n_pos_irrev)),
+            speye(n_pos_rev) * -force_on_lim,
+            csr_matrix((n_pos_rev, n_neg_irrev + n_neg_rev + n_pos_irrev)),
+            speye(n_pos_rev),
+            speye(n_pos_rev),
+            csr_matrix((n_pos_rev, n_pos_rev)),
+            speye(n_pos_rev) * -1,
+            csr_matrix((n_pos_rev, n_pos_rev * 2 + n_neg_irrev + n_neg_rev * vars_per_neg_rev + n_ess_rev * 6 + n_met_vars)),
+        ]
+    )
+
+    pr_rows3 = hstack(
+        [
+            csr_matrix((n_pos_rev, n_rxns + n_y_block + n_pos_irrev)),
+            speye(n_pos_rev),
+            csr_matrix((n_pos_rev, n_pos_rev)),
+            speye(n_pos_rev) * -100,
+            csr_matrix((n_pos_rev, n_pos_rev)),
+            speye(n_pos_rev),
+            csr_matrix((n_pos_rev, n_pos_rev + n_neg_irrev + n_neg_rev * vars_per_neg_rev + n_ess_rev * 6 + n_met_vars)),
+        ]
+    )
+
+    pr_rows4 = hstack(
+        [
+            csr_matrix((n_pos_rev, n_rxns + n_y_block + n_pos_irrev + n_pos_rev)),
+            speye(n_pos_rev),
+            speye(n_pos_rev) * 100,
+            csr_matrix((n_pos_rev, n_pos_rev * 2)),
+            speye(n_pos_rev),
+            csr_matrix((n_pos_rev, n_neg_irrev + n_neg_rev * vars_per_neg_rev + n_ess_rev * 6 + n_met_vars)),
+        ]
+    )
 
     return deleted_rxns, met_production, res, turned_on_rxns, fluxes
