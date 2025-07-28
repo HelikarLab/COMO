@@ -111,7 +111,7 @@ def ftinit_internal_alg(model, rxn_scores, met_data, essential_rxns, prod_weight
     # Some nice to have numbers
     n_mets = len(model.metabolites)
     n_rxns = len(model.reactions)
-    nrxns_with_on_off = n_rxns
+    n_rxns_with_on_off = n_rxns
 
     # Reactions with score 0 will just be left in the model, and will not be a part of the problem (but can carry flux).
     # It is possible to set score = 0 for e.g. spontaneous reactions, exchange rxns, etc., which may not be that interesting to remove
@@ -525,9 +525,12 @@ def ftinit_internal_alg(model, rxn_scores, met_data, essential_rxns, prod_weight
         met_ub = []
         met_var_type = []
 
-    prob_a = vstack([s_row, pi_rows, pr_rows1, pr_rows2, pr_rows3, pr_rows4, ni_rows, nr_rows, er_rows1, er_rows2, er_rows3, er_rows4, met_rows])
-    prob_b = np.zeros(prob_a.shape[0])
-    prob_c = np.concatenate(
+    # Prepare the optimization problem in a dictionary format
+    prob = {}
+
+    prob["a"] = vstack([s_row, pi_rows, pr_rows1, pr_rows2, pr_rows3, pr_rows4, ni_rows, nr_rows, er_rows1, er_rows2, er_rows3, er_rows4, met_rows])
+    prob["b"] = np.zeros(prob["a"].shape[0])
+    prob["c"] = np.concatenate(
         [
             np.zeros(n_rxns),
             -rxn_scores[pos_irrev_rxns],
@@ -538,7 +541,7 @@ def ftinit_internal_alg(model, rxn_scores, met_data, essential_rxns, prod_weight
             met_var_c,
         ]
     )
-    prob_lb = np.concatenate(
+    prob["lb"] = np.concatenate(
         [
             milp_model["lb"],
             np.zeros(n_y_block + n_pos_irrev + 5 * n_pos_rev),
@@ -550,9 +553,9 @@ def ftinit_internal_alg(model, rxn_scores, met_data, essential_rxns, prod_weight
             met_lb,
         ]
     )
-    prob_lb[ess_irrev_rxns] = force_on_lim_ess[ess_irrev_rxns]  # force flux for the essential irreversible reactions
+    prob["lb"][ess_irrev_rxns] = force_on_lim_ess[ess_irrev_rxns]  # force flux for the essential irreversible reactions
 
-    prob_ub = np.concatenate(
+    prob["ub"] = np.concatenate(
         [
             milp_model["ub"],
             np.ones(n_y_block),
@@ -564,7 +567,7 @@ def ftinit_internal_alg(model, rxn_scores, met_data, essential_rxns, prod_weight
             met_ub,
         ]
     )
-    prob_var_type = np.concatenate(
+    prob["vartype"] = np.concatenate(
         [
             np.array(["C"] * (n_rxns + n_pos_irrev + n_pos_rev)),
             np.array(["B"] * (n_neg_irrev + n_neg_rev)),
@@ -582,25 +585,33 @@ def ftinit_internal_alg(model, rxn_scores, met_data, essential_rxns, prod_weight
     onoff_pos_rev = onoff_var_ind[n_pos_irrev : n_pos_irrev + n_pos_rev]
     onoff_neg_irrev = onoff_var_ind[n_pos_irrev + n_pos_rev : n_pos_irrev + n_pos_rev + n_neg_irrev]
     onoff_neg_rev = onoff_var_ind[n_pos_irrev + n_pos_rev + n_neg_irrev :]
-    met_var_ind = np.arange(1, n_metabol_mets + 1) + (len(prob_var_type) - n_met_vars)
+    met_var_ind = np.arange(1, n_metabol_mets + 1) + (len(prob["var_type"]) - n_met_vars)
 
-    met_var_ind = np.arange(1, n_metabol_mets + 1) + (len(prob_var_type) - n_met_vars)
+    met_var_ind = np.arange(1, n_metabol_mets + 1) + (len(prob["var_type"]) - n_met_vars)
     if params.get("allowExcretion", False):
-        prob_csense = np.concatenate([np.array(["L"] * len(milp_model["mets"])), np.array(["E"] * (len(prob_b) - len(milp_model["mets"])))]).tolist()
+        prob["csense"] = np.concatenate(
+            [np.array(["L"] * len(milp_model["mets"])), np.array(["E"] * (len(prob["b"]) - len(milp_model["mets"])))]
+        ).tolist()
     else:
-        prob_csense = "="
-    params["intTol"] = 10**-7  # This value is very important.
-    prob_osense = 1  # minimize
+        prob["csense"] = "="
+    params["intTol"] = 10**-7  # This value is very important. If set too low there is a risk that gurobi fails due to numerical issues -
+    # this happened for Gurobi v. 10.0 with TestModelL. On the other hand, it shouldn't be too large either. With this value, fluxe fluxes of 10-7
+    # can slip through, which should be fin, Another option if this becomes a problem is to set NumericFocus = 2, which makes the solver slower but fixes the issue with TestModelL.
+
+    prob["osense"] = 1  # minimize
     if "startVals" in params and params["startVals"] is not None:
-        prob_start = params["startVals"]  # This doesn't work...
+        prob["start"] = params["startVals"]  # This doesn't work...
     res = optimize_prob_scipy(prob, params, verbose)
 
-    if not check_solution(res):
-        if res["origStat"] == "TIME_LIMIT":
-            em = "Time limit reached without finding a solution. Try increasing the TimeLimit parameter."
-        else:
-            em = "The problem is infeasible"
-        print(em)  # Replace dispEM with print for simplicity
+    """
+    Cannot find check solution function within ftinit
+    # if not check_solution(res):
+    #     if res["origStat"] == "TIME_LIMIT":
+    #         em = "Time limit reached without finding a solution. Try increasing the TimeLimit parameter."
+    #     else:
+    #         em = "The problem is infeasible"
+    #     print(em)  # Replace dispEM with print for simplicity
+    """
     # Get the on/off vals
     onoff = np.ones(n_rxns_with_on_off)  # standard is on
     onoff[pos_irrev_rxns] = res["full"][onoff_pos_irrev]
