@@ -109,7 +109,10 @@ from scipy.sparse import csr_matrix
 from xlrd.formula import num2strg
 
 from reconstruction_methods.ftinit.ftinit_fill_gaps_for_all_tasks import ftinit_fill_gaps_for_all_tasks
+from reconstruction_methods.ftinit.ftinit_internal_alg import ftinit_internal_alg
 from reconstruction_methods.ftinit.getinitsteps import get_initstep
+from reconstruction_methods.ftinit.group_rxn_scores import group_rxn_scores
+from reconstruction_methods.ftinit.reverse_rxns import reverse_rxns
 from reconstruction_methods.ftinit.score_complex_model import score_complex_model
 
 
@@ -228,7 +231,7 @@ def run_ftinit(prepData, tissue, celltype, hpaData, transcrData, metabolomicsDat
 
         # Set up the reaction scores and essential rxns
         rxnToIgnore = getRxnsFromPattern(stp["RxnsToIgnoreMask"], prepData)
-        rxnScores = groupRxnScores(prepData["minModel"], origRxnScores, prepData["refModel"].rxns, prepData["groupIds"], rxnsToIgnore)
+        rxnScores = group_rxn_scores(prepData["minModel"], origRxnScores, prepData["refModel"].rxns, prepData["groupIds"], rxnsToIgnore)
 
         essentialRxns = prepData["essentialRxns"]
         toRev = np.zeros(len(mm.rxns), dtype=bool)
@@ -239,7 +242,7 @@ def run_ftinit(prepData, tissue, celltype, hpaData, transcrData, metabolomicsDat
         elif stp["HowToUsePrevResults"] == "essential":
             rev = np.array(mm.rev) == 1
             toRev = rxnsTurnedOn & rev & (fluxes < 0)
-            mm = reverseRxns(mm, [mm.rxns[i] for i, rev_it in enumerate(toRev) if rev_it])
+            mm = reverse_rxns(mm, [mm.rxns[i] for i, rev_it in enumerate(toRev) if rev_it])
 
             # Then make reactions irreversible
             mm.rev[rxnsTurnedOn] = 0
@@ -399,7 +402,7 @@ def run_ftinit(prepData, tissue, celltype, hpaData, transcrData, metabolomicsDat
 
         if (removeGenes):
             ~,geneScores = score_complex_model(outModel, hpaData, transcrData,tissue,celltype)
-            outModel = removeLowScoreGenes(outModel,geneScores)
+            outModel = remove_low_score_genes(outModel,geneScores)
 
         model = outModel
 
