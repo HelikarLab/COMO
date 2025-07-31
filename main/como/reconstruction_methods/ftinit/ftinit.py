@@ -112,6 +112,7 @@ from reconstruction_methods.ftinit.ftinit_fill_gaps_for_all_tasks import ftinit_
 from reconstruction_methods.ftinit.ftinit_internal_alg import ftinit_internal_alg
 from reconstruction_methods.ftinit.getinitsteps import get_initstep
 from reconstruction_methods.ftinit.group_rxn_scores import group_rxn_scores
+from reconstruction_methods.ftinit.remove_low_score_genes import remove_low_score_genes
 from reconstruction_methods.ftinit.reverse_rxns import reverse_rxns
 from reconstruction_methods.ftinit.score_complex_model import score_complex_model
 
