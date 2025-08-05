@@ -25,104 +25,160 @@
 # tasks. The gap-filling is done in a task-by-task manner, rather than solving for all tasks at once. This means that the order
 # of the tasks could influence the result.
 
+from copy import deepcopy
+
+import cobra
 import numpy as np
-from mpmath.libmp import mpi_delta
+import pandas as pd
+from cobra import Model
+from cobra.flux_analysis import pfba
+from cobra.util.solver import linear_reaction_coefficients
+from sanity_checks.fastLeakTest import add_demand_reaction
 
 
-def ftinit_fill_gaps_for_all_tasks(model, ref_model, input_file, print_output, rxn_scores, task_structure, params, verbose):
-    if rxn_scores is None or len(rxn_scores) == 0:
-        rxn_scores = np.full(len(ref_model.reactions), -1.0)
-    if not task_structure & input_file.isfile:
-        ValueError(f"Task file cannot be found.{input_file}")
-    if model.id.lower() == ref_model.id.lower():
-        print(
-            'NOTE: The model and reference model have the same IDs. The ID for the referece model was set to "refModel" '
-            "in order to keep track of the origin of reactions.\n"
+class Task:
+    def __init__(self, row):
+        self.id = str(row["id"]) if "id" in row else ""
+        self.description = str(row["description"]) if "description" in row else ""
+        self.inputs = str(row["input"]) if "input" in row else ""
+        self.outputs = str(row["output"]) if "output" in row else ""
+        self.should_fail = bool(row["shouldFail"]) if "shouldFail" in row else False
+        self.equations = str(row["equations"]).split(";") if "equations" in row and pd.notna(row["equations"]) else []
+        self.LBequ = [float(x) for x in str(row["LBequ"]).split(";")] if "LBequ" in row and pd.notna(row["LBequ"]) else []
+        self.UBequ = [float(x) for x in str(row["UBequ"]).split(";")] if "UBequ" in row and pd.notna(row["UBequ"]) else []
+        self.changed = str(row["changed"]).split(";") if "changed" in row and pd.notna(row["changed"]) else []
+        self.LBrxn = [float(x) for x in str(row["LBrxn"]).split(";")] if "LBrxn" in row and pd.notna(row["LBrxn"]) else []
+        self.UBrxn = [float(x) for x in str(row["UBrxn"]).split(";")] if "UBrxn" in row and pd.notna(row["UBrxn"]) else []
+        self.print_fluxes = bool(row["printFluxes"]) if "printFluxes" in row else False
+
+
+def parse_task_list(input_file: str):
+    df = pd.read_csv(input_file, sep=",")
+    tasks = [Task(row) for _, row in df.iterrows()]
+    return tasks
+
+
+def add_rxns(model, equations, lb_list, ub_list, prefix="TEMPORARY_"):
+    for i, eq in enumerate(equations):
+        rxn = (
+            model.reactions.get_by_id(f"{prefix}{i + 1}")
+            if f"{prefix}{i + 1}" in model.reactions
+            else model.add_reactions(cobra.Reaction(id=f"{prefix}{i + 1}"))
         )
-    rxn_scores = np.array(rxn_scores)
+        rxn.reaction = eq
+        rxn.lower_bound = lb_list[i] if i < len(lb_list) else -1000
+        rxn.upper_bound = ub_list[i] if i < len(ub_list) else 1000
+
+
+def set_bounds(model, rxn_ids, lb_list, ub_list):
+    for i, rxn_id in enumerate(rxn_ids):
+        if rxn_id in model.reactions:
+            rxn = model.reactions.get_by_id(rxn_id)
+            if i < len(lb_list):
+                rxn.lower_bound = lb_list[i]
+            if i < len(ub_list):
+                rxn.upper_bound = ub_list[i]
+
+
+def solve_lp(model):
+    try:
+        solution = model.optimize()
+        return solution
+    except Exception as e:
+        print(f"Optimization failed: {e}")
+        return None
+
+
+def print_fluxes(model, fluxes, threshold=1e-5):
+    for rxn in model.reactions:
+        flux = fluxes.get(rxn.id, 0.0)
+        if abs(flux) > threshold:
+            print(f"{rxn.id} ({rxn.reaction}): {flux:.4f}")
+
+
+def ftinit_fill_gaps_for_all_tasks(
+    model: Model,
+    ref_model: Model,
+    input_file: str = None,
+    print_output: bool = True,
+    rxn_scores: np.ndarray = None,
+    task_structure: list = None,
+    params: dict = None,
+    verbose: bool = False,
+):
+    if rxn_scores is None:
+        rxn_scores = -1 * np.ones(len(ref_model.reactions))
+    if task_structure is None and input_file is None:
+        raise FileNotFoundError("Task structure or task input file must be provided")
+    if model.id == ref_model.id:
+        print("NOTE: The model and reference model have the same IDs. Renaming ref_model to 'ref_model' for clarity.")
+        ref_model.id = "ref_model"
     if np.any(rxn_scores >= 0):
-        ValueError("Only negative values are allowed in rxnScores")
-    # Prepare the input models a little
-    # REWRITE
-    model.b = np.zeros((len(model.metabolites),2))
-    model_mets = [f"{met.name.upper()}[{met.compartment.upper()}" for met in model.metabolites]
+        raise ValueError("Only negative values are allowed in rxn_scores")
 
-    # This is the mets in the reference model. used if the tasks involve metabolites that doesn't exist in the model.
-    large_model_mets = [f"{met.name.upper()}[{met.compartment.upper()}]" for met in ref_model.metabolites]
+    model_mets = set([f"{met.name}[{met.compartment}".upper() for met in model.metabolites])
+    large_model_mets = set([f"{met.name}[{met.compartnebt}]".upper() for met in ref_model.metabolites])
 
-    if not model["unconstrained"]:
-        print(
-            "Exchange metabolites should normally not be removed from the model when using checkTasks. Inputs and outputs are defined in the task file "
-            "instead. Use importModel(file, false) to import a model with exchange metabolites remaining"
-        )
+    if task_structure is None:
+        task_structure = parse_task_list(input_file)
 
-    if task_structure is None or len(task_structure) == 0:
-        task_structure = parseTaskList(input_file)  ## parseTaskList function needed (not found as a MATLAB file)
-
-    t_model = model
+    t_model = deepcopy(model)
     added_rxns = np.zeros((len(ref_model.reactions), len(task_structure)), dtype=bool)
-    supress_warnings = False
+    suppress_warnings = False
     n_added = 0
 
-    for i in range(len(task_structure)):
-        if task_structure[i].taskType == "SHOULD FAIL":
-            t_refmodel = ref_model  # we need to add stuff to this one as well...
-            t_rxn_scores = rxn_scores  # these need to be extended (with zeros) when rxns are added in tasks
+    for i, task in enumerate(task_structure):
+        if task.should_fail:
+            print(f"[{task.id}]{task.description} is set as SHOULD FAIL. Skipping this task.")
 
-            # Set the inputs
-            if task_structure[i].inputs is None or len(task_structure[i].inputs) == 0:
-                pass
-                if not np.all(good_mets):
-                    # Not all of the inputs could be found in the small model.
-                    # Check if they exist in the large model.
-                    pass
-                    if not np.all(found):
-                        pass
-                    else:
-                        # Otherwise add them to the model
-                        """
-                        code comes here
-                        """
-                        # Add the metabolite both to the base model and the model used in the current task
-                        """
-                        code comes here
-                        """
-                    # By now the indexes might be getting a bit confusing, but this is to update the indexes of the "real"
-                    # metabolites to point to the newly added ones
-                    """
-                    code comes here
-                    """
-                # if numel(J(I))...
-                # If all metabolites should be added
-                if np.any(K):
-                    # Check if ALLMETS is the first metabolite. Otherwise print a warning since it will write over any other constraints that are set
-                    if K[0] == 0:
-                        print(
-                            f"ALLMETS is used as an input in [{task_structure[i].id}]{task_structure[i].description} but it is not the first "
-                            f"metabolite in the list. Constraints defined for the metabolites before it will be over-written"
-                        )
-                    # Use the first match of ALLMETS. There should only be one, but still...
-                    """
-                    code comes here 
-                    """
-                if np.any(L):
-                    L = find(L)
-                    for j in range(len(L)):
-                        # The compartment defined
-                        #compartmen =
-                        # Check if it exists in the model
-                        # C = find()
-                        if np.any(C):
-                            # Match to metabolites
-                            # t_model.b
-                        else:
-                            print(f"The compartment defined for ALLMETSIN in [{task_structure[i].id}] {task_structure[i].description} does not exist")
-                # Then add the normal constraints
-                if np.any(J(I)):
-                    pass
-                # for the t_refmodel as well
-                if np.any(J2(I2)):
-                    pass
-            if task_structure[i].outputs is None:
-                pass
-    return out_model, added_rxns
+            t_ref_model = deepcopy(ref_model)
+            t_rxn_scores = rxn_scores.copy()
+
+            # Input and Output Constraints Setup would go here
+            # This section includes checking and adding metabolites, updating bounds, etc.
+            # Placeholder for task input/output setup
+
+            # Temporary reactions from task.equations
+            if task.equations:
+                add_rxns(t_model, task.equations, task.LBequ, task.UBeq, prefix="TEMPORARY_")
+                add_rxns(t_ref_model, task.equations, task.LBequ, task.UBeq, prefix="TEMPORARY_")
+                t_rxn_scores = np.append(t_rxn_scores, np.zeros(len(task.equations)))
+
+            # Apply bound changes
+            if task.changed:
+                set_bounds(t_model, task.changed, task.LBrxn, task.UBrxn)
+                set_bounds(t_ref_model, task.changed, task.LBrxn, task.UBrxn)
+
+            # Try solving
+            sol = solve_lp(t_model)
+
+            if sol is None or sol.status != "optimal":
+                try:
+                    new_rxns, new_model, exit_flag = ftinit_fill_gaps(t_model, t_ref_model, False, suppress_warnings, t_rxn_scores, params, verbose)
+                    if exit_flag == -2:
+                        print(f"[{task.id}] {task.description} was aborted before optimality. Consider max_time in params.")
+                    if new_rxns:
+                        n_added += len(new_rxns)
+                        if print_output:
+                            print(f"[{task.id}] {task.description}: Added {len(new_rxns)} reaction(s), {n_added} reactions added in total")
+                            for r in new_rxns:
+                                print(r)
+                        for idx, rxn in enumerate(ref_model.reactions):
+                            if rxn.id in new_rxns:
+                                added_rxns[idx, i] = True
+                        model = new_model
+                except Exception as e:
+                    print(f"[{task.id}] {task.description} could not be performed: {e}")
+            else:
+                if print_output:
+                    print(f"[{task.id}] {task.description}: Added 0 reaction(s), {n_added} reactions added in total")
+            suppress_warnings = True
+
+            if task.print_fluxes and print_output:
+                if sol and sol.status == "optimal":
+                    print_fluxes(t_model, sol.fluxes)
+                else:
+                    new_sol = solve_lp(model)
+                    print_fluxes(model, new_sol.fluxes)
+            t_model = deepcopy(model)
+        return model, added_rxns
