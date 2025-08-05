@@ -280,10 +280,7 @@ def ftinit_internal_alg(model, rxn_scores, met_data, essential_rxns, prod_weight
     vars_per_neg_rev = 3
 
     # Figure out the number of variables needed for metabolomics
-    if met_data is not None:
-        n_met_vars = 2 * met_data.shape[0] + 4 * n_met_neg_rev + n_met_neg_irrev
-    else:
-        n_met_vars = 0
+    n_met_vars = 2 * met_data.shape[0] + 4 * n_met_neg_rev + n_met_neg_irrev if met_data is not None else 0
 
     s_row = csr_matrix((n_mets, n_pos_irrev * 2 + n_pos_rev * 7 + n_neg_irrev * 2 + n_neg_rev * (1 + vars_per_neg_rev) + n_ess_rev * 6 + n_met_vars))
     s_eye = speye(n_rxns)
