@@ -37,16 +37,12 @@
 # arrayScores scores for each of the genes in model if only taking arrayData into account. Genes which are not in the dataset(s) have -Inf as scores
 
 import inspect
-import math
 import re
-from collections import defaultdict
 
 import numpy as np
 from networkx.classes import is_empty
 from numpy.ma.extras import unique
-from plotly.utils import node_generator
 from scipy.sparse import csr_matrix
-from sympy.codegen.cfunctions import isnan
 
 
 def score_complex_model(
@@ -246,7 +242,7 @@ def score_complex_model(
         for i, sub in enumerate(subsets):
             score = scoreSimpleRule(sub, genes, gScores, isozymeScoring, complexScoring)
             gScores = np.append(gScores, score)
-            genes = genes + [f"#{i  + 1}#"]
+            genes = genes + [f"#{i + 1}#"]
         return gScores[-1]
 
     def find_nonzero(martrix):
@@ -303,7 +299,7 @@ def score_complex_model(
     K, L, M = find_nonzero(hpaData["gene2Level"])
 
     shape = (len(hpaData["genes"]), len(hpaData["tissues"]))
-    sparse_scores = csr_matrix((scores[M], (K,L)), shape=shape)
+    sparse_scores = csr_matrix((scores[M], (K, L)), shape=shape)
 
     if multipleCellScoring.lower() == "max":
         hScores = np.max(sparse_scores.toarray(), axis=1)
