@@ -47,3 +47,83 @@ def simplify_model(model, delete_unconstrained=True, delete_duplicates=True, del
         deleted_metabolites.update([met.id for met in unconstrained_mets])
         reduced_model.remove_metabolites(unconstrained_mets, destructive=True)
         delattr(reduced_model, "unconstrained")
+
+    if delete_duplicates:
+        seen = {}
+        to_delete = set()
+        for rxn in reduced_model.reactions:
+            key = (frozenset(rxn.metabolites.items()), rxn.lower_bound, rxn.upper_bound,rxn.objective_coefficient)
+            if key in seen:
+                to_delete.add(rxn.id)
+            else:
+                seen[key]= rxn.id
+        to_delete -= reserved_rxns
+        reduced_model.remove_reactions(list(to_delete), destructive=True)
+        deleted_reactions.update(to_delete)
+
+    if delete_zero_interval:
+        to_delete = {r.id for r in reduced_model.reactions if r.lower_bound}
+        to_delete -= reserved_rxns
+        reduced_model.remove_reactions(list(to_delete),destructive=True)
+        deleted_reactions.update(to_delete)
+
+        unused_mets = [m for m in reduced_model.metabolites if not m.reactions]
+        reduced_model.remove_metabolites(unused_mets, destructive=True)
+        deleted_metabolites.update([m.id for m in unused_mets])
+
+    if delete_inaccessible:
+        while True:
+            to_delete = []
+            for met in reduced_model.metabolites:
+                rxns = list(met.reactions)
+                if len(rxns) == 0:
+                    continue
+                coeffs = [rxn.getcoefficient(met) for rxn in rxns]
+                if all(c > 0 for c in coeffs) or all(c < 0 for c in coeffs):
+                    to_delete += [rxn.id for rxn in rxns]
+            to_delete = list(set(to_delete) - reserved_rxns)
+            if not to_delete:
+                break
+            reduced_model.remove_reactions(to_delete, destructive=True)
+            deleted_reactions.update(to_delete)
+
+            unused_mets = [m for m in reduced_model.metabolites if not m.reactions]
+            reduced_model.remove_metabolites(unused_mets, destructive=True)
+            deleted_metabolites.update([m.id for m in unused_mets])
+
+    if delete_min_max:
+        fva_result = flux_variability_analysis(reduced_model)
+        zero_flux_rxns = fva_result[(fva_result['minimum'] == 0) & (fva_result['maximum'] == 0)].index
+        to_delete = list(set(zero_flux_rxns) - reserved_rxns)
+        reduced_model.remove_reactions(to_delete, destructive=True)
+        deleted_reactions.update(to_delete)
+
+        unused_mets = [m for m in reduced_model.metabolites if not m.reactions]
+        reduced_model.remove_metabolites(unused_mets, destructive=True)
+        deleted_metabolites.update([m.id for m in unused_mets])
+
+    if constrain_reversible:
+        rev_rxns = [r for r in reduced_model.reactions if r.reversibility]
+        fva_result = flux_variability_analysis(reduced_model, reaction_list=rev_rxns)
+        for rxn in rev_rxns:
+            min_flux = fva_result.loc[rxn.id, 'minimum']
+            max_flux = fva_result.loc[rxn.id, 'maximum']
+            if abs(min_flux) < 1e-10 and abs(max_flux) >= 1e-10:
+                rxn.lower_bound = 0
+                rxn.reversibility = False
+            elif abs(max_flux) < 1e-10 and abs(min_flux) >= 1e-10:
+                rxn.upper_bound = 0
+                rxn.reversibility = False
+
+    if group_linear:
+        if not supress_warnings:
+            warnings.warn("Linear grouping will remove gene rules. Not implemented yet.")
+        reduced_model.genes = []
+        for rxn in reduced_model.reactions:
+            rxn.gene_reaction_rule = ('')
+        # Placeholder: Actual group logic is complex and model-specific
+
+    return reduced_model, list(deleted_reactions), list(deleted_metabolites)
+
+
+
