@@ -43,7 +43,6 @@ from cobra.flux_analysis import pfba
 from cobra.util.solver import linear_reaction_coefficients
 from sympy import false
 from sympy.printing.dot import template
-from utils import add_rxns, construct_equations, ftinit_fill_gaps_milp, simplify_model
 
 
 def ftinit_fill_gaps(
