@@ -38,11 +38,15 @@
 from typing import Dict, List, Tuple
 
 import numpy as np
+from Bio.Pathway import Reaction
 from cobra import Model
 from cobra.flux_analysis import pfba
 from cobra.util.solver import linear_reaction_coefficients
 from sympy import false
 from sympy.printing.dot import template
+
+from reconstruction_methods.ftinit.ftinit_fill_gaps_milp import ftinit_fill_gaps_milp
+from reconstruction_methods.ftinit.simplify_model import simplify_model
 
 
 def ftinit_fill_gaps(
@@ -61,7 +65,7 @@ def ftinit_fill_gaps(
     # Add scores to t_ref_model reactions
     for rxn, score in zip(t_ref_model.reactions, rxn_scores):
         rxn.notes["score"] = score
-    t_ref_model = simplify_model(t_ref_model, skip_constrained_rxns=True)
+    t_ref_model = simplify_model(t_ref_model)
 
     # Set scores of t_model reactions to 0
     for rxn in t_model.reactions:
@@ -86,4 +90,26 @@ def ftinit_fill_gaps(
     template_scores = [rxn.notes.get("score", 0) for rxn in full_model.reactions if rxn.id in template_rxns]
 
     # Solve MILP to identify which template reactions are needed
-    selected_rxns, exit_flage = ftinit_fill_gaps_milp(full_model, template_rxns, template_scores, params, verbose)
+    _,selected_rxns, exit_flage = ftinit_fill_gaps_milp(full_model, template_rxns, template_scores, params, verbose)
+
+    # Get indexes of reactions to be added from the template
+    added_rxn_indexes = [template_rxns[j] for j in selected_rxns]
+
+    # Create a copy of the original model
+    new_model = orig_model.copy()
+
+    # Add only the selected reactions from the full model to the original model
+    for idx in added_rxn_indexes:
+        rxn_template = full_model.reactions[idx]
+
+        new_rxn = Reaction(rxn_template.id)
+        new_rxn.name = rxn_template.name
+        new_rxn.lower_bound = rxn_template.lower_bound
+        new_rxn.upper_bound = rxn_template.upper_bound
+        new_rxn.objective_coefficient = rxn_template.objective_coefficient
+
+        new_rxn.add_metabolites(rxn_template.metabolites)
+        new_rxn.gene_reaction_rule = rxn_template.gene_reaction_rule
+
+        new_model.add_reactions([new_rxn])
+
