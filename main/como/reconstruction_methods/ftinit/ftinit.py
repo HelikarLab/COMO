@@ -198,13 +198,13 @@ def run_ftinit(prepData, tissue, celltype, hpaData, transcrData, metabolomicsDat
     rxnsTurnedOn = np.zeros(len(prepData["minModel"]["rxns"]), dtype=bool)
     fluxes = np.zeros(len(prepData["minModel"]["rxns"]))
     
-    rxnsToIgnoreLastStep = [[1],[1],[1],[1],[1],[1],[1],[1]]
+    rxns_to_ignore_last_steps = [[1],[1],[1],[1],[1],[1],[1],[1]]
 
     # We assume that all essential rxns are irrev - this is taken care of in prepINITMode. We then use an initial flux "
     # from last run" of 0.1 for all reactions. This is used for knowing what flux should be forced through an essential rxn.
 
     #! have to figure out what 'ones' does in matlab
-    fluxes = ones(len(prepData.minModel.rxns)) * 0.1
+    fluxes = np.ones(len(prepData.minModel.rxns)) * 0.1
 
     for initStep in INITSteps:
         print(f'ftINIT: Running step {num2strg(initStep)}')
