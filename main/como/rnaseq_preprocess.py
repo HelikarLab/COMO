@@ -243,7 +243,7 @@ async def _process_first_multirun_sample(strand_file: Path, all_counts_files: li
 
     # Set na values to 0
     sample_count = sample_count.fillna(value="0")
-    sample_count.iloc[:, 1:] = sample_count.iloc[:, 1:].apply(pd.to_numeric)
+    sample_count["counts"] = sample_count["counts"].astype(np.float64)
 
     count_sums: pd.DataFrame = pd.DataFrame(sample_count.sum(axis=1, numeric_only=True))
     count_sums.insert(0, "ensembl_gene_id", sample_count["ensembl_gene_id"])
@@ -359,7 +359,7 @@ async def _create_config_df(  # noqa: C901
     The configuration file created is based on the gene counts matrix.
      If using zFPKM normalization technique, mean fragment lengths will be fetched
     """
-    label_regex: Final = re.compile(r"(?P<study>S\d{1,3})(?P<rep>R\d{1,3})(?:(?P<run>r\d{1,3}))?")
+    label_regex: Final = re.compile(r"(?P<study>S\d{1,3})(?P<rep>R\d{1,3})(?P<run>r\d{1,3})?")
     gene_counts: list[Path] = list((como_context_dir / gene_count_dirname).rglob("*.tab"))
     if not gene_counts:
         _log_and_raise_error(
@@ -621,6 +621,7 @@ async def _create_gene_info_file(
     """
 
     async def read_counts(file: Path) -> list[str]:
+        print(f"Will read: '{file}'")
         data = await _read_file(file, h5ad_as_df=False)
 
         try:
@@ -677,6 +678,7 @@ async def _process_como_input(
     rna: RNAType,
 ) -> None:
     config_df = await _create_config_df(context_name, como_context_dir=como_context_dir)
+
     await _write_counts_matrix(
         config_df=config_df,
         como_context_dir=como_context_dir,
@@ -796,3 +798,28 @@ async def rnaseq_preprocess(
         output_mrna_matrix_filepath=output_mrna_count_matrix_filepath,
         cache=cache,
     )
+
+
+async def _main():
+    context_name = "notreatment"
+    taxon = 9606
+    como_context_dir = Path("/Users/joshl/Projects/COMO/main/data/COMO_input/notreatment")
+    output_gene_info_filepath = Path("/Users/joshl/Projects/COMO/main/data/results/notreatment/gene_info.csv")
+    output_trna_metadata_filepath = Path("/Users/joshl/Projects/COMO/main/data/config_sheets/trna_config.xlsx")
+    output_trna_count_matrix_filepath = Path("/Users/joshl/Projects/COMO/main/data/results/notreatment/total-rna/totalrna_notreatment.csv")
+
+    await rnaseq_preprocess(
+        context_name=context_name,
+        taxon=taxon,
+        como_context_dir=como_context_dir,
+        input_matrix_filepath=None,
+        output_gene_info_filepath=output_gene_info_filepath,
+        output_trna_metadata_filepath=output_trna_metadata_filepath,
+        output_trna_count_matrix_filepath=output_trna_count_matrix_filepath,
+        cache=False,
+        log_level="INFO",
+    )
+
+
+if __name__ == "__main__":
+    asyncio.run(_main())
