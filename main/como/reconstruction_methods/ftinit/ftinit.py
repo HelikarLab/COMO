@@ -133,7 +133,7 @@ def run_ftinit(prep_data, tissue: str, celltype: Optional[str]=None, hpa_data=No
             group_ids = prep_data['group_ids']
             min_rxns = prep_data['min_model'].reactions.list_attr("id")
             ref_rxns = ref_model.reactions.list_attr("id")
-            ia_ib = [{i, ref_rxns.index(r.id)) for i, r in enumerate(prep_data['min_model'].reactions) if r.id in ref_rxns]
+            ia_ib = [(i, ref_rxns.index(r.id)) for i, r in enumerate(prep_data['min_model'].reactions) if r.id in ref_rxns]
             grp_ids_merged = [np.nan] * len(min_rxns)
             for i,j in ia_ib:
                 grp_ids_merged[i] = group_ids[j]
@@ -151,7 +151,7 @@ def run_ftinit(prep_data, tissue: str, celltype: Optional[str]=None, hpa_data=No
         orig_rxn_scores = np.where((orig_rxn_scores > 0.1) & (orig_rxn_scores <= 0), -0.1, orig_rxn_scores)
         orig_rxn_scores = np.where((orig_rxn_scores < 0.1) & (orig_rxn_scores > 0), 0.1, orig_rxn_scores)
 
-        rxn_turned_on = np.zeros(len(prep_data['min_model'].reactions), dtype=bool)
+        rxns_turned_on = np.zeros(len(prep_data['min_model'].reactions), dtype=bool)
         fluxes = np.full(len(prep_data['min_model'].reactions),0.1)
         rxns_to_ignore_last_step = [1] * 8
 
@@ -167,6 +167,89 @@ def run_ftinit(prep_data, tissue: str, celltype: Optional[str]=None, hpa_data=No
             mm = prep_data['min_model'].copy()
 
             if step.get('mets_to_ignore') and step['mets_to_ignore'].get('simple_mets'):
-                mets_to_erm = [m.name in step['mets_to_ignore']['simple_mets']['mets'] for m in mm.metabolites]
-                somps_to_keep = [mm.compartments.index(c)]
+                mets_to_rem = [m.name in step['mets_to_ignore']['simple_mets']['mets'] for m in mm.metabolites]
+                comps_to_keep = [mm.compartments.index(c) for c in step['mets_to_ignore']['simple_mets']['comps_to_keep']]
+                met_comp_mask = [m.compartment not in comps_to_keep for m in mm.metabolites]
+                for i, remove in enumerate(np.logical_and(mets_to_rem, met_comp_mask)):
+                    if remove:
+                        mm.solver.matrix[i,:] = 0
+            rxns_to_ignore = get_rxns_from_pattern(step['rxns_to_ignore_mask'], prep_data)
+            rxn_scores = group_rxn_scores(mm, orig_rxn_scores, prep_data['ref_model'].reactions.list_attr("id"), prep_data['group_ids'], rxns_to_ignore)
+
+            essential_rxns = prep_data['essential_rxns'][:]
+            to_rev = np.zeros(len(mm.reactions),dtype=bool)
+
+            if step['how_to_use_results'] == 'exclude':
+                rxn_scores[rxn_turned_on] = 0
+            elif step['how_to_use_prev_results'] == 'essential':
+                rev = [rxn.reversibility for rxn in mm.reactions]
+                to_rev = np.logical_and(rxns_turned_on, rev & (fluxes < 0))
+                mm = reverse_rxns(mm, [r.id for i, r in enumerate(mm.reations) if to_rev[i]])
+                for i,r in enumerate(mm.reactions):
+                    if rxns_turned_on[i]:
+                        r.lower_bound = 0
+                        r.reversibility = False
+                essential_rxns += [r.id for i, r in enumerate(mm.reactions) if rxns_turned_on[i]]
+
+            success = False
+            first = True
+            mip_gap = 1
+
+            for params in step['milp_params']:
+                params.setdefault('milp_gap', 0.0004)
+                params.setdefault('time_limit', 5000)
+                if not first:
+                    params['milp_gap'] = min(max(params['milp_gap'], step['abs_mip_gap'][0]/abs(last_obj_val)),1)
+                    params['seed'] = 1234
+                    if mip_gap <= params['milp_gap']:
+                        success = True
+                        break
+                first = False
+                start_vals = full_mip_res.get('full', None)
+                try:
+                    deleted_rxns_in_INIT1, met_production, full_mip_res, rxns_turned_on1,fluxes1 = ftinit_internal_alg(mm,rxn_scores, met_data, essential_rxns, 5, step['allow_met_secr'],step['pos_rev_off'], params,start_vals,verbose)
+                    fluxes1[to_rev] = -fluxes1[to_rev]
+                    mip_gap = full_mip_res['obj']
+                except Exception:
+                    mip_gap = float('inf')
+                    last_obj_val = float('inf')
+
+                success = mip_gap <= params['milp_gap']
+
+            if not success:
+                raise RuntimeError(f"Failed to find good enough solution. MIPGap: {mip_gap}")
+
+            rxns_turned_on = np.logical_or(rxns_turned_on, rxns_turned_on1)
+            fluxes = np.where(np.abs(fluxes1) > 1e-6, fluxes1, fluxes)
+
+        essential = [r.id in prep_data['essential_rxns'] for r in prep_data['min_model'].reactions]
+        rxns_to_ign = rxn_scores == 0
+        deleted_sel = ~(rxns_turned_on | rxns_to_ign | essential)
+        deleted_rxns_in_INIT = [r.id for i, r in enumerate(prep_data['min_model'].reactions) if deleted_sel[i]]
+
+        group_ids_removed =[prep_data['group_ids'][prep_data['ref_model'].reactions.index(r)]
+                            for r in deleted_rxns_in_INIT if prep_data['group_ids'][prep_data['ref_model'].reactions.index(r)] != 0]
+        rxns_to_rem = set([r.id for i, r in enumerate(prep_data['ref_model'].reactions) if prep_data['group_ids'][i] in group_ids_removed] + deleted_rxns_in_INIT)
+
+        init_model = remove_reactions(prep_data['ref_model'], rxns_to_rem, remove_genes=False, remove_unused=True)
+        unused_mets = [m.id for m in init_model.metabolites if all(v == 0 for v in init_model.metabolite_coefficients(m).values())]
+        init_model = remove_mets(init_model, set(unused_mets) - set(prep_data['essential_mets_for_tasks']))
+
+        init_model.id = 'init_model'
+
+        if prep_data.get('task_struct'):
+            exch_rxns = get_exchange_rxns(prep_data['ref_model'])
+            ref_model_no_exc = remove_reactions(prep_data['ref_model_with_BM'], exch_rxns, remove_genes=False, remove_unused=True)
+            exch_rxns = get_exchange_rxns(init_model)
+            init_model_no_exc = remove_reactions(close_model(init_model), exch_rxns, remove_genes=False, remove_unused=True)
+
+            if use_scores_for_tasks:
+                ref_rxns = prep_data['ref_model'].reactions.list_attr("id")
+                ref_rxns_no_exc = ref_model_no_exc.reactions.list_attr("id")
+                rxn_scores_2nd = np.full(len(ref_rxns_no_exc), np.nan)
+                for i, r in enumerate(ref_rxns_no_exc):
+                    if r in ref_rxns:
+                        rxn_scores_2nd[i] = orig_rxn_scores[ref_rxns.index(r)]
+                out_model, added_rxn_mat = ftinit_fill_gaps_for_all_tasks(init_model_no_exc, ref_model_no_exc, None, True, np.minimum(rxn_scores_2nd, -0.1), prep_data['task_struct'], params_ft, verbose)
+
 
