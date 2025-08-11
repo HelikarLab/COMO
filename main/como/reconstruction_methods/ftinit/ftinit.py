@@ -110,6 +110,9 @@ from reconstruction_methods.ftinit.group_rxn_scores import group_rxn_scores
 from reconstruction_methods.ftinit.remove_low_score_genes import remove_low_score_genes
 from reconstruction_methods.ftinit.reverse_rxns import reverse_rxns
 from reconstruction_methods.ftinit.score_complex_model import score_complex_model
+from reconstruction_methods.ftinit.remove_reactions import remove_reactions
+from reconstruction_methods.ftinit.get_exchange_rxns import get_exchange_rxns
+from reconstruction_methods.ftinit.remove_mets import remove_mets
 
 def run_ftinit(prep_data, tissue: str, celltype: Optional[str]=None, hpa_data=None, transcr_data=None, metabolomics_data=None,
                INIT_steps=None, remove_genes: bool=True, use_score_for_tasks: bool=True, params_ft: Optional[dict]=None, verbose: bool=False)-> Tuple[Model, np.ndarray,List[str],List[str],dict]:
@@ -180,7 +183,7 @@ def run_ftinit(prep_data, tissue: str, celltype: Optional[str]=None, hpa_data=No
             to_rev = np.zeros(len(mm.reactions),dtype=bool)
 
             if step['how_to_use_results'] == 'exclude':
-                rxn_scores[rxn_turned_on] = 0
+                rxn_scores[rxns_turned_on] = 0
             elif step['how_to_use_prev_results'] == 'essential':
                 rev = [rxn.reversibility for rxn in mm.reactions]
                 to_rev = np.logical_and(rxns_turned_on, rev & (fluxes < 0))
