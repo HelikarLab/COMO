@@ -121,9 +121,9 @@ def run_ftinit(prep_data, tissue: str, celltype: Optional[str]=None, hpa_data=No
         if len(set(m.upper() for m in metabolomics_data)) != len(metabolomics_data):
             raise ValueError("Metabolomics contains the same metabolite multiple times")
 
-        met_data = sp.lil_matrix((len(metabolomics_data), len(prepData['min_model'].reactions)))
+        met_data = sp.lil_matrix((len(metabolomics_data), len(prep_data['min_model'].reactions)))
 
-        ref_model = prepData['ref_model']
+        ref_model = prep_data['ref_model']
         for i, met_name in enumerate(metabolomics_data):
             met_sel = [met.upper() == met_name.upper() for met in ref_model.metabolites.list_attr("name")]
             S = ref_model.solver.matrix
@@ -251,5 +251,25 @@ def run_ftinit(prep_data, tissue: str, celltype: Optional[str]=None, hpa_data=No
                     if r in ref_rxns:
                         rxn_scores_2nd[i] = orig_rxn_scores[ref_rxns.index(r)]
                 out_model, added_rxn_mat = ftinit_fill_gaps_for_all_tasks(init_model_no_exc, ref_model_no_exc, None, True, np.minimum(rxn_scores_2nd, -0.1), prep_data['task_struct'], params_ft, verbose)
+            else:
+                out_model, added_rxn_mat = ftinit_fill_gaps_for_all_tasks(init_model_no_exc, ref_model_no_exc, None, True,None,prep_data['task_strct'], params_ft,verbose)
+            added_rxns_for_tasks = [r.id for i, r in enumerate(ref_model_no_exc.reactions) if any(added_rxn_mat[i,:])]
+        else:
+            out_model = init_model
+            added_rxns_for_tasks = []
 
+        exch_rxns = get_exchange_rxns(prep_data['ref_model'])
+        deleted_rxns_in_INIT = list(set(prep_data['ref_model'].reactions.list_attr("id")) - set(out_model.reactions.list_attr("id")) - set(added_rxns_for_tasks) - set(exch_rxns))
 
+        if remove_genes:
+            _, gene_scores = score_complex_model(out_model, hpa_data, transcr_data, tissue, celltype)
+            out_model = remove_low_score_genes(out_model, gene_scores)
+        return out_model, met_production, added_rxns_for_tasks, deleted_rxns_in_INIT, full_mip_res
+
+    def get_rxns_from_pattern(pattern: List[int], prep_data) -> np.ndarray:
+        flags = [
+            'to_ignore_exch', 'to_ignore_import_rxns', 'to_ignore_simple_transp',
+            'to_ignore_adv_transp', 'to_ignore_spont', 'to_ignore_s',
+            'to_ignore_custom_rxns', 'to_ignore_all_without_grps'
+        ]
+        return np.any(pattern[i] and prep_data[flags[i]] for i in range(8)], axis=0])
