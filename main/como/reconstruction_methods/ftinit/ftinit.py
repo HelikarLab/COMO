@@ -114,6 +114,17 @@ from reconstruction_methods.ftinit.remove_reactions import remove_reactions
 from reconstruction_methods.ftinit.get_exchange_rxns import get_exchange_rxns
 from reconstruction_methods.ftinit.remove_mets import remove_mets
 
+###-------------------------------------------------Helper Function-------------------------------------------------###
+def get_rxns_from_pattern(pattern: List[int], prep_data) -> np.ndarray:
+    flags = [
+        'to_ignore_exch', 'to_ignore_import_rxns', 'to_ignore_simple_transp',
+        'to_ignore_adv_transp', 'to_ignore_spont', 'to_ignore_s',
+        'to_ignore_custom_rxns', 'to_ignore_all_without_grps'
+    ]
+    rxns_to_ign = np.any([pattern[i] and prep_data[flags[i]] for i in range(8)], axis=0)
+
+    return rxns_to_ign
+
 def run_ftinit(prep_data, tissue: str, celltype: Optional[str]=None, hpa_data=None, transcr_data=None, metabolomics_data=None,
                INIT_steps=None, remove_genes: bool=True, use_score_for_tasks: bool=True, params_ft: Optional[dict]=None, verbose: bool=False)-> Tuple[Model, np.ndarray,List[str],List[str],dict]:
     prep_data = prep_data.copy()
@@ -243,9 +254,9 @@ def run_ftinit(prep_data, tissue: str, celltype: Optional[str]=None, hpa_data=No
 
         if prep_data.get('task_struct'):
             exch_rxns = get_exchange_rxns(prep_data['ref_model'])
-            ref_model_no_exc = remove_reactions(prep_data['ref_model_with_BM'], exch_rxns, remove_genes=False, remove_unused=True)
+            ref_model_no_exc = remove_reactions(prep_data['ref_model_with_BM'], exch_rxns, False, True, True)
             exch_rxns = get_exchange_rxns(init_model)
-            init_model_no_exc = remove_reactions(close_model(init_model), exch_rxns, remove_genes=False, remove_unused=True)
+            init_model_no_exc = remove_mets(ref_model_no_exc, exch_rxns, False, True,True,True)
 
             if use_score_for_tasks:
                 ref_rxns = prep_data['ref_model'].reactions.list_attr("id")
@@ -268,12 +279,5 @@ def run_ftinit(prep_data, tissue: str, celltype: Optional[str]=None, hpa_data=No
         if remove_genes:
             _, gene_scores = score_complex_model(out_model, hpa_data, transcr_data, tissue, celltype)
             out_model = remove_low_score_genes(out_model, gene_scores)
-        return out_model, met_production, added_rxns_for_tasks, deleted_rxns_in_INIT, full_mip_res
 
-    def get_rxns_from_pattern(pattern: List[int], prep_data) -> np.ndarray:
-        flags = [
-            'to_ignore_exch', 'to_ignore_import_rxns', 'to_ignore_simple_transp',
-            'to_ignore_adv_transp', 'to_ignore_spont', 'to_ignore_s',
-            'to_ignore_custom_rxns', 'to_ignore_all_without_grps'
-        ]
-        return np.any([pattern[i] and prep_data[flags[i]] for i in range(8)], axis=0)
+    return out_model, met_production, added_rxns_for_tasks, deleted_rxns_in_INIT, full_mip_res
