@@ -116,7 +116,8 @@ from reconstruction_methods.ftinit.remove_mets import remove_mets
 
 def run_ftinit(prep_data, tissue: str, celltype: Optional[str]=None, hpa_data=None, transcr_data=None, metabolomics_data=None,
                INIT_steps=None, remove_genes: bool=True, use_score_for_tasks: bool=True, params_ft: Optional[dict]=None, verbose: bool=False)-> Tuple[Model, np.ndarray,List[str],List[str],dict]:
-
+    prep_data = prep_data.copy()
+    use_score_for_tasks = use_score_for_tasks
     if INIT_steps is None:
         INIT_steps = get_initstep([],'1+1')
 
@@ -234,7 +235,7 @@ def run_ftinit(prep_data, tissue: str, celltype: Optional[str]=None, hpa_data=No
                             for r in deleted_rxns_in_INIT if prep_data['group_ids'][prep_data['ref_model'].reactions.index(r)] != 0]
         rxns_to_rem = set([r.id for i, r in enumerate(prep_data['ref_model'].reactions) if prep_data['group_ids'][i] in group_ids_removed] + deleted_rxns_in_INIT)
 
-        init_model = remove_reactions(prep_data['ref_model'], rxns_to_rem, remove_genes=False, remove_unused=True)
+        init_model = remove_reactions(prep_data['ref_model'], rxns_to_rem, False, True,True)
         unused_mets = [m.id for m in init_model.metabolites if all(v == 0 for v in init_model.metabolite_coefficients(m).values())]
         init_model = remove_mets(init_model, set(unused_mets) - set(prep_data['essential_mets_for_tasks']))
 
@@ -246,7 +247,7 @@ def run_ftinit(prep_data, tissue: str, celltype: Optional[str]=None, hpa_data=No
             exch_rxns = get_exchange_rxns(init_model)
             init_model_no_exc = remove_reactions(close_model(init_model), exch_rxns, remove_genes=False, remove_unused=True)
 
-            if use_scores_for_tasks:
+            if use_score_for_tasks:
                 ref_rxns = prep_data['ref_model'].reactions.list_attr("id")
                 ref_rxns_no_exc = ref_model_no_exc.reactions.list_attr("id")
                 rxn_scores_2nd = np.full(len(ref_rxns_no_exc), np.nan)
@@ -275,4 +276,4 @@ def run_ftinit(prep_data, tissue: str, celltype: Optional[str]=None, hpa_data=No
             'to_ignore_adv_transp', 'to_ignore_spont', 'to_ignore_s',
             'to_ignore_custom_rxns', 'to_ignore_all_without_grps'
         ]
-        return np.any(pattern[i] and prep_data[flags[i]] for i in range(8)], axis=0])
+        return np.any([pattern[i] and prep_data[flags[i]] for i in range(8)], axis=0)
