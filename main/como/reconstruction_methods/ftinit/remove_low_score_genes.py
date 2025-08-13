@@ -1,5 +1,7 @@
 # This is the Python version of removeLowScoreGenes (used in ftinit) originally written in MATLAB.
 # Source code: https://github.com/SysBioChalmers/RAVEN/blob/cd82b5c6ba26a88bed2a9ca179c682a6434fd541/INIT/removeLowScoreGenes.m
+from copy import deepcopy
+
 
 # remove_low_score_genes: remove low-scoring genes from model
 # This function removes genes from a model based on their scores, a step used by the tINIT package. The function recognizes and differentiates
@@ -36,131 +38,136 @@
 # but not all will not be included in this list.
 
 import re
-from typing import List, Tuple
-
+import random
 import numpy as np
+from copy import deepcopy
 from cobra import Model
 
+def remove_low_score_genes(model, gene_scores, isoenzyme_scoring='max', complex_scoring='min'):
+    if len(model.genes) != len(gene_scores):
+        raise ValueError("The dimentions of the model genes and gene_scores do not match")
 
-def remove_low_score_genes(
-    model: Model, gene_score: np.ndarray, isoenzyme_scoring: str = "max", complex_scoring: str = "min"
-) -> Tuple[Model, List[str]]:
-    # Convert logical operators to symbols if needed
-    gr_rules = model.gr_rules.copy()
-    symbolic_rules = any("&" in rule or "|" in rule for rule in gr_rules)
+    gene_scores = np.array(gene_scores, dtype=float)
+    new_model = deepcopy(model)
 
-    if not symbolic_rules:
-        gr_rules = [re.sub(r"and", "&", rule) for rule in gr_rules]
-        gr_rules = [re.sub(r" or ", "|", rule) for rule in gr_rules]
+    # Convert logical operators to symbolic form
+    gr_rules = [gpr.rule_str if hasattr(gpr, 'rule_str') else "" for gpr in new_model.reactions]
+    symbolic_rules = any('&' in rule or '|' in rule for rule in gr_rules)
+    gr_rules = [re.sub(r' and ', ' & ', rule) for rule in gr_rules]
+    gr_rules = [re.sub(r' or ', ' | ', rule) for rule in gr_rules]
 
-    # Get unique rules and their mapping
-    u_rules, rule_ind = np.unique(gr_rules, return_inverse=True)
+    # Get the unique rules
+    unique_rules = list(dict.fromkeys(gr_rules)) # preserves order
+    rule_map = {rule: i for i, rule in enumerate(unique_rules)}
 
     # Process each unique rule
-    new_rules = u_rules.copy()
-    for i, rule in enumerate(u_rules):
-        if not rule or "|" not in rule:
-            continue  # Skip empty rules or rules without ORs
-        elif "&" in rule:
-            new_rules[i] = process_complex_rule(rule, model.genes, gene_score, isoenzyme_scoring, complex_scoring)
+    new_rules = unique_rules.copy()
+    for i, rule in enumerate(unique_rules):
+        if not rule or '|' not in rule:
+            continue
+        elif '&' in rule:
+            new_rules[i] = _process_complex_rule(rule, model.genes, gene_scores, isoenzyme_scoring, complex_scoring)
         else:
-            new_rules[i], _ = process_simple_rule(rule, model.genes, gene_score, isoenzyme_scoring, complex_scoring)
+            new_rules[i] = _process_simple_rule(rule, model.genes, gene_scores, isoenzyme_scoring,complex_scoring)[0]
 
-    # Create new model with updated rules
-    new_model = model.copy()
-    new_model.gr_rules = new_rules[rule_ind]
+    # Re-map updated rules back to model reactions
+    updated_gr_rules = [new_rules[rule_map[rule]] for rule in gr_rules]
 
-    # Restore original operator format if needed
+    # Restore original logical formatting if needed
     if not symbolic_rules:
-        new_model.gr_rules = [re.sub(r"\|", "or", rule) for rule in new_model.gr_rules]
-        new_model.gr_rules = [re.sub(r"&", "and", rule) for rule in new_model.gr_rules]
+        updated_gr_rules = [re.sub(r' \| ', ' or ', rule) for rule in updated_gr_rules]
+        updated_gr_rules = [re.sub(r' & ', ' and ', rule) for rule in updated_gr_rules]
 
-    # Regenerate gene list and rxn_gene_mat
-    genes, rxn_gene_mat = get_genes_format_rules(new_model.gr_rules)
-    new_model.genes = genes
-    new_model.rxn_gene_mat = rxn_gene_mat
+        # Updated gene-reactions associations
+        for rxn, new_rule in zip(new_model.reactions, updated_gr_rules):
+            rxn.gene_reaction_rule = new_rule
 
-    # Find and remove genes no longer present
-    rem_ind = ~np.isin(model.genes, new_model.genes)
-    rem_genes = model.genes[rem_ind].tolist()
+        # Determine removed genes
+        current_genes = [g.id for g in new_model.genes]
+        removed_genes = [g.id for g in model.genes if g.id not in current_genes]
+    else:
+        removed_genes = []
+    return new_model, removed_genes
 
-    # Cleanup other gene_related fields
-    for field in ["gene_short_names", "proteins", "gene_miriams", "gene_from", "gene_comps"]:
-        if hasattr(new_model, field):
-            current_field = getattr(new_model, field)
-            if isinstance(current_field, list):
-                setattr(new_model, field, [val for i, val in enumerate(current_field) if not rem_ind[i]])
-    return new_model, rem_genes
-
-
-def process_simple_rule(rule: str, genes: List[str], g_scores: np.ndarray, isozyme_scoring: str, complex_scoring: str) -> Tuple[str, float]:
-    # Helper function to process rules with only ANDs or ORs
-    rule_genes = list(set(re.findall(r"[^&|\(\)]+", rule)))
-    gene_ind = [genes.index(g) for g in rule_genes]
+def _process_simple_rule(rule, genes, g_scores, isozyme_scoring, complex_scoring):
+    """Handle rules that are all ORs (isozymes) or all ANDs (complexes)"""
+    rule_genes = list(set(re.findall(r'[^&|\(\) ]+', rule)))
+    gene_indices = [genes.index(g) for g in rule_genes if g in genes]
 
     if len(rule_genes) < 2:
-        return rule, g_scores[gene_ind[0]] if rule_genes else None
-
-    if "&" not in rule:  # Isozyme case
-        neg_ind = g_scores[gene_ind] < 0
-        if np.any(~neg_ind):
-            kept_genes = [g for g, keep in zip(rule_genes, ~neg_ind) if keep]
-            updated_rule = "|".join(kept_genes)
-            if rule.startswith("("):
-                updated_rule = f"({updated_rule})"
-
-            # Recalculate indices for scoring
-            rule_genes = kept_genes
-            gene_ind = [genes.index(g) for f in rule_genes]
+        r_score = g_scores[gene_indices[0]] if gene_indices else np.nan
+        return rule. r_score
+    if '&' not in rule:
+        neg_idx = g_scores[gene_indices] < 0
+        if all(neg_idx):
+            # Keep least negative, break ties randomly
+            vals = g_scores[gene_indices] + np.random.rand(len(gene_indices)) * 1e-8
+            keep_idx = np.argmax(vals)
+            updated_rule = rule_genes[keep_idx]
+        elif np.sum(~neg_idx) == 1:
+            updated_rule = rule_genes[np.where(~neg_idx)[0][0]]
         else:
-            # Keep most positive gene
-            best_gene = rule_genes[np.argmax(g_scores[gene_ind])]
-            updated_rule = best_gene
-            gene_ind = [genes.index(best_gene)]
-    elif "|" not in rule:  # Complex case
+            updated_rule = ' | '.join([rule_genes[i] for i in range(len(rule_genes)) if not neg_idx[i]])
+            if rule.strip().startswith("("):
+                updated_rule = f"({updated_rule})"
+        scored_method = isozyme_scoring
+
+    elif '|' not in rule: # complex case
         updated_rule = rule
+        score_method = complex_scoring
     else:
-        raise ValueError("Mixed AND/OR rules should use process_complex_rule")
-    # Score the rule
-    valid_scores = g_scores[gene_ind][~np.isnan(g_scores[gene_ind])]
-    if len(valid_scores) == 0:
-        return updated_rule, None
+        raise ValueError('Mixed AND/OR rules must be handled by _process_complex_rule.')
 
-    if isozyme_scoring.lower() == "max":
-        score = np.max(valid_scores)
-    elif isozyme_scoring.lower() == "min":
-        score = np.min(valid_scores)
-    elif isozyme_scoring.lower() == "median":
-        score = np.median(valid_scores)
-    elif isozyme_scoring.lower() == "average":
-        score = np.mean(valid_scores)
+    # Score updated rule
+    updated_genes = list(set(re.findall(r'[^&|\(\) ]+', updated_rule)))
+    updated_indices = [genes.index(g) for g in updated_genes if g in genes]
+    if score_method.lower() == 'min':
+        r_score = np.nanmin(g_scores[updated_indices])
+    elif scored_method.lower() == 'max':
+        r_score = np.nanmax(g_scores[updated_indices])
+    elif scored_method.lower() == 'median':
+        r_score = np.nanmedian(g_scores[updated_indices])
+    elif scored_method.lower() == 'average':
+        r_score = np.nanmean(g_scores[updated_indices])
+    else:
+        raise ValueError(f"Invalid scoring method: {scored_method}")
+    return updated_rule, r_score
 
-    return updated_rule, score
+def _process_complex_rule(rule, genes, g_scores, isozyme_scoring, complex_scoring):
+    """Handle rules with both ANDs and ORs by breaking them into subsets."""
+    search_patterns = [
+        r'|([^&|\(\) ]+( & [^|\(\) ]+)+\)', # all ANDs
+        r'|([^&|\(\) ]+( \| [^|\(\) ]+)+\)' # all ORs
+    ]
 
+    subsets = []
+    c = 1
+    r_orig = None
+    for _ in range(100): # arbitrary high number
+        if r_orig == rule:
+            break
+        r_orig = rule
+        for pat in search_patterns:
+            matches = re.findall(pat, rule)
+            if matches:
+                subsets.extend(matches)
+                for  m in matches:
+                    rule = re.sub(pat, f"#{c}#", rule, count=1)
+                    c+=1
 
-def process_complex_rule(rule: str, genes: List[str], g_scores: np.ndarray, isozyme_scoring: str, complex_scoring: str) -> str:
-    """Helper function to process rules containing both AND and OR expressions"""
-    # Implement similar logic as MATLAB version
-    # This would involve recursive processing of nested rules
-    raise NotImplementedError("Complex rule processing not implemented")
+    subsets.append(rule)
 
+    # Process subsets recursively
+    for i in range(len(subsets)):
+        new_rule, subset_score = _process_simple_rule(subsets[i], genes, g_scores, isozyme_scoring, complex_scoring)
+        subsets[i] = new_rule
+        g_scores = np.append(g_scores, subset_score)
+        genes = genes + [f"#{i+1}#"]
 
-def get_genes_from_gr_rules(gr_rules: List[str]) -> Tuple[List[str], np.ndarray]:
-    """Extract unique genes and create reaction-gene matrix"""
-    # Extract all unique genes from rules
-    all_genes = set()
-    for rule in gr_rules:
-        if rule:
-            all_genes.update(re.findall(r"[^&|\(\)]+", rule))
+    # Reconstruction updated rule
+    updated_rule = subsets[-1]
+    for i in range(c - 1, 0, -1):
+        updated_rule = updated_rule.replace(f"#{i}#", subsets[i-1])
 
-    # Create binary matrix
-    genes = sorted(all_genes)
-    rxn_gene_mat = np.zeros((len(gr_rules), len(genes)), dtype=bool)
+    return updated_rule
 
-    for i, rule in enumerate(gr_rules):
-        if rule:
-            rule_genes = re.findall(r"[^&|\(\)]+", rule)
-            for g in rule_genes:
-                rxn_gene_mat[i, genes.index(g)] = True
-
-    return genes, rxn_gene_mat
