@@ -25,160 +25,142 @@
 # tasks. The gap-filling is done in a task-by-task manner, rather than solving for all tasks at once. This means that the order
 # of the tasks could influence the result.
 
-from copy import deepcopy
+import os
+import copy
+from sys import prefix
 
-import cobra
 import numpy as np
-import pandas as pd
-from cobra import Model
-from cobra.flux_analysis import pfba
-from cobra.util.solver import linear_reaction_coefficients
-from sanity_checks.fastLeakTest import add_demand_reaction
+from typing import List, Tuple, Optional
+from cobra import Model, Reaction, Metabolite
+from nbclient.exceptions import timeout_err_msg
 
 
 class Task:
-    def __init__(self, row):
-        self.id = str(row["id"]) if "id" in row else ""
-        self.description = str(row["description"]) if "description" in row else ""
-        self.inputs = str(row["input"]) if "input" in row else ""
-        self.outputs = str(row["output"]) if "output" in row else ""
-        self.should_fail = bool(row["shouldFail"]) if "shouldFail" in row else False
-        self.equations = str(row["equations"]).split(";") if "equations" in row and pd.notna(row["equations"]) else []
-        self.LBequ = [float(x) for x in str(row["LBequ"]).split(";")] if "LBequ" in row and pd.notna(row["LBequ"]) else []
-        self.UBequ = [float(x) for x in str(row["UBequ"]).split(";")] if "UBequ" in row and pd.notna(row["UBequ"]) else []
-        self.changed = str(row["changed"]).split(";") if "changed" in row and pd.notna(row["changed"]) else []
-        self.LBrxn = [float(x) for x in str(row["LBrxn"]).split(";")] if "LBrxn" in row and pd.notna(row["LBrxn"]) else []
-        self.UBrxn = [float(x) for x in str(row["UBrxn"]).split(";")] if "UBrxn" in row and pd.notna(row["UBrxn"]) else []
-        self.print_fluxes = bool(row["printFluxes"]) if "printFluxes" in row else False
+    """Container matching the MATLAB taskStructure field used here.
+    Provide objects with these attributes, or adapt as needed"""
+    def __init__(self,
+                 id: str,
+                 description: str = "",
+                 shouldFail: bool = False,
+                 printFluxes: bool = False,
+                 inputs: Optional[List[str]] = None,
+                 UBin: Optional[List[float]] = None,
+                 LBin: Optional[List[float]] = None,
+                 outputs: Optional[List[str]] = None,
+                 UBout: Optional[List[float]] = None,
+                 LBout: Optional[List[float]] = None,
+                 equations: Optional[List[str]] = None,
+                 LBequ: Optional[List[float]] = None,
+                 UBequ: Optional[List[float]] = None,
+                 changed: Optional[List[str]] = None,
+                 LBrxn: Optional[List[float]] = None,
+                 UBrxn: Optional[List[float]] = None):
+        self.id = id
+        self.description = description
+        self.shouldFail = shouldFail
+        self.printFluxes = printFluxes
+        self.inputs = inputs or []
+        self.UBin = np.array(UBin or [], dtype=float)
+        self.LBin = np.array(LBin or [], dtype=float)
+        self.outputs = outputs or []
+        self.UBout = np.array(UBout or [], dtype=float)
+        self.LBout = np.array(LBout or [], dtype=float)
+        self.equations = equations or []
+        self.LBequ = np.array(LBequ or [], dtype=float)
+        self.UBequ = np.array(UBequ or [], dtype=float)
+        self.changed = changed or []
+        self.LBrxn = np.array(LBrxn or [], dtype=float)
+        self.UBrxn = np.array(UBrxn or [], dtype=float)
 
+def disp_em(message: str, is_error: bool = True):
+    prefix = "ERROR" if is_error else "WARNING: "
+    print(prefix + str(message))
 
-def parse_task_list(input_file: str):
-    df = pd.read_csv(input_file, sep=",")
-    tasks = [Task(row) for _, row in df.iterrows()]
-    return tasks
+def parse_task_list(input_file: str) -> List[Task]:
+    """ User must implement according to their task file format. Should return List[Task]"""
+    raise NotImplementedError("parse_task_list needs to be implemented for your task format")
 
+def add_mets(model: Model, met: dict) -> Model:
+    """Add metabolites to COBRApy model. Expects keys 'met_names' and 'compartments'. The metabolite id is synthesized from name + compartment"""
+    met_names = met.get('met_names', [])
+    comps = met.get('compartments', [])
+    mets_to_add: List[Metabolite] = []
+    for name, comp in zip(met_names, comps):
+        # ID: sanitize name for an id; you can customize this mapping
+        met_id  = f"{name.strip().replace(' ','_').replace('[','').replace(']','')}_{comp}"
+        if hasattr(model, 'metabolites'):
+            if any(m.id == met_id for m in model.metabolites):
+                # already exists; skip creating duplicate
+                continue
+        m = Metabolite(id=met_id, name=name, compartment=comp)
+        mets_to_add.append(m)
+    if mets_to_add:
+        model.add_metabolites(mets_to_add)
+    return model
 
-def add_rxns(model, equations, lb_list, ub_list, prefix="TEMPORARY_"):
-    for i, eq in enumerate(equations):
-        rxn = (
-            model.reactions.get_by_id(f"{prefix}{i + 1}")
-            if f"{prefix}{i + 1}" in model.reactions
-            else model.add_reactions(cobra.Reaction(id=f"{prefix}{i + 1}"))
-        )
-        rxn.reaction = eq
-        rxn.lower_bound = lb_list[i] if i < len(lb_list) else -1000
-        rxn.upper_bound = ub_list[i] if i < len(ub_list) else 1000
+def add_rxns(model: Model, rxn: dict) -> Model:
+    """Add reactions to CPBRApy model from equations + bounds. Excepts keys 'equations','lb','ub','rxns'."""
+    eqs = rxn.get('equations',[])
+    lbs = rxn.get('lb',[])
+    ubs = rxn.get('ub',[])
+    rids = rxn.get('rxns',[])
+    for rid, eq, lb, ub in zip(rids, eqs, lbs, ubs):
+        if any(r.id == rid for r in model.reactions):
+            # If exsits, update equation/bounds
+            r = model.reactions.get_by_id(rid)
+        else:
+            r = Reaction(rid)
+            model.add_reactions([r])
+        r.lower_bound = float(lb)
+        r.upper_bound = float(ub)
+        # COBRApy expects a string like "A_c + 2 B_c -> C_c"
+        r.build_reaction_from_string(eq, verbose=False)
+    return Model
 
+def set_param(model: Model, bound_type: str, rxn_ids: List[str], values: np.ndarray) -> Model:
+    for rid, val in zip(rxn_ids, values):
+        r = model.reactions.get_by_id(rid)
+        if bound_type.lower() == "lb":
+            r.lower_bound = float(val)
+        elif bound_type.lower() == "ub":
+            r.upper_bound = float(val)
+        else:
+            raise ValueError(f"Unknown bound type: {bound_type}")
+    return model
 
-def set_bounds(model, rxn_ids, lb_list, ub_list):
-    for i, rxn_id in enumerate(rxn_ids):
-        if rxn_id in model.reactions:
-            rxn = model.reactions.get_by_id(rxn_id)
-            if i < len(lb_list):
-                rxn.lower_bound = lb_list[i]
-            if i < len(ub_list):
-                rxn.upper_bound = ub_list[i]
-
-
-def solve_lp(model):
+def solve_lp(model:Model, objective_sense: int = 0):
+    """Solve LP. objective_sense: 0 = default (as set on model), 1 = maximize. Returns COBRApy Solution, or a simple namespace with .x=None on failure."""
     try:
-        solution = model.optimize()
-        return solution
-    except Exception as e:
-        print(f"Optimization failed: {e}")
-        return None
+        if objective_sense == 1:
+            # COBRApy maximize by default; if model.objective has coefficients, this is fine
+            sol = model.optimize(objective_sense='maximize')
+        else:
+            sol = model.optimize()
+        return sol
+    except Exception:
+        class _Empty:
+            x = None
+        return _Empty
 
+def print_fluxes(model: Model, flux_vector, *_args, **_kwargs):
+    if hasattr(flux_vector, 'items'):
+        items = flux_vector.items()
+    else:
+        items = zip([r.id for r in model.reactions], flux_vector)
+    for rid, val in items:
+        r = model.reactions.get_by_id(rid)
+        print(f"{r.id} ({r.reaction}): {float(val):.6g}")
 
-def print_fluxes(model, fluxes, threshold=1e-5):
-    for rxn in model.reactions:
-        flux = fluxes.get(rxn.id, 0.0)
-        if abs(flux) > threshold:
-            print(f"{rxn.id} ({rxn.reaction}): {flux:.4f}")
+##---------------------------------------------GAP-FILLING CALL BACK PLACEHOLDER---------------------------------------------##
 
+def ftinit_fill_gaps(t_model: Model, base_model: Model, t_ref_model: Model, flag: bool, suppress_warnings: bool, t_rxn_scores: np.ndarray, params: dict, verbose: bool) -> Tuple[List[str], Model, int]:
+    """
+    User must suplly their gap-filling implementation.
+    Should return (new_rxns, new_model, exit_flag)
+    new_rxns: list of reaction IDs added
+    new_model: the gap  filling model
+    exit_flag: -2 if aborted before optimality (to mirror MATLAB), 1 if success
+    """
+    raise NotImplementedError("Provide your ftINITFillGaps implementation")
 
-def ftinit_fill_gaps_for_all_tasks(
-    model: Model,
-    ref_model: Model,
-    input_file: str = None,
-    print_output: bool = True,
-    rxn_scores: np.ndarray = None,
-    task_structure: list = None,
-    params: dict = None,
-    verbose: bool = False,
-):
-    if rxn_scores is None:
-        rxn_scores = -1 * np.ones(len(ref_model.reactions))
-    if task_structure is None and input_file is None:
-        raise FileNotFoundError("Task structure or task input file must be provided")
-    if model.id == ref_model.id:
-        print("NOTE: The model and reference model have the same IDs. Renaming ref_model to 'ref_model' for clarity.")
-        ref_model.id = "ref_model"
-    if np.any(rxn_scores >= 0):
-        raise ValueError("Only negative values are allowed in rxn_scores")
-
-    model_mets = set([f"{met.name}[{met.compartment}".upper() for met in model.metabolites])
-    large_model_mets = set([f"{met.name}[{met.compartnebt}]".upper() for met in ref_model.metabolites])
-
-    if task_structure is None:
-        task_structure = parse_task_list(input_file)
-
-    t_model = deepcopy(model)
-    added_rxns = np.zeros((len(ref_model.reactions), len(task_structure)), dtype=bool)
-    suppress_warnings = False
-    n_added = 0
-
-    for i, task in enumerate(task_structure):
-        if task.should_fail:
-            print(f"[{task.id}]{task.description} is set as SHOULD FAIL. Skipping this task.")
-
-            t_ref_model = deepcopy(ref_model)
-            t_rxn_scores = rxn_scores.copy()
-
-            # Input and Output Constraints Setup would go here
-            # This section includes checking and adding metabolites, updating bounds, etc.
-            # Placeholder for task input/output setup
-
-            # Temporary reactions from task.equations
-            if task.equations:
-                add_rxns(t_model, task.equations, task.LBequ, task.UBeq, prefix="TEMPORARY_")
-                add_rxns(t_ref_model, task.equations, task.LBequ, task.UBeq, prefix="TEMPORARY_")
-                t_rxn_scores = np.append(t_rxn_scores, np.zeros(len(task.equations)))
-
-            # Apply bound changes
-            if task.changed:
-                set_bounds(t_model, task.changed, task.LBrxn, task.UBrxn)
-                set_bounds(t_ref_model, task.changed, task.LBrxn, task.UBrxn)
-
-            # Try solving
-            sol = solve_lp(t_model)
-
-            if sol is None or sol.status != "optimal":
-                try:
-                    new_rxns, new_model, exit_flag = ftinit_fill_gaps(t_model, t_ref_model, False, suppress_warnings, t_rxn_scores, params, verbose)
-                    if exit_flag == -2:
-                        print(f"[{task.id}] {task.description} was aborted before optimality. Consider max_time in params.")
-                    if new_rxns:
-                        n_added += len(new_rxns)
-                        if print_output:
-                            print(f"[{task.id}] {task.description}: Added {len(new_rxns)} reaction(s), {n_added} reactions added in total")
-                            for r in new_rxns:
-                                print(r)
-                        for idx, rxn in enumerate(ref_model.reactions):
-                            if rxn.id in new_rxns:
-                                added_rxns[idx, i] = True
-                        model = new_model
-                except Exception as e:
-                    print(f"[{task.id}] {task.description} could not be performed: {e}")
-            else:
-                if print_output:
-                    print(f"[{task.id}] {task.description}: Added 0 reaction(s), {n_added} reactions added in total")
-            suppress_warnings = True
-
-            if task.print_fluxes and print_output:
-                if sol and sol.status == "optimal":
-                    print_fluxes(t_model, sol.fluxes)
-                else:
-                    new_sol = solve_lp(model)
-                    print_fluxes(model, new_sol.fluxes)
-            t_model = deepcopy(model)
-        return model, added_rxns
+##---------------------------------------------UTILITY FUNCTIONS---------------------------------------------##
