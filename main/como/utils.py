@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 import contextlib
-import functools
 import io
 import sys
 from collections.abc import Iterator
-from concurrent.futures import ThreadPoolExecutor
 from io import TextIOWrapper
 from pathlib import Path
+from typing import Literal
 
 import numpy.typing as npt
 import pandas as pd
@@ -61,30 +59,33 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
 
 def split_gene_expression_data(
     expression_data: pd.DataFrame,
+    identifier_column: Literal["ensembl_gene_id", "entrez_gene_id"],
     recon_algorithm: Algorithm | None = None,
-    entrez_as_index: bool = True,
+    *,
+    ensembl_as_index: bool = True,
 ):
     """Split the gene expression data into single-gene and multiple-gene names.
 
     :param expression_data: The gene expression data to map
+    :param identifier_column: The column containing the gene identifiers, either 'ensembl_gene_id' or 'entrez_gene_id'
     :param recon_algorithm: The recon algorithm used to generate the gene expression data
-    :param entrez_as_index: Should the 'entrez_gene_id' column be set as the index
+    :param ensembl_as_index: Should the 'ensembl_gene_id' column be set as the index
     :return:
     """
     expression_data.columns = [c.lower() for c in expression_data.columns]
     if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT}:
         expression_data.rename(columns={"combine_z": "active"}, inplace=True)
 
-    expression_data = expression_data[["entrez_gene_id", "active"]]
-    single_gene_names = expression_data[~expression_data["entrez_gene_id"].astype(str).str.contains("//")]
-    multiple_gene_names = expression_data[expression_data["entrez_gene_id"].astype(str).str.contains("//")]
-    split_gene_names = multiple_gene_names.assign(entrez_gene_id=multiple_gene_names["entrez_gene_id"].astype(str).str.split("///")).explode(
-        "entrez_gene_id"
+    expression_data = expression_data[[identifier_column, "active"]]
+    single_gene_names = expression_data[~expression_data[identifier_column].astype(str).str.contains("//")]
+    multiple_gene_names = expression_data[expression_data[identifier_column].astype(str).str.contains("//")]
+    split_gene_names = multiple_gene_names.assign(ensembl_gene_id=multiple_gene_names[identifier_column].astype(str).str.split("///")).explode(
+        identifier_column
     )
 
     gene_expressions = pd.concat([single_gene_names, split_gene_names], axis=0, ignore_index=True)
-    if entrez_as_index:
-        gene_expressions.set_index("entrez_gene_id", inplace=True)
+    if ensembl_as_index:
+        gene_expressions.set_index(identifier_column, inplace=True)
     return gene_expressions
 
 
@@ -135,6 +136,8 @@ async def _read_file(
         or scanpy.read_h5ad, depending on the filepath provided
     :return: None, or a pandas DataFrame or AnnData
     """
+    if isinstance(path, (pd.DataFrame, sc.AnnData)):
+        return path
     if not path:
         return None
 
@@ -159,7 +162,7 @@ async def _read_file(
             if h5ad_as_df:
                 df = adata.to_df().T
                 df.index.name = "gene_symbol"
-                df.reset_index(inplace=True)
+                df.reset_index(inplace=True, drop=False)
                 return df
             return adata
         case _:
