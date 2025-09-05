@@ -45,7 +45,7 @@ async def load_gene_symbol_map(gene_symbols: list[str], entrez_map: Path | None 
             input_db=Input.GENE_SYMBOL,
             output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID],
         )
-        df.loc[df["gene_id"] == "-", ["gene_id"]] = np.nan
+        df.loc[df["gene_id"].isna(), ["gene_id"]] = np.nan
         df.to_csv(entrez_map, index_label="gene_symbol")
 
     return df[~df.index.duplicated()]
@@ -134,9 +134,7 @@ def load_proteomics_tests(filename, context_name):
 
     inquiry_full_path = config.data_dir / "config_sheets" / filename
     if not inquiry_full_path.exists():
-        _log_and_raise_error(
-            f"Error: file not found {inquiry_full_path}", error=FileNotFoundError, level=LogLevel.ERROR
-        )
+        _log_and_raise_error(f"Error: file not found {inquiry_full_path}", error=FileNotFoundError, level=LogLevel.ERROR)
 
     filename = f"Proteomics_{context_name}.csv"
     full_save_filepath = config.result_dir / context_name / "proteomics" / filename
@@ -146,10 +144,7 @@ def load_proteomics_tests(filename, context_name):
         return context_name, data
 
     else:
-        logger.warning(
-            f"Proteomics gene expression file for {context_name} was not found at {full_save_filepath}. "
-            f"Is this intentional?"
-        )
+        logger.warning(f"Proteomics gene expression file for {context_name} was not found at {full_save_filepath}. Is this intentional?")
         return load_empty_dict()
 
 
