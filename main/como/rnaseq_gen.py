@@ -532,7 +532,11 @@ def cpm_filter(
         top_samples = round(n_top * len(counts.columns))  # noqa: F841
         test_bools = pd.DataFrame({"entrez_gene_ids": entrez_ids})
         for i in range(len(counts_per_million.columns)):
-            cutoff = 10e6 / (np.median(np.sum(counts[:, i]))) if cut_off == "default" else (1e6 * cut_off) / np.median(np.sum(counts[:, i]))
+            median_sum = np.float64(np.median(np.sum(counts[:, i])))
+            if cut_off == "default":  # noqa: SIM108
+                cutoff = np.float64(10e6) / median_sum
+            else:
+                cutoff = np.float64(1e6 * cut_off) / median_sum
             test_bools = test_bools.merge(counts_per_million[counts_per_million.iloc[:, i] > cutoff])
 
     return metrics
