@@ -225,7 +225,7 @@ async def _begin_combining_distributions(
                     matrix=matrix[[GeneIdentifier.ENSEMBL_GENE_ID.value, *batch.sample_names]],
                     source=source,
                     output_combined_matrix_filepath=(
-                        output_filepaths[source.value].parent / f"{context_name}_{source.value}_batch{batch.batch_num}_combined_z_distribution_.csv"
+                        output_filepaths[source.value].parent / f"{context_name}_{source.value}_batch{batch.batch_num}_combined_z_distribution.csv"
                     ),
                     output_figure_dirpath=output_figure_dirpath,
                     weighted_z_floor=weighted_z_floor,
@@ -257,7 +257,7 @@ async def _begin_combining_distributions(
                 weight=source_weights[source.value],
             )
         )
-        merged_source_results.to_csv(output_filepaths[source.value])
+        merged_source_results.to_csv(output_filepaths[source.value], index=False)
         logger.success(f"Wrote z-scores for source '{source.value}' in context '{context_name}' to '{output_filepaths[source.value]}'")
 
     logger.trace(f"Combining z-score distributions for all sources in context '{context_name}'")
