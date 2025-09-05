@@ -23,7 +23,7 @@ from como.utils import (
 )
 
 
-async def _combine_z_distribution_for_batch(
+def _combine_z_distribution_for_batch(
     context_name: str,
     batch: _BatchEntry,
     matrix: pd.DataFrame,
@@ -33,6 +33,21 @@ async def _combine_z_distribution_for_batch(
     weighted_z_floor: int,
     weighted_z_ceiling: int,
 ) -> pd.DataFrame:
+    """Combine z-score distributions across samples for a single batch.
+
+    Args:
+        context_name: Name of the context (e.g., tissue or condition).
+        batch: Batch entry containing batch number and sample names.
+        matrix: DataFrame with 'ensembl_gene_id' and sample columns.
+        source: Source type (e.g., trna, mrna, scrna, proteomics).
+        output_combined_matrix_filepath: Path to save the combined z-score matrix.
+        output_figure_dirpath: Path to save the z-score distribution figure.
+        weighted_z_floor: Minimum z-score value after combining.
+        weighted_z_ceiling: Maximum z-score value after combining.
+
+    Returns:
+            A pandas dataframe of the weighted z-distributions
+    """
     output_combined_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
     output_figure_dirpath.mkdir(parents=True, exist_ok=True)
 
@@ -80,7 +95,7 @@ async def _combine_z_distribution_for_batch(
     return weighted_matrix
 
 
-async def _combine_z_distribution_for_source(
+def _combine_z_distribution_for_source(
     merged_source_data: pd.DataFrame,
     context_name: str,
     num_replicates: int,
@@ -88,7 +103,21 @@ async def _combine_z_distribution_for_source(
     output_figure_filepath: Path,
     weighted_z_floor: int = -6,
     weighted_z_ceiling: int = 6,
-):
+) -> pd.DataFrame:
+    """Combine z-score distributions across batches for a single source.
+
+    Args:
+        merged_source_data: DataFrame with 'ensembl_gene_id' and batch columns.
+        context_name: Name of the context (e.g., tissue or condition).
+        num_replicates: Number of replicates (samples) for weighting.
+        output_combined_matrix_filepath: Path to save the combined z-score matrix.
+        output_figure_filepath: Path to save the z-score distribution figure.
+        weighted_z_floor: Minimum z-score value after combining.
+        weighted_z_ceiling: Maximum z-score value after combining.
+
+    Returns:
+          A pandas dataframe of the weighted z-distributions
+    """
     if _num_columns(merged_source_data) <= 2:
         logger.warning("A single source exists, returning matrix as-is because no additional combining can be done")
         merged_source_data.columns = ["ensembl_gene_id", "combine_z"]
@@ -144,7 +173,7 @@ def _combine_z_distribution_for_context(
         return pd.DataFrame({"ensembl_gene_id": [], "combine_z": []})
 
     z_matrices = [
-        res.z_score_matrix.set_index("ensembl_gene_id").rename(columns={col: res.type.value for col in res.z_score_matrix.columns[1:]})
+        res.z_score_matrix.set_index("ensembl_gene_id").rename(columns=dict.fromkeys(res.z_score_matrix.columns[1:], res.type.value))
         for res in zscore_results
     ]
     z_matrix = pd.concat(z_matrices, axis=1, join="outer").reset_index()
@@ -239,7 +268,7 @@ async def _begin_combining_distributions(
         for df in batch_results:
             merged_batch_results = df if merged_batch_results.empty else merged_batch_results.merge(df, on="ensembl_gene_id", how="outer")
 
-        merged_source_results: pd.DataFrame = await _combine_z_distribution_for_source(
+        merged_source_results: pd.DataFrame = _combine_z_distribution_for_source(
             merged_source_data=merged_batch_results,
             context_name=context_name,
             num_replicates=sum(batch.num_samples for batch in batch_names[source.value]),

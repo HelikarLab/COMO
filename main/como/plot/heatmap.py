@@ -20,12 +20,14 @@ def condition_vs_pathway(
 ) -> plt.Figure:
     """Build a heatmap of fluxes through pathways across conditions.
 
-    :param data: Index values are conditions, column names are pathways
-    :param save_filepath: If provided, the resulting figure will be saved to this location
-    :param copy_df: Should the incoming dataframe be copied to prevent modifications to data?
-    :param exclude_zero_flux_pathways: Should pathways that have 0 flux across all rows be excluded?
+    Args:
+        data: Index values are conditions, column names are pathways
+        save_filepath: If provided, the resulting figure will be saved to this location
+        copy_df: Should the incoming dataframe be copied to prevent modifications to data?
+        exclude_zero_flux_pathways: Should pathways that have 0 flux across all rows be excluded?
 
-    :return: The resulting `matpotlib.pyplt.Figure` object
+    Returns:
+        The resulting `matpotlib.pyplt.Figure` object
     """
     plot_df: pd.DataFrame = data.copy() if copy_df else data
     plot_df = plot_df.astype(np.float32)

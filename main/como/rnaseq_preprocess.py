@@ -196,7 +196,7 @@ def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
 
     # For each study, collect gene count files, fragment files, insert size files, layouts, and strandedness information
     study_metrics: list[_StudyMetrics] = []
-    for gene_dir, strand_dir in zip(gene_counts_directories, strandedness_directories):
+    for gene_dir, strand_dir in zip(gene_counts_directories, strandedness_directories, strict=True):
         count_files = list(gene_dir.glob("*.tab"))
         strand_files = list(strand_dir.glob("*.txt"))
         if len(count_files) == 0:
@@ -328,7 +328,17 @@ async def _write_counts_matrix(
     output_counts_matrix_filepath: Path,
     rna: RNAType,
 ) -> pd.DataFrame:
-    """Create a counts matrix file by reading gene counts table(s)."""
+    """Create a counts matrix file by reading gene counts table(s).
+
+    Args:
+        config_df: Configuration DataFrame containing sample information.
+        como_context_dir: Path to the COMO_input directory containing gene count files.
+        output_counts_matrix_filepath: Path where the output counts matrix CSV will be saved.
+        rna: RNAType enum indicating whether to process 'trna' or 'mrna' samples.
+
+    Returns:
+        A pandas DataFrame representing the final counts matrix.
+    """
     study_metrics = _organize_gene_counts_files(data_dir=como_context_dir)
     counts: list[pd.DataFrame] = await asyncio.gather(*[_create_sample_counts_matrix(metric) for metric in study_metrics])
     rna_specific_sample_names = set(config_df.loc[config_df["library_prep"] == rna.value, "sample_name"].tolist())
@@ -358,7 +368,20 @@ async def _create_config_df(  # noqa: C901
     """Create configuration sheet.
 
     The configuration file created is based on the gene counts matrix.
-     If using zFPKM normalization technique, mean fragment lengths will be fetched
+    If using zFPKM normalization technique, mean fragment lengths will be fetched
+
+    Args:
+        context_name: Name of the context, used as a prefix for sample names.
+        como_context_dir: Path to the COMO_input directory containing subdirectories for
+            gene counts, layouts, strandedness, fragment sizes, and prep methods.
+        gene_count_dirname: Name of the subdirectory containing gene count files.
+        layout_dirname: Name of the subdirectory containing layout files.
+        strandedness_dirname: Name of the subdirectory containing strandedness files.
+        fragment_sizes_dirname: Name of the subdirectory containing fragment size files.
+        prep_method_dirname: Name of the subdirectory containing library preparation method files.
+
+    Returns:
+        A pandas DataFrame representing the configuration sheet.
     """
     label_regex: Final = re.compile(r"(?P<study>S\d{1,3})(?P<rep>R\d{1,3})(?P<run>r\d{1,3})?")
     gene_counts: list[Path] = list((como_context_dir / gene_count_dirname).rglob("*.tab"))

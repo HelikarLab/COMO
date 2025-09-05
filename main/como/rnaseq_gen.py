@@ -4,12 +4,13 @@ import multiprocessing
 import sys
 import time
 from collections import namedtuple
+from collections.abc import Callable
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from enum import Enum
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Callable, NamedTuple
+from typing import NamedTuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -131,9 +132,12 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
 
     This code is based on the `genefilter` function found in R's `genefilter` package: https://www.rdocumentation.org/packages/genefilter/versions/1.54.2/topics/genefilter
 
-    :param data: The data to filter
-    :param filter_func: THe function to filter the data by
-    :return: A NumPy array of the filtered data.
+    Arg:
+        data: The data to filter, either a Pandas DataFrame or a NumPy array.
+        filter_func: THe function to filter the data by
+
+    Returns:
+        A NumPy array of the filtered data.
     """
     if not isinstance(data, (pd.DataFrame, npt.NDArray)):
         _log_and_raise_error(
@@ -154,10 +158,13 @@ async def _build_matrix_results(
 ) -> _ReadMatrixResults:
     """Read the counts matrix and returns the results.
 
-    :param matrix: The gene counts matrix to process
-    :param metadata_df: The configuration dataframe related to the current context
-    :param taxon: The NCBI Taxon ID
-    :return: A dataclass `ReadMatrixResults`
+    Arg:
+        matrix: The gene counts matrix to process
+        metadata_df: The configuration dataframe related to the current context
+        taxon: The NCBI Taxon ID
+
+    Returns:
+        A dataclass `ReadMatrixResults`
     """
     matrix.dropna(subset="ensembl_gene_id", inplace=True)
     conversion = await ensembl_to_gene_id_and_symbol(ids=matrix["ensembl_gene_id"].tolist(), taxon=taxon)
@@ -226,7 +233,14 @@ async def _build_matrix_results(
 
 
 def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
-    """Calculate the Transcripts Per Million (TPM) for each sample in the metrics dictionary."""
+    """Calculate the Transcripts Per Million (TPM) for each sample in the metrics dictionary.
+
+    Args:
+        metrics: A dictionary of study metrics to calculate TPM for.
+
+    Returns:
+        A dictionary of study metrics with TPM calculated.
+    """
     for sample in metrics:
         count_matrix = metrics[sample].count_matrix
 
@@ -242,7 +256,15 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
 
 
 def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
-    """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary."""
+    """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary.
+
+    Args:
+        metrics: A dictionary of study metrics to calculate FPKM for.
+        scale: The scaling factor for normalization (default is 1e6).
+
+    Returns:
+        A dictionary of study metrics with FPKM calculated.
+    """
     for study in metrics:
         matrix_values = []
 
@@ -333,7 +355,7 @@ def _zfpkm_calculation(
          - Standard deviation is estimated based on the assumption that the right tail of the distribution
             This represents expressed genes) can be approximated by a half-normal distribution
 
-     zFPKM Transformation
+    zFPKM Transformation
         - Centers disbribution around 0 and scales it by the standard deviation.
             This makes it easier to compare gene expression across different samples
         - Represents the number of standard deviations away from the mean of the "inactive" gene distribution
@@ -342,6 +364,19 @@ def _zfpkm_calculation(
         - Research shows that a zFPKM value of -3 or greater can be used as
             a threshold for calling a gene as "active" and/or "expressed"
             : https://doi.org/10.1186/1471-2164-14-778
+
+    Args:
+        column: A Pandas Series containing FPKM values for a single sample.
+        peak_parameters: Parameters for peak identification in zFPKM calculation.
+        bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
+
+    Returns:
+        A named tuple containing:
+            - zfpkm: A Pandas Series of zFPKM values for the input sample.
+            - density: A named tuple containing the x and y values of the KDE.
+            - mu: The mean of the "inactive" gene distribution.
+            - std_dev: The estimated standard deviation of the "inactive" gene distribution.
+            - max_fpkm: The maximum FPKM value at the identified peak.
     """
     values: npt.NDArray = column.values
     # replace na values with 0
@@ -374,7 +409,19 @@ def zfpkm_transform(
     bandwidth: int,
     update_every_percent: float = 0.1,
 ) -> tuple[dict[str, _ZFPKMResult], DataFrame]:
-    """Perform zFPKM calculation/transformation."""
+    """Perform zFPKM calculation/transformation.
+
+    Args:
+        fpkm_df: A DataFrame containing FPKM values with genes as rows and samples as columns.
+        peak_parameters: Parameters for peak identification in zFPKM calculation.
+        bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
+        update_every_percent: Frequency of progress updates as a decimal between 0 and 1 (e.g., 0.1 for every 10%).
+
+    Returns:
+        A tuple containing:
+            - A dictionary of intermediate results for each sample.
+            - A DataFrame of zFPKM values with the same shape as the input fpkm_df.
+    """
     if update_every_percent > 1:
         logger.warning(f"update_every_percent should be a decimal value between 0 and 1; got: {update_every_percent} - will convert to percentage")
         update_every_percent /= 100
@@ -459,9 +506,11 @@ def zfpkm_plot(results, *, output_png_filepath: Path, plot_xfloor: int = -4):
     mega_df.columns = pd.Series(data=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
     mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")
 
+    fig: plt.Figure
+    axes: plt.Axes
     fig, axes = plt.subplots(nrows=len(results), ncols=1, figsize=(8, 4 * len(results)))
     if len(results) == 1:
-        axes = [axes]
+        axes: list[plt.Axes] = [axes]
 
     for i, sample_name in enumerate(results):
         sample_data = mega_df[mega_df["sample_name"] == sample_name]
@@ -476,15 +525,22 @@ def zfpkm_plot(results, *, output_png_filepath: Path, plot_xfloor: int = -4):
         axis.set_ylabel("density [scaled]")
         axis.legend(title="Source")
 
-    plt.tight_layout()
+    fig.tight_layout()
     if output_png_filepath.suffix != ".png":
         logger.warning(f"Output filepath did not end in '.png', setting to '.png' now. Got: '{output_png_filepath.suffix}'")
         output_png_filepath = output_png_filepath.with_suffix(".png")
-    plt.savefig(output_png_filepath)
+    fig.savefig(output_png_filepath)
 
 
 def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
-    """Calculate the z-score for each sample in the metrics dictionary."""
+    """Calculate the z-score for each sample in the metrics dictionary.
+
+    Args:
+        metrics: A dictionary of study metrics to calculate z-scores for.
+
+    Returns:
+        A dictionary of study metrics with z-scores calculated.
+    """
     for sample in metrics:
         log_matrix = np.log(metrics[sample].normalization_matrix)
         z_matrix = pd.DataFrame(data=sklearn.preprocessing.scale(log_matrix, axis=1), columns=metrics[sample].sample_names)
@@ -499,7 +555,17 @@ def cpm_filter(
     filtering_options: _FilteringOptions,
     prep: RNAType,
 ) -> NamedMetrics:
-    """Apply Counts Per Million (CPM) filtering to the count matrix for a given sample."""
+    """Apply Counts Per Million (CPM) filtering to the count matrix for a given sample.
+
+    Args:
+        context_name: The name of the context being processed.
+        metrics: A dictionary of study metrics to filter.
+        filtering_options: Options for filtering the count matrix.
+        prep: The RNA preparation type.
+
+    Returns:
+        A dictionary of filtered study metrics.
+    """
     config = Config()
     n_exp = filtering_options.replicate_ratio
     n_top = filtering_options.high_replicate_ratio
@@ -543,7 +609,15 @@ def cpm_filter(
 
 
 def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions) -> NamedMetrics:
-    """Apply quantile-based filtering to the TPM matrix for a given sample."""
+    """Apply quantile-based filtering to the TPM matrix for a given sample.
+
+    Args:
+        metrics: A dictionary of study metrics to filter.
+        filtering_options: Options for filtering the count matrix.
+
+    Returns:
+        A dictionary of filtered study metrics.
+    """
     # TODO: Write the TPM matrix to disk
 
     n_exp = filtering_options.replicate_ratio
@@ -572,13 +646,13 @@ def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
         top_genes: npt.NDArray[bool] = genefilter(boolean_expression, top_func)
 
         # Only keep `entrez_gene_ids` that pass `min_genes`
-        metric.entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, min_genes) if keep]
-        metric.gene_sizes = np.array(gene for gene, keep in zip(gene_size, min_genes) if keep)
+        metric.entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, min_genes, strict=True) if keep]
+        metric.gene_sizes = np.array(gene for gene, keep in zip(gene_size, min_genes, strict=True) if keep)
         metric.count_matrix = metric.count_matrix.iloc[min_genes, :]
         metric.normalization_matrix = metrics[sample].normalization_matrix.iloc[min_genes, :]
 
-        keep_top_genes = [gene for gene, keep in zip(entrez_ids, top_genes) if keep]
-        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, keep_top_genes) if keep]
+        keep_top_genes = [gene for gene, keep in zip(entrez_ids, top_genes, strict=True) if keep]
+        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, keep_top_genes, strict=True) if keep]
 
     metrics = calculate_z_score(metrics)
 
@@ -595,7 +669,20 @@ def zfpkm_filter(
     bandwidth: int,
     output_png_filepath: Path | None,
 ) -> NamedMetrics:
-    """Apply zFPKM filtering to the FPKM matrix for a given sample."""
+    """Apply zFPKM filtering to the FPKM matrix for a given sample.
+
+    Args:
+        metrics: A dictionary of study metrics to filter.
+        filtering_options: Options for filtering the count matrix.
+        calculate_fpkm: Whether to calculate FPKM from counts.
+        force_zfpkm_plot: Whether to force plotting of zFPKM results even if there are many samples.
+        peak_parameters: Parameters for peak identification in zFPKM calculation.
+        bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
+        output_png_filepath: Optional filepath to save the zFPKM plot.
+
+    Returns:
+        A dictionary of filtered study metrics.
+    """
     min_sample_expression = filtering_options.replicate_ratio
     high_confidence_sample_expression = filtering_options.high_replicate_ratio
     cut_off = filtering_options.cut_off
@@ -628,13 +715,13 @@ def zfpkm_filter(
         min_samples = round(min_sample_expression * len(zfpkm_df.columns))
         min_func = k_over_a(min_samples, cut_off)
         min_genes: npt.NDArray[bool] = genefilter(zfpkm_df, min_func)
-        metric.entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, min_genes) if keep]
+        metric.entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, min_genes, strict=True) if keep]
 
         # determine which genes are confidently expressed
         top_samples = round(high_confidence_sample_expression * len(zfpkm_df.columns))
         top_func = k_over_a(top_samples, cut_off)
         top_genes: npt.NDArray[bool] = genefilter(zfpkm_df, top_func)
-        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, top_genes) if keep]
+        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, top_genes, strict=True) if keep]
 
     return metrics
 
@@ -651,7 +738,22 @@ def filter_counts(
     bandwidth: int,
     output_png_filepath: Path | None = None,
 ) -> NamedMetrics:
-    """Filter the count matrix based on the specified technique."""
+    """Filter the count matrix based on the specified technique.
+
+    Args:
+        context_name: The name of the context being processed.
+        metrics: A dictionary of study metrics to filter.
+        technique: The filtering technique to use.
+        filtering_options: Options for filtering the count matrix.
+        prep: The RNA preparation type.
+        force_zfpkm_plot: Whether to force plotting of zFPKM results even if there are many samples.
+        peak_parameters: Parameters for peak identification in zFPKM calculation.
+        bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
+        output_png_filepath: Optional filepath to save the zFPKM plot.
+
+    Returns:
+        A dictionary of filtered study metrics.
+    """
     match technique:
         case FilteringTechnique.CPM:
             return cpm_filter(context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep)

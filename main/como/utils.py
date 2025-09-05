@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import io
 import sys
@@ -8,6 +9,7 @@ from io import TextIOWrapper
 from pathlib import Path
 from typing import Literal
 
+import aiofiles
 import numpy.typing as npt
 import pandas as pd
 import scanpy as sc
@@ -33,7 +35,11 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
     If '[' and ']' are present in the first and last items of the list,
         assume we are using the "old" method of providing context names
 
-    :param stringlist: The "string list" gathered from the command line. Example input: "['mat', 'xml', 'json']"
+    Args:
+        stringlist: The "string list" gathered from the command line. Example input: "['mat', 'xml', 'json']"
+
+    Returns:
+        A list of strings. Example output: ['mat', 'xml', 'json']
     """
     if isinstance(stringlist, list):
         return stringlist
@@ -66,11 +72,14 @@ def split_gene_expression_data(
 ):
     """Split the gene expression data into single-gene and multiple-gene names.
 
-    :param expression_data: The gene expression data to map
-    :param identifier_column: The column containing the gene identifiers, either 'ensembl_gene_id' or 'entrez_gene_id'
-    :param recon_algorithm: The recon algorithm used to generate the gene expression data
-    :param ensembl_as_index: Should the 'ensembl_gene_id' column be set as the index
-    :return:
+    Arg:
+        expression_data: The gene expression data to map
+        identifier_column: The column containing the gene identifiers, either 'ensembl_gene_id'
+        recon_algorithm: The recon algorithm used to generate the gene expression data
+        ensembl_as_index: Should the 'ensembl_gene_id' column be set as
+
+    Returns:
+        A pandas DataFrame with the split gene expression data
     """
     expression_data.columns = [c.lower() for c in expression_data.columns]
     if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT}:
@@ -108,11 +117,14 @@ async def _format_determination(
 ) -> pd.DataFrame:
     """Determine the data type of the given input values (i.e., Entrez Gene ID, Gene Symbol, etc.).
 
-    :param biodbnet: The BioDBNet to use for deter
-    :param requested_output: The data type to generate (of type `Output`)
-    :param input_values: The input values to determine
-    :param taxon: The Taxon ID
-    :return: A pandas DataFrame
+    Args:
+        biodbnet: The BioDBNet to use for determination
+        requested_output: The data type to generate (of type `Output`)
+        input_values: The input values to determine
+        taxon: The Taxon ID
+
+    Returns:
+        A pandas DataFrame
     """
     requested_output = [requested_output] if isinstance(requested_output, Output) else requested_output
     coercion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(columns=["Input Type"])
@@ -131,10 +143,13 @@ async def _read_file(
     None may be provided to this function so that `asyncio.gather` can safely be used on all sources
         (trna, mrna, scrna, proteomics) without needing to check if the user has provided those sources
 
-    :param path: The path to read from
-    :param kwargs: Additional arguments to pass to pandas.read_csv, pandas.read_excel,
-        or scanpy.read_h5ad, depending on the filepath provided
-    :return: None, or a pandas DataFrame or AnnData
+    Args:
+        path: The path to read from
+        h5ad_as_df: If True and the file is an h5ad, return a DataFrame of the .X matrix instead of an AnnData object
+        kwargs: Additional arguments to pass to pandas.read_csv, pandas.read_excel, or scanpy.read_h5ad, depending on the filepath provided
+
+    Returns:
+        None, or a pandas DataFrame or AnnData
     """
     if isinstance(path, (pd.DataFrame, sc.AnnData)):
         return path
@@ -152,13 +167,13 @@ async def _read_file(
         case ".csv" | ".tsv" | ".txt":
             if "sep" not in kwargs:
                 kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")
-            with path.open("r") as i_stream:
-                content = i_stream.read()
+            async with aiofiles.open(path) as i_stream:
+                content = await i_stream.read()
                 return pd.read_csv(io.StringIO(content), **kwargs)
         case ".xlsx" | ".xls":
-            return pd.read_excel(path, **kwargs)
+            return await asyncio.to_thread(pd.read_excel, path, **kwargs)
         case ".h5ad":
-            adata: sc.AnnData = sc.read_h5ad(path, **kwargs)
+            adata: sc.AnnData = await asyncio.to_thread(sc.read_h5ad, path, **kwargs)
             if h5ad_as_df:
                 df = adata.to_df().T
                 df.index.name = "gene_symbol"
@@ -200,7 +215,14 @@ async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int 
 
 
 def _listify(value):
-    """Convert items into a list."""
+    """Convert items into a list.
+
+    Args:
+        value: The value to convert to a list
+
+    Returns:
+        A list containing `value`, unless it is already a list
+    """
     return [value] if not isinstance(value, list) else value
 
 

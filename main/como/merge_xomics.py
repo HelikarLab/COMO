@@ -50,8 +50,17 @@ class _HighExpressionHeaderNames:
 
 
 # TODO: If function is no longer needed, remove?
-async def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tuple[str, pd.DataFrame]:
-    """Load rnaseq results."""
+def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tuple[str, pd.DataFrame]:
+    """Load rnaseq results.
+
+    Args:
+        filename: Name of the file to load
+        context_name: Name of the context (e.g., tissue or cell type)
+        prep_method: The RNA-seq library preparation method (e.g., mRNA, total RNA, single-cell RNA)
+
+    Returns:
+        A tuple containing the context name and the loaded DataFrame±
+    """
     logger.debug(f"Loading data for context '{context_name}' using preparation method '{prep_method.value}'")
     config = Config()
 
@@ -103,8 +112,11 @@ async def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tu
 def _merge_logical_table(df: pd.DataFrame):
     """Merge rows of Logical Table belonging to the same entrez_gene_id.
 
-    :param df: pandas dataframe of logical table
-    :return: pandas dataframe of merged table
+    Args:
+        df: Pandas dataframe containing the logical table
+
+    Returns:
+        pandas dataframe of merged table
     """
     # step 1: get all plural ENTREZ_GENE_IDs in the input table, extract unique IDs
     df.dropna(subset=["entrez_gene_id"], inplace=True)
@@ -135,6 +147,7 @@ def _merge_logical_table(df: pd.DataFrame):
     multi_entrez_index = list(range(len(multiple_entrez_ids)))
 
     logger.trace("Starting to merge multiple entrez IDs")
+    temp_multi_entrez_index = multi_entrez_index.copy()
     for i in range(len(multiple_entrez_ids)):
         if i not in multi_entrez_index:
             continue
@@ -142,23 +155,25 @@ def _merge_logical_table(df: pd.DataFrame):
         logger.trace(f"Iterating through multi-entrez ids, index {i}")
 
         set1 = set(multiple_entrez_ids[i].split("//"))
-        multi_entrez_index.remove(i)
+        temp_multi_entrez_index.remove(i)
 
         for j in multi_entrez_index:
             set2 = set(multiple_entrez_ids[j].split("//"))
             intersect = set1.intersection(set2)
             if bool(intersect):
                 set1 = set1.union(set2)
-                multi_entrez_index.remove(j)
+                temp_multi_entrez_index.remove(j)
 
         sortlist = list(set1)
         sortlist.sort(key=int)
         new_entrez_id = " /// ".join(sortlist)
         full_entrez_id_sets.add(new_entrez_id)
 
+    multi_entrez_index = temp_multi_entrez_index.copy()
+
     logger.debug(f"Finished merging multiple entrez IDs, found {len(full_entrez_id_sets)} sets")
     entrez_dups_list.extend(i.split(" /// ") for i in full_entrez_id_sets)
-    entrez_dups_dict = dict(zip(full_entrez_id_sets, entrez_dups_list))
+    entrez_dups_dict = dict(zip(full_entrez_id_sets, entrez_dups_list, strict=True))
 
     logger.trace("Replacing IDs in dataframe")
     for merged_entrez_id, entrez_dups_list in entrez_dups_dict.items():
@@ -193,8 +208,12 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame, taxon_id: int) ->
     The resulting dataframe will have its columns created in the order listed above
     It will return a pandas dataframe with this information
 
-    :param merged_df: A dataframe containing all active transcriptomic and proteomic genes
-    :return: A dataframe with the above-listed columns
+    Args:
+        merged_df: A dataframe containing all active transcriptomic and proteomic genes
+        taxon_id: The NCBI taxonomy ID of the organism
+
+    Returns:
+        A dataframe with the above-listed columns
     """
     # If _ExpressedHeaderNames.PROTEOMICS.value is in the dataframe, lower the required expression by 1
     # We are only trying to get details for transcriptomic data
@@ -486,7 +505,7 @@ def _build_batches(
     proteomic_metadata: pd.DataFrame | None,
 ) -> _BatchNames:
     batch_names = _BatchNames(**{source.name.lower(): [] for source in SourceTypes})
-    for source, metadata in zip(SourceTypes, [trna_metadata, mrna_metadata, scrna_metadata, proteomic_metadata]):
+    for source, metadata in zip(SourceTypes, [trna_metadata, mrna_metadata, scrna_metadata, proteomic_metadata], strict=True):
         source: SourceTypes
         metadata: pd.DataFrame
         if metadata is None:

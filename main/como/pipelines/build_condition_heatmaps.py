@@ -10,65 +10,36 @@ from collections import defaultdict
 from functools import partial
 from pathlib import Path
 
-import aiofiles.os
-import aiofiles.ospath
 import cobra
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-import orjson
 import pandas as pd
 from pandas._libs.missing import NAType
 
 from como.plot.heatmap import condition_vs_pathway
 
 
-async def afind_possible_model_filepaths(search_dir: Path) -> list[Path]:
-    """Asynchronously find potential files that could be constraint-based metabolic models.
-
-    :param search_dir: The directory to search for models.
-    :return: Potential filepaths that could be loaded as a `cobra.Model` object
-    """
-    return [f for f in list(await asyncio.to_thread(search_dir.rglob, pattern="*")) if f.suffix in {".mat", ".json", ".sbml", ".xml"}]
-
-
 def find_possible_model_filepaths(search_dir: Path) -> list[Path]:
     """Find potential files that could be constraint-based metabolic models.
 
-    :param search_dir: The directory to search for models.
-    :return: Potential filepaths that could be loaded as a `cobra.Model` object
+    Args:
+        search_dir: The directory to search for models.
+
+    Returns:
+        Potential filepaths that could be loaded as a `cobra.Model` object
     """
     return [f for f in search_dir.rglob("*") if f.suffix in {".mat", ".json", ".sbml", ".xml"}]
-
-
-async def ais_filepath_a_model(filepath: Path) -> cobra.Model | None:
-    """Asynchronously evaluate if a given filepath can be read as a `cobra.Model`.
-
-    :param filepath: The filepath to read
-    :return a `cobra.Model` object if the file can be read, otherwise None
-    """
-    suffix = filepath.suffix.lower()
-    if suffix == ".mat":
-        return await asyncio.to_thread(cobra.io.load_matlab_model, infile_path=filepath)
-    elif suffix in {".xml", ".sbml"}:
-        return await asyncio.to_thread(cobra.io.read_sbml_model, filename=filepath)
-    elif suffix in {".yaml", ".yml"}:
-        async with aiofiles.open(filepath) as i_stream:
-            content = await i_stream.read()
-        return cobra.io.from_yaml(content)
-    elif suffix == ".json":
-        async with aiofiles.open(filepath) as i_stream:
-            content = await i_stream.read()
-        data = orjson.loads(content)
-        return cobra.io.model_from_dict(data)
-    return None
 
 
 def get_cobra_model_if_valid(filepath: Path) -> cobra.Model | None:
     """Evaluate if a given filepath can be read as a `cobra.Model`.
 
-    :param filepath: The filepath to read
-    :return a `cobra.Model` object if the file can be read, otherwise None
+    Args:
+        filepath: The filepath to read
+
+    Returns:
+        a `cobra.Model` object if the file can be read, otherwise None
     """
     if filepath.suffix == ".json":
         return cobra.io.load_json_model(filepath)
@@ -84,10 +55,13 @@ def get_cobra_model_if_valid(filepath: Path) -> cobra.Model | None:
 def get_model_flux(model: cobra.Model, objective: str = "biomass_maintenance", solver: str = "gurobi") -> pd.Series:
     """Get the flux through a CBMM.
 
-    :param model: A `cobra.Model` object
-    :param objective: The objective function to optimize
-    :param solver: The solver to use
-    :return: A pandas Series of reaction fluxes indexed by reaction ID
+    Args:
+        model: A `cobra.Model` object
+        objective: The objective function to optimize
+        solver: The solver to use
+
+    Returns:
+        A pandas Series of reaction fluxes indexed by reaction ID
     """
     model.objective = objective
     model.solver = solver
@@ -106,18 +80,25 @@ def get_many_model_flux(
 ) -> pd.DataFrame:
     """Get the flux through many CBMMs.
 
-    :param models: A list of `cobra.Model` objects
-    :param objective: The objective function to optimize
-    :param solver: The solver to use
-    :param cores: The number of CPU cores to use
-    :param process_pool: An existing process pool to use
-    :param colnames: Column names to use for the resulting dataframe
-    :param na_value: Value to use for missing values in the dataframe
+    Args:
+        models: A list of `cobra.Model` objects
+        objective: The objective function to optimize
+        solver: The solver to use
+        cores: The number of CPU cores to use
+        process_pool: An existing process pool to use
+        colnames: Column names to use for the resulting dataframe
+        na_value: Value to use for missing values in the dataframe
+
+    Returns:
+        A pandas DataFrame of reaction fluxes indexed by condition (row) and reaction ID (column)
+
+    Raises:
+        ValueError: If `colnames` is provided and its length does not match the number of models
     """
     if colnames and len(colnames) != len(models):
         raise ValueError("Length of colnames must match length of models")
 
-    pool = process_pool if process_pool else concurrent.futures.ProcessPoolExecutor(max_workers=cores)
+    pool = process_pool or concurrent.futures.ProcessPoolExecutor(max_workers=cores)
     shutdown = not process_pool  # if the user provided a pool, do not shut it down
 
     func = partial(get_model_flux, objective=objective, solver=solver)
@@ -137,6 +118,15 @@ def get_many_model_flux(
 
 
 def group_reactions_by_pathway(models: cobra.Model | list[cobra.Model], flux_df: pd.DataFrame) -> pd.DataFrame:
+    """Group reactions by their subsystem/pathway and sum the fluxes.
+
+    Args:
+        models: A cobra.Model or list of cobra.Models
+        flux_df: A dataframe of reaction fluxes, indexed by condition and with reaction IDs as columns
+
+    Returns:
+        A dataframe of pathway fluxes, indexed by condition and with pathways as columns
+    """
     pathways_by_reaction: dict[str, set[str]] = defaultdict(set)
     models = [models] if isinstance(models, cobra.Model) else models
 
@@ -191,20 +181,25 @@ def build_condition_vs_pathway_heatmap(
         - Models will be simulated with the given objective and solver
         - A pd.DataFrame will be built from the resulting series based on the above rules
 
-    :param data: The data to use for the heatmap
-    :param search_path: Whether to search the given path for models
-    :param save_filepath: The filepath to save the heatmap to
-    :param objective: The objective function to optimize
-    :param solver: The solver to use
-    :param process_pool: An existing process pool to use
-    :param cores: The number of CPU cores to use
-    :param condition_names: Column names to use for the resulting dataframe if `data` is a Path or list of Paths
-    :param na_value: Value to use for missing values in the flux dataframe
-    :param copy_df_when_building_plot: Whether to copy the dataframe when building the plot. This can be useful if the dataframe is going to be reused later.
-    :param exclude_zero_flux_pathways: Whether to exclude pathways that have zero flux across all conditions
+    Args:
+        data: The data to use for the heatmap
+        search_path: Whether to search the given path for models
+        save_filepath: The filepath to save the heatmap to
+        objective: The objective function to optimize
+        solver: The solver to use
+        process_pool: An existing process pool to use
+        cores: The number of CPU cores to use
+        condition_names: Column names to use for the resulting dataframe if `data` is a Path or list of Paths
+        na_value: Value to use for missing values in the flux dataframe
+        copy_df_when_building_plot: Whether to copy the dataframe when building the plot.
+            This can be useful if the dataframe is going to be reused later.
+        exclude_zero_flux_pathways: Whether to exclude pathways that have zero flux across all conditions
 
+    Returns:
+        A matplotlib Figure object containing the heatmap
 
-    :return: A matplotlib Figure object containing the heatmap
+    Raises:
+        ValueError: If `search_path` is True and `data` is not a Path
     """
     if not isinstance(data, Path) and search_path:
         raise ValueError("If search_path is True, data must be a Path")
@@ -263,7 +258,7 @@ def build_condition_vs_pathway_heatmap(
     return condition_vs_pathway(data=flux_df, save_filepath=save_filepath)
 
 
-async def _main():
+def _main():
     models = [
         Path("/home/joshl/projects/ImmunoMetabolism/data/model_build/A/A_pDCs/A_pDCs_model_imat.json"),
         Path("/home/joshl/projects/ImmunoMetabolism/data/model_build/B/B_pDCs/B_pDCs_model_imat.json"),
@@ -285,6 +280,4 @@ async def _main():
 
 
 if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(_main())
+    _main()

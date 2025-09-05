@@ -25,7 +25,15 @@ from como.utils import _log_and_raise_error, _read_file, _set_up_logging, split_
 
 
 def _correct_bracket(rule: str, name: str) -> str:
-    """Correct GPR rules to format readable by."""
+    """Correct GPR rules to format readable by.
+
+    Args:
+        rule: GPR rule string from a COBRA model
+        name: Gene name string from a COBRA model
+
+    Returns:
+        A corrected GPR rule string
+    """
     rule_match = re.search(r"or|and", rule)
     name_match = re.search(r"or|and", name)
     if rule_match is None or name_match is None:
@@ -54,7 +62,15 @@ def _correct_bracket(rule: str, name: str) -> str:
 
 
 def _gene_rule_logical(gpr_expression: str, level: int = 0) -> str:
-    """Create an expression from GPR rule which can be evaluated as true or false."""
+    """Create an expression from GPR rule which can be evaluated as true or false.
+
+    Args:
+        gpr_expression: GPR rule string from a COBRA model
+        level: Current recursion level (used for debugging)
+
+    Returns:
+        An evaluable string where "and" is replaced with "min" and "or" is replaced with "max"
+    """
     try:
         loc_r = gpr_expression.index(")")
     except ValueError:
@@ -95,9 +111,9 @@ def _set_boundaries(
     upper_bounds: list[float],
 ) -> cobra.Model:
     # get boundary reactions
-    exchange_rxns = [rxn.id for rxn in model.reactions if re.search("EX_", rxn.id)]
-    sink_rxns = [rxn.id for rxn in model.reactions if re.search("sink_", rxn.id)]
-    demand_rxns = [rxn.id for rxn in model.reactions if re.search("DM_", rxn.id)]
+    exchange_rxns = [rxn.id for rxn in model.reactions if "EX_" in rxn.id]
+    sink_rxns = [rxn.id for rxn in model.reactions if "sink_" in rxn.id]
+    demand_rxns = [rxn.id for rxn in model.reactions if "DM_" in rxn.id]
 
     # Allows all boundary reactions to be used if none are given
     allow_all_boundary_rxns = not boundary_reactions
@@ -181,7 +197,7 @@ def _build_with_fastcore(cobra_model, s_matrix, lower_bounds, upper_bounds, exp_
     # e1003424.'
     logger.warning("Fastcore requires a flux consistant model is used as refererence, to achieve this fastcc is required which is NOT reproducible.")
     logger.debug("Creating feasible model")
-    incon_rxns, cobra_model = _feasibility_test(cobra_model, "other")
+    _, cobra_model = _feasibility_test(cobra_model, "other")
     properties = FastcoreProperties(core=exp_idx_list, solver=solver)
     algorithm = FASTcore(s_matrix, lower_bounds, upper_bounds, properties)
     context_rxns = algorithm.fastcore()
@@ -263,6 +279,19 @@ async def _map_expression_to_reaction(
     """Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules.
 
     These rules should be defined in the general genome-scale metabolic model
+
+    Args:
+        reference_model: A COBRA model object representing the general genome-scale metabolic model.
+        gene_expression_file: Path to a gene expression file (.csv, .tsv, .xlsx, or .xls)
+        recon_algorithm: Algorithm to use for reconstruction (GIMME, FASTCORE, iMAT, or tINIT)
+        low_thresh: Low expression threshold for algorithms that require it (iMAT, tINIT)
+        high_thresh: High expression threshold for algorithms that require it (iMAT, tINIT)
+
+    Returns:
+        An ordered dictionary mapping reaction IDs to their corresponding expression values.
+
+    Raises:
+        ValueError: If neither 'entrez_gene_id' nor 'ensembl_gene_id' columns are found in the gene expression file.
     """
     expression_data = await _read_file(gene_expression_file)
     identifier_column = next((col for col in ("entrez_gene_id", "ensembl_gene_id") if col in expression_data.columns), "")
@@ -282,8 +311,8 @@ async def _map_expression_to_reaction(
     # Define a default expression value if a gene ID is not found
     default_expression = (
         np.mean([low_thresh, high_thresh]) if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT}
-        else -1 if recon_algorithm in {Algorithm.GIMME}
-        else 0 if recon_algorithm in {Algorithm.FASTCORE}
+        else -1 if recon_algorithm == Algorithm.GIMME
+        else 0 if recon_algorithm == Algorithm.FASTCORE
         else 1
     )
     # fmt: on
@@ -339,6 +368,24 @@ async def _build_model(  # noqa: C901
     Core reactions that do not necessarily meet GPR association requirements can be forced if in the force reaction
     file. Metabolite exchange (media), sinks, and demands are determined from exchanges file. Reactions can also be
     force excluded even if they meet GPR association requirements using the force exclude file.
+
+    Args:
+        general_model_file: Path to a COBRA model file (.xml, .mat, or .json)
+        gene_expression_file: Path to a gene expression file (.csv, .tsv, .xlsx, or .xls)
+        recon_algorithm: Algorithm to use for reconstruction (GIMME, FASTCORE, iMAT, or tINIT)
+        objective: Objective reaction ID in the general model
+        boundary_reactions: List of boundary reactions to set in the model
+        exclude_reactions: List of reactions to exclude from the model
+        force_reactions: List of reactions to force include in the model
+        lower_bounds: List of lower bounds corresponding to boundary reactions
+        upper_bounds: List of upper bounds corresponding to boundary reactions
+        solver: Solver to use (e.g., 'glpk', 'cplex', 'gurobi')
+        low_thresh: Low expression threshold for algorithms that require it (iMAT, tINIT)
+        high_thresh: High expression threshold for algorithms that require it (iMAT, tINIT)
+        output_flux_result_filepath: Path to save flux results (for iMAT only)
+
+    Returns:
+        A _BuildResults object containing the context-specific model, list of expression indices used, and a DataFrame of infeasible reactions.
     """
     reference_model: cobra.Model
     match general_model_file.suffix:
@@ -583,7 +630,31 @@ async def create_context_specific_model(  # noqa: C901
     log_level: LogLevel = LogLevel.INFO,
     log_location: str | TextIOWrapper = sys.stderr,
 ):
-    """Create a context-specific model using the provided data."""
+    """Create a context-specific model using the provided data.
+
+    Args:
+        context_name: Name of the context-specific model.
+        reference_model: Path to the general genome-scale metabolic model file (.xml, .mat, or .json).
+        active_genes_filepath: Path to the gene expression data file (csv, tsv, or Excel).
+        output_infeasible_reactions_filepath: Path to save infeasible reactions (csv).
+        output_flux_result_filepath: Path to save flux results (csv).
+        output_model_filepaths: Path or list of paths to save the context-specific model (.xml, .mat, or .json).
+        output_filetypes: List of file types to save the model as ('xml', 'mat', 'json').
+        output_fastcore_expression_index_filepath: Path to save Fastcore expression indices (txt). Required if using Fastcore.
+        objective: Objective function reaction ID.
+        boundary_rxns_filepath: Optional path to boundary reactions file (csv, tsv, or Excel).
+        exclude_rxns_filepath: Optional path to reactions to exclude file (csv, tsv, or Excel).
+        force_rxns_filepath: Optional path to reactions to force include file (csv, tsv, or Excel).
+        algorithm: Algorithm to use for reconstruction. One of Algorithm.GIMME, Algorithm.FASTCORE, Algorithm.IMAT, Algorithm.TINIT.
+        low_threshold: Low expression threshold for algorithms that require it.
+        high_threshold: High expression threshold for algorithms that require it.
+        solver: Solver to use. One of Solver.GLPK, Solver.CPLEX, Solver.GUROBI
+        log_level: Logging level. One of LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARNING, LogLevel.ERROR, LogLevel.CRITICAL
+        log_location: Location for log output. Can be a file path or sys.stderr/sys.stdout.
+
+    Raises:
+        ImportError: If Gurobi solver is selected but gurobipy is not installed.
+    """
     _set_up_logging(level=log_level, location=log_location)
     output_model_filepaths = [output_model_filepaths] if isinstance(output_model_filepaths, Path) else output_model_filepaths
     for path in output_model_filepaths:

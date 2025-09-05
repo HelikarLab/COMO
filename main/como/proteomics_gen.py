@@ -17,7 +17,14 @@ from como.utils import _log_and_raise_error, _set_up_logging, return_placeholder
 
 # Load Proteomics
 def process_proteomics_data(path: Path) -> pd.DataFrame:
-    """Load proteomics data from a given context and filename."""
+    """Load proteomics data from a given context and filename.
+
+    Args:
+        path: Path to the proteomics data file (CSV format).
+
+    Returns:
+        pd.DataFrame: Processed proteomics data with 'gene_symbol' column exploded.
+    """
     # Preprocess data, drop na, duplicate ';' in symbol,
     matrix: pd.DataFrame = pd.read_csv(path)
     if "gene_symbol" not in matrix.columns:
@@ -35,7 +42,15 @@ def process_proteomics_data(path: Path) -> pd.DataFrame:
 
 # read map to convert to entrez
 async def load_gene_symbol_map(gene_symbols: list[str], entrez_map: Path | None = None):
-    """Add descirption...."""
+    """Load a mapping from gene symbols to Entrez IDs.
+
+    Args:
+        gene_symbols (list[str]): List of gene symbols to map.
+        entrez_map (Path | None): Optional path to a CSV file containing precomputed mappings.
+
+    Returns:
+        pd.DataFrame: DataFrame with gene symbols as index and corresponding Entrez IDs.
+    """
     if entrez_map and entrez_map.exists():
         df = pd.read_csv(entrez_map, index_col="gene_symbol")
     else:
@@ -122,8 +137,16 @@ def to_bool_context(context_name, group_ratio, hi_group_ratio, group_names):
 
 
 # read data from csv files
-def load_proteomics_tests(filename, context_name):
-    """Load statistical test results."""
+def load_proteomics_tests(filename, context_name) -> tuple[str, pd.DataFrame]:
+    """Load statistical test results.
+
+    Arg:
+        filename (str): The name of the file to load.
+        context_name (str): The context name for the data.
+
+    Returns:
+        tuple: A tuple containing the context name and the loaded data as a pandas DataFrame.
+    """
     config = Config()
 
     def load_empty_dict():
@@ -187,7 +210,7 @@ async def proteomics_gen(
             error=FileNotFoundError,
             level=LogLevel.ERROR,
         )
-    if matrix_filepath.suffix not in {".csv"}:
+    if matrix_filepath.suffix != ".csv":
         _log_and_raise_error(
             f"Matrix file must be a csv file at {matrix_filepath}",
             error=FileNotFoundError,

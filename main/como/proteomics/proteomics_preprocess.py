@@ -159,7 +159,7 @@ class PopulateInformation:
             url_count = 0
 
             # Iterate through the URLs available
-            for url, study in zip(ftp_urls, studies):
+            for url, study in zip(ftp_urls, studies, strict=True):
                 ftp_data: FTPManager.Reader = FTPManager.Reader(root_link=url, file_extensions=self._preferred_extensions)
 
                 urls = list(ftp_data.files)
@@ -167,7 +167,7 @@ class PopulateInformation:
                 url_count += len(urls)
 
                 # Iterate through all files and sizes found for url_##
-                for file, size in zip(urls, sizes):
+                for file, size in zip(urls, sizes, strict=True):
                     self.file_information.append(FileInformation(cell_type=cell_type, download_url=file, file_size=size, study=study))
 
     def print_download_size(self):
@@ -205,12 +205,23 @@ class PopulateInformation:
                 current_info.set_replicate(replicate_value)
 
     def _collect_cell_type_information(self, cell_type: str) -> list[FileInformation]:
-        """Collect all FileInformation objects of a given cell type."""
+        """Collect all FileInformation objects of a given cell type.
+
+        Arg:
+            cell_type: The cell type to collect information for.
+
+        Returns:
+            A list of FileInformation objects matching the given cell type.
+        """
         return [information for information in self.file_information if information.cell_type == cell_type]
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse arguments from the command line."""
+    """Parse arguments from the command line.
+
+    Returns:
+        An argparse.Namespace object containing the parsed arguments.
+    """
     parser = argparse.ArgumentParser(
         prog="proteomics_preprocess.py",
         description="Download and analyze proteomics data from proteomeXchange\n"

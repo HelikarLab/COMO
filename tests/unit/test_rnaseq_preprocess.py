@@ -40,7 +40,7 @@ class TestSTARInformation:
     @pytest.mark.asyncio
     async def test_build_from_tab_invalid_file(self):
         """Validate error on invalid file."""
-        with pytest.raises(ValueError, match="Building STAR information requires a '.tab' file"):
+        with pytest.raises(ValueError, match="Building STAR information requires a '\.tab' file"):
             await _STARinformation.build_from_tab(TestSTARInformation.invalid_data)
 
 
