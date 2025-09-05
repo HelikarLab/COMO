@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import json
 import re
 import sys
@@ -49,17 +50,16 @@ class _STARinformation:
                 level=LogLevel.ERROR,
             )
 
-        with filepath.open("r") as i_stream:
-            unmapped = i_stream.readline()
-            multimapping = i_stream.readline()
-            no_feature = i_stream.readline()
-            ambiguous = i_stream.readline()
+        async with aiofiles.open(filepath) as i_stream:
+            unmapped, multimapping, no_feature, ambiguous = await asyncio.gather(
+                *[i_stream.readline(), i_stream.readline(), i_stream.readline(), i_stream.readline()]
+            )
 
             num_unmapped = [int(i) for i in unmapped.rstrip("\n").split("\t")[1:]]
             num_multimapping = [int(i) for i in multimapping.rstrip("\n").split("\t")[1:]]
             num_no_feature = [int(i) for i in no_feature.rstrip("\n").split("\t")[1:]]
             num_ambiguous = [int(i) for i in ambiguous.rstrip("\n").split("\t")[1:]]
-            remainder = await asyncio.to_thread(i_stream.read)
+            remainder = await i_stream.read()
 
         df = await _read_file(StringIO(remainder), sep="\t", header=None)
         df.columns = [
@@ -220,8 +220,9 @@ def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
 
 async def _process_first_multirun_sample(strand_file: Path, all_counts_files: list[Path]):
     sample_count = pd.DataFrame()
-    for file in all_counts_files:
-        star_information = await _STARinformation.build_from_tab(file)
+    all_star_information: list[_STARinformation] = await asyncio.gather(*[_STARinformation.build_from_tab(file) for file in all_counts_files])
+
+    for star_information in all_star_information:
         strand_information = strand_file.read_text().rstrip("\n").lower()
 
         if strand_information not in ("none", "first_read_transcription_strand", "second_read_transcription_strand"):
@@ -238,16 +239,16 @@ async def _process_first_multirun_sample(strand_file: Path, all_counts_files: li
             strand_information = "unstranded_rna_counts"
 
         run_counts = star_information.count_matrix[["ensembl_gene_id", strand_information]]
-        run_counts.columns = pd.Index(["ensembl_gene_id", "counts"])
+        run_counts.columns = ["ensembl_gene_id", "counts"]
         sample_count = run_counts if sample_count.empty else sample_count.merge(run_counts, on=["ensembl_gene_id", "counts"], how="outer")
 
     # Set na values to 0
     sample_count = sample_count.fillna(value="0")
     sample_count["counts"] = sample_count["counts"].astype(np.float64)
 
-    count_sums: pd.DataFrame = pd.DataFrame(sample_count.sum(axis=1, numeric_only=True))
-    count_sums.insert(0, "ensembl_gene_id", sample_count["ensembl_gene_id"])
-    count_sums.columns = pd.Index(["ensembl_gene_id", _sample_name_from_filepath(strand_file)])
+    count_sums = sample_count.groupby("ensembl_gene_id", as_index=False)["counts"].mean()
+    count_sums["counts"] = np.ceil(count_sums["counts"].astype(np.uint32))
+    count_sums.columns = ["ensembl_gene_id", _sample_name_from_filepath(strand_file)]
     return count_sums
 
 
@@ -269,7 +270,7 @@ async def _process_standard_replicate(counts_file: Path, strand_file: Path, samp
         strand_information = "unstranded_rna_counts"
 
     sample_count = star_information.count_matrix[["ensembl_gene_id", strand_information]]
-    sample_count.columns = pd.Index(["ensembl_gene_id", sample_name])
+    sample_count.columns = ["ensembl_gene_id", sample_name]
     return sample_count
 
 
@@ -314,7 +315,8 @@ async def _create_sample_counts_matrix(metrics: _StudyMetrics) -> pd.DataFrame:
         # Remove run number "r\d+" from multi-run names
         if re.search(r"R\d+r1", metrics.sample_names[i]):
             new_sample_name = re.sub(r"r\d+", "", metrics.sample_names[i])
-            counts.columns[i + 1 - adjusted_index] = new_sample_name
+            old_col_name = counts.columns[i + 1 - adjusted_index]
+            counts.rename(columns={old_col_name: new_sample_name}, inplace=True)
 
     return counts
 
@@ -329,12 +331,11 @@ async def _write_counts_matrix(
     """Create a counts matrix file by reading gene counts table(s)."""
     study_metrics = _organize_gene_counts_files(data_dir=como_context_dir)
     counts: list[pd.DataFrame] = await asyncio.gather(*[_create_sample_counts_matrix(metric) for metric in study_metrics])
+    rna_specific_sample_names = set(config_df.loc[config_df["library_prep"] == rna.value, "sample_name"].tolist())
 
-    final_matrix = pd.DataFrame()
-    for count in counts:
-        final_matrix = count if final_matrix.empty else pd.merge(final_matrix, count, on="ensembl_gene_id", how="outer")
-
-    rna_specific_sample_names = config_df.loc[config_df["library_prep"] == rna.value, "sample_name"].tolist()
+    final_matrix: pd.DataFrame = functools.reduce(lambda left, right: pd.merge(left, right, on="ensembl_gene_id", how="outer"), counts)
+    final_matrix.fillna(value=0, inplace=True)
+    final_matrix.iloc[:, 1:] = final_matrix.iloc[:, 1:].astype(np.uint64)
     final_matrix = final_matrix[["ensembl_gene_id", *rna_specific_sample_names]]
 
     output_counts_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -418,6 +419,7 @@ async def _create_config_df(  # noqa: C901
 
         fragment_label = f"{context_name}_{label}_fragment_size.txt"
         frag_paths = [p for p in aux_lookup["fragment"].values() if p.name == fragment_label]
+        mean_frag = 100.0
         if not frag_paths and prep != RNAType.TRNA.value:
             logger.warning(f"No fragment file for '{label}'; defaulting to 100 bp (needed for zFPKM).")
             mean_frag = 100.0
@@ -430,6 +432,7 @@ async def _create_config_df(  # noqa: C901
                 counts = np.array([df["frag_count"].sum() for df in dfs])
                 means = np.array([(df["meanxcount"] / df["frag_count"].sum()).sum() for df in dfs])
                 mean_frag = float(np.average(means, weights=counts))
+
         rows.append(
             SampleConfiguration(
                 sample_name=sample_id,
@@ -621,7 +624,6 @@ async def _create_gene_info_file(
     """
 
     async def read_counts(file: Path) -> list[str]:
-        print(f"Will read: '{file}'")
         data = await _read_file(file, h5ad_as_df=False)
 
         try:
@@ -632,7 +634,7 @@ async def _create_gene_info_file(
             )
         except json.JSONDecodeError:
             _log_and_raise_error(
-                f"Got a JSO decode error for file '{counts_matrix_filepaths}'",
+                f"Got a JSON decode error for file '{counts_matrix_filepaths}'",
                 error=ValueError,
                 level=LogLevel.CRITICAL,
             )
@@ -645,11 +647,12 @@ async def _create_gene_info_file(
     gene_data = await MyGene(cache=cache).query(items=list(genes), taxon=taxon, scopes="entrezgene")
     gene_info: pd.DataFrame = pd.DataFrame(
         data=None,
-        columns=pd.Index(data=["ensembl_gene_id", "gene_symbol", "entrez_gene_id", "size"]),
-        index=pd.Index(data=range(len(gene_data))),
+        columns=["ensembl_gene_id", "gene_symbol", "entrez_gene_id", "size"],
+        index=list(range(len(gene_data))),
     )
     for i, data in enumerate(gene_data):
-        ensembl_ids = data.get("genomic_pos.ensemblgene", "-")
+        # ensembl_ids = data.get("genomic_pos.ensemblgene", "-")
+        ensembl_ids = data.get("genomic_pos.ensemblgene", pd.NA)
         if isinstance(ensembl_ids, list):
             ensembl_ids = ensembl_ids[0]
 
@@ -658,14 +661,16 @@ async def _create_gene_info_file(
         end_pos = data.get("genomic_pos.end", 0)
         end_pos: int = int(sum(end_pos) / len(end_pos)) if isinstance(end_pos, list) else int(end_pos)
 
-        gene_info.at[i, "gene_symbol"] = data.get("symbol", "-")
-        gene_info.at[i, "entrez_gene_id"] = data.get("entrezgene", "-")
+        gene_info.at[i, "gene_symbol"] = data.get("symbol", pd.NA)
+        gene_info.at[i, "entrez_gene_id"] = data.get("entrezgene", pd.NA)
         gene_info.at[i, "ensembl_gene_id"] = ensembl_ids
         gene_info.at[i, "size"] = end_pos - start_pos
 
-    gene_info = gene_info[((gene_info["entrez_gene_id"] != "-") & (gene_info["ensembl_gene_id"] != "-") & (gene_info["gene_symbol"] != "-"))]
+    gene_info = gene_info[((~gene_info["entrez_gene_id"].isna()) & (~gene_info["ensembl_gene_id"].isna()) & (~gene_info["gene_symbol"].isna()))]
     gene_info.sort_values(by="ensembl_gene_id", inplace=True)
     gene_info.dropna(inplace=True)
+
+    output_filepath.parent.mkdir(parents=True, exist_ok=True)
     gene_info.to_csv(output_filepath, index=False)
     logger.success(f"Gene Info file written at '{output_filepath}'")
 
@@ -700,7 +705,9 @@ async def _process(
     output_mrna_config_filepath: Path | None,
     output_trna_matrix_filepath: Path | None,
     output_mrna_matrix_filepath: Path | None,
+    *,
     cache: bool,
+    create_gene_info_only: bool,
 ):
     rna_types: list[tuple[RNAType, Path, Path]] = []
     if output_trna_config_filepath:
@@ -709,29 +716,31 @@ async def _process(
         rna_types.append((RNAType.MRNA, output_mrna_config_filepath, output_mrna_matrix_filepath))
 
     # if provided, iterate through como-input specific directories
-    tasks = []
-    for rna, output_config_filepath, output_matrix_filepath in rna_types:
-        tasks.append(
-            asyncio.create_task(
-                _process_como_input(
-                    context_name=context_name,
-                    output_config_filepath=output_config_filepath,
-                    como_context_dir=como_context_dir,
-                    output_counts_matrix_filepath=output_matrix_filepath,
-                    rna=rna,
+    if not create_gene_info_only:
+        tasks = []
+        for rna, output_config_filepath, output_matrix_filepath in rna_types:
+            tasks.append(
+                asyncio.create_task(
+                    _process_como_input(
+                        context_name=context_name,
+                        output_config_filepath=output_config_filepath,
+                        como_context_dir=como_context_dir,
+                        output_counts_matrix_filepath=output_matrix_filepath,
+                        rna=rna,
+                    )
                 )
             )
-        )
 
-    await asyncio.gather(*tasks)
+        await asyncio.gather(*tasks)
 
     # create the gene info filepath based on provided data
-
     input_files = []
     if input_matrix_filepath:
         input_files.extend(input_matrix_filepath)
-    output_trna_matrix_filepath and input_files.append(output_trna_matrix_filepath)
-    output_mrna_matrix_filepath and input_files.append(output_mrna_matrix_filepath)
+    if output_trna_matrix_filepath:
+        input_files.append(output_trna_matrix_filepath)
+    if output_mrna_matrix_filepath:
+        input_files.append(output_mrna_matrix_filepath)
 
     await _create_gene_info_file(
         counts_matrix_filepaths=input_files,
@@ -754,6 +763,8 @@ async def rnaseq_preprocess(
     cache: bool = True,
     log_level: LogLevel | str = LogLevel.INFO,
     log_location: str | TextIOWrapper = sys.stderr,
+    *,
+    create_gene_info_only: bool = False,
 ) -> None:
     """Preprocesses RNA-seq data for downstream analysis.
 
@@ -773,6 +784,7 @@ async def rnaseq_preprocess(
     :param cache: Should HTTP requests be cached
     :param log_level: The logging level
     :param log_location: The logging location
+    :param create_gene_info_only: If True, only create the gene info file and skip general preprocessing steps
     """
     _set_up_logging(level=log_level, location=log_location)
 
@@ -780,6 +792,7 @@ async def rnaseq_preprocess(
 
     if como_context_dir:
         como_context_dir = como_context_dir.resolve()
+
     input_matrix_filepath = [i.resolve() for i in _listify(input_matrix_filepath)] if input_matrix_filepath else None
     output_trna_metadata_filepath = output_trna_metadata_filepath.resolve() if output_trna_metadata_filepath else None
     output_mrna_metadata_filepath = output_mrna_metadata_filepath.resolve() if output_mrna_metadata_filepath else None
@@ -797,6 +810,7 @@ async def rnaseq_preprocess(
         output_trna_matrix_filepath=output_trna_count_matrix_filepath,
         output_mrna_matrix_filepath=output_mrna_count_matrix_filepath,
         cache=cache,
+        create_gene_info_only=create_gene_info_only,
     )
 
 
