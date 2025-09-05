@@ -86,27 +86,21 @@ class _Arguments:
                 level=LogLevel.ERROR,
             )
 
-        if (
-            isdigit(self.num_replicate_neighbors) and self.num_replicate_neighbors < 1
-        ) or self.num_replicate_neighbors != "default":
+        if (isdigit(self.num_replicate_neighbors) and self.num_replicate_neighbors < 1) or self.num_replicate_neighbors != "default":
             _log_and_raise_error(
                 "--n-neighbors-rep must be either 'default' or an integer > 1",
                 error=ValueError,
                 level=LogLevel.ERROR,
             )
 
-        if (
-            isdigit(self.num_batch_neighbors) and self.num_batch_neighbors < 1
-        ) or self.num_batch_neighbors != "default":
+        if (isdigit(self.num_batch_neighbors) and self.num_batch_neighbors < 1) or self.num_batch_neighbors != "default":
             _log_and_raise_error(
                 "--n-neighbors-batch must be either 'default' or an integer > 1",
                 error=ValueError,
                 level=LogLevel.ERROR,
             )
 
-        if (
-            isdigit(self.num_context_neighbors) and self.num_context_neighbors < 1
-        ) or self.num_context_neighbors != "default":
+        if (isdigit(self.num_context_neighbors) and self.num_context_neighbors < 1) or self.num_context_neighbors != "default":
             _log_and_raise_error(
                 "--n-neighbors-context must be either 'default' or an integer > 1",
                 error=ValueError,
