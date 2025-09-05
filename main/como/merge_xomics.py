@@ -128,7 +128,7 @@ def _merge_logical_table(df: pd.DataFrame):
 
         df = pd.concat([df, pd.DataFrame(duplicate_rows)], axis=0, ignore_index=True)
         df.drop(df[df["entrez_gene_id"] == i].index, inplace=True)
-    logger.trace(f"Shape after merging duplciated rows: {df.shape}")
+    logger.trace(f"Shape after merging duplicated rows: {df.shape}")
 
     full_entrez_id_sets: set[str] = set()
     entrez_dups_list: list[list[str]] = []
