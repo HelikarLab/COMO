@@ -11,11 +11,7 @@ import pandas as pd
 from loguru import logger
 
 PATH_TYPE = str | Path
-LOG_FORMAT = (
-    "<green>{time:YYYY-MM-DD HH:mm:ss}</> | "
-    "<level>{level:<8}</> | "
-    "<cyan>{name}</>:<cyan>{line}</> - <level>{message}</>"
-)
+LOG_FORMAT = "<green>{time:YYYY-MM-DD HH:mm:ss}</> | <level>{level:<8}</> | <cyan>{name}</>:<cyan>{line}</> - <level>{message}</>"
 
 
 class AdjustmentMethod(Enum):
@@ -139,9 +135,7 @@ class CobraCompartments:
         "s": ["eyespot", "eyespot apparatus", "stigma"],
     }
 
-    _REVERSE_LOOKUP: ClassVar[dict[str, list[str]]] = {
-        value.lower(): key for key, values in SHORTHAND.items() for value in values
-    }
+    _REVERSE_LOOKUP: ClassVar[dict[str, list[str]]] = {value.lower(): key for key, values in SHORTHAND.items() for value in values}
 
     @classmethod
     def get_shorthand(cls, longhand: str) -> str | None:
@@ -215,7 +209,7 @@ class _BaseDataType:
 
     def _validate_attribute(self, key):
         if key not in {i.value for i in SourceTypes._member_map_.values()}:
-            # Unable to use como.utils._log_and_raise_error becuase it results in a circular import
+            # Unable to use como.utils._log_and_raise_error because it results in a circular import
             message = f"{key} is not a valid attribute of {SourceTypes.__name__}; got '{key}'"
             logger.warning(message)
             raise ValueError(message)
