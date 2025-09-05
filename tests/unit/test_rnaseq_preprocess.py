@@ -40,7 +40,7 @@ class TestSTARInformation:
     @pytest.mark.asyncio
     async def test_build_from_tab_invalid_file(self):
         """Validate error on invalid file."""
-        with pytest.raises(ValueError, match="Building STAR information requires a '\.tab' file"):
+        with pytest.raises(ValueError, match=r"Building STAR information requires a '\.tab' file"):
             await _STARinformation.build_from_tab(TestSTARInformation.invalid_data)
 
 
@@ -70,7 +70,7 @@ async def test_process_first_multirun_sample(strand_filepath: Path, all_gene_cou
     result: pd.DataFrame = await _process_first_multirun_sample(strand_filepath, all_gene_count_filepaths)
     assert result.columns[0] == "ensembl_gene_id"
     assert len(result.columns) == 2
-    assert result.columns[1] in strand_filepath.as_posix()
+    assert result.columns.tolist()[1] in strand_filepath.as_posix()
 
 
 def test_pack_filepaths(packed_filepaths: PackedFilepaths):
