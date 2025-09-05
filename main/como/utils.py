@@ -164,12 +164,10 @@ async def _read_file(
         return pd.read_csv(path, **kwargs)
 
     match path.suffix:
-        case ".csv" | ".tsv" | ".txt":
+        case ".csv" | ".tsv" | ".txt" | ".tab":
             if "sep" not in kwargs:
                 kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")
-            async with aiofiles.open(path) as i_stream:
-                content = await i_stream.read()
-                return pd.read_csv(io.StringIO(content), **kwargs)
+            return await asyncio.to_thread(pd.read_csv, path, **kwargs)
         case ".xlsx" | ".xls":
             return await asyncio.to_thread(pd.read_excel, path, **kwargs)
         case ".h5ad":

@@ -51,23 +51,29 @@ class _STARinformation:
             )
 
         async with aiofiles.open(filepath) as i_stream:
-            unmapped, multimapping, no_feature, ambiguous = await asyncio.gather(
-                *[i_stream.readline(), i_stream.readline(), i_stream.readline(), i_stream.readline()]
-            )
+            # Cannot use `asyncio.gather()` here because the order of execution is not guaranteed
+            unmapped = await i_stream.readline()
+            multimapping = await i_stream.readline()
+            no_feature = await i_stream.readline()
+            ambiguous = await i_stream.readline()
 
-            num_unmapped = [int(i) for i in unmapped.rstrip("\n").split("\t")[1:]]
-            num_multimapping = [int(i) for i in multimapping.rstrip("\n").split("\t")[1:]]
-            num_no_feature = [int(i) for i in no_feature.rstrip("\n").split("\t")[1:]]
-            num_ambiguous = [int(i) for i in ambiguous.rstrip("\n").split("\t")[1:]]
-            remainder = await i_stream.read()
+            num_unmapped = [int(i) for i in unmapped.removesuffix("\n").split("\t")[1:]]
+            num_multimapping = [int(i) for i in multimapping.removesuffix("\n").split("\t")[1:]]
+            num_no_feature = [int(i) for i in no_feature.removesuffix("\n").split("\t")[1:]]
+            num_ambiguous = [int(i) for i in ambiguous.removesuffix("\n").split("\t")[1:]]
 
-        df = await _read_file(StringIO(remainder), sep="\t", header=None)
-        df.columns = [
-            "ensembl_gene_id",
-            "unstranded_rna_counts",
-            "first_read_transcription_strand",
-            "second_read_transcription_strand",
-        ]
+        df = await _read_file(
+            filepath,
+            sep="\t",
+            header=None,
+            skiprows=4,
+            names=[
+                "ensembl_gene_id",
+                "unstranded_rna_counts",
+                "first_read_transcription_strand",
+                "second_read_transcription_strand",
+            ],
+        )
         df = df[~df["ensembl_gene_id"].isna()]
         return _STARinformation(
             num_unmapped=num_unmapped,

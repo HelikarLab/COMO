@@ -31,6 +31,7 @@ class TestSTARInformation:
     async def test_build_from_tab_valid_file(self):
         """Validate building STAR information object."""
         star: _STARinformation = await _STARinformation.build_from_tab(TestSTARInformation.valid_data)
+
         assert len(star.gene_names) == len(star.count_matrix) == 61541
         assert len(star.num_unmapped) == 3
         assert len(star.num_multimapping) == 3
