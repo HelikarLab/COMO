@@ -575,7 +575,7 @@ async def merge_xomics(  # noqa: C901
     }
     # fmt: on
     for source in source_data:
-        _validate_source_arguments(source, source_data[source])
+        _validate_source_arguments(source, *source_data[source])
 
     if all(
         file is None
