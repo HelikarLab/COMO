@@ -159,7 +159,7 @@ async def _build_matrix_results(
     :param taxon: The NCBI Taxon ID
     :return: A dataclass `ReadMatrixResults`
     """
-    matrix.dropna(inplace=True)
+    matrix.dropna(subset="ensembl_gene_id", inplace=True)
     conversion = await ensembl_to_gene_id_and_symbol(ids=matrix["ensembl_gene_id"].tolist(), taxon=taxon)
     conversion["ensembl_gene_id"] = conversion["ensembl_gene_id"].str.split(",")
     conversion = conversion.explode("ensembl_gene_id")
@@ -184,11 +184,12 @@ async def _build_matrix_results(
     # Only include Entrez and Ensembl Gene IDs that are present in `gene_info`
     matrix["entrez_gene_id"] = matrix["entrez_gene_id"].str.split("//")
     matrix = matrix.explode("entrez_gene_id")
-    matrix = matrix.replace(to_replace="-", value=pd.NA).dropna()
+    # matrix = matrix.replace(to_replace="-", value=pd.NA)
+    matrix.dropna(subset="entrez_gene_id", inplace=True)
     matrix["entrez_gene_id"] = matrix["entrez_gene_id"].astype(int)
 
     gene_info = gene_info_migrations(gene_info)
-    gene_info = gene_info.replace(to_replace="-", value=pd.NA).dropna()
+    # gene_info = gene_info.replace(to_replace="-", value=pd.NA)
     gene_info["entrez_gene_id"] = gene_info["entrez_gene_id"].astype(int)
 
     counts_matrix = matrix.merge(
@@ -244,9 +245,10 @@ def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
     """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary."""
     for study in metrics:
         matrix_values = []
+
         for sample in range(metrics[study].num_samples):
             layout = metrics[study].layout[sample]
-            count_matrix: pd.DataFrame = metrics[study].count_matrix.iloc[:, sample].values.astype(np.float32)
+            count_matrix: npt.NDArray[np.float32] = metrics[study].count_matrix.iloc[:, sample].values
             gene_lengths = (
                 metrics[study].fragment_lengths[sample].astype(np.float32)
                 if layout == LayoutMethod.paired_end
@@ -302,6 +304,7 @@ def _zfpkm_calculation(
     Stabilize the variance in the data to make the distribution more symmetric; this is helpful for Gaussian fitting
 
     Kernel Density Estimation (kde)
+        - SciKit Learn: https://scikit-learn.org/stable/modules/density.html
         - Non-parametric method to estimate the probability density function (PDF) of a random variable
         - Estimates the distribution of log2-transformed FPKM values
         - Bandwidth parameter controls the smoothness of the density estimate
@@ -340,8 +343,11 @@ def _zfpkm_calculation(
             a threshold for calling a gene as "active" and/or "expressed"
             : https://doi.org/10.1186/1471-2164-14-778
     """
-    values = column.values
-    refit: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(values.reshape(-1, 1))  # type: ignore
+    values: npt.NDArray = column.values
+    # replace na values with 0
+    values = np.nan_to_num(values, nan=0.0)
+    refit: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth)
+    refit.fit(values.reshape(-1, 1))
 
     x_range = np.linspace(values.min(), values.max(), 2000)
     density = np.exp(refit.score_samples(x_range.reshape(-1, 1)))
@@ -702,9 +708,9 @@ async def _process(
     rnaseq_matrix: pd.DataFrame = await _read_file(rnaseq_matrix_filepath)
     if rnaseq_matrix_filepath.suffix == ".h5ad":
         conversion = await gene_symbol_to_ensembl_and_gene_id(symbols=rnaseq_matrix["gene_symbol"].tolist(), taxon=taxon)
-        conversion.reset_index(inplace=True)
+        conversion.reset_index(inplace=True, drop=False)
         rnaseq_matrix = rnaseq_matrix.merge(conversion, how="left", on="gene_symbol")
-        rnaseq_matrix.replace(to_replace=pd.NA, value="-")
+        # rnaseq_matrix = rnaseq_matrix.replace(to_replace=pd.NA, value="-")
 
     filtering_options = _FilteringOptions(
         replicate_ratio=replicate_ratio,
@@ -916,6 +922,17 @@ async def rnaseq_gen(  # noqa: C901
             level=LogLevel.ERROR,
         )
 
+    metadata_df["fragment_length"] = metadata_df["fragment_length"].astype(np.float32)
+    metadata_df = metadata_df.groupby("sample_name", as_index=False).agg(
+        {
+            "sample_name": "first",
+            "fragment_length": "mean",
+            "layout": "first",
+            "strand": "first",
+            "study": "first",
+            "library_prep": "first",
+        }
+    )
     logger.debug(f"Starting '{context_name}'")
     await _process(
         context_name=context_name,
