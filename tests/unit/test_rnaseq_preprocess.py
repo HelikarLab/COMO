@@ -7,7 +7,6 @@ import pytest
 from como.rnaseq_preprocess import (
     _organize_gene_counts_files,
     _process_first_multirun_sample,
-    _process_standard_replicate,
     _sample_name_from_filepath,
     _STARinformation,
     _StudyMetrics,
@@ -28,7 +27,7 @@ class TestSTARInformation:
     invalid_data = Path("main/data/COMO_input/naiveB/fragmentSizes/S1/naiveB_S1R1_fragment_size.txt").resolve()
 
     @pytest.mark.asyncio
-    async def test_build_from_tab_valid_file(self):
+    async def test_build_from_tab_valid_file(self) -> None:
         """Validate building STAR information object."""
         star: _STARinformation = await _STARinformation.build_from_tab(TestSTARInformation.valid_data)
 
@@ -51,8 +50,8 @@ def test_sample_name_from_filepath(any_como_input_filepath: Path):
 
 
 def test_organize_gene_counts_files(como_input_data_directory: Path):
-    metrics: list[_StudyMetrics] = _organize_gene_counts_files(como_input_data_directory)
-    for metric in metrics:
+    metric: _StudyMetrics
+    for metric in _organize_gene_counts_files(como_input_data_directory):
         assert len(metric.sample_names) == metric.num_samples == len(metric.count_files) == len(metric.strand_files)
 
         for file in metric.count_files:
