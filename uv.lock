@@ -150,27 +150,6 @@ wheels = [
 ]
 
 [[package]]
-name = "arviz"
-version = "0.22.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "h5netcdf" },
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "packaging" },
-    { name = "pandas" },
-    { name = "scipy" },
-    { name = "setuptools" },
-    { name = "typing-extensions" },
-    { name = "xarray" },
-    { name = "xarray-einstats" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/31/24/727d666e137f0b8c4a4fdc3dc91484ab2ed1206ac61733b2688efa85b5e7/arviz-0.22.0.tar.gz", hash = "sha256:d9df7592f1ce77ce69f7504dba13f8d550204c49c23e54849861dbcb2c640954", size = 1591019, upload-time = "2025-07-09T10:07:21.525Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/38/5a3ee119be7f9f94f03a7626ee8edc52c9c9a9720cb020fa1f01fc87d4f2/arviz-0.22.0-py3-none-any.whl", hash = "sha256:336a3a4b1aa981997945f9ca104ca9f827e9c943f13760b18bf645ee5b12d56d", size = 1672062, upload-time = "2025-07-09T10:07:19.643Z" },
-]
-
-[[package]]
 name = "asttokens"
 version = "3.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -457,8 +436,6 @@ dependencies = [
     { name = "cobamp" },
     { name = "cobra" },
     { name = "fast-bioservices" },
-    { name = "gurobipy" },
-    { name = "hopsy" },
     { name = "kaleido" },
     { name = "loguru" },
     { name = "numpy" },
@@ -477,11 +454,19 @@ dependencies = [
 dev = [
     { name = "commitizen" },
     { name = "commitlint" },
-    { name = "hypothesis" },
+    { name = "hatchling" },
+    { name = "pandas-stubs" },
+    { name = "pre-commit" },
+    { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "ruff" },
+    { name = "scipy-stubs" },
+    { name = "types-aiofiles" },
+]
+gurobi = [
+    { name = "gurobipy" },
 ]
 interactive = [
     { name = "ipython" },
@@ -490,10 +475,17 @@ interactive = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "commitizen" },
+    { name = "commitlint" },
     { name = "como" },
     { name = "pandas-stubs" },
     { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
     { name = "scipy-stubs" },
+    { name = "types-aiofiles" },
 ]
 
 [package.metadata]
@@ -502,40 +494,51 @@ requires-dist = [
     { name = "anndata", specifier = ">=0.12.0" },
     { name = "cobamp", git = "https://github.com/JoshLoecker/cobamp?rev=master" },
     { name = "cobra", git = "https://github.com/ripaul/cobrapy?rev=hopsy-backend" },
-    { name = "commitizen", marker = "extra == 'dev'", specifier = ">=4.1.0" },
-    { name = "commitlint", marker = "extra == 'dev'", specifier = ">=1.3.0" },
+    { name = "commitizen", marker = "extra == 'dev'", specifier = ">=4.8.3" },
+    { name = "commitlint", marker = "extra == 'dev'", specifier = ">=1.3.1" },
     { name = "fast-bioservices", specifier = ">=0.3.9" },
-    { name = "gurobipy", specifier = "<14" },
-    { name = "hopsy", specifier = ">=1.6.1" },
-    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.122.1" },
+    { name = "gurobipy", marker = "extra == 'gurobi'", specifier = "<14" },
+    { name = "hatchling", marker = "extra == 'dev'", specifier = ">=1.27.0" },
     { name = "ipython", marker = "extra == 'interactive'", specifier = ">=8.0.0" },
     { name = "jupyterlab", marker = "extra == 'interactive'", specifier = ">=4.3.2" },
-    { name = "kaleido", specifier = ">=0.2.1" },
+    { name = "kaleido", specifier = ">=1.0.0" },
     { name = "loguru", specifier = ">=0.7.2" },
-    { name = "numpy", specifier = ">2.0" },
+    { name = "numpy", specifier = ">=2" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas", specifier = ">=1.3.5" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.3" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
+    { name = "pandas-stubs", marker = "extra == 'dev'", specifier = ">=2.3.2.250827" },
+    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.2.0" },
+    { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.405" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.4.1" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.1.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.2.1" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.12.11" },
     { name = "scanpy", specifier = ">=1.10.4" },
     { name = "scikit-learn", specifier = ">=1.5.2" },
     { name = "scipy", specifier = ">=1.13.0" },
+    { name = "scipy-stubs", marker = "extra == 'dev'", specifier = ">=1.16.1.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "setuptools", specifier = ">=78.1.1" },
     { name = "statsmodels", marker = "python_full_version < '3.12'", specifier = ">=0.13.0" },
     { name = "statsmodels", marker = "python_full_version >= '3.12'", specifier = ">=0.14.0" },
     { name = "troppo", git = "https://github.com/JoshLoecker/troppo?rev=master" },
+    { name = "types-aiofiles", marker = "extra == 'dev'", specifier = ">=24.1.0.20250822" },
 ]
-provides-extras = ["dev", "interactive"]
+provides-extras = ["dev", "gurobi", "interactive"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "commitizen", specifier = ">=4.8.3" },
+    { name = "commitlint", specifier = ">=1.3.1" },
     { name = "como", editable = "." },
     { name = "pandas-stubs", specifier = ">=2.3.2.250827" },
     { name = "pre-commit", specifier = ">=4.2.0" },
+    { name = "pytest", specifier = ">=8.4.1" },
+    { name = "pytest-asyncio", specifier = ">=1.1.0" },
+    { name = "pytest-cov", specifier = ">=6.2.1" },
+    { name = "ruff", specifier = ">=0.12.11" },
     { name = "scipy-stubs", specifier = ">=1.16.1.1" },
+    { name = "types-aiofiles", specifier = ">=24.1.0.20250822" },
 ]
 
 [[package]]
@@ -946,19 +949,6 @@ wheels = [
 ]
 
 [[package]]
-name = "h5netcdf"
-version = "1.6.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "h5py" },
-    { name = "packaging" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5a/a1/e3ca842fd0895fcfb21c754a18fd8cd7362d1625b3a93408c982c38f4ec1/h5netcdf-1.6.4.tar.gz", hash = "sha256:83db7e5eb9b822bed2c79050d6cf8f36ecbd1039f4252bd90fab200edcaaf67d", size = 65832, upload-time = "2025-08-05T06:26:56.707Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/5b/f5/ac71e692aad076d50a0f5f073204346d5f5577daffd21bb4b72c485f8959/h5netcdf-1.6.4-py3-none-any.whl", hash = "sha256:e0018e6a918f2bef2a4aa7b470a952b8a0b5d16a5893d59bea56524cc6207fcf", size = 50683, upload-time = "2025-08-05T06:26:55.644Z" },
-]
-
-[[package]]
 name = "h5py"
 version = "3.14.0"
 source = { registry = "https://pypi.org/simple" }
@@ -985,6 +975,21 @@ wheels = [
 ]
 
 [[package]]
+name = "hatchling"
+version = "1.27.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+    { name = "pathspec" },
+    { name = "pluggy" },
+    { name = "trove-classifiers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8f/8a/cc1debe3514da292094f1c3a700e4ca25442489731ef7c0814358816bb03/hatchling-1.27.0.tar.gz", hash = "sha256:971c296d9819abb3811112fc52c7a9751c8d381898f36533bb16f9791e941fd6", size = 54983, upload-time = "2024-12-15T17:08:11.894Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/08/e7/ae38d7a6dfba0533684e0b2136817d667588ae3ec984c1a4e5df5eb88482/hatchling-1.27.0-py3-none-any.whl", hash = "sha256:d3a2f3567c4f926ea39849cdf924c7e99e6686c9c8e288ae1037c8fa2a5d937b", size = 75794, upload-time = "2024-12-15T17:08:10.364Z" },
+]
+
+[[package]]
 name = "hishel"
 version = "0.1.3"
 source = { registry = "https://pypi.org/simple" }
@@ -994,34 +999,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/3e/b5/c063cd3eab8154ddd61deb07b50497cf24010727eaeec4d78ed1a6262986/hishel-0.1.3.tar.gz", hash = "sha256:db3e07429cb739dcda851ff9b35b0f3e7589e21b90ee167df54336ac608b6ec3", size = 36649, upload-time = "2025-07-06T14:19:23.528Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/29/a5/bf3553b44a36e1c5d2aa0cd15478e02b466dcaecdc2983b07068999d2675/hishel-0.1.3-py3-none-any.whl", hash = "sha256:bae3ba9970ffc56f90014aea2b3019158fb0a5b0b635a56f414ba6b96651966e", size = 42518, upload-time = "2025-07-06T14:19:22.336Z" },
-]
-
-[[package]]
-name = "hopsy"
-version = "1.6.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "arviz" },
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "optlang" },
-    { name = "pandas" },
-    { name = "polyround" },
-    { name = "scikit-learn" },
-    { name = "scipy" },
-    { name = "tqdm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a0/51/164517fc870771d17b3dd9d0afef23b128dc22352688069e238916dec309/hopsy-1.6.1.tar.gz", hash = "sha256:1eb812a0ad42c34ef4c4e949ad804b4860f18795c9447954e175bcbd4b1edf64", size = 7258188, upload-time = "2025-03-30T22:00:24.918Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7f/9e/5a8ff4b789477fe38d745a737505a181015366e1bed39d4fae037cd4daf3/hopsy-1.6.1-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:0ab345af6d585111a45905357f06ada13dc30a70599a23925b896cec9ed9048a", size = 729960, upload-time = "2025-03-30T21:59:44.756Z" },
-    { url = "https://files.pythonhosted.org/packages/be/4b/1ff628b101104c61d600e8701a20a593721f810a517ac5b95de6a79b95c8/hopsy-1.6.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5b8fc6257a71ebd06d1a967cae41151d2b31fe490bd3e8c246db14ae7549820a", size = 989378, upload-time = "2025-03-30T21:59:49.087Z" },
-    { url = "https://files.pythonhosted.org/packages/04/2b/8f2cf2cc1cb4891c8ddaa5dbb7420809bf0674b82b3bc63fcf1f662880af/hopsy-1.6.1-cp311-cp311-win_amd64.whl", hash = "sha256:20dfc5020a18fde834c38661edb8ea3f1b9c4245f282d79619afe798e0620336", size = 944853, upload-time = "2025-03-30T21:59:52.518Z" },
-    { url = "https://files.pythonhosted.org/packages/e5/86/f94eb3f6a5f88e37e53ab45be32240a569ade754d7051003448bc4278e99/hopsy-1.6.1-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:84d6efa0202dcd7aab716fe240525f32482e90f1d7b8eea07b29d25254b4fc2e", size = 736022, upload-time = "2025-03-30T21:59:55.335Z" },
-    { url = "https://files.pythonhosted.org/packages/c2/ae/51077c9eb7aeb51e2f3d6e16fea6930931ad55e73692d19c1da83870f30e/hopsy-1.6.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:42843d9fc38d99df1861bc0965a87ecc57c52b11cf4dd1d224b4c9bc8f095eba", size = 992344, upload-time = "2025-03-30T21:59:58.038Z" },
-    { url = "https://files.pythonhosted.org/packages/51/f8/612cfaaa6943e27257a22baeb5351c30dc96f0cc8c717457866ef377aba6/hopsy-1.6.1-cp312-cp312-win_amd64.whl", hash = "sha256:efed7a7ec3e58e40055eb70d4694a59ca117ee04930528a8b95824d2f02371f3", size = 961936, upload-time = "2025-03-30T22:00:01.718Z" },
-    { url = "https://files.pythonhosted.org/packages/fe/cd/b99bee05141201d7a280b2da0902f59dfda0ba7c96bb34fd53ed7ef3f955/hopsy-1.6.1-cp313-cp313-macosx_14_0_arm64.whl", hash = "sha256:2675e0dba93591d5ff144b5d573d1867f09eac71e6c596f59d09390ab068b587", size = 736084, upload-time = "2025-03-30T22:00:04.393Z" },
-    { url = "https://files.pythonhosted.org/packages/ca/21/537996d2328368323f08ac9d02fa2e158df63acc210bf19a2dd7ffa28bb5/hopsy-1.6.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:fdfb78fc445f0f70a2d7025ac42e02de34d2eac457892fd2cdd1f91826fdcece", size = 991801, upload-time = "2025-03-30T22:00:06.882Z" },
-    { url = "https://files.pythonhosted.org/packages/1e/37/751ab1e34c8e900737e9d964f63a4dd7e1502684c98c7ef8b1875d24703e/hopsy-1.6.1-cp313-cp313-win_amd64.whl", hash = "sha256:53d49094e96edd7e6b425c62006eae9aeb878fb41ae63cedc54639f685a62f69", size = 961795, upload-time = "2025-03-30T22:00:09.85Z" },
 ]
 
 [[package]]
@@ -1050,19 +1027,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/b1/df/48c586a5fe32a0f01324ee087459e112ebb7224f646c0b5023f5e79e9956/httpx-0.28.1.tar.gz", hash = "sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc", size = 141406, upload-time = "2024-12-06T15:37:23.222Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl", hash = "sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad", size = 73517, upload-time = "2024-12-06T15:37:21.509Z" },
-]
-
-[[package]]
-name = "hypothesis"
-version = "6.138.13"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "attrs" },
-    { name = "sortedcontainers" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/37/42/9cd666af7fd2c3e604f055f756e80d537faba5327cc72cbd44177792d074/hypothesis-6.138.13.tar.gz", hash = "sha256:2bea91629b8b3bb103a5b51442b1037cede3aae26e56ec063c52b9d5d8eaf70b", size = 466041, upload-time = "2025-09-01T14:02:51.468Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/cc/82/823c202c8b349ff31a0718e46ff98074bebfb3aa20813091cea07821c25f/hypothesis-6.138.13-py3-none-any.whl", hash = "sha256:09f1130deb08e5d12fb3b59b55c113fd79debaaab9b224ffac17be8341de4326", size = 533564, upload-time = "2025-09-01T14:02:48.15Z" },
 ]
 
 [[package]]
@@ -2173,6 +2137,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pathspec"
+version = "0.12.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ca/bc/f35b8446f4531a7cb215605d100cd88b7ac6f44ab3fc94870c120ab3adbf/pathspec-0.12.1.tar.gz", hash = "sha256:a482d51503a1ab33b1c67a6c3813a26953dbdc71c31dacaef9a838c4e29f5712", size = 51043, upload-time = "2023-12-10T22:30:45Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cc/20/ff623b09d963f88bfde16306a54e12ee5ea43e9b597108672ff3a408aad6/pathspec-0.12.1-py3-none-any.whl", hash = "sha256:a0d503e138a4c123b27490a4f7beda6a01c6f288df0e4a8b79c7eb0dc7b4cc08", size = 31191, upload-time = "2023-12-10T22:30:43.14Z" },
+]
+
+[[package]]
 name = "patsy"
 version = "1.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2274,21 +2247,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3", size = 69412, upload-time = "2025-05-15T12:30:07.975Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
-]
-
-[[package]]
-name = "polyround"
-version = "0.4.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-    { name = "optlang" },
-    { name = "pandas" },
-    { name = "scipy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/4a/56/5b05ab0cbfe77dcf792e82ce1e1311461776c5413a99342f141641d7804a/polyround-0.4.0.tar.gz", hash = "sha256:e7312f0a8c435827627ac05d873969168f31373e5136f75e66c5a4d9e06f8833", size = 38570, upload-time = "2025-08-12T14:09:18.38Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2d/f1/9b10002d4114a08a807ce69cc1136eea62e32cbc9da2a24a12357c3201b7/polyround-0.4.0-py3-none-any.whl", hash = "sha256:4ac6a2a4b31f5ac83b32ee95e276fb6ec31a76ec0719d80ba4160c3f6bfa9cd3", size = 43357, upload-time = "2025-08-12T14:09:17.434Z" },
 ]
 
 [[package]]
@@ -2500,6 +2458,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/bb/22/f1129e69d94ffff626bdb5c835506b3a5b4f3d070f17ea295e12c2c6f60f/pyparsing-3.2.3.tar.gz", hash = "sha256:b9c13f1ab8b3b542f72e28f634bad4de758ab3ce4546e4301970ad6fa77c38be", size = 1088608, upload-time = "2025-03-25T05:01:28.114Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/05/e7/df2285f3d08fee213f2d041540fa4fc9ca6c2d44cf36d3a035bf2a8d2bcc/pyparsing-3.2.3-py3-none-any.whl", hash = "sha256:a749938e02d6fd0b59b356ca504a24982314bb090c383e3cf201c95ef7e2bfcf", size = 111120, upload-time = "2025-03-25T05:01:24.908Z" },
+]
+
+[[package]]
+name = "pyright"
+version = "1.1.405"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "nodeenv" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fb/6c/ba4bbee22e76af700ea593a1d8701e3225080956753bee9750dcc25e2649/pyright-1.1.405.tar.gz", hash = "sha256:5c2a30e1037af27eb463a1cc0b9f6d65fec48478ccf092c1ac28385a15c55763", size = 4068319, upload-time = "2025-09-04T03:37:06.776Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d5/1a/524f832e1ff1962a22a1accc775ca7b143ba2e9f5924bb6749dce566784a/pyright-1.1.405-py3-none-any.whl", hash = "sha256:a2cb13700b5508ce8e5d4546034cb7ea4aedb60215c6c33f56cec7f53996035a", size = 5905038, upload-time = "2025-09-04T03:37:04.913Z" },
 ]
 
 [[package]]
@@ -3180,15 +3151,6 @@ wheels = [
 ]
 
 [[package]]
-name = "sortedcontainers"
-version = "2.4.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e8/c4/ba2f8066cceb6f23394729afe52f3bf7adec04bf9ed2c820b39e19299111/sortedcontainers-2.4.0.tar.gz", hash = "sha256:25caa5a06cc30b6b83d11423433f65d1f9d76c4c6a0c90e3379eaa43b9bfdb88", size = 30594, upload-time = "2021-05-16T22:03:42.897Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/32/46/9cb0e58b2deb7f82b84065f37f3bffeb12413f947f9388e4cac22c4621ce/sortedcontainers-2.4.0-py2.py3-none-any.whl", hash = "sha256:a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0", size = 29575, upload-time = "2021-05-16T22:03:41.177Z" },
-]
-
-[[package]]
 name = "soupsieve"
 version = "2.8"
 source = { registry = "https://pypi.org/simple" }
@@ -3428,6 +3390,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "trove-classifiers"
+version = "2025.9.9.12"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/52/45fa9c4f39ada33d803e4c0f288e94dc2e9d499201a0aa5697e30ef8a0cb/trove_classifiers-2025.9.9.12.tar.gz", hash = "sha256:6a00942fc023f4f383af3254b4ed818d7fa7923a3c7c03b0e71da2ce71b538ab", size = 16970, upload-time = "2025-09-09T12:23:47.737Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/15/05/618f6a55cced5402364af0d7629cbfd04e9852d464193bde9bd03c85b56a/trove_classifiers-2025.9.9.12-py3-none-any.whl", hash = "sha256:d449bd9d4715105657732d6dd1f46aa1595278d01ef1716ca164b35867135a4f", size = 14136, upload-time = "2025-09-09T12:23:46.314Z" },
+]
+
+[[package]]
+name = "types-aiofiles"
+version = "24.1.0.20250822"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/19/48/c64471adac9206cc844afb33ed311ac5a65d2f59df3d861e0f2d0cad7414/types_aiofiles-24.1.0.20250822.tar.gz", hash = "sha256:9ab90d8e0c307fe97a7cf09338301e3f01a163e39f3b529ace82466355c84a7b", size = 14484, upload-time = "2025-08-22T03:02:23.039Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bc/8e/5e6d2215e1d8f7c2a94c6e9d0059ae8109ce0f5681956d11bb0a228cef04/types_aiofiles-24.1.0.20250822-py3-none-any.whl", hash = "sha256:0ec8f8909e1a85a5a79aed0573af7901f53120dd2a29771dd0b3ef48e12328b0", size = 14322, upload-time = "2025-08-22T03:02:21.918Z" },
+]
+
+[[package]]
 name = "types-python-dateutil"
 version = "2.9.0.20250822"
 source = { registry = "https://pypi.org/simple" }
@@ -3567,34 +3547,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b3/8f/705086c9d734d3b663af0e9bb3d4de6578d08f46b1b101c2442fd9aecaa2/win32_setctime-1.2.0.tar.gz", hash = "sha256:ae1fdf948f5640aae05c511ade119313fb6a30d7eabe25fef9764dca5873c4c0", size = 4867, upload-time = "2024-12-07T15:28:28.314Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e1/07/c6fe3ad3e685340704d314d765b7912993bcb8dc198f0e7a89382d37974b/win32_setctime-1.2.0-py3-none-any.whl", hash = "sha256:95d644c4e708aba81dc3704a116d8cbc974d70b3bdb8be1d150e36be6e9d1390", size = 4083, upload-time = "2024-12-07T15:28:26.465Z" },
-]
-
-[[package]]
-name = "xarray"
-version = "2025.8.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-    { name = "packaging" },
-    { name = "pandas" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/d2/55/18055bc943029d25fb8f260b7e3b1485c30646ccf503a5e4a744d31a3b78/xarray-2025.8.0.tar.gz", hash = "sha256:323d4169ce72d4ef849de2b0bd122f9cd2905b82c7558169930dc16070982bab", size = 3034425, upload-time = "2025-08-14T16:52:13.872Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/e6/c8/0f8db9d9478de8d70cbcae2056588401e26168e269d6d9919bf2ecb01f78/xarray-2025.8.0-py3-none-any.whl", hash = "sha256:1c454f32b38c93df68e450238c9473fe21248b8572d42ddd58c5170bb30934ee", size = 1342279, upload-time = "2025-08-14T16:52:10.956Z" },
-]
-
-[[package]]
-name = "xarray-einstats"
-version = "0.9.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-    { name = "scipy" },
-    { name = "xarray" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/f1/10/ef474494a7f2102ec4c02352c723fa282c6237b600565eb82ee354291211/xarray_einstats-0.9.1.tar.gz", hash = "sha256:39b373deed43592c41d3fbf8863af62e19e01c1ae553ae5ff059a8df78d995c6", size = 33327, upload-time = "2025-06-18T15:53:28.499Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/17/8b/ed2f0f49385c3d7739cd4699954add26e8f09a372a0c3f04f2bde32fcea2/xarray_einstats-0.9.1-py3-none-any.whl", hash = "sha256:777339524e85d066f2ef9ed1e3a3fb63aead4c1065fd1406f30dfa4de58ce063", size = 39043, upload-time = "2025-06-18T15:53:24.088Z" },
 ]
 
 [[package]]
