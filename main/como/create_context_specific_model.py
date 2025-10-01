@@ -217,9 +217,9 @@ def _build_with_imat(
     expr_thresh: tuple[float, float],
     force_gene_indices: Sequence[int],
     solver: str,
-) -> (cobra.Model, pd.DataFrame):
     expr_vector = np.array(expr_vector)
     properties = IMATProperties(
+) -> cobra.Model:
         exp_vector=expr_vector,
         exp_thresholds=expr_thresh,
         core=force_gene_ids,
