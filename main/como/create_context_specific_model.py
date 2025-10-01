@@ -210,13 +210,12 @@ def _build_with_fastcore(cobra_model, s_matrix, lower_bounds, upper_bounds, exp_
 
 
 def _build_with_imat(
-    cobra_model: cobra.Model,
-    s_matrix: npt.NDArray,
+    reference_model: cobra.Model,
     lower_bounds: Sequence[float],
     upper_bounds: Sequence[float],
     expr_vector: npt.NDArray,
     expr_thresh: tuple[float, float],
-    force_gene_ids: Sequence[int],
+    force_gene_indices: Sequence[int],
     solver: str,
 ) -> (cobra.Model, pd.DataFrame):
     expr_vector = np.array(expr_vector)
