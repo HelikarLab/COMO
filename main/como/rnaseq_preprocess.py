@@ -398,7 +398,7 @@ async def _create_config_df(  # noqa: C901
     gene_counts: list[Path] = list((como_context_dir / gene_count_dirname).rglob("*.tab"))
     if not gene_counts:
         _log_and_raise_error(
-            f"No gene count files found in '{gene_count_dirname}'",
+            f"No gene count files found in '{como_context_dir / gene_count_dirname}'",
             error=FileNotFoundError,
             level=LogLevel.ERROR,
         )
