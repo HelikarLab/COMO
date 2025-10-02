@@ -401,7 +401,7 @@ async def _build_model(  # noqa: C901
     match general_model_file.suffix:
         case ".mat":
             reference_model = cobra.io.load_matlab_model(general_model_file)
-        case ".xml":
+        case (".xml", ".sbml"):
             reference_model = cobra.io.read_sbml_model(general_model_file)
         case ".json":
             reference_model = cobra.io.load_json_model(general_model_file)
