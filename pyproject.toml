@@ -19,7 +19,7 @@ dependencies = [
     "plotly>=5.24.1",
     "pydantic-settings",
     "pydantic>=2.10.3",
-    "scanpy>=1.9.8",
+    "scanpy>=1.11.4",
     "scikit-learn>=1.5.2",
     "scipy>=1.7.3",
     "setuptools<60.0",
@@ -28,7 +28,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-gurobi = [ "gurobipy>=10.0.0" ]
+gurobi = ["gurobipy>=10.0.0"]
 interactive = [
     "ipython>=7.0.0",
     "jupyterlab>=4.0.0",
@@ -50,4 +50,4 @@ packages = ["main/como"]
 allow-direct-references = true
 
 [tool.pytest.ini_options]
-pythonpath = [ "main/src" ]
+pythonpath = ["main/src"]
