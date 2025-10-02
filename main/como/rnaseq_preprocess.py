@@ -289,19 +289,19 @@ async def _prepare_sample_counts(
     counts_file: Path,
     strand_file: Path,
     all_counts_files: list[Path],
-) -> pd.DataFrame | Literal["SKIP"]:
+) -> pd.Series | pd.DataFrame | None:
     # Test if the counts_file is the first run in a multi-run smaple
     if re.search(r"R\d+r1", counts_file.as_posix()):
         return await _process_first_multirun_sample(strand_file=strand_file, all_counts_files=all_counts_files)
     elif re.search(r"R\d+r\d+", counts_file.as_posix()):
-        return "SKIP"
+        return None
     else:
         return await _process_standard_replicate(counts_file, strand_file, sample_name)
 
 
 async def _create_sample_counts_matrix(metrics: _StudyMetrics) -> pd.DataFrame:
     adjusted_index = 0
-    counts: pd.DataFrame | Literal["SKIP"] = await _prepare_sample_counts(
+    counts = await _prepare_sample_counts(
         sample_name=metrics.sample_names[0],
         counts_file=metrics.count_files[0],
         strand_file=metrics.strand_files[0],
@@ -315,7 +315,7 @@ async def _create_sample_counts_matrix(metrics: _StudyMetrics) -> pd.DataFrame:
             strand_file=metrics.strand_files[i],
             all_counts_files=metrics.count_files,
         )
-        if isinstance(new_counts, str) and new_counts == "SKIP":
+        if new_counts is None:
             adjusted_index += 1
             continue
 
