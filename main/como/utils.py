@@ -221,7 +221,8 @@ async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int 
             raise ValueError("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
 
 
-def _listify(value):
+
+def listify(value):
     """Convert items into a list.
 
     Args:
@@ -233,11 +234,11 @@ def _listify(value):
     return [value] if not isinstance(value, list) else value
 
 
-def _num_rows(item: pd.DataFrame | npt.NDArray) -> int:
+def num_rows(item: pd.DataFrame | npt.NDArray) -> int:
     return item.shape[0]
 
 
-def _num_columns(item: pd.DataFrame | npt.NDArray) -> int:
+def num_columns(item: pd.DataFrame | npt.NDArray) -> int:
     return item.shape[1]
 
 
@@ -245,7 +246,7 @@ def return_placeholder_data() -> pd.DataFrame:
     return pd.DataFrame(data=0, index=pd.Index(data=[0], name="entrez_gene_id"), columns=["expressed", "top"])
 
 
-def _set_up_logging(
+def set_up_logging(
     level: LogLevel | str,
     location: str | TextIO,
     formatting: str = LOG_FORMAT,
