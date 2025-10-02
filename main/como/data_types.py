@@ -135,7 +135,7 @@ class CobraCompartments:
         "s": ["eyespot", "eyespot apparatus", "stigma"],
     }
 
-    _REVERSE_LOOKUP: ClassVar[dict[str, list[str]]] = {value.lower(): key for key, values in SHORTHAND.items() for value in values}
+    _REVERSE_LOOKUP: ClassVar[dict[str, str]] = {value.lower(): key for key, values in SHORTHAND.items() for value in values}
 
     @classmethod
     def get_shorthand(cls, longhand: str) -> str | None:
