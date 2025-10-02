@@ -9,7 +9,6 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Literal, TextIO, overload
 
-import aiofiles
 import numpy.typing as npt
 import pandas as pd
 import scanpy as sc
