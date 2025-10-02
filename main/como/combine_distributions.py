@@ -144,7 +144,7 @@ def _combine_z_distribution_for_context(
         return pd.DataFrame({"ensembl_gene_id": [], "combine_z": []})
 
     z_matrices = [
-        res.z_score_matrix.set_index("ensembl_gene_id").rename(columns={col: res.type.value for col in res.z_score_matrix.columns[1:]})
+        res.z_score_matrix.set_index("ensembl_gene_id").rename(columns=dict.fromkeys([res.type.value for res in zscore_results]))
         for res in zscore_results
     ]
     z_matrix = pd.concat(z_matrices, axis=1, join="outer").reset_index()
