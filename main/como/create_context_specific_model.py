@@ -86,15 +86,9 @@ class _Arguments:
     def __post_init__(self):
         self.reference_model = Path(self.reference_model)
         self.active_genes_filepath = Path(self.active_genes_filepath)
-        self.boundary_reactions_filepath = (
-            Path(self.boundary_reactions_filepath) if self.boundary_reactions_filepath is not None else None
-        )
-        self.exclude_reactions_filepath = (
-            Path(self.exclude_reactions_filepath) if self.exclude_reactions_filepath is not None else None
-        )
-        self.force_reactions_filepath = (
-            Path(self.force_reactions_filepath) if self.force_reactions_filepath is not None else None
-        )
+        self.boundary_reactions_filepath = Path(self.boundary_reactions_filepath) if self.boundary_reactions_filepath is not None else None
+        self.exclude_reactions_filepath = Path(self.exclude_reactions_filepath) if self.exclude_reactions_filepath is not None else None
+        self.force_reactions_filepath = Path(self.force_reactions_filepath) if self.force_reactions_filepath is not None else None
 
         if not self.reference_model.exists():
             raise FileNotFoundError(f"Reference model not found at {self.reference_model}")
@@ -109,8 +103,7 @@ class _Arguments:
 
         if self.high_threshold < self.low_threshold:
             raise ValueError(
-                f"Low threshold must be less than high threshold. "
-                f"Received low threshold: {self.low_threshold}, high threshold: {self.high_threshold}"
+                f"Low threshold must be less than high threshold. Received low threshold: {self.low_threshold}, high threshold: {self.high_threshold}"
             )
 
 
@@ -283,12 +276,9 @@ def _build_with_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
     # 'Vlassis, Pacheco, Sauter (2014). Fast reconstruction of compact
     # context-specific metabolic network models. PLoS Comput. Biol. 10,
     # e1003424.'
-    logger.warning(
-        "Fastcore requires a flux consistant model is used as refererence, "
-        "to achieve this fastcc is required which is NOT reproducible."
-    )
+    logger.warning("Fastcore requires a flux consistant model is used as refererence, to achieve this fastcc is required which is NOT reproducible.")
     logger.debug("Creating feasible model")
-    incon_rxns, cobra_model = _feasibility_test(cobra_model, "other")
+    _, cobra_model = _feasibility_test(cobra_model, "other")
     properties = FastcoreProperties(core=exp_idx_list, solver=solver)
     algorithm = FASTcore(s_matrix, lb, ub, properties)
     context_rxns = algorithm.fastcore()
@@ -435,9 +425,7 @@ def _build_model(  # noqa: C901
         case ".json":
             reference_model = cobra.io.load_json_model(general_model_file)
         case _:
-            raise NameError(
-                f"Reference reference_model format must be .xml, .mat, or .json, found '{general_model_file.suffix}'"
-            )
+            raise NameError(f"Reference reference_model format must be .xml, .mat, or .json, found '{general_model_file.suffix}'")
 
     reference_model.objective = {getattr(reference_model.reactions, objective): 1}  # set objective
 
@@ -445,7 +433,7 @@ def _build_model(  # noqa: C901
         force_rxns.append(objective)
 
     # set boundaries
-    reference_model, bound_rm_rxns = _set_boundaries(reference_model, bound_rxns, bound_lb, bound_ub)
+    reference_model, _ = _set_boundaries(reference_model, bound_rxns, bound_lb, bound_ub)
 
     # set solver
     reference_model.solver = solver.lower()
@@ -681,14 +669,10 @@ def create_context_specific_model(  # noqa: C901
     )
 
     config = Config()
-    build_results.infeasible_reactions.to_csv(
-        config.result_dir / context_name / f"{context_name}_infeasible_rxns.csv", index=False
-    )
+    build_results.infeasible_reactions.to_csv(config.result_dir / context_name / f"{context_name}_infeasible_rxns.csv", index=False)
 
     if algorithm == Algorithm.FASTCORE:
-        pd.DataFrame(build_results.expression_index_list).to_csv(
-            config.result_dir / context_name / f"{context_name}_core_rxns.csv", index=False
-        )
+        pd.DataFrame(build_results.expression_index_list).to_csv(config.result_dir / context_name / f"{context_name}_core_rxns.csv", index=False)
 
     output_directory = config.result_dir / context_name
     _write_model_to_disk(
@@ -789,8 +773,7 @@ def _parse_args():
         type=str,
         default="GIMME",
         dest="recon_algorithm",
-        help="Algorithm used to seed context specific model to the Genome-scale model. "
-        "Can be either GIMME, FASTCORE, iMAT, or tINIT.",
+        help="Algorithm used to seed context specific model to the Genome-scale model. Can be either GIMME, FASTCORE, iMAT, or tINIT.",
     )
     parser.add_argument(
         "-lt",
