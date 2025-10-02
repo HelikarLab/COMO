@@ -1,5 +1,6 @@
-import argparse
-import asyncio
+from __future__ import annotations
+
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -12,85 +13,73 @@ from como.proteomics_preprocessing import protein_transform_main
 
 
 # Load Proteomics
-def load_proteomics_data(datafilename, context_name):
+def process_proteomics_data(path: Path) -> pd.DataFrame:
     """Load proteomics data from a given context and filename."""
-    config = Config()
-    data_path = config.data_dir / "data_matrices" / context_name / datafilename
-    logger.info(f"Data Matrix Path: {data_path}")
-
-    if data_path.exists():
-        proteomics_data = pd.read_csv(data_path, header=0)
-    else:
-        logger.error(f"Error: file not found: {data_path}")
-
-        return None
-
     # Preprocess data, drop na, duplicate ';' in symbol,
-    proteomics_data["gene_symbol"] = proteomics_data["gene_symbol"].astype(str)
-    proteomics_data.dropna(subset=["gene_symbol"], inplace=True)
-    pluralnames = proteomics_data[proteomics_data["gene_symbol"].str.contains(";") == True]  # noqa: E712
+    matrix: pd.DataFrame = pd.read_csv(path)
+    if "gene_symbol" not in matrix.columns:
+        raise ValueError("No gene_symbol column found in proteomics data.")
 
-    for idx, row in pluralnames.iterrows():
-        names = row["gene_symbol"].split(";")
-        rows = []
-
-        for name in names:
-            rowcopy = row.copy()
-            rowcopy["gene_symbol"] = name
-            rows.append(rowcopy)
-        proteomics_data.drop(index=idx, inplace=True)
-        proteomics_data = pd.concat([proteomics_data, pd.DataFrame(rows)], ignore_index=True)
-
-    return proteomics_data
+    matrix["gene_symbol"] = matrix["gene_symbol"].astype(str)
+    matrix.dropna(subset=["gene_symbol"], inplace=True)
+    matrix = matrix.assign(gene_symbol=matrix["gene_symbol"].str.split(";")).explode("gene_symbol")
+    return matrix
 
 
 # read map to convert to entrez
-async def load_gene_symbol_map(gene_symbols: list[str]):
+async def load_gene_symbol_map(gene_symbols: list[str], entrez_map: Path | None = None):
     """Add descirption...."""
-    config = Config()
-    filepath = config.data_dir / "proteomics_entrez_map.csv"
-    if filepath.exists():
-        df = pd.read_csv(filepath, index_col="gene_symbol")
+    if entrez_map and entrez_map.exists():
+        df = pd.read_csv(entrez_map, index_col="gene_symbol")
     else:
         biodbnet = BioDBNet()
         df = await biodbnet.async_db2db(
-            values=gene_symbols, input_db=Input.GENE_SYMBOL, output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID]
+            values=gene_symbols,
+            input_db=Input.GENE_SYMBOL,
+            output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID],
         )
         df.loc[df["gene_id"] == "-", ["gene_id"]] = np.nan
-        df.to_csv(filepath, index_label="gene_symbol")
+        df.to_csv(entrez_map, index_label="gene_symbol")
 
     return df[~df.index.duplicated()]
 
 
-def abundance_to_bool_group(context_name, group_name, abundance_matrix, rep_ratio, hi_rep_ratio, quantile):
-    """Descrioption...."""
-    config = Config()
-    output_dir = config.result_dir / context_name / "proteomics"
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # write group abundances to individual files
-    abundance_filepath = (
-        config.result_dir / context_name / "proteomics" / "".join(["protein_abundance_", group_name, ".csv"])
-    )
+def abundance_to_bool_group(
+    context_name,
+    abundance_filepath: Path,
+    output_gaussian_png_filepath: Path,
+    output_gaussian_html_filepath: Path,
+    output_z_score_matrix_filepath: Path,
+    abundance_matrix: pd.DataFrame,
+    replicate_ratio: float,
+    high_confidence_replicate_ratio: float,
+    quantile: float,
+    output_boolean_filepath: Path,
+):
+    """Convert proteomic data to boolean expression."""
     abundance_matrix.to_csv(abundance_filepath, index_label="entrez_gene_id")
-    protein_transform_main(abundance_matrix, output_dir, group_name)
+    protein_transform_main(
+        abundance_df=abundance_matrix,
+        output_gaussian_png_filepath=output_gaussian_png_filepath,
+        output_gaussian_html_filepath=output_gaussian_html_filepath,
+        output_z_score_matrix_filepath=output_z_score_matrix_filepath,
+    )
 
     # Logical Calculation
     abundance_matrix_nozero = abundance_matrix.replace(0, np.nan)
     thresholds = abundance_matrix_nozero.quantile(quantile, axis=0)
-    testbool = pd.DataFrame(0, columns=list(abundance_matrix), index=abundance_matrix.index)
+    testbool = pd.DataFrame(0, columns=abundance_matrix.columns, index=abundance_matrix.index)
 
-    for col in list(abundance_matrix):
+    for col in abundance_matrix.columns:
         testbool.loc[abundance_matrix[col] > thresholds[col], [col]] = 1
 
-    abundance_matrix["pos"] = (abundance_matrix > 0).sum(axis=1) / abundance_matrix.count(axis=1)
     abundance_matrix["expressed"] = 0
-    abundance_matrix.loc[(abundance_matrix["pos"] >= rep_ratio), ["expressed"]] = 1
     abundance_matrix["high"] = 0
-    abundance_matrix.loc[(abundance_matrix["pos"] >= hi_rep_ratio), ["high"]] = 1
+    abundance_matrix["pos"] = abundance_matrix[abundance_matrix > 0].sum(axis=1) / abundance_matrix.count(axis=1)
+    abundance_matrix.loc[(abundance_matrix["pos"] >= replicate_ratio), ["expressed"]] = 1
+    abundance_matrix.loc[(abundance_matrix["pos"] >= high_confidence_replicate_ratio), ["high"]] = 1
 
-    bool_filepath = output_dir / f"bool_prot_Matrix_{context_name}_{group_name}.csv"
-    abundance_matrix.to_csv(bool_filepath, index_label="entrez_gene_id")
+    abundance_matrix.to_csv(output_boolean_filepath, index_label="entrez_gene_id")
 
 
 def to_bool_context(context_name, group_ratio, hi_group_ratio, group_names):
@@ -156,129 +145,74 @@ def load_proteomics_tests(filename, context_name):
 
 
 async def proteomics_gen(
-    config_file: str,
-    rep_ratio: float = 0.5,
-    group_ratio: float = 0.5,
-    hi_rep_ratio: float = 0.5,
-    hi_group_ratio: float = 0.5,
+    context_name: str,
+    config_filepath: Path,
+    matrix_filepath: Path,
+    output_boolean_filepath: Path,
+    output_z_score_matrix_filepath: Path,
+    output_gaussian_png_filepath: Path | None = None,
+    output_gaussian_html_filepath: Path | None = None,
+    input_entrez_map: Path | None = None,
+    replicate_ratio: float = 0.5,
+    batch_ratio: float = 0.5,
+    high_confidence_replicate_ratio: float = 0.7,
+    high_confidence_batch_ratio: float = 0.7,
     quantile: int = 25,
 ):
     """Generate proteomics data."""
-    config = Config()
-    if not config_file:
-        raise ValueError("Config file must be provided")
+    if not config_filepath.exists():
+        raise FileNotFoundError(f"Config file not found at {config_filepath}")
+    if config_filepath.suffix not in (".xlsx", ".xls"):
+        raise FileNotFoundError(f"Config file must be an xlsx or xls file at {config_filepath}")
+
+    if not matrix_filepath.exists():
+        raise FileNotFoundError(f"Matrix file not found at {matrix_filepath}")
+    if matrix_filepath.suffix not in {".csv"}:
+        raise FileNotFoundError(f"Matrix file must be a csv file at {matrix_filepath}")
 
     if quantile < 0 or quantile > 100:
         raise ValueError("Quantile must be an integer from 0 to 100")
     quantile /= 100
 
-    prot_config_filepath = config.data_dir / "config_sheets" / config_file
-    logger.info(f"Config file is at '{prot_config_filepath}'")
+    config_df = pd.read_excel(config_filepath, sheet_name=context_name)
+    matrix: pd.DataFrame = process_proteomics_data(matrix_filepath)
 
-    xl = pd.ExcelFile(prot_config_filepath)
-    sheet_names = xl.sheet_names
+    groups = config_df["group"].unique().tolist()
 
-    for context_name in sheet_names:
-        datafilename = "".join(["protein_abundance_", context_name, ".csv"])
-        config_sheet = pd.read_excel(prot_config_filepath, sheet_name=context_name)
-        groups = config_sheet["group"].unique().tolist()
+    for group in groups:
+        indices = np.where([g == group for g in config_df["group"]])
+        sample_columns = [*np.take(config_df["sample_name"].to_numpy(), indices).ravel().tolist(), "gene_symbol"]
+        matrix = matrix.loc[:, sample_columns]
 
-        for group in groups:
-            group_idx = np.where([g == group for g in config_sheet["group"].tolist()])
-            cols = [*np.take(config_sheet["sample_name"].to_numpy(), group_idx).ravel().tolist(), "gene_symbol"]
-
-            proteomics_data = load_proteomics_data(datafilename, context_name)
-            proteomics_data = proteomics_data.loc[:, cols]
-
-            symbols_to_ids = await load_gene_symbol_map(gene_symbols=proteomics_data["gene_symbol"].tolist())
-            proteomics_data.dropna(subset=["gene_symbol"], inplace=True)
-            if "uniprot" in proteomics_data.columns:
-                proteomics_data.drop(columns=["uniprot"], inplace=True)
-
-            proteomics_data = proteomics_data.groupby(["gene_symbol"]).agg("max")
-            proteomics_data["entrez_gene_id"] = symbols_to_ids["gene_id"]
-            proteomics_data.dropna(subset=["entrez_gene_id"], inplace=True)
-            proteomics_data.set_index("entrez_gene_id", inplace=True)
-
-            # save proteomics data by test
-            abundance_to_bool_group(context_name, group, proteomics_data, rep_ratio, hi_rep_ratio, quantile)
-        to_bool_context(context_name, group_ratio, hi_group_ratio, groups)
-
-
-def _main():
-    parser = argparse.ArgumentParser(
-        prog="proteomics_gen.py",
-        description="Description goes here",
-        epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
-        "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
-    )
-    parser.add_argument(
-        "-c",
-        "--config-file",
-        type=str,
-        required=True,
-        dest="config_file",
-        help="The configuration file for proteomics",
-    )
-    parser.add_argument(
-        "-r",
-        "--replicate-ratio",
-        type=float,
-        required=False,
-        default=0.5,
-        dest="rep_ratio",
-        help="Ratio of replicates required for a gene to be considered active in that group",
-    )
-    parser.add_argument(
-        "-b",
-        "--batch-ratio",
-        type=float,
-        required=False,
-        default=0.5,
-        dest="group_ratio",
-        help="Ratio of groups (batches or studies) required for a gene to be considered active in a context",
-    )
-    parser.add_argument(
-        "-hr",
-        "--high-replicate-ratio",
-        type=float,
-        required=False,
-        default=0.5,
-        dest="hi_rep_ratio",
-        help="Ratio of replicates required for a gene to be considered high-confidence in that group",
-    )
-    parser.add_argument(
-        "-hb",
-        "--high-batch-ratio",
-        type=float,
-        required=False,
-        default=0.5,
-        dest="hi_group_ratio",
-        help="Ratio of groups (batches or studies) required for a gene to be considered high-confidence in a context",
-    )
-
-    parser.add_argument(
-        "-q",
-        "--quantile",
-        type=int,
-        required=False,
-        default=25,
-        dest="quantile",
-        help="The quantile of genes to accept. This should be an integer from 0% (no proteins pass) "
-        "to 100% (all proteins pass).",
-    )
-    args = parser.parse_args()
-    asyncio.run(
-        proteomics_gen(
-            args.config_file,
-            args.rep_ratio,
-            args.group_ratio,
-            args.hi_rep_ratio,
-            args.hi_group_ratio,
-            args.quantile,
+        symbols_to_gene_ids = await load_gene_symbol_map(
+            gene_symbols=matrix["gene_symbol"].tolist(),
+            entrez_map=input_entrez_map,
         )
+        matrix.dropna(subset=["gene_symbol"], inplace=True)
+        if "uniprot" in matrix.columns:
+            matrix.drop(columns=["uniprot"], inplace=True)
+
+        matrix = matrix.groupby(["gene_symbol"]).agg("max")
+        matrix["entrez_gene_id"] = symbols_to_gene_ids["gene_id"]
+        matrix.dropna(subset=["entrez_gene_id"], inplace=True)
+        matrix.set_index("entrez_gene_id", inplace=True)
+
+        # bool_filepath = output_dir / f"bool_prot_Matrix_{context_name}_{group_name}.csv"
+        abundance_to_bool_group(
+            context_name=context_name,
+            abundance_filepath=matrix_filepath,
+            abundance_matrix=matrix,
+            replicate_ratio=replicate_ratio,
+            high_confidence_replicate_ratio=high_confidence_replicate_ratio,
+            quantile=quantile,
+            output_boolean_filepath=output_boolean_filepath,
+            output_gaussian_png_filepath=output_gaussian_png_filepath,
+            output_gaussian_html_filepath=output_gaussian_html_filepath,
+            output_z_score_matrix_filepath=output_z_score_matrix_filepath,
+        )
+    to_bool_context(
+        context_name=context_name,
+        group_ratio=batch_ratio,
+        hi_group_ratio=high_confidence_batch_ratio,
+        group_names=groups,
     )
-
-
-if __name__ == "__main__":
-    _main()
