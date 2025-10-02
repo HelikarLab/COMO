@@ -112,8 +112,12 @@ def suppress_stdout() -> Iterator[None]:
             sys.stdout = sys.__stdout__
 
 
-async def _format_determination(
-    biodbnet: BioDBNet, *, requested_output: Output | list[Output], input_values: list[str], taxon: Taxon
+async def format_determination(
+    biodbnet: BioDBNet,
+    *,
+    requested_output: Output | list[Output],
+    input_values: list[str],
+    taxon: Taxon,
 ) -> pd.DataFrame:
     """Determine the data type of the given input values (i.e., Entrez Gene ID, Gene Symbol, etc.).
 
@@ -151,7 +155,7 @@ async def _read_file(
     Returns:
         None, or a pandas DataFrame or AnnData
     """
-    if isinstance(path, (pd.DataFrame, sc.AnnData)):
+    if isinstance(path, pd.DataFrame | sc.AnnData):
         return path
     if not path:
         return None
@@ -184,7 +188,6 @@ async def _read_file(
                 error=ValueError,
                 level=LogLevel.CRITICAL,
             )
-            return None
 
 
 async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int | str | Taxon) -> pd.DataFrame:
@@ -199,13 +202,12 @@ async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int 
         else:
             logger.critical("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
             raise ValueError("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
-    else:
-        values: pd.DataFrame  # Re-define type to assist in type hinting
-        if "gene_symbol" in values:
+    elif isinstance(values, pd.DataFrame):
+        if "gene_symbol" in values.columns:
             return await get_missing_gene_data(values["gene_symbol"].tolist(), taxon_id=taxon_id)
-        elif "entrez_gene_id" in values:
+        elif "entrez_gene_id" in values.columns:
             return await get_missing_gene_data(values["entrez_gene_id"].tolist(), taxon_id=taxon_id)
-        elif "ensembl_gene_id" in values:
+        elif "ensembl_gene_id" in values.columns:
             return await get_missing_gene_data(values["ensembl_gene_id"].tolist(), taxon_id=taxon_id)
         else:
             logger.critical("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
