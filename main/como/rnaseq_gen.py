@@ -359,8 +359,7 @@ def zfpkm_transform(
     cores = min(multiprocessing.cpu_count() - 2, total)
     logger.debug(f"Processing {total:,} samples through zFPKM transform using {cores} cores")
     logger.debug(
-        f"Will update every {update_per_step:,} steps as this is approximately "
-        f"{update_every_percent:.1%} of {total:,}"
+        f"Will update every {update_per_step:,} steps as this is approximately {update_every_percent:.1%} of {total:,}"
     )
 
     with Pool(processes=cores) as pool:
