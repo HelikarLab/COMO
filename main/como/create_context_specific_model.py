@@ -6,9 +6,10 @@ import sys
 from collections.abc import Sequence
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal, TextIO, cast
 
 import cobra
+import cobra.util.array
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
@@ -647,7 +648,7 @@ async def create_context_specific_model(  # noqa: C901
     high_threshold: float = -3,
     solver: Solver = Solver.GLPK,
     log_level: LogLevel = LogLevel.INFO,
-    log_location: str | TextIOWrapper = sys.stderr,
+    log_location: str | TextIO | TextIOWrapper = sys.stderr,
     *,
     force_boundary_rxn_inclusion: bool = True,
 ):
