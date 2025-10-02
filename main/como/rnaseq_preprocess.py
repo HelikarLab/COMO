@@ -196,7 +196,7 @@ def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
 
     # For each study, collect gene count files, fragment files, insert size files, layouts, and strandedness information
     study_metrics: list[_StudyMetrics] = []
-    for gene_dir, strand_dir in zip(gene_counts_directories, strandedness_directories):
+    for gene_dir, strand_dir in zip(gene_counts_directories, strandedness_directories, strict=True):
         count_files = list(gene_dir.glob("*.tab"))
         strand_files = list(strand_dir.glob("*.txt"))
         if len(count_files) == 0:
