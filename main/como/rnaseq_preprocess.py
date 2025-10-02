@@ -93,20 +93,20 @@ class _StudyMetrics:
     study_name: str
     count_files: list[Path]
     strand_files: list[Path]
-    __sample_names: list[str] = field(default_factory=list)
-    __num_samples: int = 0
+    _sample_names: list[str] = field(default_factory=list)
+    _num_samples: int = 0
 
     @property
     def sample_names(self) -> list[str]:
-        return self.__sample_names
+        return self._sample_names
 
     @property
     def num_samples(self):
-        return self.__num_samples
+        return self._num_samples
 
     def __post_init__(self):
-        self.__num_samples = len(self.count_files)
-        self.__sample_names = [f.stem for f in self.count_files]
+        self._num_samples = len(self.count_files)
+        self._sample_names = [f.stem for f in self.count_files]
 
         if len(self.count_files) != len(self.strand_files):
             _log_and_raise_error(
@@ -138,7 +138,7 @@ class _StudyMetrics:
                 level=LogLevel.ERROR,
             )
 
-        if self.__num_samples == 1:
+        if self._num_samples == 1:
             _log_and_raise_error(
                 f"Only one sample exists for study {self.study_name}. Provide at least two samples",
                 error=ValueError,
@@ -147,7 +147,7 @@ class _StudyMetrics:
 
         self.count_files.sort()
         self.strand_files.sort()
-        self.__sample_names.sort()
+        self._sample_names.sort()
 
 
 @dataclass(slots=True)
