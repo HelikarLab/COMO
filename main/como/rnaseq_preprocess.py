@@ -207,7 +207,6 @@ def _organize_gene_counts_files(data_dir: Path) -> Generator[_StudyMetrics, None
         )
 
     # For each study, collect gene count files, fragment files, insert size files, layouts, and strandedness information
-    study_metrics: list[_StudyMetrics] = []
     for gene_dir, strand_dir in zip(gene_counts_directories, strandedness_directories, strict=True):
         count_files = list(gene_dir.glob("*.tab"))
         strand_files = list(strand_dir.glob("*.txt"))
@@ -220,14 +219,11 @@ def _organize_gene_counts_files(data_dir: Path) -> Generator[_StudyMetrics, None
                 level=LogLevel.ERROR,
             )
 
-        study_metrics.append(
-            _StudyMetrics(
-                study_name=gene_dir.stem,
-                count_files=count_files,
-                strand_files=strand_files,
-            )
+        yield _StudyMetrics(
+            study_name=gene_dir.stem,
+            count_files=count_files,
+            strand_files=strand_files,
         )
-    return study_metrics
 
 
 async def _process_first_multirun_sample(strand_file: Path, all_counts_files: list[Path]):
