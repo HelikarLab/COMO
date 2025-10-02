@@ -661,11 +661,12 @@ async def _create_gene_info_file(
         data = await read_file(file, h5ad_as_df=False)
 
         try:
-            conversion = await (
-                ensembl_to_gene_id_and_symbol(ids=data["ensembl_gene_id"].tolist(), taxon=taxon)
-                if isinstance(data, pd.DataFrame)
-                else gene_symbol_to_ensembl_and_gene_id(symbols=data.var_names.tolist(), taxon=taxon)
-            )
+            if isinstance(data, pd.DataFrame):
+                conversion = await ensembl_to_gene_id_and_symbol(ids=data["ensembl_gene_id"].tolist(), taxon=taxon)
+            elif isinstance(data, sc.AnnData):
+                conversion = await gene_symbol_to_ensembl_and_gene_id(symbols=data.var_names.tolist(), taxon=taxon)
+            else:
+                raise TypeError(f"Unsupported data type '{type(data)}' for file '{file}'")
         except json.JSONDecodeError:
             _log_and_raise_error(
                 f"Got a JSON decode error for file '{counts_matrix_filepaths}'",
