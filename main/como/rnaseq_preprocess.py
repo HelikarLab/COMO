@@ -460,7 +460,7 @@ async def _create_config_df(  # noqa: C901
         elif len(frag_paths) == 1 and layout == "single-end":
             mean_frag = 0.0
         else:  # 1-N files, paired end
-            dfs: list[pd.DataFrame] = await asyncio.gather(*[_read_file(f, sep="\t", on_bad_lines="skip") for f in frag_paths])
+            dfs: list[pd.DataFrame] = await asyncio.gather(*[read_file(f, h5ad_as_df=True, sep="\t", on_bad_lines="skip") for f in frag_paths])
             for df in dfs:
                 df["meanxcount"] = df["frag_mean"] * df["frag_count"]
                 counts = np.array([df["frag_count"].sum() for df in dfs])
