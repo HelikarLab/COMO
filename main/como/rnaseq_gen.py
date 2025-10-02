@@ -111,42 +111,23 @@ Density = namedtuple("Density", ["x", "y"])
 NamedMetrics = dict[str, _StudyMetrics]
 
 
-def k_over_a(k: int, a: float) -> Callable[[npt.NDArray], bool]:
-    """Return a function that filters rows of an array based on the sum of elements being greater than or equal to A at least k times.
+def k_over_a(data: pd.DataFrame | npt.NDArray, k: int, a: float) -> npt.NDArray:
+    """Return a boolean mask of rows where at least k entries are >= a.
 
     This code is based on the `kOverA` function found in R's `genefilter` package: https://www.rdocumentation.org/packages/genefilter/versions/1.54.2/topics/kOverA
 
-    :param k: The minimum number of times the sum of elements must be greater than or equal to A.
-    :param a: The value to compare the sum of elements to.
-    :return: A function that accepts a NumPy array to perform the actual filtering
-    """
-
-    def filter_func(row: npt.NDArray) -> bool:
-        return np.sum(row >= a) >= k
-
-    return filter_func
-
-
-def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDArray], bool]) -> npt.NDArray:
-    """Apply a filter function to the rows of the data and return the filtered array.
-
-    This code is based on the `genefilter` function found in R's `genefilter` package: https://www.rdocumentation.org/packages/genefilter/versions/1.54.2/topics/genefilter
-
-    Arg:
+    Args:
         data: The data to filter, either a Pandas DataFrame or a NumPy array.
-        filter_func: THe function to filter the data by
+        k: The minimum number of times the sum of elements must be greater than or equal to A.
+        a: The value to compare the sum of elements to.
 
     Returns:
-        A NumPy array of the filtered data.
+        A NumPy array of booleans indicating which rows pass the filter.
     """
-    if not isinstance(data, (pd.DataFrame, npt.NDArray)):
-        _log_and_raise_error(
-            f"Unsupported data type. Must be a Pandas DataFrame or a NumPy array, got '{type(data)}'",
-            error=TypeError,
-            level=LogLevel.CRITICAL,
-        )
+    arr = data.to_numpy() if isinstance(data, pd.DataFrame) else np.asarray(data)
+    counts = np.sum(arr >= a, axis=1)
+    return counts >= k
 
-    return data.apply(filter_func, axis=1).values if isinstance(data, pd.DataFrame) else np.apply_along_axis(filter_func, axis=1, arr=data)
 
 
 async def _build_matrix_results(
@@ -632,27 +613,23 @@ def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
         gene_size = metric.gene_sizes
         tpm_matrix: pd.DataFrame = metric.normalization_matrix
 
-        min_samples = round(n_exp * len(tpm_matrix.columns))
-        top_samples = round(n_top * len(tpm_matrix.columns))
+        min_samples = round(n_exp * tpm_matrix.shape[1])
+        top_samples = round(n_top * tpm_matrix.shape[1])
 
         tpm_quantile = tpm_matrix[tpm_matrix > 0]
         quantile_cutoff = np.quantile(a=tpm_quantile.values, q=1 - (cut_off / 100), axis=0)  # Compute quantile across columns
-        boolean_expression = pd.DataFrame(data=tpm_matrix > quantile_cutoff, index=tpm_matrix.index, columns=tpm_matrix.columns).astype(int)
+        boolean_expression = pd.DataFrame(data=(tpm_matrix > quantile_cutoff), index=tpm_matrix.index, columns=tpm_matrix.columns, dtype=int)
 
-        min_func = k_over_a(min_samples, 0.9)
-        top_func = k_over_a(top_samples, 0.9)
-
-        min_genes: npt.NDArray[bool] = genefilter(boolean_expression, min_func)
-        top_genes: npt.NDArray[bool] = genefilter(boolean_expression, top_func)
+        min_genes: npt.NDArray[bool] = k_over_a(boolean_expression, min_samples, 0.9)
+        top_genes: npt.NDArray[bool] = k_over_a(boolean_expression, top_samples, 0.9)
 
         # Only keep `entrez_gene_ids` that pass `min_genes`
-        metric.entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, min_genes, strict=True) if keep]
-        metric.gene_sizes = np.array(gene for gene, keep in zip(gene_size, min_genes, strict=True) if keep)
-        metric.count_matrix = metric.count_matrix.iloc[min_genes, :]
-        metric.normalization_matrix = metrics[sample].normalization_matrix.iloc[min_genes, :]
+        metric.entrez_gene_ids = boolean_expression.index[min_genes].tolist()
+        metric.gene_sizes = gene_size[min_genes]
+        metric.count_matrix = metric.count_matrix.loc[min_genes, :]
+        metric.normalization_matrix = metrics[sample].normalization_matrix.loc[min_genes, :]
 
-        keep_top_genes = [gene for gene, keep in zip(entrez_ids, top_genes, strict=True) if keep]
-        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, keep_top_genes, strict=True) if keep]
+        metric.high_confidence_entrez_gene_ids = entrez_ids[top_genes].tolist()
 
     metrics = calculate_z_score(metrics)
 
@@ -712,16 +689,14 @@ def zfpkm_filter(
         metric.z_score_matrix = zfpkm_df
 
         # determine which genes are expressed
-        min_samples = round(min_sample_expression * len(zfpkm_df.columns))
-        min_func = k_over_a(min_samples, cut_off)
-        min_genes: npt.NDArray[bool] = genefilter(zfpkm_df, min_func)
-        metric.entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, min_genes, strict=True) if keep]
+        min_samples = round(min_sample_expression * zfpkm_df.shape[1])  # [1] is the number of columns
+        mask = k_over_a(zfpkm_df, min_samples, cut_off)
+        metric.entrez_gene_ids = zfpkm_df.index[mask].tolist()
 
         # determine which genes are confidently expressed
-        top_samples = round(high_confidence_sample_expression * len(zfpkm_df.columns))
-        top_func = k_over_a(top_samples, cut_off)
-        top_genes: npt.NDArray[bool] = genefilter(zfpkm_df, top_func)
-        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, top_genes, strict=True) if keep]
+        top_samples = round(high_confidence_sample_expression * zfpkm_df.shape[1])  # [1] is the number of columns
+        top_mask = k_over_a(zfpkm_df, top_samples, cut_off)
+        metric.high_confidence_entrez_gene_ids = zfpkm_df.index[top_mask].tolist()
 
     return metrics
 
