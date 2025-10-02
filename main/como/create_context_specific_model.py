@@ -559,19 +559,20 @@ async def _build_model(  # noqa: C901
     )
 
 
-async def _create_df(path: Path) -> pd.DataFrame:
-    match path.suffix:
-        case ".csv" | ".tsv":
-            df = await _read_file(path, header=0, sep="," if path.suffix == ".csv" else "\t")
-        case ".xlsx" | ".xls":
-            df = await _read_file(path, header=0)
-        case _:
-            _log_and_raise_error(
-                f"File not found! Must be a csv, tsv, or Excel file. Searching for: {path}",
-                error=FileNotFoundError,
-                level=LogLevel.ERROR,
-            )
-    df.columns = [c.lower() for c in df.columns]
+async def _create_df(path: Path, *, lowercase_col_names: bool = False) -> pd.DataFrame:
+    if path.suffix not in {".csv", ".tsv"}:
+        raise ValueError(f"File must be a .csv or .tsv file, got '{path.suffix}'")
+    df: pd.DataFrame = await read_file(path=path, header=0, sep="," if path.suffix == ".csv" else "\t", h5ad_as_df=True)
+
+    if not isinstance(df, pd.DataFrame):
+        _log_and_raise_error(
+            f"Expected a pandas.DataFrame, got {type(df)}",
+            error=TypeError,
+            level=LogLevel.ERROR,
+        )
+
+    if lowercase_col_names:
+        df.columns = [c.lower() for c in df.columns]
     return df
 
 
