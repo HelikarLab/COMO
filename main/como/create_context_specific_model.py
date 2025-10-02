@@ -510,13 +510,15 @@ async def _build_model(  # noqa: C901
                 upper_bounds=upper_bounds,
                 expr_vector=expression_vector,
                 expr_thresh=expression_threshold,
-                force_gene_ids=force_reaction_indices,
+                force_gene_indices=force_reaction_indices,
                 solver=solver,
             )
-            imat_reactions = flux_df.rxn
-            model_reactions = [reaction.id for reaction in context_model_cobra.reactions]
-            reaction_intersections = set(imat_reactions).intersection(model_reactions)
-            flux_df: pd.DataFrame = flux_df[~flux_df["rxn"].isin(reaction_intersections)]
+            context_model_cobra.objective = objective
+            flux_sol: cobra.Solution = context_model_cobra.optimize()
+            fluxes: pd.Series = flux_sol.fluxes
+            model_reactions: list[str] = [reaction.id for reaction in context_model_cobra.reactions]
+            reaction_intersections: set[str] = set(fluxes.index).intersection(model_reactions)
+            flux_df: pd.DataFrame = fluxes[~fluxes.index.isin(reaction_intersections)]
             flux_df.dropna(inplace=True)
             flux_df.to_csv(output_flux_result_filepath)
         case Algorithm.TINIT:
