@@ -80,14 +80,10 @@ class _Arguments:
         if self.expression_requirement.isdigit():
             self.expression_requirement = int(self.expression_requirement)
             if self.expression_requirement < 1:
-                logger.warning(
-                    f"Expression requirement should be at least 1, setting to 1 now. Got {self.expression_requirement}"
-                )
+                logger.warning(f"Expression requirement should be at least 1, setting to 1 now. Got {self.expression_requirement}")
                 self.expression_requirement = 1
         elif self.expression_requirement != "default":
-            raise ValueError(
-                f"Expression requirement should be an integer or 'default', got {self.expression_requirement}"
-            )
+            raise ValueError(f"Expression requirement should be an integer or 'default', got {self.expression_requirement}")
 
         if self.adjustment_method.value.lower() not in ["progressive", "regressive", "flat", "custom"]:
             raise ValueError("Adjust method must be either 'progressive', 'regressive', 'flat', or 'custom'")
@@ -119,10 +115,7 @@ def _load_rnaseq_tests(filename, context_name, prep_method: RNAPrepMethod) -> tu
         case RNAPrepMethod.SCRNA:
             filename = f"rnaseq_scrna_{context_name}.csv"
         case _:
-            raise ValueError(
-                f"Unsupported RNA-seq library type: {prep_method.value}. "
-                f"Must be an option defined in 'RNASeqPreparationMethod'."
-            )
+            raise ValueError(f"Unsupported RNA-seq library type: {prep_method.value}. Must be an option defined in 'RNASeqPreparationMethod'.")
 
     save_filepath = config.result_dir / context_name / prep_method.value / filename
     if save_filepath.exists():
@@ -150,9 +143,7 @@ def _merge_logical_table(df: pd.DataFrame):
     df.dropna(axis=0, subset=["entrez_gene_id"], inplace=True)
     df["entrez_gene_id"] = df["entrez_gene_id"].astype(str).str.replace(" /// ", "//").astype(str)
 
-    id_list: list[str] = df.loc[
-        ~df["entrez_gene_id"].str.contains("//"), "entrez_gene_id"
-    ].tolist()  # Collect "single" ids, like "123"
+    id_list: list[str] = df.loc[~df["entrez_gene_id"].str.contains("//"), "entrez_gene_id"].tolist()  # Collect "single" ids, like "123"
     multiple_entrez_ids: list[str] = df.loc[
         df["entrez_gene_id"].str.contains("//"), "entrez_gene_id"
     ].tolist()  # Collect "double" ids, like "123//456"
@@ -285,8 +276,7 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame) -> pd.DataFrame:
     ]
 
     gene_details["gene_info_type"] = [
-        i.group(1) if isinstance(i, re.Match) else "None"
-        for i in gene_details["Gene Info"].apply(lambda x: re.search(r"\[Gene Type: (.*)\]", x))
+        i.group(1) if isinstance(i, re.Match) else "None" for i in gene_details["Gene Info"].apply(lambda x: re.search(r"\[Gene Type: (.*)\]", x))
     ]
     gene_details["ensembl_info_type"] = [
         i.group(1) if isinstance(i, re.Match) else "None"
@@ -406,9 +396,7 @@ async def _merge_xomics(
         merge_data = prote_data if merge_data is None else merge_data.join(prote_data, how="outer")
 
     if merge_data is None:
-        logger.critical(
-            f"No data is available for the '{context_name}' context. If this is intentional, ignore this error."
-        )
+        logger.critical(f"No data is available for the '{context_name}' context. If this is intentional, ignore this error.")
         return {}
     merge_data = _merge_logical_table(merge_data)
 
@@ -423,9 +411,7 @@ async def _merge_xomics(
         )
     else:  # subtract one from requirement per NA
         merge_data.loc[:, "Required"] = merge_data[expression_list].apply(
-            lambda x: expression_requirement - (num_sources - x.count())
-            if (expression_requirement - (num_sources - x.count()) > 0)
-            else 1,
+            lambda x: expression_requirement - (num_sources - x.count()) if (expression_requirement - (num_sources - x.count()) > 0) else 1,
             axis=1,
         )
 
@@ -528,9 +514,7 @@ async def _handle_context_batch(  # noqa: C901
             case AdjustmentMethod.FLAT:
                 adjusted_expression_requirement = expression_requirement
             case _:
-                adjusted_expression_requirement = int(
-                    custom_df.iloc[custom_df["context"] == context_name, "req"].iloc[0]
-                )
+                adjusted_expression_requirement = int(custom_df.iloc[custom_df["context"] == context_name, "req"].iloc[0])
 
         if adjusted_expression_requirement != expression_requirement:
             logger.debug(
@@ -715,8 +699,7 @@ def _parse_args() -> _Arguments:
         required=False,
         default=None,
         dest="expression_requirement",
-        help="Number of sources with active gene for it to be considered active "
-        "even if it is not a high confidence-gene",
+        help="Number of sources with active gene for it to be considered active even if it is not a high confidence-gene",
     )
 
     parser.add_argument(
@@ -735,8 +718,7 @@ def _parse_args() -> _Arguments:
         required="custom" in sys.argv,  # required if --requriement-adjust is "custom",
         dest="custom_expression_filename",
         default=None,
-        help="Name of .xlsx file where first column is context names and "
-        "second column is expression requirement for that context",
+        help="Name of .xlsx file where first column is context names and second column is expression requirement for that context",
     )
 
     parser.add_argument(
@@ -746,8 +728,7 @@ def _parse_args() -> _Arguments:
         required=False,
         default=False,
         dest="no_high_confidence",
-        help="Prevent high-confidence genes forcing a gene to be used in final model, "
-        "irrespective of other other data sources",
+        help="Prevent high-confidence genes forcing a gene to be used in final model, irrespective of other other data sources",
     )
 
     parser.add_argument(

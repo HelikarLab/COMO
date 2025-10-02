@@ -135,11 +135,7 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
     if not isinstance(data, (pd.DataFrame, npt.NDArray)):
         raise TypeError("Unsupported data type. Must be a Pandas DataFrame or a NumPy array.")
 
-    return (
-        data.apply(filter_func, axis=1).values
-        if isinstance(data, pd.DataFrame)
-        else np.apply_along_axis(filter_func, axis=1, arr=data)
-    )
+    return data.apply(filter_func, axis=1).values if isinstance(data, pd.DataFrame) else np.apply_along_axis(filter_func, axis=1, arr=data)
 
 
 async def _read_counts(path: Path) -> pd.DataFrame:
@@ -349,18 +345,14 @@ def zfpkm_transform(
 ) -> tuple[dict[str, _ZFPKMResult], DataFrame]:
     """Perform zFPKM calculation/transformation."""
     if update_every_percent > 1:
-        logger.warning(
-            f"update_every_percent should be a decimal value between 0 and 1; got: {update_every_percent} - will convert to percentage"
-        )
+        logger.warning(f"update_every_percent should be a decimal value between 0 and 1; got: {update_every_percent} - will convert to percentage")
         update_every_percent /= 100
 
     total = len(fpkm_df.columns)
     update_per_step: int = int(np.ceil(total * update_every_percent))
     cores = min(multiprocessing.cpu_count() - 2, total)
     logger.debug(f"Processing {total:,} samples through zFPKM transform using {cores} cores")
-    logger.debug(
-        f"Will update every {update_per_step:,} steps as this is approximately {update_every_percent:.1%} of {total:,}"
-    )
+    logger.debug(f"Will update every {update_per_step:,} steps as this is approximately {update_every_percent:.1%} of {total:,}")
 
     with Pool(processes=cores) as pool:
         kernel = KernelDensity(kernel="gaussian", bandwidth=bandwidth)
@@ -453,9 +445,7 @@ def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
     """Calculate the z-score for each sample in the metrics dictionary."""
     for sample in metrics:
         log_matrix = np.log(metrics[sample].normalization_matrix)
-        z_matrix = pd.DataFrame(
-            data=sklearn.preprocessing.scale(log_matrix, axis=1), columns=metrics[sample].sample_names
-        )
+        z_matrix = pd.DataFrame(data=sklearn.preprocessing.scale(log_matrix, axis=1), columns=metrics[sample].sample_names)
         metrics[sample].z_score_matrix = z_matrix
     return metrics
 
@@ -499,11 +489,7 @@ def cpm_filter(
         top_samples = round(n_top * len(counts.columns))  # noqa: F841
         test_bools = pd.DataFrame({"entrez_gene_ids": entrez_ids})
         for i in range(len(counts_per_million.columns)):
-            cutoff = (
-                10e6 / (np.median(np.sum(counts[:, i])))
-                if cut_off == "default"
-                else (1e6 * cut_off) / np.median(np.sum(counts[:, i]))
-            )
+            cutoff = 10e6 / (np.median(np.sum(counts[:, i]))) if cut_off == "default" else (1e6 * cut_off) / np.median(np.sum(counts[:, i]))
             test_bools = test_bools.merge(counts_per_million[counts_per_million.iloc[:, i] > cutoff])
 
     return metrics
@@ -529,12 +515,8 @@ def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
         top_samples = round(n_top * len(tpm_matrix.columns))
 
         tpm_quantile = tpm_matrix[tpm_matrix > 0]
-        quantile_cutoff = np.quantile(
-            a=tpm_quantile.values, q=1 - (cut_off / 100), axis=0
-        )  # Compute quantile across columns
-        boolean_expression = pd.DataFrame(
-            data=tpm_matrix > quantile_cutoff, index=tpm_matrix.index, columns=tpm_matrix.columns
-        ).astype(int)
+        quantile_cutoff = np.quantile(a=tpm_quantile.values, q=1 - (cut_off / 100), axis=0)  # Compute quantile across columns
+        boolean_expression = pd.DataFrame(data=tpm_matrix > quantile_cutoff, index=tpm_matrix.index, columns=tpm_matrix.columns).astype(int)
 
         min_func = k_over_a(min_samples, 0.9)
         top_func = k_over_a(top_samples, 0.9)
@@ -549,9 +531,7 @@ def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
         metric.normalization_matrix = metrics[sample].normalization_matrix.iloc[min_genes, :]
 
         keep_top_genes = [gene for gene, keep in zip(entrez_ids, top_genes, strict=True) if keep]
-        metric.high_confidence_entrez_gene_ids = [
-            gene for gene, keep in zip(entrez_ids, keep_top_genes, strict=True) if keep
-        ]
+        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, keep_top_genes, strict=True) if keep]
 
     metrics = calculate_z_score(metrics)
 
@@ -588,9 +568,7 @@ def zfpkm_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions,
         top_samples = round(high_confidence_sample_expression * len(zfpkm_df.columns))
         top_func = k_over_a(top_samples, cut_off)
         top_genes: npt.NDArray[bool] = genefilter(zfpkm_df, top_func)
-        metric.high_confidence_entrez_gene_ids = [
-            gene for gene, keep in zip(metric.entrez_gene_ids, top_genes, strict=True) if keep
-        ]
+        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, top_genes, strict=True) if keep]
 
     return metrics
 
@@ -606,9 +584,7 @@ def filter_counts(
     """Filter the count matrix based on the specified technique."""
     match technique:
         case FilteringTechnique.cpm:
-            return cpm_filter(
-                context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep
-            )
+            return cpm_filter(context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep)
         case FilteringTechnique.tpm:
             return tpm_quantile_filter(metrics=metrics, filtering_options=filtering_options)
         case FilteringTechnique.zfpkm:
@@ -667,9 +643,7 @@ async def _save_rnaseq_tests(
         top_genes.extend(metric.high_confidence_entrez_gene_ids)
 
     expression_frequency = pd.Series(expressed_genes).value_counts()
-    expression_df = pd.DataFrame(
-        {"entrez_gene_id": expression_frequency.index, "frequency": expression_frequency.values}
-    )
+    expression_df = pd.DataFrame({"entrez_gene_id": expression_frequency.index, "frequency": expression_frequency.values})
     expression_df["prop"] = expression_df["frequency"] / len(metrics)
     expression_df = expression_df[expression_df["prop"] >= filtering_options.batch_ratio]
 
@@ -689,17 +663,13 @@ async def _save_rnaseq_tests(
     high_confidence_count = len(boolean_matrix[boolean_matrix["high"] == 1])
 
     boolean_matrix.to_csv(output_filepath, index=False)
-    logger.info(
-        f"{context_name} - Found {expressed_count} expressed and {high_confidence_count} confidently expressed genes"
-    )
+    logger.info(f"{context_name} - Found {expressed_count} expressed and {high_confidence_count} confidently expressed genes")
     logger.success(f"Wrote boolean matrix to {output_filepath}")
 
 
 async def _create_metadata_df(path: Path) -> pd.DataFrame:
     if path.suffix not in {".xls", ".xlsx"}:
-        raise ValueError(
-            f"Expected an excel file with extension of '.xlsx' or '.xls', got '{path.suffix}'. Attempted to process: {path}"
-        )
+        raise ValueError(f"Expected an excel file with extension of '.xlsx' or '.xls', got '{path.suffix}'. Attempted to process: {path}")
     return pd.read_excel(path)
 
 
@@ -747,9 +717,7 @@ async def rnaseq_gen(  # noqa: C901, allow complex function
     if not input_metadata_df and not input_metadata_filepath:
         raise ValueError("At least one of input_metadata_filepath or input_metadata_df must be provided")
 
-    technique = (
-        FilteringTechnique.from_string(str(technique.lower())) if isinstance(technique, (str, int)) else technique
-    )
+    technique = FilteringTechnique.from_string(str(technique.lower())) if isinstance(technique, (str, int)) else technique
 
     match technique:
         case FilteringTechnique.tpm:

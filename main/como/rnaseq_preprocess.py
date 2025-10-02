@@ -172,11 +172,7 @@ async def _process_first_multirun_sample(strand_file: Path, all_counts_files: li
 
         run_counts = star_information.count_matrix[["ensembl_gene_id", strand_information]]
         run_counts.columns = pd.Index(["ensembl_gene_id", "counts"])
-        sample_count = (
-            run_counts
-            if sample_count.empty
-            else sample_count.merge(run_counts, on=["ensembl_gene_id", "counts"], how="outer")
-        )
+        sample_count = run_counts if sample_count.empty else sample_count.merge(run_counts, on=["ensembl_gene_id", "counts"], how="outer")
 
     # Set na values to 0
     sample_count = sample_count.fillna(value="0")
@@ -261,9 +257,7 @@ async def _write_counts_matrix(
 ) -> pd.DataFrame:
     """Create a counts matrix file by reading gene counts table(s)."""
     study_metrics = _organize_gene_counts_files(data_dir=como_context_dir)
-    counts: list[pd.DataFrame] = await asyncio.gather(
-        *[_create_sample_counts_matrix(metric) for metric in study_metrics]
-    )
+    counts: list[pd.DataFrame] = await asyncio.gather(*[_create_sample_counts_matrix(metric) for metric in study_metrics])
 
     final_matrix = pd.DataFrame()
     for count in counts:
@@ -357,9 +351,7 @@ async def _create_config_df(  # noqa: C901
             with layout_files[0].open("r") as file:
                 layout = file.read().strip()
         elif len(layout_files) > 1:
-            raise ValueError(
-                f"Multiple matching layout files for {label}, make sure there is only one copy for each replicate in COMO_input"
-            )
+            raise ValueError(f"Multiple matching layout files for {label}, make sure there is only one copy for each replicate in COMO_input")
 
         strand = "UNKNOWN"
         if len(strand_files) == 0:
@@ -372,9 +364,7 @@ async def _create_config_df(  # noqa: C901
             with strand_files[0].open("r") as file:
                 strand = file.read().strip()
         elif len(strand_files) > 1:
-            raise ValueError(
-                f"Multiple matching strandedness files for {label}, make sure there is only one copy for each replicate in COMO_input"
-            )
+            raise ValueError(f"Multiple matching strandedness files for {label}, make sure there is only one copy for each replicate in COMO_input")
 
         prep = "total"
         if len(prep_files) == 0:
@@ -385,9 +375,7 @@ async def _create_config_df(  # noqa: C901
                 if prep not in ["total", "mrna"]:
                     raise ValueError(f"Prep method must be either 'total' or 'mrna' for {label}")
         elif len(prep_files) > 1:
-            raise ValueError(
-                f"Multiple matching prep files for {label}, make sure there is only one copy for each replicate in COMO_input"
-            )
+            raise ValueError(f"Multiple matching prep files for {label}, make sure there is only one copy for each replicate in COMO_input")
 
         mean_fragment_size = 100
         if len(frag_files) == 0 and prep != RNAPrepMethod.TOTAL.value:
@@ -415,9 +403,7 @@ async def _create_config_df(  # noqa: C901
 
                     mean_fragment_size = sum(mean_fragment_sizes * library_sizes) / sum(library_sizes)
         elif len(frag_files) > 1:
-            raise ValueError(
-                f"Multiple matching fragment files for {label}, make sure there is only one copy for each replicate in COMO_input"
-            )
+            raise ValueError(f"Multiple matching fragment files for {label}, make sure there is only one copy for each replicate in COMO_input")
 
         sample_names.append(f"{context_name}_{study_number}{rep_number}")
         fragment_lengths.append(mean_fragment_size)
@@ -460,9 +446,7 @@ async def _create_gene_info_file(
         )
         return conversion["entrez_gene_id"].tolist()
 
-    logger.info(
-        "Fetching gene info (this may take 1-5 minutes depending on the number of genes and your internet connection)"
-    )
+    logger.info("Fetching gene info (this may take 1-5 minutes depending on the number of genes and your internet connection)")
     genes = set(chain.from_iterable(await asyncio.gather(*[read_counts(f) for f in counts_matrix_filepaths])))
     gene_data = await MyGene(cache=cache).query(items=list(genes), taxon=taxon, scopes="entrezgene")
     gene_info: pd.DataFrame = pd.DataFrame(
@@ -486,13 +470,7 @@ async def _create_gene_info_file(
         gene_info.at[i, "start_position"] = start_pos
         gene_info.at[i, "end_position"] = end_pos
 
-    gene_info = gene_info[
-        (
-            (gene_info["entrez_gene_id"] != "-")
-            & (gene_info["ensembl_gene_id"] != "-")
-            & (gene_info["gene_symbol"] != "-")
-        )
-    ]
+    gene_info = gene_info[((gene_info["entrez_gene_id"] != "-") & (gene_info["ensembl_gene_id"] != "-") & (gene_info["gene_symbol"] != "-"))]
     gene_info["size"] = gene_info["end_position"].astype(int) - gene_info["start_position"].astype(int)
     gene_info.drop(columns=["start_position", "end_position"], inplace=True)
     gene_info.sort_values(by="ensembl_gene_id", inplace=True)
@@ -556,11 +534,7 @@ async def _process(
 
     # create the gene info filepath based on provided data
     await _create_gene_info_file(
-        counts_matrix_filepaths=[
-            f
-            for f in [*input_matrix_filepath, output_trna_matrix_filepath, output_mrna_matrix_filepath]
-            if f is not None
-        ],
+        counts_matrix_filepaths=[f for f in [*input_matrix_filepath, output_trna_matrix_filepath, output_mrna_matrix_filepath] if f is not None],
         output_filepath=output_gene_info_filepath,
         taxon=taxon,
         cache=cache,
@@ -611,21 +585,13 @@ async def rnaseq_preprocess(
     output_gene_info_filepath = output_gene_info_filepath.resolve()
     como_context_dir = como_context_dir.resolve()
     input_matrix_filepath = [i.resolve() for i in _listify(input_matrix_filepath)] if input_matrix_filepath else None
-    output_trna_config_filepath = (
-        output_trna_config_filepath.resolve() if output_trna_config_filepath else output_trna_config_filepath
-    )
-    output_mrna_config_filepath = (
-        output_mrna_config_filepath.resolve() if output_mrna_config_filepath else output_mrna_config_filepath
-    )
+    output_trna_config_filepath = output_trna_config_filepath.resolve() if output_trna_config_filepath else output_trna_config_filepath
+    output_mrna_config_filepath = output_mrna_config_filepath.resolve() if output_mrna_config_filepath else output_mrna_config_filepath
     output_trna_count_matrix_filepath = (
-        output_trna_count_matrix_filepath.resolve()
-        if output_trna_count_matrix_filepath
-        else output_trna_count_matrix_filepath
+        output_trna_count_matrix_filepath.resolve() if output_trna_count_matrix_filepath else output_trna_count_matrix_filepath
     )
     output_mrna_count_matrix_filepath = (
-        output_mrna_count_matrix_filepath.resolve()
-        if output_mrna_count_matrix_filepath
-        else output_mrna_count_matrix_filepath
+        output_mrna_count_matrix_filepath.resolve() if output_mrna_count_matrix_filepath else output_mrna_count_matrix_filepath
     )
 
     input_matrix_filepath = _listify(input_matrix_filepath)
