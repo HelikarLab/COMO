@@ -19,29 +19,26 @@ dependencies = [
     "plotly>=5.24.1",
     "pydantic-settings",
     "pydantic>=2.10.3",
-    "scanpy>=1.9.8",
+    "scanpy>=1.11.4",
     "scikit-learn>=1.5.2",
     "scipy>=1.7.3",
     "setuptools<60.0",
+    "statsmodels>=0.14",
     "troppo@git+https://github.com/JoshLoecker/troppo@master",
 ]
 
 [project.optional-dependencies]
-gurobi = [ "gurobipy>=10.0.0" ]
-interactive =   [
-    "ipython>=8.0.0",
-    "jupyterlab>=4.3.2"
+gurobi = ["gurobipy>=10.0.0"]
+interactive = [
+    "ipython>=7.0.0",
+    "jupyterlab>=4.0.0",
 ]
 dev = [
-    "commitlint>=1.3.0",
     "pytest-asyncio>=0.24.0",
-    "pytest>=8.3.3",
-    "ruff>=0.8.0",
-    "hypothesis>=6.122.1",
     "pytest-cov>=6.0.0",
-    "commitizen>=4.1.0",
+    "pytest>=8.0.0",
+    "ruff>=0.8.0",
 ]
-
 
 [tool.hatch.version]
 path = "main/como/__init__.py"
@@ -53,11 +50,4 @@ packages = ["main/como"]
 allow-direct-references = true
 
 [tool.pytest.ini_options]
-pythonpath = [ "main/src" ]
-
-[tool.commitizen]
-name = "cz_conventional_commits"
-tag_format = "$version"
-version_scheme = "semver2"
-version_provider = "pep621"
-update_changelog_on_bump = true
+pythonpath = ["main/src"]

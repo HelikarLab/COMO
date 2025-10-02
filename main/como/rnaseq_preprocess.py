@@ -137,7 +137,7 @@ def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
 
     # For each study, collect gene count files, fragment files, insert size files, layouts, and strandedness information
     study_metrics: list[_StudyMetrics] = []
-    for gene_dir, strand_dir in zip(gene_counts_directories, strandedness_directories):
+    for gene_dir, strand_dir in zip(gene_counts_directories, strandedness_directories, strict=True):
         count_files = list(gene_dir.glob("*.tab"))
         strand_files = list(strand_dir.glob("*.txt"))
         if len(count_files) == 0:
@@ -358,8 +358,7 @@ async def _create_config_df(  # noqa: C901
                 layout = file.read().strip()
         elif len(layout_files) > 1:
             raise ValueError(
-                f"Multiple matching layout files for {label}, "
-                f"make sure there is only one copy for each replicate in COMO_input"
+                f"Multiple matching layout files for {label}, make sure there is only one copy for each replicate in COMO_input"
             )
 
         strand = "UNKNOWN"
@@ -374,8 +373,7 @@ async def _create_config_df(  # noqa: C901
                 strand = file.read().strip()
         elif len(strand_files) > 1:
             raise ValueError(
-                f"Multiple matching strandedness files for {label}, "
-                f"make sure there is only one copy for each replicate in COMO_input"
+                f"Multiple matching strandedness files for {label}, make sure there is only one copy for each replicate in COMO_input"
             )
 
         prep = "total"
@@ -388,15 +386,13 @@ async def _create_config_df(  # noqa: C901
                     raise ValueError(f"Prep method must be either 'total' or 'mrna' for {label}")
         elif len(prep_files) > 1:
             raise ValueError(
-                f"Multiple matching prep files for {label}, "
-                f"make sure there is only one copy for each replicate in COMO_input"
+                f"Multiple matching prep files for {label}, make sure there is only one copy for each replicate in COMO_input"
             )
 
         mean_fragment_size = 100
         if len(frag_files) == 0 and prep != RNAPrepMethod.TOTAL.value:
             logger.warning(
-                f"No fragment file found for {label}, using '100'. "
-                "You should define this if you are going to use downstream zFPKM normalization"
+                f"No fragment file found for {label}, using '100'. You should define this if you are going to use downstream zFPKM normalization"
             )
         elif len(frag_files) == 1:
             if layout == "single-end":
@@ -420,8 +416,7 @@ async def _create_config_df(  # noqa: C901
                     mean_fragment_size = sum(mean_fragment_sizes * library_sizes) / sum(library_sizes)
         elif len(frag_files) > 1:
             raise ValueError(
-                f"Multiple matching fragment files for {label}, "
-                f"make sure there is only one copy for each replicate in COMO_input"
+                f"Multiple matching fragment files for {label}, make sure there is only one copy for each replicate in COMO_input"
             )
 
         sample_names.append(f"{context_name}_{study_number}{rep_number}")
