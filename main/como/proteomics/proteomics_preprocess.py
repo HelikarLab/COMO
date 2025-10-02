@@ -159,7 +159,7 @@ class PopulateInformation:
             url_count = 0
 
             # Iterate through the URLs available
-            for url, study in zip(ftp_urls, studies):
+            for url, study in zip(ftp_urls, studies, strict=True):
                 ftp_data: FTPManager.Reader = FTPManager.Reader(root_link=url, file_extensions=self._preferred_extensions)
 
                 urls = list(ftp_data.files)
@@ -167,7 +167,7 @@ class PopulateInformation:
                 url_count += len(urls)
 
                 # Iterate through all files and sizes found for url_##
-                for file, size in zip(urls, sizes):
+                for file, size in zip(urls, sizes, strict=True):
                     self.file_information.append(FileInformation(cell_type=cell_type, download_url=file, file_size=size, study=study))
 
     def print_download_size(self):
