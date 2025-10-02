@@ -21,8 +21,8 @@ from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.imat import IMAT, IMATProperties
 from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
 
-from como.data_types import Algorithm, CobraCompartments, LogLevel, Solver, _BoundaryReactions, _BuildResults
-from como.utils import _log_and_raise_error, _read_file, _set_up_logging, split_gene_expression_data
+from como.data_types import Algorithm, BoundaryReactions, BuildResults, CobraCompartments, LogLevel, Solver
+from como.utils import _log_and_raise_error, read_file, set_up_logging, split_gene_expression_data
 
 
 def _correct_bracket(rule: str, name: str) -> str:
@@ -300,7 +300,7 @@ async def _map_expression_to_reaction(
     Raises:
         ValueError: If neither 'entrez_gene_id' nor 'ensembl_gene_id' columns are found in the gene expression file.
     """
-    expression_data = await _read_file(gene_expression_file)
+    expression_data = await read_file(gene_expression_file)
     identifier_column = next((col for col in ("entrez_gene_id", "ensembl_gene_id") if col in expression_data.columns), "")
 
     if not identifier_column:
@@ -546,7 +546,7 @@ async def _build_model(  # noqa: C901
         axis=0,
     )
 
-    return _BuildResults(
+    return BuildResults(
         model=context_model_cobra,
         expression_index_list=expression_vector_indices,
         infeasible_reactions=inconsistent_and_infeasible_reactions,
@@ -569,8 +569,8 @@ async def _create_df(path: Path) -> pd.DataFrame:
     return df
 
 
-async def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
-    df: pd.DataFrame = await _create_df(path)
+async def _collect_boundary_reactions(path: Path) -> BoundaryReactions:
+    df: pd.DataFrame = await _create_df(path, lowercase_col_names=True)
     for column in df.columns:
         if column not in [
             "reaction",
@@ -605,7 +605,7 @@ async def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
         shorthand_compartment = CobraCompartments.get_shorthand(reaction_compartment[i])
         reactions[i] = f"{boundary_map.get(boundary)}_{reaction_abbreviation[i]}[{shorthand_compartment}]"
 
-    return _BoundaryReactions(
+    return BoundaryReactions(
         reactions=reactions,
         lower_bounds=df["minimum reaction rate"].tolist(),
         upper_bounds=df["maximum reaction rate"].tolist(),
@@ -792,7 +792,7 @@ async def create_context_specific_model(  # noqa: C901
         del env, gp
 
     logger.info(f"Creating '{context_name}' model using '{algorithm.value}' reconstruction and '{solver.value}' solver")
-    build_results: _BuildResults = await _build_model(
+    build_results: BuildResults = await _build_model(
         general_model_file=reference_model,
         gene_expression_file=active_genes_filepath,
         recon_algorithm=algorithm,
