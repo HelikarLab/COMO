@@ -182,7 +182,6 @@ def _require_one(paths: list[Path], kind: Literal["layout", "strand", "preparati
         error=ValueError,
         level=LogLevel.ERROR,
     )
-    return None  # explicit return None to satisfy type-check
 
 
 def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
