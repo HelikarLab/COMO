@@ -163,7 +163,7 @@ class CobraCompartments:
         return longhand[0] if longhand else None
 
 
-class _BuildResults(NamedTuple):
+class BuildResults(NamedTuple):
     """Results of building a context specific model."""
 
     model: cobra.Model
@@ -171,7 +171,7 @@ class _BuildResults(NamedTuple):
     infeasible_reactions: pd.DataFrame
 
 
-class _BoundaryReactions(NamedTuple):
+class BoundaryReactions(NamedTuple):
     """Boundary reactions to be used in the context specific model."""
 
     reactions: list[str]
@@ -194,7 +194,7 @@ class _BatchEntry:
 
 
 @dataclass
-class _CombineOmicsInput:
+class CombineOmicsInput:
     z_score_matrix: pd.DataFrame
     type: SourceTypes
     weight: int
@@ -242,32 +242,32 @@ class _BaseDataType:
             yield SourceTypes(field_.name), getattr(self, field_.name)
 
 
-@dataclass
-class _BatchNames(_BaseDataType):
+@dataclass(slots=True)
+class BatchNames(_BaseDataType):
     trna: list[_BatchEntry]
     mrna: list[_BatchEntry]
     scrna: list[_BatchEntry]
     proteomics: list[_BatchEntry]
 
 
-@dataclass
-class _InputMatrices(_BaseDataType):
+@dataclass(slots=True)
+class InputMatrices(_BaseDataType):
     trna: pd.DataFrame | None = None
     mrna: pd.DataFrame | None = None
     scrna: pd.DataFrame | None = None
     proteomics: pd.DataFrame | None = None
 
 
-@dataclass
-class _OutputCombinedSourceFilepath(_BaseDataType):
+@dataclass(slots=True)
+class OutputCombinedSourceFilepath(_BaseDataType):
     trna: Path | None
     mrna: Path | None
     scrna: Path | None
     proteomics: Path | None
 
 
-@dataclass
-class _SourceWeights(_BaseDataType):
+@dataclass(slots=True)
+class SourceWeights(_BaseDataType):
     trna: int
     mrna: int
     scrna: int
