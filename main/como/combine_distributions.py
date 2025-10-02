@@ -82,7 +82,7 @@ def _combine_z_distribution_for_batch(
     #     / f"{context_name}_{source.value}_batch{batch.batch_num}_combined_zscore_distribution.pdf",
     # )
 
-    weighted_matrix.columns = ["ensembl_gene_id", batch.batch_num]
+    weighted_matrix.columns = [batch.batch_num]
     weighted_matrix.to_csv(output_combined_matrix_filepath, index=False)
     return weighted_matrix
 
@@ -159,10 +159,7 @@ def _combine_z_distribution_for_context(
         logger.warning("No zscore results exist, returning empty dataframe")
         return pd.DataFrame({"ensembl_gene_id": [], "combine_z": []})
 
-    z_matrices = [
-        res.z_score_matrix.set_index("ensembl_gene_id").rename(columns=dict.fromkeys(res.z_score_matrix.columns[1:], res.type.value))
-        for res in zscore_results
-    ]
+    z_matrices = [res.z_score_matrix.rename(columns=dict.fromkeys(res.z_score_matrix.columns, res.type.value)) for res in zscore_results]
     z_matrix = pd.concat(z_matrices, axis=1, join="outer").reset_index()
     if num_columns(z_matrix) <= 1:
         logger.trace(f"Only 1 source exists for '{context}', returning dataframe as-is becuase no data exists to combine")
@@ -181,10 +178,8 @@ def _combine_z_distribution_for_context(
     combined_z_matrix = numerator / denominator
     combined_z_matrix = np.clip(combined_z_matrix, weighted_z_floor, weighted_z_ceiling)
     combined_z_matrix_df = pd.DataFrame(
-        {
-            "ensembl_gene_id": z_matrix["ensembl_gene_id"],
-            "combine_z": combined_z_matrix,
-        }
+        {"combine_z": combined_z_matrix},
+        index=z_matrix.index,
     )
 
     stack_df = pd.melt(
@@ -194,13 +189,11 @@ def _combine_z_distribution_for_context(
         var_name="source",
         value_name="zscore",
     )
-    combined_df = pd.DataFrame(
-        {
-            "ensembl_gene_id": z_matrix["ensembl_gene_id"],
-            "zscore": combined_z_matrix,
-            "source": "combined",
-        }
-    )
+    combined_df = pd.DataFrame({
+        "ensembl_gene_id": z_matrix["ensembl_gene_id"],
+        "zscore": combined_z_matrix,
+        "source": "combined",
+    })
     stack_df = pd.concat([stack_df, combined_df])
     # graph_zscore_distribution(
     #     df=stack_df,
