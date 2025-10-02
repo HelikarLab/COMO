@@ -597,8 +597,8 @@ async def _collect_boundary_reactions(path: Path) -> BoundaryReactions:
 
     reactions: list[str] = [""] * len(df)
     boundary_type: list[str] = df["reaction"].tolist()
-    reaction_abbreviation: list[str] = df["abbreviation"].astype(str).tolist()
-    reaction_compartment: list[str] = df["compartment"].astype(str).tolist()
+    reaction_abbreviation: list[str] = list(df["abbreviation"].astype(str))
+    reaction_compartment: list[str] = list(df["compartment"].astype(str))
     boundary_map = {"exchange": "EX", "demand": "DM", "sink": "SK"}
     for i in range(len(boundary_type)):
         boundary: str = boundary_type[i].lower()
@@ -685,7 +685,8 @@ async def create_context_specific_model(  # noqa: C901
     Raises:
         ImportError: If Gurobi solver is selected but gurobipy is not installed.
     """
-    _set_up_logging(level=log_level, location=log_location)
+    boundary_rxns_filepath: Path | None = Path(boundary_rxns_filepath) if boundary_rxns_filepath else None
+    set_up_logging(level=log_level, location=log_location)
     output_model_filepaths = [output_model_filepaths] if isinstance(output_model_filepaths, Path) else output_model_filepaths
     for path in output_model_filepaths:
         if path.suffix not in {".mat", ".xml", ".sbml", ".json"}:
@@ -767,7 +768,7 @@ async def create_context_specific_model(  # noqa: C901
     force_rxns: list[str] = []
     if force_rxns_filepath:
         force_rxns_filepath: Path = Path(force_rxns_filepath)
-        df = await _create_df(force_rxns_filepath)
+        df = await _create_df(force_rxns_filepath, lowercase_col_names=True)
         if "abbreviation" not in df.columns:
             _log_and_raise_error(
                 "The force reactions file should have a single column with a header named Abbreviation",
