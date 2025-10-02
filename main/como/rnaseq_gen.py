@@ -787,9 +787,15 @@ async def _process(
     """Save the results of the RNA-Seq tests to a CSV file."""
     output_boolean_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
 
-    rnaseq_matrix: pd.DataFrame = await _read_file(rnaseq_matrix_filepath)
-    if rnaseq_matrix_filepath.suffix == ".h5ad":
-        conversion = await gene_symbol_to_ensembl_and_gene_id(symbols=rnaseq_matrix["gene_symbol"].tolist(), taxon=taxon)
+    rnaseq_matrix: pd.DataFrame | sc.AnnData = await read_file(rnaseq_matrix_filepath)
+    if isinstance(rnaseq_matrix, pd.DataFrame):
+        rnaseq_matrix: pd.DataFrame
+    elif isinstance(rnaseq_matrix, sc.AnnData):
+        rnaseq_matrix: sc.AnnData
+
+    if isinstance(rnaseq_matrix, sc.AnnData):
+        rnaseq_matrix: sc.AnnData
+        conversion = await gene_symbol_to_ensembl_and_gene_id(symbols=rnaseq_matrix.var_names.tolist(), taxon=taxon)
         conversion.reset_index(inplace=True, drop=False)
         rnaseq_matrix = rnaseq_matrix.merge(conversion, how="left", on="gene_symbol")
         # rnaseq_matrix = rnaseq_matrix.replace(to_replace=pd.NA, value="-")
@@ -996,16 +1002,14 @@ async def rnaseq_gen(  # noqa: C901
         )
 
     metadata_df["fragment_length"] = metadata_df["fragment_length"].astype(np.float32)
-    metadata_df = metadata_df.groupby("sample_name", as_index=False).agg(
-        {
-            "sample_name": "first",
-            "fragment_length": "mean",
-            "layout": "first",
-            "strand": "first",
-            "study": "first",
-            "library_prep": "first",
-        }
-    )
+    metadata_df = metadata_df.groupby("sample_name", as_index=False).agg({
+        "sample_name": "first",
+        "fragment_length": "mean",
+        "layout": "first",
+        "strand": "first",
+        "study": "first",
+        "library_prep": "first",
+    })
     logger.debug(f"Starting '{context_name}'")
     await _process(
         context_name=context_name,
