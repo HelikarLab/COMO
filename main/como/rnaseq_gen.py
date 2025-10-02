@@ -129,8 +129,7 @@ def k_over_a(data: pd.DataFrame | npt.NDArray, k: int, a: float) -> npt.NDArray:
     return counts >= k
 
 
-
-async def _build_matrix_results(
+async def _build_count_metrics(
     *,
     matrix: pd.DataFrame,
     gene_info: pd.DataFrame,
