@@ -182,6 +182,12 @@ async def _build_count_metrics(
         on=["entrez_gene_id", "ensembl_gene_id"],
         how="inner",
     )
+    # Did not combine gene count information, show error
+    if len(counts_matrix.columns) == 3:
+        raise ValueError(
+            "No sample columns found in the counts matrix after merging with gene information. "
+            "Please ensure that your counts matrix contains sample columns in addition to gene identifiers."
+        )
 
     gene_info = gene_info.merge(
         counts_matrix[["entrez_gene_id", "ensembl_gene_id"]],
