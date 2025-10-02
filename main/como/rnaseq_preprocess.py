@@ -463,9 +463,9 @@ async def _create_config_df(  # noqa: C901
             dfs: list[pd.DataFrame] = await asyncio.gather(*[read_file(f, h5ad_as_df=True, sep="\t", on_bad_lines="skip") for f in frag_paths])
             for df in dfs:
                 df["meanxcount"] = df["frag_mean"] * df["frag_count"]
-                counts = np.array([df["frag_count"].sum() for df in dfs])
-                means = np.array([(df["meanxcount"] / df["frag_count"].sum()).sum() for df in dfs])
-                mean_frag = float(np.average(means, weights=counts))
+            counts = np.array([df["frag_count"].sum() for df in dfs])
+            means = np.array([(df["meanxcount"] / df["frag_count"].sum()).sum() for df in dfs])
+            mean_frag = float(np.average(means, weights=counts))
 
         rows.append(
             SampleConfiguration(
