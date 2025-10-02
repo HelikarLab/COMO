@@ -19,7 +19,7 @@ from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol
 from loguru import logger
 
 from como.data_types import PATH_TYPE, LogLevel, RNAType
-from como.utils import _listify, _log_and_raise_error, _read_file, _set_up_logging
+from como.utils import _log_and_raise_error, listify, read_file, set_up_logging
 
 
 @dataclass
@@ -653,7 +653,7 @@ async def _create_gene_info_file(
     """
 
     async def read_counts(file: Path) -> list[str]:
-        data = await _read_file(file, h5ad_as_df=False)
+        data = await read_file(file, h5ad_as_df=False)
 
         try:
             conversion = await (
@@ -711,7 +711,10 @@ async def _process_como_input(
     output_counts_matrix_filepath: Path,
     rna: RNAType,
 ) -> None:
-    config_df = await _create_config_df(context_name, como_context_dir=como_context_dir)
+    config_df = await _create_config_df(
+        context_name,
+        como_context_dir=Path(como_context_dir),
+    )
 
     await _write_counts_matrix(
         config_df=config_df,
@@ -791,7 +794,7 @@ async def rnaseq_preprocess(
     output_mrna_count_matrix_filepath: Path | None = None,
     cache: bool = True,
     log_level: LogLevel | str = LogLevel.INFO,
-    log_location: str | TextIOWrapper = sys.stderr,
+    log_location: str | TextIO = sys.stderr,
     *,
     create_gene_info_only: bool = False,
 ) -> None:
@@ -815,14 +818,14 @@ async def rnaseq_preprocess(
     :param log_location: The logging location
     :param create_gene_info_only: If True, only create the gene info file and skip general preprocessing steps
     """
-    _set_up_logging(level=log_level, location=log_location)
+    set_up_logging(level=log_level, location=log_location)
 
     output_gene_info_filepath = output_gene_info_filepath.resolve()
 
     if como_context_dir:
         como_context_dir = como_context_dir.resolve()
 
-    input_matrix_filepath = [i.resolve() for i in _listify(input_matrix_filepath)] if input_matrix_filepath else None
+    input_matrix_filepath = [i.resolve() for i in listify(input_matrix_filepath)] if input_matrix_filepath else None
     output_trna_metadata_filepath = output_trna_metadata_filepath.resolve() if output_trna_metadata_filepath else None
     output_mrna_metadata_filepath = output_mrna_metadata_filepath.resolve() if output_mrna_metadata_filepath else None
     output_trna_count_matrix_filepath = output_trna_count_matrix_filepath.resolve() if output_trna_count_matrix_filepath else None
