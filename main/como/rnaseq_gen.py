@@ -454,7 +454,7 @@ def zfpkm_plot(results, *, output_png_filepath: Path, plot_xfloor: int = -4):
     mega_df.columns = pd.Series(data=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
     mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")
 
-    _, axes = plt.subplots(nrows=len(results), ncols=1, figsize=(8, 4 * len(results)))
+    fig, axes = plt.subplots(nrows=len(results), ncols=1, figsize=(8, 4 * len(results)))
     if len(results) == 1:
         axes = [axes]
 
