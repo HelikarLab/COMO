@@ -1,0 +1,92 @@
+name: Build and publish python package
+
+on:
+  push:
+    tags:
+      - "*"
+
+# Define permissions needed for the workflow GITHUB_TOKEN
+permissions:
+  contents: read # Allow checkout
+  packages: write # Allow publishing to GitHub Packages
+
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        operating-system: [macos-latest, ubuntu-latest, windows-latest]
+        python-version: [ 3.10, 3.11, 3.12, 3.13 ]
+
+    name: Build Python Package (${{ matrix.operating-system }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.operating-system }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Hatch
+        run: pip install hatch
+
+      - name: Build distributions
+        run: hatch build # Uses pyproject.toml to build sdist and wheel into dist/
+
+      - name: Upload distributions artifact
+        uses: actions/upload-artifact@v4 # Action to save artifacts between jobs
+        with:
+          name: como-distribution-package-${{ matrix.operating-system }}-${{ matrix.python-version }}  # Name for the artifact
+          path: dist/ # Path to the directory to upload
+
+  publish:
+    strategy:
+      matrix:
+        python-version: [ 3.10, 3.11, 3.12, 3.13 ]
+        operating-system: [macos-latest, windows-latest, ubuntu-latest]
+
+    name: Publish to GitHub Packages
+    runs-on: ubuntu-latest
+    needs: build # Depends on the build job succeeding
+
+    # IMPORTANT: Only run the publish job when a tag starting with 'v' is pushed
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+
+
+    permissions: # Explicit permissions needed for this job
+      packages: write # Required to write to GitHub Packages registry
+      contents: read # Needed if accessing repo content (e.g., for download artifact)
+
+    steps:
+      - name: Download distributions artifact
+        uses: actions/download-artifact@v4 # Action to retrieve artifacts from previous job.
+        with:
+          name: como-distribution-package-${{ matrix.operating-system }}-${{ matrix.python-version }}
+          path: dist/
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Twine
+        run: pip install twine
+
+      - name: Publish package to GitHub Packages
+        env:
+          # Use __token__ as username and the automatically generated GITHUB_TOKEN as password
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Uploading to GitHub Packages for repository: ${{ github.repository }}"
+          # Construct the repository URL dynamically using the repository owner
+          TWINE_REPOSITORY_URL="https://pypi.pkg.github.com/${{ github.repository_owner }}"
+          python -m twine upload --verbose --repository-url ${TWINE_REPOSITORY_URL} dist/*
+
+        
+    
