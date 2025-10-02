@@ -373,10 +373,7 @@ def _map_expression_to_reaction(
         if gene_reaction_rule.strip() == "":
             continue
         for gid in gene_ids:
-            if gid in gene_expressions.index:
-                rep_val = f" {gene_expressions.at[gid, 'active']} "
-            else:
-                rep_val = f" {unknown_val!s} "
+            rep_val = f" {gene_expressions.at[gid, 'active']} " if gid in gene_expressions.index else f" {unknown_val!s} "
             gene_reaction_rule = f" {gene_reaction_rule} "  # pad white space to prevent gene matches inside floats
             gene_reaction_rule = gene_reaction_rule.replace(f" {gid} ", rep_val, 1)
         try:
