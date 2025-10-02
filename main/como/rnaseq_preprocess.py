@@ -747,7 +747,7 @@ async def _process(
     cache: bool,
     create_gene_info_only: bool,
 ):
-    rna_types: list[tuple[RNAType, Path, Path]] = []
+    rna_types: list[tuple[RNAType, Path, Path | None]] = []
     if output_trna_config_filepath:
         rna_types.append((RNAType.TRNA, output_trna_config_filepath, output_trna_matrix_filepath))
     if output_mrna_config_filepath:
@@ -755,8 +755,13 @@ async def _process(
 
     # if provided, iterate through como-input specific directories
     if not create_gene_info_only:
+        if not como_context_dir:
+            raise ValueError("`como_context_directory` must not be None if not in `create_gene_info_only` mode")
         tasks = []
         for rna, output_config_filepath, output_matrix_filepath in rna_types:
+            if output_matrix_filepath is None:
+                logger.warning(f"Not creating RNA type '{rna.value}' because the output matrix filepath was None.")
+                continue
             tasks.append(
                 asyncio.create_task(
                     _process_como_input(
