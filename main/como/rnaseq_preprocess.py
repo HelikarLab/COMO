@@ -169,7 +169,10 @@ async def _read_text(path: Path | None, *, default: str, lower: bool = False) ->
 
 
 def _sample_name_from_filepath(file: Path) -> str:
-    return re.search(r".+_S\d+R\d+(r\d+)?", file.stem).group()
+    result = re.search(r".+_S\d+R\d+(r\d+)?", file.stem)
+    if result:
+        return result.group()
+    raise ValueError(f"Could not extract sample name from filepath: {file}")
 
 
 def _require_one(paths: list[Path], kind: Literal["layout", "strand", "preparation", "fragment"], label: str) -> Path | None:
