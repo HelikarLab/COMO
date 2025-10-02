@@ -175,7 +175,7 @@ def _sample_name_from_filepath(file: Path) -> str:
     raise ValueError(f"Could not extract sample name from filepath: {file}")
 
 
-def _require_one(paths: list[Path], kind: Literal["layout", "strand", "preparation", "fragment"], label: str) -> Path | None:
+def _require_one(paths: list[Path | None], kind: Literal["layout", "strand", "preparation", "fragment"], label: str) -> Path | None:
     if len(paths) == 1:
         return paths[0]
     if len(paths) == 0:
@@ -187,7 +187,8 @@ def _require_one(paths: list[Path], kind: Literal["layout", "strand", "preparati
     )
 
 
-def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
+# def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
+def _organize_gene_counts_files(data_dir: Path) -> Generator[_StudyMetrics, None, None]:
     gene_count_dir = Path(data_dir, "geneCounts")
     strand_dir = Path(data_dir, "strandedness")
 
