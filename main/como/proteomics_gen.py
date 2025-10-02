@@ -12,7 +12,7 @@ from loguru import logger
 from como.data_types import LOG_FORMAT, LogLevel
 from como.project import Config
 from como.proteomics_preprocessing import protein_transform_main
-from como.utils import _log_and_raise_error, _set_up_logging, return_placeholder_data
+from como.utils import _log_and_raise_error, return_placeholder_data, set_up_logging
 
 
 # Load Proteomics
@@ -189,7 +189,7 @@ async def proteomics_gen(
     log_location: str | TextIOWrapper = sys.stderr,
 ):
     """Generate proteomics data."""
-    _set_up_logging(level=log_level, location=log_location)
+    set_up_logging(level=log_level, location=log_location)
 
     if not config_filepath.exists():
         _log_and_raise_error(
