@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 
 import numpy as np
@@ -8,19 +7,18 @@ import pandas as pd
 from loguru import logger
 
 from como.data_types import (
+    BatchNames,
+    CombineOmicsInput,
     GeneIdentifier,
+    InputMatrices,
+    OutputCombinedSourceFilepath,
     SourceTypes,
+    SourceWeights,
     _BatchEntry,
-    _BatchNames,
-    _CombineOmicsInput,
-    _InputMatrices,
-    _OutputCombinedSourceFilepath,
-    _SourceWeights,
 )
-from como.graph import z_score_distribution as graph_zscore_distribution
-from como.utils import (
-    _num_columns,
-)
+
+# from como.plot.z_score import z_score_distribution
+from como.utils import num_columns
 
 
 def _combine_z_distribution_for_batch(
@@ -57,7 +55,7 @@ def _combine_z_distribution_for_batch(
         f"source: '{source.value}', "
         f"context: '{context_name}'"
     )
-    if _num_columns(matrix) < 2:
+    if num_columns(matrix) < 2:
         logger.trace(f"A single sample exists for batch '{batch.batch_num}'. Returning as-is because no additional combining can be done")
         return matrix
 
@@ -118,7 +116,7 @@ def _combine_z_distribution_for_source(
     Returns:
           A pandas dataframe of the weighted z-distributions
     """
-    if _num_columns(merged_source_data) <= 2:
+    if num_columns(merged_source_data) <= 2:
         logger.warning("A single source exists, returning matrix as-is because no additional combining can be done")
         merged_source_data.columns = ["ensembl_gene_id", "combine_z"]
         return merged_source_data
@@ -126,7 +124,7 @@ def _combine_z_distribution_for_source(
     output_combined_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
     output_figure_filepath.parent.mkdir(parents=True, exist_ok=True)
 
-    logger.trace(f"Found {_num_columns(merged_source_data) - 1} samples for context '{context_name}' to combine")
+    logger.trace(f"Found {num_columns(merged_source_data) - 1} samples for context '{context_name}' to combine")
     values = merged_source_data.iloc[:, 1:].values
     mask = ~np.isnan(values)
     masked_values = np.where(mask, values, 0)  # Replace NaN with 0
@@ -139,12 +137,7 @@ def _combine_z_distribution_for_source(
     weighted_matrix = np.clip(weighted_matrix, weighted_z_floor, weighted_z_ceiling)
     logger.trace("Finished combining z-distribution")
     # merge_df = pd.concat([merged_source_data, pd.Series(weighted_matrix, name="combined")], axis=1)
-    weighted_matrix = pd.DataFrame(
-        {
-            "ensembl_gene_id": merged_source_data["ensembl_gene_id"],
-            "combine_z": weighted_matrix,
-        }
-    )
+    weighted_matrix = pd.DataFrame({"combine_z": weighted_matrix}, index=merged_source_data.index)
 
     # stack_df = pd.melt(
     #     merge_df,
@@ -163,7 +156,7 @@ def _combine_z_distribution_for_source(
 
 def _combine_z_distribution_for_context(
     context: str,
-    zscore_results: list[_CombineOmicsInput],
+    zscore_results: list[CombineOmicsInput],
     output_graph_filepath: Path,
     weighted_z_floor: int = -6,
     weighted_z_ceiling: int = 6,
@@ -177,7 +170,7 @@ def _combine_z_distribution_for_context(
         for res in zscore_results
     ]
     z_matrix = pd.concat(z_matrices, axis=1, join="outer").reset_index()
-    if _num_columns(z_matrix) <= 1:
+    if num_columns(z_matrix) <= 1:
         logger.trace(f"Only 1 source exists for '{context}', returning dataframe as-is becuase no data exists to combine")
         z_matrix.columns = ["ensembl_gene_id", "combine_z"]
         return z_matrix
@@ -225,10 +218,10 @@ def _combine_z_distribution_for_context(
 
 async def _begin_combining_distributions(
     context_name: str,
-    input_matrices: _InputMatrices,
-    batch_names: _BatchNames,
-    source_weights: _SourceWeights,
-    output_filepaths: _OutputCombinedSourceFilepath,
+    input_matrices: InputMatrices,
+    batch_names: BatchNames,
+    source_weights: SourceWeights,
+    output_filepaths: OutputCombinedSourceFilepath,
     output_figure_dirpath: Path,
     output_final_model_scores: Path,
     weighted_z_floor: int = -6,
@@ -237,7 +230,7 @@ async def _begin_combining_distributions(
     logger.info(f"Starting to combine z-scores for context '{context_name}'")
     output_figure_dirpath.mkdir(parents=True, exist_ok=True)
 
-    z_score_results: list[_CombineOmicsInput] = []
+    z_score_results: list[CombineOmicsInput] = []
     for source, matrix in input_matrices:
         if matrix is None:
             logger.trace(f"Source '{source.value}' is None, skipping")
@@ -280,7 +273,7 @@ async def _begin_combining_distributions(
             weighted_z_ceiling=weighted_z_ceiling,
         )
         z_score_results.append(
-            _CombineOmicsInput(
+            CombineOmicsInput(
                 z_score_matrix=merged_source_results,
                 type=source,
                 weight=source_weights[source.value],
