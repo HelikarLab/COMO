@@ -237,13 +237,16 @@ async def _begin_combining_distributions(
         if source not in SourceTypes:
             logger.critical(f"Invalid source; got '{source.value}', expected 'trna', 'mrna', 'scrna', or 'proteomics'.")
             raise ValueError("Invalid source")
+        batch_results: list[pd.DataFrame] = []
+        for batch in batch_names[source.value]:
+            send_df: pd.DataFrame = matrix[[GeneIdentifier.ENSEMBL_GENE_ID.value, *batch.sample_names]].copy()
+            send_df.set_index(GeneIdentifier.ENSEMBL_GENE_ID.value, drop=True, inplace=True)
 
-        batch_results = await asyncio.gather(
-            *[
+            batch_results.append(
                 _combine_z_distribution_for_batch(
                     context_name=context_name,
                     batch=batch,
-                    matrix=matrix[[GeneIdentifier.ENSEMBL_GENE_ID.value, *batch.sample_names]],
+                    matrix=send_df,
                     source=source,
                     output_combined_matrix_filepath=(
                         output_filepaths[source.value].parent / f"{context_name}_{source.value}_batch{batch.batch_num}_combined_z_distribution.csv"
@@ -252,13 +255,13 @@ async def _begin_combining_distributions(
                     weighted_z_floor=weighted_z_floor,
                     weighted_z_ceiling=weighted_z_ceiling,
                 )
-                for batch in batch_names[source.value]
-            ]
-        )
+            )
 
         merged_batch_results = pd.DataFrame()
         for df in batch_results:
-            merged_batch_results = df if merged_batch_results.empty else merged_batch_results.merge(df, on="ensembl_gene_id", how="outer")
+            merged_batch_results = (
+                df if merged_batch_results.empty else merged_batch_results.merge(df, left_index=True, right_index=True, how="outer")
+            )
 
         merged_source_results: pd.DataFrame = _combine_z_distribution_for_source(
             merged_source_data=merged_batch_results,
