@@ -217,32 +217,39 @@ def _build_with_imat(
     expr_thresh: tuple[float, float],
     force_gene_indices: Sequence[int],
     solver: str,
-    expr_vector = np.array(expr_vector)
-    properties = IMATProperties(
 ) -> cobra.Model:
+    properties: IMATProperties = IMATProperties(
         exp_vector=expr_vector,
         exp_thresholds=expr_thresh,
-        core=force_gene_ids,
+        core=force_gene_indices,
         epsilon=0.01,
         solver=solver.upper(),
     )
-    algorithm = IMAT(s_matrix, np.array(lower_bounds), np.array(upper_bounds), properties)
-    context_rxns: npt.NDArray = algorithm.run()
-    fluxes: pd.Series = algorithm.sol.to_series()
-    context_cobra_model = cobra_model.copy()
-    reaction_ids = [r.id for r in context_cobra_model.reactions]
 
-    remove_rxns = [reaction_ids[i] for i in range(s_matrix.shape[1]) if i not in context_rxns]
-    flux_df = pd.DataFrame(columns=["rxn", "flux"])
-    for idx, (_, val) in enumerate(fluxes.items()):
-        if idx <= len(cobra_model.reactions) - 1:
-            r_id = str(context_cobra_model.reactions.get_by_id(reaction_ids[idx])).split(":")[0]
-            getattr(context_cobra_model.reactions, r_id).fluxes = val
-            flux_df.loc[len(flux_df.index)] = [r_id, val]
+    # Creating a copy of the model ensures we don't make any in-place modifications by accident
+    # Using cobra to create the stoichiometry matrix means we have less work to do
+    force_gene_indices = np.array(force_gene_indices, dtype=np.uint16)
+    model_reconstruction: cobra.Model = reference_model.copy()
+    s_matrix: npt.NDArray[np.floating] = cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction)
+    algorithm: IMAT = IMAT(S=s_matrix, lb=np.array(lower_bounds), ub=np.array(upper_bounds), properties=properties)
+    rxns_from_imat: npt.NDArray[np.uint16] = algorithm.run().astype(np.uint16)
 
-    context_cobra_model.remove_reactions(remove_rxns, True)
+    # Collect all reaction IDs and their associated index (e.g., HEX1 is at index 123)
+    all_rxn_ids: npt.NDArray[str] = np.array([r.id for r in model_reconstruction.reactions], dtype=object)
+    all_rxn_indices: npt.NDArray[np.uint16] = np.array(range(len(model_reconstruction.reactions)), dtype=np.uint16)
 
-    return context_cobra_model, flux_df
+    # Collect reactions to keep by creating a unique set of reactions from the iMAT algorithm and force-include reactions
+    # dtype is set to uint16 because indices will not be below 0 or be greater than 65,535 (max size of uint16),
+    #   because only ~10,000 reactions exist in Recon3D
+    # Unsafe casting is OK because of these facts.
+    rxn_indices_to_keep: npt.NDArray[np.uint16] = np.unique(np.concatenate([rxns_from_imat, force_gene_indices], dtype=np.uint16))
+
+    # Reaction indices to exclude from the model are thus reactions that are not marked to be included in the model
+    # Assume unique is false because every value that is in `rxn_indices_to_keep` is included in `all_rxn_indices`
+    rxn_indices_to_remove: npt.NDArray[np.uint16] = np.setdiff1d(all_rxn_indices, rxn_indices_to_keep, assume_unique=False)
+    model_reconstruction.remove_reactions(reactions=all_rxn_ids[rxn_indices_to_remove].tolist(), remove_orphans=True)
+
+    return model_reconstruction
 
 
 def _build_with_tinit(
