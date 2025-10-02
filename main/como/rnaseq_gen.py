@@ -4,7 +4,6 @@ import multiprocessing
 import sys
 import time
 from collections import namedtuple
-from collections.abc import Callable
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from enum import Enum
@@ -16,6 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import scanpy as sc
 import seaborn as sns
 import sklearn
 import sklearn.neighbors
@@ -28,7 +28,7 @@ from sklearn.neighbors import KernelDensity
 from como.data_types import FilteringTechnique, LogLevel, PeakIdentificationParameters, RNAType
 from como.migrations import gene_info_migrations
 from como.project import Config
-from como.utils import _log_and_raise_error, _num_columns, _read_file, _set_up_logging
+from como.utils import _log_and_raise_error, num_columns, read_file, set_up_logging
 
 
 class _FilteringOptions(NamedTuple):
@@ -54,11 +54,11 @@ class _StudyMetrics:
     fragment_lengths: npt.NDArray[np.float32]
     sample_names: list[str]
     layout: list[LayoutMethod]
-    entrez_gene_ids: list[str]
+    entrez_gene_ids: list[int]
     gene_sizes: npt.NDArray[np.float32]
     __normalization_matrix: pd.DataFrame = field(default_factory=pd.DataFrame)
     __z_score_matrix: pd.DataFrame = field(default_factory=pd.DataFrame)
-    __high_confidence_entrez_gene_ids: list[str] = field(default=list)
+    __high_confidence_entrez_gene_ids: list[str] = field(default=list)  # type: ignore
 
     def __post_init__(self):
         for layout in self.layout:
@@ -102,9 +102,9 @@ class _ZFPKMResult(NamedTuple):
     max_fpkm: float
 
 
-class _ReadMatrixResults(NamedTuple):
+class _CountMetrics(NamedTuple):
     metrics: dict[str, _StudyMetrics]
-    entrez_gene_ids: list[str]
+    entrez_gene_ids: list[int]
 
 
 Density = namedtuple("Density", ["x", "y"])
@@ -155,7 +155,7 @@ async def _build_matrix_results(
     gene_info: pd.DataFrame,
     metadata_df: pd.DataFrame,
     taxon: int,
-) -> _ReadMatrixResults:
+) -> _CountMetrics:
     """Read the counts matrix and returns the results.
 
     Arg:
@@ -229,7 +229,7 @@ async def _build_matrix_results(
         metrics[study].fragment_lengths[np.isnan(metrics[study].fragment_lengths)] = 0
         metrics[study].count_matrix.index = pd.Index(entrez_gene_ids, name="entrez_gene_id")
 
-    return _ReadMatrixResults(metrics=metrics, entrez_gene_ids=gene_info["entrez_gene_id"].tolist())
+    return _CountMetrics(metrics=metrics, entrez_gene_ids=gene_info["entrez_gene_id"].astype(int).tolist())
 
 
 def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
@@ -255,7 +255,7 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
     return metrics
 
 
-def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
+def _calculate_fpkm(metrics: NamedMetrics, scale: float = 1e6) -> NamedMetrics:
     """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary.
 
     Args:
@@ -426,7 +426,7 @@ def zfpkm_transform(
         logger.warning(f"update_every_percent should be a decimal value between 0 and 1; got: {update_every_percent} - will convert to percentage")
         update_every_percent /= 100
 
-    total_samples = _num_columns(fpkm_df)
+    total_samples = num_columns(fpkm_df)
     update_per_step: int = int(np.ceil(total_samples * update_every_percent))
 
     # Get at least 1 core and at most cpu_count() - 2
@@ -826,17 +826,11 @@ async def _process(
         high_batch_ratio=high_batch_ratio,
     )
 
-    read_counts_results: _ReadMatrixResults = await _build_matrix_results(
-        matrix=rnaseq_matrix,
-        gene_info=gene_info_df,
-        metadata_df=metadata_df,
-        taxon=taxon,
-    )
+    count_metrics: _CountMetrics = await _build_count_metrics(matrix=rnaseq_matrix, gene_info=gene_info_df, metadata_df=metadata_df, taxon=taxon)
+    metrics: NamedMetrics = count_metrics.metrics
+    entrez_gene_ids: list[int] = count_metrics.entrez_gene_ids
 
-    metrics = read_counts_results.metrics
-    entrez_gene_ids = read_counts_results.entrez_gene_ids
-
-    metrics: NamedMetrics = filter_counts(
+    metrics = filter_counts(
         context_name=context_name,
         metrics=metrics,
         technique=technique,
@@ -957,7 +951,7 @@ async def rnaseq_gen(  # noqa: C901
     :param output_zfpkm_png_filepath: Optional filepath to save zFPKM plots
     :return: None
     """
-    _set_up_logging(level=log_level, location=log_location)
+    set_up_logging(level=log_level, location=log_location)
 
     technique = FilteringTechnique(technique) if isinstance(technique, str) else technique
     match technique:
@@ -1044,7 +1038,7 @@ async def rnaseq_gen(  # noqa: C901
         context_name=context_name,
         rnaseq_matrix_filepath=input_rnaseq_filepath,
         metadata_df=metadata_df,
-        gene_info_df=await _read_file(input_gene_info_filepath),
+        gene_info_df=await read_file(input_gene_info_filepath),
         prep=prep,
         taxon=taxon_id,
         replicate_ratio=replicate_ratio,
