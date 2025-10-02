@@ -59,8 +59,7 @@ def _combine_z_distribution_for_batch(
         logger.trace(f"A single sample exists for batch '{batch.batch_num}'. Returning as-is because no additional combining can be done")
         return matrix
 
-    values = matrix.iloc[:, 1:].values
-    weighted_matrix = np.sum(values, axis=1) / np.sqrt(values.shape[1])
+    weighted_matrix = np.sum(matrix, axis=1) / np.sqrt(matrix.shape[1])
     weighted_matrix = np.clip(weighted_matrix, weighted_z_floor, weighted_z_ceiling).astype(np.int8)
 
     merge_df = pd.concat([matrix, pd.Series(weighted_matrix, name="combined")], axis=1)
