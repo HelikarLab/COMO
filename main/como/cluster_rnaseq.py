@@ -57,19 +57,13 @@ class _Arguments:
         if 0 > self.min_distance > 1.0:
             raise ValueError("--min_dist must be a float between 0 and 1")
 
-        if (
-            isdigit(self.num_replicate_neighbors) and self.num_replicate_neighbors < 1
-        ) or self.num_replicate_neighbors != "default":
+        if (isdigit(self.num_replicate_neighbors) and self.num_replicate_neighbors < 1) or self.num_replicate_neighbors != "default":
             raise ValueError("--n-neighbors-rep must be either 'default' or an integer > 1")
 
-        if (
-            isdigit(self.num_batch_neighbors) and self.num_batch_neighbors < 1
-        ) or self.num_batch_neighbors != "default":
+        if (isdigit(self.num_batch_neighbors) and self.num_batch_neighbors < 1) or self.num_batch_neighbors != "default":
             raise ValueError("--n-neighbors-batch must be either 'default' or an integer > 1")
 
-        if (
-            isdigit(self.num_context_neighbors) and self.num_context_neighbors < 1
-        ) or self.num_context_neighbors != "default":
+        if (isdigit(self.num_context_neighbors) and self.num_context_neighbors < 1) or self.num_context_neighbors != "default":
             raise ValueError("--n-neighbors-context must be either 'default' or an integer > 1")
 
 

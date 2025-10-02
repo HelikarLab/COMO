@@ -159,9 +159,7 @@ class PopulateInformation:
 
             # Iterate through the URLs available
             for url, study in zip(ftp_urls, studies, strict=True):
-                ftp_data: FTPManager.Reader = FTPManager.Reader(
-                    root_link=url, file_extensions=self._preferred_extensions
-                )
+                ftp_data: FTPManager.Reader = FTPManager.Reader(root_link=url, file_extensions=self._preferred_extensions)
 
                 urls = list(ftp_data.files)
                 sizes = list(ftp_data.file_sizes)
@@ -169,9 +167,7 @@ class PopulateInformation:
 
                 # Iterate through all files and sizes found for url_##
                 for file, size in zip(urls, sizes, strict=True):
-                    self.file_information.append(
-                        FileInformation(cell_type=cell_type, download_url=file, file_size=size, study=study)
-                    )
+                    self.file_information.append(FileInformation(cell_type=cell_type, download_url=file, file_size=size, study=study))
 
     def print_download_size(self):
         """Print the total size to download if we must download data."""
@@ -313,16 +309,11 @@ def parse_args() -> argparse.Namespace:
     if args.core_count == "all":
         args.core_count = os.cpu_count()
     elif not str(args.core_count).isdigit():
-        raise ValueError(
-            f"Invalid option '{args.core_count}' for option '--cores'. Enter an integer or 'all' to use all cores"
-        )
+        raise ValueError(f"Invalid option '{args.core_count}' for option '--cores'. Enter an integer or 'all' to use all cores")
     else:
         args.core_count = int(args.core_count)
         if args.core_count > os.cpu_count():
-            logger.info(
-                f"{args.core_count} cores not available, system only has {os.cpu_count()} cores. "
-                f"Setting '--cores' to {os.cpu_count()}"
-            )
+            logger.info(f"{args.core_count} cores not available, system only has {os.cpu_count()} cores. Setting '--cores' to {os.cpu_count()}")
             args.core_count = os.cpu_count()
 
     return args

@@ -18,9 +18,7 @@ import aioftp
 from .FileInformation import FileInformation, clear_print
 
 
-async def aioftp_client(
-    host: str, username: str = "anonymous", password: str = "guest", port: int = 21, max_attempts: int = 3
-) -> aioftp.Client:
+async def aioftp_client(host: str, username: str = "anonymous", password: str = "guest", port: int = 21, max_attempts: int = 3) -> aioftp.Client:
     """This class is responsible for creating a "client" connection"""
     connection_successful: bool = False
     attempt_num: int = 1

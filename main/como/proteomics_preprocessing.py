@@ -36,15 +36,9 @@ def z_score_calc(abundance: pd.DataFrame, min_thresh: int) -> ZResult:
 
     # np.zeros((1000, len(abundance.columns)), dtype=np.float64),
     z_result = ZResult(
-        zfpkm=pd.DataFrame(
-            data=np.nan * np.ones_like(values), index=abundance.index, columns=abundance.columns, dtype=np.float64
-        ),
-        x_range=pd.DataFrame(
-            data=np.zeros((1000, len(abundance.columns))), columns=abundance.columns, dtype=np.float64
-        ),
-        density=pd.DataFrame(
-            data=np.zeros((1000, len(abundance.columns))), columns=abundance.columns, dtype=np.float64
-        ),
+        zfpkm=pd.DataFrame(data=np.nan * np.ones_like(values), index=abundance.index, columns=abundance.columns, dtype=np.float64),
+        x_range=pd.DataFrame(data=np.zeros((1000, len(abundance.columns))), columns=abundance.columns, dtype=np.float64),
+        density=pd.DataFrame(data=np.zeros((1000, len(abundance.columns))), columns=abundance.columns, dtype=np.float64),
         mu=np.zeros(len(abundance.columns)),
         std_dev=np.zeros(len(abundance.columns)),
         max_fpkm_peak=np.zeros(len(abundance.columns)),
@@ -98,9 +92,7 @@ def plot_gaussian_fit(z_results: ZResult, facet_titles: bool = True, x_min: int 
     std_dev = z_results.std_dev
     max_fpkm = z_results.max_fpkm_peak
 
-    fig = make_subplots(
-        rows=len(zfpkm.columns), cols=1, subplot_titles=zfpkm.columns if facet_titles else [None] * len(zfpkm.columns)
-    )
+    fig = make_subplots(rows=len(zfpkm.columns), cols=1, subplot_titles=zfpkm.columns if facet_titles else [None] * len(zfpkm.columns))
     for i, col in enumerate(zfpkm.columns):
         fitted = stats.norm.pdf(x_range[col], loc=mu[i], scale=std_dev[i])
         scale_fit = fitted * (max_fpkm[i] / fitted.max())
@@ -136,9 +128,7 @@ def protein_transform_main(
     output_z_score_matrix_filepath: Path,
 ) -> None:
     """Transform protein abundance data."""
-    abundance_df: pd.DataFrame = (
-        pd.read_csv(abundance_df) if isinstance(abundance_df, str | Path) else abundance_df.fillna(0)
-    )
+    abundance_df: pd.DataFrame = pd.read_csv(abundance_df) if isinstance(abundance_df, str | Path) else abundance_df.fillna(0)
     abundance_df = abundance_df[np.isfinite(abundance_df).all(axis=1)]  # Remove +/- infinity values
     z_transform: ZResult = z_score_calc(abundance_df, min_thresh=0)
 
