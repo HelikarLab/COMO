@@ -17,7 +17,6 @@ from como.data_types import (
     _OutputCombinedSourceFilepath,
     _SourceWeights,
 )
-from como.graph import z_score_distribution as graph_zscore_distribution
 from como.utils import (
     _num_columns,
 )
@@ -110,12 +109,10 @@ async def _combine_z_distribution_for_source(
     weighted_matrix = np.clip(weighted_matrix, weighted_z_floor, weighted_z_ceiling)
     logger.trace("Finished combining z-distribution")
     # merge_df = pd.concat([merged_source_data, pd.Series(weighted_matrix, name="combined")], axis=1)
-    weighted_matrix = pd.DataFrame(
-        {
-            "ensembl_gene_id": merged_source_data["ensembl_gene_id"],
-            "combine_z": weighted_matrix,
-        }
-    )
+    weighted_matrix = pd.DataFrame({
+        "ensembl_gene_id": merged_source_data["ensembl_gene_id"],
+        "combine_z": weighted_matrix,
+    })
 
     # stack_df = pd.melt(
     #     merge_df,
@@ -164,12 +161,10 @@ def _combine_z_distribution_for_context(
     denominator = np.sqrt(np.sum(normalized_weights**2, axis=1))
     combined_z_matrix = numerator / denominator
     combined_z_matrix = np.clip(combined_z_matrix, weighted_z_floor, weighted_z_ceiling)
-    combined_z_matrix_df = pd.DataFrame(
-        {
-            "ensembl_gene_id": z_matrix["ensembl_gene_id"],
-            "combine_z": combined_z_matrix,
-        }
-    )
+    combined_z_matrix_df = pd.DataFrame({
+        "ensembl_gene_id": z_matrix["ensembl_gene_id"],
+        "combine_z": combined_z_matrix,
+    })
 
     stack_df = pd.melt(
         z_matrix,
@@ -178,13 +173,11 @@ def _combine_z_distribution_for_context(
         var_name="source",
         value_name="zscore",
     )
-    combined_df = pd.DataFrame(
-        {
-            "ensembl_gene_id": z_matrix["ensembl_gene_id"],
-            "zscore": combined_z_matrix,
-            "source": "combined",
-        }
-    )
+    combined_df = pd.DataFrame({
+        "ensembl_gene_id": z_matrix["ensembl_gene_id"],
+        "zscore": combined_z_matrix,
+        "source": "combined",
+    })
     stack_df = pd.concat([stack_df, combined_df])
     # graph_zscore_distribution(
     #     df=stack_df,
@@ -217,23 +210,21 @@ async def _begin_combining_distributions(
             logger.critical(f"Invalid source; got '{source.value}', expected 'trna', 'mrna', 'scrna', or 'proteomics'.")
             raise ValueError("Invalid source")
 
-        batch_results = await asyncio.gather(
-            *[
-                _combine_z_distribution_for_batch(
-                    context_name=context_name,
-                    batch=batch,
-                    matrix=matrix[[GeneIdentifier.ENSEMBL_GENE_ID.value, *batch.sample_names]],
-                    source=source,
-                    output_combined_matrix_filepath=(
-                        output_filepaths[source.value].parent / f"{context_name}_{source.value}_batch{batch.batch_num}_combined_z_distribution_.csv"
-                    ),
-                    output_figure_dirpath=output_figure_dirpath,
-                    weighted_z_floor=weighted_z_floor,
-                    weighted_z_ceiling=weighted_z_ceiling,
-                )
-                for batch in batch_names[source.value]
-            ]
-        )
+        batch_results = await asyncio.gather(*[
+            _combine_z_distribution_for_batch(
+                context_name=context_name,
+                batch=batch,
+                matrix=matrix[[GeneIdentifier.ENSEMBL_GENE_ID.value, *batch.sample_names]],
+                source=source,
+                output_combined_matrix_filepath=(
+                    output_filepaths[source.value].parent / f"{context_name}_{source.value}_batch{batch.batch_num}_combined_z_distribution_.csv"
+                ),
+                output_figure_dirpath=output_figure_dirpath,
+                weighted_z_floor=weighted_z_floor,
+                weighted_z_ceiling=weighted_z_ceiling,
+            )
+            for batch in batch_names[source.value]
+        ])
 
         merged_batch_results = pd.DataFrame()
         for df in batch_results:
