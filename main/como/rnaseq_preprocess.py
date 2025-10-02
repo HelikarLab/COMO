@@ -244,9 +244,13 @@ async def _process_first_multirun_sample(strand_file: Path, all_counts_files: li
     if strand_information == "none":
         strand_information = "unstranded_rna_counts"
 
+    df_objs: list[pd.DataFrame] = []
+    for star_information in all_star_information:
         run_counts = star_information.count_matrix[["ensembl_gene_id", strand_information]]
         run_counts.columns = ["ensembl_gene_id", "counts"]
-        sample_count = run_counts if sample_count.empty else sample_count.merge(run_counts, on=["ensembl_gene_id", "counts"], how="outer")
+        df_objs.append(run_counts)
+        # sample_count = run_counts if sample_count.empty else sample_count.merge(run_counts, on=["ensembl_gene_id", "counts"], how="outer")
+    sample_count = reduce(lambda x, y: pd.merge(x, y, on=["ensembl_gene_id", "counts"], how="outer"), df_objs)
 
     # Set na values to 0
     sample_count = sample_count.fillna(value="0")
