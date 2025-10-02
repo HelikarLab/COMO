@@ -62,25 +62,20 @@ def _combine_z_distribution_for_batch(
     weighted_matrix = np.sum(matrix, axis=1) / np.sqrt(matrix.shape[1])
     weighted_matrix = np.clip(weighted_matrix, weighted_z_floor, weighted_z_ceiling).astype(np.int8)
 
-    merge_df = pd.concat([matrix, pd.Series(weighted_matrix, name="combined")], axis=1)
-    weighted_matrix = pd.DataFrame(
-        {
-            "ensembl_gene_id": matrix["ensembl_gene_id"],
-            "combine_z": weighted_matrix,
-        },
-    )
-    stack_df = pd.melt(
-        merge_df,
-        id_vars=["ensembl_gene_id"],
-        # Get all columns except ensembl_gene_id
-        value_vars=[col for col in merge_df.columns if col not in GeneIdentifier._member_map_],
-        var_name="source",
-        value_name="zscore",
-    )
-    if len(stack_df["source"].unique()) > 10:
-        stack_df = stack_df[stack_df["source"] == "combined"]
+    # merge_df = pd.concat([matrix, pd.Series(weighted_matrix, name="combined")], axis=1)
+    weighted_matrix = pd.DataFrame({"combine_z": weighted_matrix}, index=matrix.index)
 
-    # graph_zscore_distribution(
+    # stack_df = pd.melt(
+    #     merge_df,
+    #     id_vars=["ensembl_gene_id"],
+    #     # Get all columns except gene identifier items (ensembl gene id, gene symbol, etc)
+    #     value_vars=[col for col in merge_df.columns if col not in GeneIdentifier._member_map_],
+    #     var_name="source",
+    #     value_name="zscore",
+    # )
+    # if len(stack_df["source"].unique()) > 10:
+    #     stack_df = stack_df[stack_df["source"] == "combined"]
+    # z_score_distribution(
     #     stack_df,
     #     title=f"Combined Z-score Distribution for {context_name} - batch #{batch.batch_num}",
     #     output_filepath=output_figure_dirpath
