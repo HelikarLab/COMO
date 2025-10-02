@@ -4,12 +4,13 @@ import multiprocessing
 import sys
 import time
 from collections import namedtuple
+from collections.abc import Callable
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from enum import Enum
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Callable, NamedTuple
+from typing import NamedTuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -440,14 +441,12 @@ def zfpkm_plot(results, *, output_png_filepath: Path, plot_xfloor: int = -4):
         scale_fitted = fitted * (max_fpkm / max_fitted)
 
         to_concat.append(
-            pd.DataFrame(
-                {
-                    "sample_name": [name] * len(x),
-                    "log2fpkm": x,
-                    "fpkm_density": y,
-                    "fitted_density_scaled": scale_fitted,
-                }
-            )
+            pd.DataFrame({
+                "sample_name": [name] * len(x),
+                "log2fpkm": x,
+                "fpkm_density": y,
+                "fitted_density_scaled": scale_fitted,
+            })
         )
     mega_df = pd.concat(to_concat, ignore_index=True)
     mega_df.columns = pd.Series(data=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
