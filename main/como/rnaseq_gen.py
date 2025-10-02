@@ -115,7 +115,7 @@ def k_over_a(k: int, a: float) -> Callable[[npt.NDArray], bool]:
     :param k: The minimum number of times the sum of elements must be greater than or equal to A.
     :param a: The value to compare the sum of elements to.
     :return: A function that accepts a NumPy array to perform the actual filtering
-    """  # noqa: E501
+    """
 
     def filter_func(row: npt.NDArray) -> bool:
         return np.sum(row >= a) >= k
@@ -233,7 +233,7 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
 
 
 def calculate_fpkm(metrics: NamedMetrics) -> NamedMetrics:
-    """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary."""  # noqa: E501
+    """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary."""
     matrix_values = []
     for study in metrics:
         for sample in range(metrics[study].num_samples):
@@ -356,7 +356,7 @@ def zfpkm_transform(
 
     with Pool(processes=cores) as pool:
         kernel = KernelDensity(kernel="gaussian", bandwidth=bandwidth)
-        chunksize = int(math.ceil(len(fpkm_df.columns) / (4 * cores)))
+        chunksize = math.ceil(len(fpkm_df.columns) / (4 * cores))
         partial_func = partial(_zfpkm_calculation, kernel=kernel, peak_parameters=peak_parameters)
         chunk_time = time.time()
         start_time = time.time()
@@ -408,14 +408,12 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
         max_fitted = fitted.max()
         scale_fitted = fitted * (max_fpkm / max_fitted)
 
-        df = pd.DataFrame(
-            {
-                "sample_name": [name] * len(x),
-                "log2fpkm": x,
-                "fpkm_density": y,
-                "fitted_density_scaled": scale_fitted,
-            }
-        )
+        df = pd.DataFrame({
+            "sample_name": [name] * len(x),
+            "log2fpkm": x,
+            "fpkm_density": y,
+            "fitted_density_scaled": scale_fitted,
+        })
         mega_df = pd.concat([mega_df, df], ignore_index=True)
 
     mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")
