@@ -229,21 +229,20 @@ def _organize_gene_counts_files(data_dir: Path) -> Generator[_StudyMetrics, None
 async def _process_first_multirun_sample(strand_file: Path, all_counts_files: list[Path]) -> pd.Series:
     all_star_information: tuple[_STARinformation] = await asyncio.gather(*[_STARinformation.build_from_tab(file) for file in all_counts_files])
 
-    for star_information in all_star_information:
-        strand_information = strand_file.read_text().rstrip("\n").lower()
-
-        if strand_information not in ("none", "first_read_transcription_strand", "second_read_transcription_strand"):
-            _log_and_raise_error(
-                (
-                    f"Unrecognized Strand Information: {strand_information}; "
-                    f"expected 'none', 'first_read_transcription_strand', or 'second_read_transcription_strand'"
-                ),
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
-
-        if strand_information == "none":
-            strand_information = "unstranded_rna_counts"
+    async with aiofiles.open(strand_file) as f:
+        strand_information: str = await f.read()
+    strand_information = strand_information.removesuffix("\n").lower()
+    if strand_information not in ("none", "first_read_transcription_strand", "second_read_transcription_strand"):
+        _log_and_raise_error(
+            (
+                f"Unrecognized Strand Information: {strand_information}; "
+                f"expected 'none', 'first_read_transcription_strand', or 'second_read_transcription_strand'"
+            ),
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
+    if strand_information == "none":
+        strand_information = "unstranded_rna_counts"
 
         run_counts = star_information.count_matrix[["ensembl_gene_id", strand_information]]
         run_counts.columns = ["ensembl_gene_id", "counts"]
