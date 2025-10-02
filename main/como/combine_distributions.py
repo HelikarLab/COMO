@@ -278,7 +278,7 @@ async def _begin_combining_distributions(
                 weight=source_weights[source.value],
             )
         )
-        merged_source_results.to_csv(output_filepaths[source.value], index=False)
+        merged_source_results.to_csv(output_filepaths[source.value], index=True)
         logger.success(f"Wrote z-scores for source '{source.value}' in context '{context_name}' to '{output_filepaths[source.value]}'")
 
     logger.trace(f"Combining z-score distributions for all sources in context '{context_name}'")
@@ -287,5 +287,5 @@ async def _begin_combining_distributions(
         zscore_results=z_score_results,
         output_graph_filepath=output_figure_dirpath / f"{context_name}_combined_omics_distribution.pdf",
     )
-    merged_context_results.to_csv(output_final_model_scores, index=False)
+    merged_context_results.to_csv(output_final_model_scores, index=True)
     logger.success(f"Finished combining z-scores for context '{context_name}'")
