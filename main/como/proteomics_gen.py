@@ -137,10 +137,7 @@ def load_proteomics_tests(filename, context_name):
         return context_name, data
 
     else:
-        logger.warning(
-            f"Proteomics gene expression file for {context_name} was not found at {full_save_filepath}. "
-            f"Is this intentional?"
-        )
+        logger.warning(f"Proteomics gene expression file for {context_name} was not found at {full_save_filepath}. Is this intentional?")
         return load_empty_dict()
 
 

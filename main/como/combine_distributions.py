@@ -59,12 +59,7 @@ def _merge_batch(wd, context, batch):
         zmat.columns = rep_names
 
         stack_df = pd.concat(
-            [
-                pd.DataFrame(
-                    {"entrez_gene_id": zmat["entrez_gene_id"], "zscore": zmat[col].astype(float), "source": col}
-                )
-                for col in zmat.columns[1:]
-            ]
+            [pd.DataFrame({"entrez_gene_id": zmat["entrez_gene_id"], "zscore": zmat[col].astype(float), "source": col}) for col in zmat.columns[1:]]
         )
 
         plot_name_png = wd / "figures" / f"plot_{context}_{Path(f).stem}.png"
@@ -108,9 +103,7 @@ def _combine_batch_zdistro(wd, context, batch, zmat):
 
         stack_df = pd.concat(
             [
-                pd.DataFrame(
-                    {"entrez_gene_id": merge_df["entrez_gene_id"], "zscore": merge_df[col].astype(float), "source": col}
-                )
+                pd.DataFrame({"entrez_gene_id": merge_df["entrez_gene_id"], "zscore": merge_df[col].astype(float), "source": col})
                 for col in merge_df.columns[1:]
             ]
         )
@@ -157,9 +150,7 @@ def _combine_context_zdistro(wd, context, n_reps, zmat):
 
         stack_df = pd.concat(
             [
-                pd.DataFrame(
-                    {"entrez_gene_id": merge_df["entrez_gene_id"], "zscore": merge_df[col].astype(float), "source": col}
-                )
+                pd.DataFrame({"entrez_gene_id": merge_df["entrez_gene_id"], "zscore": merge_df[col].astype(float), "source": col})
                 for col in merge_df.columns[1:]
             ]
         )
@@ -259,9 +250,7 @@ def _combine_omics_zdistros(
 
     stack_df = pd.concat(
         [
-            pd.DataFrame(
-                {"entrez_gene_id": merge_df["entrez_gene_id"], "zscore": merge_df[col].astype(float), "source": col}
-            )
+            pd.DataFrame({"entrez_gene_id": merge_df["entrez_gene_id"], "zscore": merge_df[col].astype(float), "source": col})
             for col in merge_df.columns[1:]
         ]
     )
@@ -343,11 +332,7 @@ def _combine_zscores(  # noqa: C901
                 num_reps.extend(res[1])
                 combine_z_matrix = _combine_batch_zdistro(trna_workdir, context, batch, z_matrix)
                 combine_z_matrix.columns = ["entrez_gene_id", batch]
-                merge_z_data = (
-                    combine_z_matrix
-                    if merge_z_data.empty
-                    else pd.merge(merge_z_data, combine_z_matrix, on="entrez_gene_id", how="outer")
-                )
+                merge_z_data = combine_z_matrix if merge_z_data.empty else pd.merge(merge_z_data, combine_z_matrix, on="entrez_gene_id", how="outer")
 
             comb_batches_z_trna = _combine_context_zdistro(trna_workdir, context, num_reps, merge_z_data)
             filename = trna_workdir / f"combined_zFPKM_{context}.csv"
@@ -369,11 +354,7 @@ def _combine_zscores(  # noqa: C901
                 num_reps.extend(res[1])
                 combine_z_matrix = _combine_batch_zdistro(mrna_workdir, context, batch, z_matrix)
                 combine_z_matrix.columns = ["entrez_gene_id", batch]
-                merge_z_data = (
-                    combine_z_matrix
-                    if merge_z_data.empty
-                    else pd.merge(merge_z_data, combine_z_matrix, on="entrez_gene_id", how="outer")
-                )
+                merge_z_data = combine_z_matrix if merge_z_data.empty else pd.merge(merge_z_data, combine_z_matrix, on="entrez_gene_id", how="outer")
 
             comb_batches_z_mrna = _combine_context_zdistro(mrna_workdir, context, num_reps, merge_z_data)
             filename = mrna_workdir / f"combined_zFPKM_{context}.csv"
@@ -395,11 +376,7 @@ def _combine_zscores(  # noqa: C901
                 num_reps.extend(res[1])
                 combine_z_matrix = _combine_batch_zdistro(scrna_workdir, context, batch, z_matrix)
                 combine_z_matrix.columns = ["entrez_gene_id", batch]
-                merge_z_data = (
-                    combine_z_matrix
-                    if merge_z_data.empty
-                    else pd.merge(merge_z_data, combine_z_matrix, on="entrez_gene_id", how="outer")
-                )
+                merge_z_data = combine_z_matrix if merge_z_data.empty else pd.merge(merge_z_data, combine_z_matrix, on="entrez_gene_id", how="outer")
 
             comb_batches_z_scrna = _combine_context_zdistro(scrna_workdir, context, num_reps, merge_z_data)
             filename = scrna_workdir / f"combined_zFPKM_{context}.csv"
@@ -421,11 +398,7 @@ def _combine_zscores(  # noqa: C901
                 num_reps.extend(res[1])
                 combine_z_matrix = _combine_batch_zdistro(protein_workdir, context, batch, z_matrix)
                 combine_z_matrix.columns = ["entrez_gene_id", batch]
-                merge_z_data = (
-                    combine_z_matrix
-                    if merge_z_data.empty
-                    else pd.merge(merge_z_data, combine_z_matrix, on="entrez_gene_id", how="outer")
-                )
+                merge_z_data = combine_z_matrix if merge_z_data.empty else pd.merge(merge_z_data, combine_z_matrix, on="entrez_gene_id", how="outer")
 
             comb_batches_z_prot = _combine_context_zdistro(protein_workdir, context, num_reps, merge_z_data)
             filename = protein_workdir / f"combined_zscore_proteinAbundance_{context}.csv"
@@ -435,15 +408,8 @@ def _combine_zscores(  # noqa: C901
                 filename = protein_workdir / f"model_scores_{context}.csv"
                 comb_batches_z_prot.to_csv(filename, index=False)
 
-        if (
-            comb_batches_z_mrna is None
-            and comb_batches_z_trna is None
-            and comb_batches_z_scrna is None
-            and comb_batches_z_prot is None
-        ):
-            logger.critical(
-                f"The context '{context}' was found in the configuration file but no data was found on disk!"
-            )
+        if comb_batches_z_mrna is None and comb_batches_z_trna is None and comb_batches_z_scrna is None and comb_batches_z_prot is None:
+            logger.critical(f"The context '{context}' was found in the configuration file but no data was found on disk!")
             continue
 
         comb_omics_z = _combine_omics_zdistros(

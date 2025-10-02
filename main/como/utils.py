@@ -95,9 +95,7 @@ class Compartments:
         "s": ["eyespot", "eyespot apparatus", "stigma"],
     }
 
-    _REVERSE_LOOKUP: ClassVar[dict[str, list[str]]] = {
-        value.lower(): key for key, values in SHORTHAND.items() for value in values
-    }
+    _REVERSE_LOOKUP: ClassVar[dict[str, list[str]]] = {value.lower(): key for key, values in SHORTHAND.items() for value in values}
 
     @classmethod
     def get(cls, longhand: str) -> str | None:
@@ -125,20 +123,14 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
     new_list: list[str] = stringlist.strip("[]").replace("'", "").replace(" ", "").split(",")
 
     # Show a warning if more than one item is present in the list (this means we are using the old method)
-    logger.critical(
-        "DeprecationWarning: Please use the new method of providing context names, "
-        "i.e. --output-filetypes 'type1 type2 type3'."
-    )
+    logger.critical("DeprecationWarning: Please use the new method of providing context names, i.e. --output-filetypes 'type1 type2 type3'.")
     logger.critical(
         "If you are using COMO, this can be done by setting the 'context_names' variable to a "
         "simple string separated by spaces. Here are a few examples!"
     )
     logger.critical("context_names = 'cellType1 cellType2 cellType3'")
     logger.critical("output_filetypes = 'output1 output2 output3'")
-    logger.critical(
-        "\nYour current method of passing context names will be removed in the future. "
-        "Update your variables above accordingly!\n\n"
-    )
+    logger.critical("\nYour current method of passing context names will be removed in the future. Update your variables above accordingly!\n\n")
 
     return new_list
 
@@ -158,9 +150,7 @@ def split_gene_expression_data(expression_data: pd.DataFrame, recon_algorithm: A
     expression_data.loc[:, "entrez_gene_id"] = expression_data["entrez_gene_id"].astype(str)
     single_gene_names = expression_data[~expression_data["entrez_gene_id"].str.contains("//")]
     multiple_gene_names = expression_data[expression_data["entrez_gene_id"].str.contains("//")]
-    split_gene_names = multiple_gene_names.assign(
-        entrez_gene_id=multiple_gene_names["entrez_gene_id"].str.split("///")
-    ).explode("entrez_gene_id")
+    split_gene_names = multiple_gene_names.assign(entrez_gene_id=multiple_gene_names["entrez_gene_id"].str.split("///")).explode("entrez_gene_id")
 
     gene_expressions = pd.concat([single_gene_names, split_gene_names], axis=0, ignore_index=True)
     gene_expressions.set_index("entrez_gene_id", inplace=True)
@@ -193,9 +183,7 @@ async def _format_determination(
     :return: A pandas DataFrame
     """
     requested_output = [requested_output] if isinstance(requested_output, Output) else requested_output
-    cohersion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(
-        columns=["Input Type"]
-    )
+    cohersion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(columns=["Input Type"])
     cohersion.columns = pd.Index(["input_value", *[o.value.replace(" ", "_").lower() for o in requested_output]])
     return cohersion
 
