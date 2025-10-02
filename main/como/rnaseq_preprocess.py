@@ -669,7 +669,7 @@ async def _create_gene_info_file(
                 raise TypeError(f"Unsupported data type '{type(data)}' for file '{file}'")
         except json.JSONDecodeError:
             _log_and_raise_error(
-                f"Got a JSON decode error for file '{counts_matrix_filepaths}'",
+                f"Got a JSON decode error for file '{file}'",
                 error=ValueError,
                 level=LogLevel.CRITICAL,
             )
