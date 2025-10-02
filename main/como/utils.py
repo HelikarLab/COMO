@@ -257,12 +257,11 @@ def _log_and_raise_error(
     level: LogLevel,
 ) -> None:
     caller = logger.opt(depth=1)
-    match level:
-        case LogLevel.ERROR:
-            caller.error(message)
-        case LogLevel.CRITICAL:
-            caller.critical(message)
-        case _:
-            raise ValueError(f"When raising an error, LogLevel.ERROR or LogLevel.CRITICAL must be used. Got: {level}")
+    if level == LogLevel.ERROR:
+        caller.error(message)
+    elif level == LogLevel.CRITICAL:
+        caller.critical(message)
+    else:
+        raise ValueError(f"When raising an error, LogLevel.ERROR or LogLevel.CRITICAL must be used. Got: {level}")
 
     raise error(message)
