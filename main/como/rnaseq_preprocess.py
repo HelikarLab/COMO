@@ -226,9 +226,8 @@ def _organize_gene_counts_files(data_dir: Path) -> Generator[_StudyMetrics, None
         )
 
 
-async def _process_first_multirun_sample(strand_file: Path, all_counts_files: list[Path]):
-    sample_count = pd.DataFrame()
-    all_star_information: list[_STARinformation] = await asyncio.gather(*[_STARinformation.build_from_tab(file) for file in all_counts_files])
+async def _process_first_multirun_sample(strand_file: Path, all_counts_files: list[Path]) -> pd.Series:
+    all_star_information: tuple[_STARinformation] = await asyncio.gather(*[_STARinformation.build_from_tab(file) for file in all_counts_files])
 
     for star_information in all_star_information:
         strand_information = strand_file.read_text().rstrip("\n").lower()
