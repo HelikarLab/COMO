@@ -15,17 +15,17 @@ from como.combine_distributions import (
 )
 from como.data_types import (
     AdjustmentMethod,
+    BatchNames,
+    InputMatrices,
     LogLevel,
+    OutputCombinedSourceFilepath,
     RNAType,
     SourceTypes,
+    SourceWeights,
     _BatchEntry,
-    _BatchNames,
-    _InputMatrices,
-    _OutputCombinedSourceFilepath,
-    _SourceWeights,
 )
 from como.project import Config
-from como.utils import _log_and_raise_error, _read_file, _set_up_logging, get_missing_gene_data, return_placeholder_data
+from como.utils import _log_and_raise_error, get_missing_gene_data, read_file, return_placeholder_data, set_up_logging
 
 
 class _MergedHeaderNames:
@@ -354,7 +354,7 @@ async def _merge_xomics(
     return {context_name: output_gene_activity_filepath.as_posix()}
 
 
-async def _update_missing_data(input_matrices: _InputMatrices, taxon_id: int) -> _InputMatrices:
+async def _update_missing_data(input_matrices: InputMatrices, taxon_id: int) -> InputMatrices:
     logger.trace("Updating missing genomic data")
     matrix_keys: dict[str, list[pd.DataFrame]] = {
         "trna": [input_matrices.trna],
@@ -399,10 +399,10 @@ async def _update_missing_data(input_matrices: _InputMatrices, taxon_id: int) ->
 async def _process(
     *,
     context_name: str,
-    input_matrices: _InputMatrices,
-    boolean_matrices: _InputMatrices,
-    batch_names: _BatchNames,
-    source_weights: _SourceWeights,
+    input_matrices: InputMatrices,
+    boolean_matrices: InputMatrices,
+    batch_names: BatchNames,
+    source_weights: SourceWeights,
     taxon_id: int,
     minimum_source_expression: int,
     expression_requirement: int,
@@ -414,7 +414,7 @@ async def _process(
     adjust_for_missing_sources: bool,
     output_merge_activity_filepath: Path,
     output_transcriptomic_details_filepath: Path,
-    output_activity_filepaths: _OutputCombinedSourceFilepath,
+    output_activity_filepaths: OutputCombinedSourceFilepath,
     output_final_model_scores_filepath: Path,
     output_figure_dirpath: Path | None,
 ):
@@ -503,8 +503,8 @@ def _build_batches(
     mrna_metadata: pd.DataFrame | None,
     scrna_metadata: pd.DataFrame | None,
     proteomic_metadata: pd.DataFrame | None,
-) -> _BatchNames:
-    batch_names = _BatchNames(**{source.name.lower(): [] for source in SourceTypes})
+) -> BatchNames:
+    batch_names = BatchNames(**{source.name.lower(): [] for source in SourceTypes})
     for source, metadata in zip(SourceTypes, [trna_metadata, mrna_metadata, scrna_metadata, proteomic_metadata], strict=True):
         source: SourceTypes
         metadata: pd.DataFrame
@@ -582,7 +582,7 @@ async def merge_xomics(  # noqa: C901
     log_location: str | TextIOWrapper = sys.stderr,
 ):
     """Merge expression tables of multiple sources (RNA-seq, proteomics) into one."""
-    _set_up_logging(level=log_level, location=log_location)
+    set_up_logging(level=log_level, location=log_location)
     logger.info(f"Starting to merge all omics data for context: '{context_name}'")
 
     # fmt: off
@@ -652,9 +652,9 @@ async def merge_xomics(  # noqa: C901
     trna_metadata: pd.DataFrame | None
     trna_matrix, trna_boolean_matrix, trna_metadata = await asyncio.gather(
         *[
-            _read_file(trna_matrix_or_filepath),
-            _read_file(trna_boolean_matrix_or_filepath),
-            _read_file(trna_metadata_filepath_or_df),
+            read_file(trna_matrix_or_filepath),
+            read_file(trna_boolean_matrix_or_filepath),
+            read_file(trna_metadata_filepath_or_df),
         ]
     )
 
@@ -664,9 +664,9 @@ async def merge_xomics(  # noqa: C901
     mrna_metadata: pd.DataFrame | None
     mrna_matrix, mrna_boolean_matrix, mrna_metadata = await asyncio.gather(
         *[
-            _read_file(mrna_matrix_or_filepath),
-            _read_file(mrna_boolean_matrix_or_filepath),
-            _read_file(mrna_metadata_filepath_or_df),
+            read_file(mrna_matrix_or_filepath),
+            read_file(mrna_boolean_matrix_or_filepath),
+            read_file(mrna_metadata_filepath_or_df),
         ]
     )
 
@@ -677,9 +677,9 @@ async def merge_xomics(  # noqa: C901
     scrna_metadata: pd.DataFrame | None
     scrna_matrix, scrna_boolean_matrix, scrna_metadata = await asyncio.gather(
         *[
-            _read_file(scrna_matrix_or_filepath),
-            _read_file(scrna_boolean_matrix_or_filepath),
-            _read_file(scrna_metadata_filepath_or_df),
+            read_file(scrna_matrix_or_filepath),
+            read_file(scrna_boolean_matrix_or_filepath),
+            read_file(scrna_metadata_filepath_or_df),
         ]
     )
 
@@ -689,21 +689,21 @@ async def merge_xomics(  # noqa: C901
     proteomic_metadata: pd.DataFrame | None
     proteomic_matrix, proteomic_boolean_matrix, proteomic_metadata = await asyncio.gather(
         *[
-            _read_file(proteomic_matrix_or_filepath),
-            _read_file(proteomic_boolean_matrix_or_filepath),
-            _read_file(proteomic_metadata_filepath_or_df),
+            read_file(proteomic_matrix_or_filepath),
+            read_file(proteomic_boolean_matrix_or_filepath),
+            read_file(proteomic_metadata_filepath_or_df),
         ]
     )
 
-    source_weights = _SourceWeights(trna=trna_weight, mrna=mrna_weight, scrna=scrna_weight, proteomics=proteomic_weight)
-    input_matrices = _InputMatrices(trna=trna_matrix, mrna=mrna_matrix, scrna=scrna_matrix, proteomics=proteomic_matrix)
-    boolean_matrices = _InputMatrices(
+    source_weights = SourceWeights(trna=trna_weight, mrna=mrna_weight, scrna=scrna_weight, proteomics=proteomic_weight)
+    input_matrices = InputMatrices(trna=trna_matrix, mrna=mrna_matrix, scrna=scrna_matrix, proteomics=proteomic_matrix)
+    boolean_matrices = InputMatrices(
         trna=trna_boolean_matrix,
         mrna=mrna_boolean_matrix,
         scrna=scrna_boolean_matrix,
         proteomics=proteomic_boolean_matrix,
     )
-    output_activity_filepaths = _OutputCombinedSourceFilepath(
+    output_activity_filepaths = OutputCombinedSourceFilepath(
         trna=output_trna_activity_filepath,
         mrna=output_mrna_activity_filepath,
         scrna=output_scrna_activity_filepath,
