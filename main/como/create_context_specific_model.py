@@ -367,7 +367,9 @@ async def _build_model(  # noqa: C901
     low_thresh: float,
     high_thresh: float,
     output_flux_result_filepath: Path,
-) -> _BuildResults:
+    *,
+    force_boundary_rxn_inclusion: bool,
+) -> BuildResults:
     """Seed a context specific reference_model.
 
     Core reactions are determined from GPR associations with gene expression logicals.
@@ -389,6 +391,7 @@ async def _build_model(  # noqa: C901
         low_thresh: Low expression threshold for algorithms that require it (iMAT, tINIT)
         high_thresh: High expression threshold for algorithms that require it (iMAT, tINIT)
         output_flux_result_filepath: Path to save flux results (for iMAT only)
+        force_boundary_rxn_inclusion: If True, ensure that all boundary reactions are included in the final model.
 
     Returns:
         A _BuildResults object containing the context-specific model, list of expression indices used, and a DataFrame of infeasible reactions.
@@ -459,8 +462,18 @@ async def _build_model(  # noqa: C901
             expression_vector[i] = low_thresh - 0.1 if recon_algorithm in {Algorithm.TINIT, Algorithm.IMAT} else 0
 
     objective_index = reaction_ids.index(objective)
-    force_reaction_indices = [reaction_ids.index(rxn) for rxn in force_reactions if rxn in reaction_ids]
-    expression_vector_indices = [i for (i, val) in enumerate(expression_vector) if val > 0]  # type: ignore
+
+    if force_boundary_rxn_inclusion:
+        all_forced: set[str] = {*force_reactions, *boundary_reactions}
+        force_reaction_indices: npt.NDArray[np.uint16] = np.array(
+            [reaction_ids.index(rxn) for rxn in all_forced if rxn in reaction_ids], dtype=np.uint16
+        )
+    else:
+        force_reaction_indices: npt.NDArray[np.uint16] = np.array(
+            [reaction_ids.index(rxn) for rxn in force_reactions if rxn in reaction_ids], dtype=np.uint16
+        )
+
+    expression_vector_indices = [i for (i, val) in enumerate(expression_vector) if val > 0]
     expression_threshold = (low_thresh, high_thresh)
 
     match recon_algorithm:
@@ -635,6 +648,8 @@ async def create_context_specific_model(  # noqa: C901
     solver: Solver = Solver.GLPK,
     log_level: LogLevel = LogLevel.INFO,
     log_location: str | TextIOWrapper = sys.stderr,
+    *,
+    force_boundary_rxn_inclusion: bool = True,
 ):
     """Create a context-specific model using the provided data.
 
@@ -657,6 +672,7 @@ async def create_context_specific_model(  # noqa: C901
         solver: Solver to use. One of Solver.GLPK, Solver.CPLEX, Solver.GUROBI
         log_level: Logging level. One of LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARNING, LogLevel.ERROR, LogLevel.CRITICAL
         log_location: Location for log output. Can be a file path or sys.stderr/sys.stdout.
+        force_boundary_rxn_inclusion: If True, ensure that all provided boundary reactions are included in the final model.
 
     Raises:
         ImportError: If Gurobi solver is selected but gurobipy is not installed.
@@ -789,6 +805,7 @@ async def create_context_specific_model(  # noqa: C901
         low_thresh=low_threshold,
         high_thresh=high_threshold,
         output_flux_result_filepath=output_flux_result_filepath,
+        force_boundary_rxn_inclusion=force_boundary_rxn_inclusion,
     )
 
     build_results.infeasible_reactions.dropna(inplace=True)
