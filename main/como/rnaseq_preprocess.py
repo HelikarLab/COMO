@@ -357,7 +357,7 @@ async def _write_counts_matrix(
     final_matrix: pd.DataFrame = functools.reduce(lambda left, right: pd.merge(left, right, on="ensembl_gene_id", how="outer"), counts)
     final_matrix.fillna(value=0, inplace=True)
     final_matrix.iloc[:, 1:] = final_matrix.iloc[:, 1:].astype(np.uint64)
-    final_matrix = final_matrix[["ensembl_gene_id", *rna_specific_sample_names]]
+    final_matrix = final_matrix[["ensembl_gene_id", *[col for col in final_matrix.columns if col in rna_specific_sample_names]]]
 
     output_counts_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
     final_matrix.dropna(inplace=True)
