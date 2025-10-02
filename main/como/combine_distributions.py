@@ -203,7 +203,7 @@ def _combine_z_distribution_for_context(
     return combined_z_matrix_df
 
 
-async def _begin_combining_distributions(
+def _begin_combining_distributions(
     context_name: str,
     input_matrices: InputMatrices,
     batch_names: BatchNames,

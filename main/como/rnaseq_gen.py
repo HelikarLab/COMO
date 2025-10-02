@@ -145,6 +145,9 @@ async def _build_count_metrics(
 
     Returns:
         A dataclass `ReadMatrixResults`
+
+    Raises:
+        ValueError: If no columns to merge on are found, or if no sample columns are found after merging with gene information.
     """
     matrix.dropna(subset="ensembl_gene_id", inplace=True)
     conversion = await ensembl_to_gene_id_and_symbol(ids=matrix["ensembl_gene_id"].tolist(), taxon=taxon)
