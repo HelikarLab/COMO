@@ -170,9 +170,7 @@ async def _build_count_metrics(
 
     # Only include Entrez and Ensembl Gene IDs that are present in `gene_info`
     matrix["entrez_gene_id"] = matrix["entrez_gene_id"].str.split("//")
-    matrix = matrix.explode("entrez_gene_id")
-    # matrix = matrix.replace(to_replace="-", value=pd.NA)
-    matrix.dropna(subset="entrez_gene_id", inplace=True)
+    matrix = matrix.explode("entrez_gene_id").replace(to_replace="-", value=pd.NA).dropna(subset="entrez_gene_id")
     matrix["entrez_gene_id"] = matrix["entrez_gene_id"].astype(int)
 
     gene_info = gene_info_migrations(gene_info)
@@ -193,7 +191,7 @@ async def _build_count_metrics(
 
     entrez_gene_ids: list[str] = gene_info["entrez_gene_id"].tolist()
     metrics: NamedMetrics = {}
-    for study in metadata_df["study"].unique().tolist():
+    for study in metadata_df["study"].unique():
         study_sample_names = metadata_df[metadata_df["study"] == study]["sample_name"].tolist()
         layouts = metadata_df[metadata_df["study"] == study]["layout"].tolist()
         metrics[study] = _StudyMetrics(
