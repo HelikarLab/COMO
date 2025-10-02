@@ -4,10 +4,10 @@ import asyncio
 import contextlib
 import io
 import sys
+import typing
 from collections.abc import Iterator
-from io import TextIOWrapper
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TextIO, overload
 
 import aiofiles
 import numpy.typing as npt
@@ -136,11 +136,19 @@ async def format_determination(
     return coercion
 
 
-async def _read_file(
-    path: Path | io.StringIO | None,
-    h5ad_as_df: bool = True,
-    **kwargs,
-) -> pd.DataFrame | sc.AnnData | None:
+@overload
+async def read_file(path: Path | io.StringIO, *, h5ad_as_df: Literal[False] = False, **kwargs) -> sc.AnnData | pd.DataFrame: ...
+
+
+@overload
+async def read_file(path: Path | io.StringIO | pd.DataFrame | sc.AnnData, *, h5ad_as_df: Literal[True] = True, **kwargs) -> pd.DataFrame: ...
+
+
+@overload
+async def read_file(path: None, *, h5ad_as_df: Literal[True] = True, **kwargs) -> None: ...
+
+
+async def read_file(path, *, h5ad_as_df=True, **kwargs):
     """Asynchronously read a filepath and return a pandas DataFrame.
 
     If the provided path is None, None will also be returned.
@@ -240,7 +248,7 @@ def return_placeholder_data() -> pd.DataFrame:
 
 def _set_up_logging(
     level: LogLevel | str,
-    location: str | TextIOWrapper,
+    location: str | TextIO,
     formatting: str = LOG_FORMAT,
 ):
     if isinstance(level, str):
@@ -255,7 +263,7 @@ def _log_and_raise_error(
     *,
     error: type[BaseException],
     level: LogLevel,
-) -> None:
+) -> typing.NoReturn:
     caller = logger.opt(depth=1)
     if level == LogLevel.ERROR:
         caller.error(message)
