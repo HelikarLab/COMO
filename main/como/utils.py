@@ -220,6 +220,11 @@ async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int 
             logger.critical("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
             raise ValueError("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
 
+    _log_and_raise_error(
+        message=f"Values must be of type list or pandas DataFrame. Got: {type(values)}",
+        error=TypeError,
+        level=LogLevel.CRITICAL,
+    )
 
 
 def listify(value):
