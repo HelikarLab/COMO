@@ -64,8 +64,9 @@ class _STARinformation:
             num_no_feature = [int(i) for i in no_feature.removesuffix("\n").split("\t")[1:]]
             num_ambiguous = [int(i) for i in ambiguous.removesuffix("\n").split("\t")[1:]]
 
-        df = await _read_file(
-            filepath,
+        df: pd.DataFrame = await read_file(
+            fiepath,
+            h5ad_as_df=True,
             sep="\t",
             header=None,
             skiprows=4,
