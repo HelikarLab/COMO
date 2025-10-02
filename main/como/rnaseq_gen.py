@@ -408,12 +408,14 @@ def zfpkm_plot(results, *, plot_xfloor: int = -4, subplot_titles: bool = True):
         max_fitted = fitted.max()
         scale_fitted = fitted * (max_fpkm / max_fitted)
 
-        df = pd.DataFrame({
-            "sample_name": [name] * len(x),
-            "log2fpkm": x,
-            "fpkm_density": y,
-            "fitted_density_scaled": scale_fitted,
-        })
+        df = pd.DataFrame(
+            {
+                "sample_name": [name] * len(x),
+                "log2fpkm": x,
+                "fpkm_density": y,
+                "fitted_density_scaled": scale_fitted,
+            }
+        )
         mega_df = pd.concat([mega_df, df], ignore_index=True)
 
     mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")

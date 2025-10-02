@@ -412,14 +412,16 @@ async def _create_config_df(  # noqa: C901
         groups.append(study_number)
         preparation_method.append(prep)
 
-    out_df = pd.DataFrame({
-        "sample_name": sample_names,
-        "fragment_length": fragment_lengths,
-        "layout": layouts,
-        "strand": strands,
-        "study": groups,
-        "library_prep": preparation_method,
-    }).sort_values("sample_name")
+    out_df = pd.DataFrame(
+        {
+            "sample_name": sample_names,
+            "fragment_length": fragment_lengths,
+            "layout": layouts,
+            "strand": strands,
+            "study": groups,
+            "library_prep": preparation_method,
+        }
+    ).sort_values("sample_name")
     return out_df
 
 
