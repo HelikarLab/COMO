@@ -954,34 +954,31 @@ async def rnaseq_gen(  # noqa: C901
     set_up_logging(level=log_level, location=log_location)
 
     technique = FilteringTechnique(technique) if isinstance(technique, str) else technique
-    match technique:
-        case FilteringTechnique.TPM:
-            cutoff = cutoff or 25
-            if cutoff < 1 or cutoff > 100:
-                _log_and_raise_error(
-                    "Quantile must be between 1 - 100",
-                    error=ValueError,
-                    level=LogLevel.ERROR,
-                )
-
-        case FilteringTechnique.CPM:
-            if cutoff and cutoff < 0:
-                _log_and_raise_error(
-                    "Cutoff must be greater than or equal to 0",
-                    error=ValueError,
-                    level=LogLevel.ERROR,
-                )
-            elif cutoff:
-                cutoff = "default"
-
-        case FilteringTechnique.ZFPKM | FilteringTechnique.UMI:
-            cutoff = cutoff or -3
-        case _:
+    if technique == FilteringTechnique.TPM:
+        cutoff = cutoff or 25
+        if cutoff < 1 or cutoff > 100:
             _log_and_raise_error(
-                f"Technique must be one of {','.join(FilteringTechnique)}. Got: {technique.value}",
+                "Quantile must be between 1 - 100",
                 error=ValueError,
                 level=LogLevel.ERROR,
             )
+    elif technique == FilteringTechnique.CPM:
+        if cutoff and cutoff < 0:
+            _log_and_raise_error(
+                "Cutoff must be greater than or equal to 0",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
+        elif cutoff:
+            cutoff = "default"
+    elif technique in {FilteringTechnique.ZFPKM, FilteringTechnique.UMI}:
+        cutoff = cutoff or -3
+    else:
+        _log_and_raise_error(
+            f"Technique must be one of {','.join(FilteringTechnique)}. Got: {technique.value}",
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
 
     if not input_rnaseq_filepath.exists():
         _log_and_raise_error(
