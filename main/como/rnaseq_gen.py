@@ -3,7 +3,8 @@ from __future__ import annotations
 import math
 import multiprocessing
 import time
-from collections import Callable, namedtuple
+from collections import namedtuple
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import partial
