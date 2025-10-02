@@ -253,7 +253,7 @@ async def _process_first_multirun_sample(strand_file: Path, all_counts_files: li
     sample_count = reduce(lambda x, y: pd.merge(x, y, on=["ensembl_gene_id", "counts"], how="outer"), df_objs)
 
     # Set na values to 0
-    sample_count = sample_count.fillna(value="0")
+    sample_count = sample_count.fillna(value=np.float32(0))
     sample_count["counts"] = sample_count["counts"].astype(np.float64)
 
     count_sums = sample_count.groupby("ensembl_gene_id", as_index=False)["counts"].mean()
