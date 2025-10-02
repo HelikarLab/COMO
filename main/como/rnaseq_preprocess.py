@@ -5,15 +5,17 @@ import functools
 import json
 import re
 import sys
+from collections.abc import Generator
 from dataclasses import asdict, dataclass, field
-from io import StringIO, TextIOWrapper
+from functools import reduce
 from itertools import chain
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final, Literal, TextIO
 
 import aiofiles
 import numpy as np
 import pandas as pd
+import scanpy as sc
 from fast_bioservices.biothings.mygene import MyGene
 from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
