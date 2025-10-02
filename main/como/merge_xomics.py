@@ -631,41 +631,49 @@ async def merge_xomics(  # noqa: C901
     trna_matrix: pd.DataFrame | None
     trna_boolean_matrix: pd.DataFrame | None
     trna_metadata: pd.DataFrame | None
-    trna_matrix, trna_boolean_matrix, trna_metadata = await asyncio.gather(*[
-        _read_file(trna_matrix_or_filepath),
-        _read_file(trna_boolean_matrix_or_filepath),
-        _read_file(trna_metadata_filepath_or_df),
-    ])
+    trna_matrix, trna_boolean_matrix, trna_metadata = await asyncio.gather(
+        *[
+            _read_file(trna_matrix_or_filepath),
+            _read_file(trna_boolean_matrix_or_filepath),
+            _read_file(trna_metadata_filepath_or_df),
+        ]
+    )
 
     # Build mrna items
     mrna_matrix: pd.DataFrame | None
     mrna_boolean_matrix: pd.DataFrame | None
     mrna_metadata: pd.DataFrame | None
-    mrna_matrix, mrna_boolean_matrix, mrna_metadata = await asyncio.gather(*[
-        _read_file(mrna_matrix_or_filepath),
-        _read_file(mrna_boolean_matrix_or_filepath),
-        _read_file(mrna_metadata_filepath_or_df),
-    ])
+    mrna_matrix, mrna_boolean_matrix, mrna_metadata = await asyncio.gather(
+        *[
+            _read_file(mrna_matrix_or_filepath),
+            _read_file(mrna_boolean_matrix_or_filepath),
+            _read_file(mrna_metadata_filepath_or_df),
+        ]
+    )
 
     # build scrna items
     scrna_matrix: pd.DataFrame | None
     scrna_boolean_matrix: pd.DataFrame | None
     scrna_metadata: pd.DataFrame | None
-    scrna_matrix, scrna_boolean_matrix, scrna_metadata = await asyncio.gather(*[
-        _read_file(scrna_matrix_or_filepath),
-        _read_file(scrna_boolean_matrix_or_filepath),
-        _read_file(scrna_metadata_filepath_or_df),
-    ])
+    scrna_matrix, scrna_boolean_matrix, scrna_metadata = await asyncio.gather(
+        *[
+            _read_file(scrna_matrix_or_filepath),
+            _read_file(scrna_boolean_matrix_or_filepath),
+            _read_file(scrna_metadata_filepath_or_df),
+        ]
+    )
 
     # build proteomic items
     proteomic_matrix: pd.DataFrame | None
     proteomic_boolean_matrix: pd.DataFrame | None
     proteomic_metadata: pd.DataFrame | None
-    proteomic_matrix, proteomic_boolean_matrix, proteomic_metadata = await asyncio.gather(*[
-        _read_file(proteomic_matrix_or_filepath),
-        _read_file(proteomic_boolean_matrix_or_filepath),
-        _read_file(proteomic_metadata_filepath_or_df),
-    ])
+    proteomic_matrix, proteomic_boolean_matrix, proteomic_metadata = await asyncio.gather(
+        *[
+            _read_file(proteomic_matrix_or_filepath),
+            _read_file(proteomic_boolean_matrix_or_filepath),
+            _read_file(proteomic_metadata_filepath_or_df),
+        ]
+    )
 
     source_weights = _SourceWeights(trna=trna_weight, mrna=mrna_weight, scrna=scrna_weight, proteomics=proteomic_weight)
     input_matrices = _InputMatrices(trna=trna_matrix, mrna=mrna_matrix, scrna=scrna_matrix, proteomics=proteomic_matrix)
