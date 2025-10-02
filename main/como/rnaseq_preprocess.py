@@ -131,7 +131,7 @@ def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
     if len(gene_counts_directories) != len(strandedness_directories):
         raise ValueError(
             f"Unequal number of gene count directories and strandedness directories. "
-            f"Found {len(gene_counts_directories)} gene count directories and {len(strandedness_directories)} strandedness directories."  # noqa: E501
+            f"Found {len(gene_counts_directories)} gene count directories and {len(strandedness_directories)} strandedness directories."
             f"\nGene count directory: {gene_count_dir}\nStrandedness directory: {strand_dir}"
         )
 
@@ -412,16 +412,14 @@ async def _create_config_df(  # noqa: C901
         groups.append(study_number)
         preparation_method.append(prep)
 
-    out_df = pd.DataFrame(
-        {
-            "sample_name": sample_names,
-            "fragment_length": fragment_lengths,
-            "layout": layouts,
-            "strand": strands,
-            "study": groups,
-            "library_prep": preparation_method,
-        }
-    ).sort_values("sample_name")
+    out_df = pd.DataFrame({
+        "sample_name": sample_names,
+        "fragment_length": fragment_lengths,
+        "layout": layouts,
+        "strand": strands,
+        "study": groups,
+        "library_prep": preparation_method,
+    }).sort_values("sample_name")
     return out_df
 
 
