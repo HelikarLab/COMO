@@ -180,7 +180,7 @@ def _build_with_fastcore(cobra_model, s_matrix, lower_bounds, upper_bounds, exp_
     # e1003424.'
     logger.warning("Fastcore requires a flux consistant model is used as refererence, to achieve this fastcc is required which is NOT reproducible.")
     logger.debug("Creating feasible model")
-    incon_rxns, cobra_model = _feasibility_test(cobra_model, "other")
+    _, cobra_model = _feasibility_test(cobra_model, "other")
     properties = FastcoreProperties(core=exp_idx_list, solver=solver)
     algorithm = FASTcore(s_matrix, lower_bounds, upper_bounds, properties)
     context_rxns = algorithm.fastcore()
