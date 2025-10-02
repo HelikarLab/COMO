@@ -29,7 +29,7 @@ import numpy.typing as npt
 from loguru import logger
 from scipy.sparse import csc_matrix
 
-from como.sanity_checks import fastLeakTest
+from como.sanity_checks.fast_leak_test import fast_leak_test
 
 # from cobra import Metabolite, Reaction
 # from cobra.flux_analysis import single_gene_deletion
@@ -174,10 +174,10 @@ def run_sanity_checks(model_closed: cobra.Model, selected_exchanges: list[str]):
 
     # Perform leak test, i.e., whether the closed model can produce any exchanged metabolite, as defined in the model, from nothing.
     with model_closed as model_copy:
-        leak_reactions, _, _ = fastLeakTest.fast_leak_test_function(
+        leak_reactions, _, _ = fast_leak_test(
             model_copy,
             [rxn.id for rxn in model_copy.reactions if rxn.id in selected_exchanges],
-            demandTest=False,
+            demand_test=False,
         )
         table_check_row = ["fastLeakTest1"]
         if len(leak_reactions) > 0:
@@ -190,9 +190,7 @@ def run_sanity_checks(model_closed: cobra.Model, selected_exchanges: list[str]):
     # Test if something leaks when demand reactions for each metabolite in the model are added. Note that this step is time consuming.
     with model_closed as model_copy:
         table_checks = []
-        leak_rxn_demand, _, _ = fastLeakTest.fast_leak_test_function(
-            model_copy, [rxn.id for rxn in model_copy.reactions if rxn.id in selected_exchanges], demandTest=True
-        )
+        leak_rxn_demand, _, _ = fast_leak_test(model_copy, [rxn.id for rxn in model_copy.reactions if rxn.id in selected_exchanges], demand_test=True)
         table_check_row = ["fastLeakTest 2 - add demand reactions for each metabolite in the model"]
         if len(leak_rxn_demand) > 0:
             table_check_row.append("Model leaks metabolites when demand reactions are added!")
