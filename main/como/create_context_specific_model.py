@@ -166,7 +166,15 @@ def _feasibility_test(model_cobra: cobra.Model, step: str):
     return incon_rxns, model_cobra_rm
 
 
-def _build_with_gimme(cobra_model, s_matrix, lower_bounds, upper_bounds, idx_objective, expr_vector):
+def _build_with_gimme(
+    reference_model: cobra.Model,
+    lower_bounds: Sequence[float | np.floating],
+    upper_bounds: Sequence[float | np.floating],
+    idx_objective: int,
+    expr_vector: npt.NDArray[np.floating],
+):
+    model_reconstruction = reference_model.copy()
+    s_matrix: npt.NDArray[np.floating] = cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction)
     # `Becker and Palsson (2008). Context-specific metabolic networks are
     # consistent with experiments. PLoS Comput. Biol. 4, e1000082.`
     properties = GIMMEProperties(
@@ -178,18 +186,17 @@ def _build_with_gimme(cobra_model, s_matrix, lower_bounds, upper_bounds, idx_obj
     )
     algorithm = GIMME(s_matrix, lower_bounds, upper_bounds, properties)
     gene_activity = algorithm.run()
-    context_cobra_model = cobra_model.copy()
-    reaction_ids = [r.id for r in context_cobra_model.reactions]
+    reaction_ids = [r.id for r in model_reconstruction.reactions]
     to_remove_ids = [reaction_ids[r] for r in np.where(gene_activity == 0)[0]]
 
-    context_cobra_model.remove_reactions(to_remove_ids, True)
-    psol = pfba(context_cobra_model)  # noqa: F841
+    model_reconstruction.remove_reactions(to_remove_ids, True)
+    psol = pfba(model_reconstruction)  # noqa: F841
     # reaction_ids = [r.id for r in context_cobra_model.reactions]
     # psol = context_cobra_model.optimize()
     # to_remove_ids = [reaction_ids[r] for r in np.where(abs(psol.fluxes) < 1e-8)[0]]
     # context_cobra_model.remove_reactions(to_remove_ids, True)
 
-    return context_cobra_model
+    return model_reconstruction
 
 
 def _build_with_fastcore(cobra_model, s_matrix, lower_bounds, upper_bounds, exp_idx_list, solver):
@@ -254,8 +261,7 @@ def _build_with_imat(
 
 
 def _build_with_tinit(
-    cobra_model: cobra.Model,
-    s_matrix,
+    reference_model: cobra.Model,
     lower_bounds,
     upper_bounds,
     expr_vector,
@@ -270,6 +276,8 @@ def _build_with_tinit(
         allow_excretion=False,
         no_reverse_loops=True,
     )
+    model_reconstruction = reference_model.copy()
+    s_matrix: npt.NDArray[np.floating] = cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction).astype(np.float64)
     algorithm = tINIT(s_matrix, lower_bounds, upper_bounds, properties)
     algorithm.preprocessing()
     algorithm.build_problem()
@@ -442,8 +450,8 @@ async def _build_model(  # noqa: C901
     for rxn in force_reactions:
         if rxn not in reaction_ids:
             logger.warning(
-                f"The force reaction '{rxn}' was not found in the general reference_model. "
-                f"Check BiGG, or the relevant database for your general reference_model, for synonyms."
+                f"The force reaction '{rxn}' was not found in the reference model. "
+                f"Check BiGG, or the relevant database for your reference model, for synonyms."
             )
 
     # collect list of reactions that are infeasible but active in expression data or user defined
@@ -479,16 +487,15 @@ async def _build_model(  # noqa: C901
 
     match recon_algorithm:
         case Algorithm.GIMME:
-            context_model_cobra = _build_with_gimme(
-                cobra_model=reference_model,
-                s_matrix=s_matrix,
+            context_model_cobra: cobra.Model = _build_with_gimme(
+                reference_model=reference_model,
                 lower_bounds=lower_bounds,
                 upper_bounds=upper_bounds,
                 idx_objective=objective_index,
                 expr_vector=expression_vector,
             )
         case Algorithm.FASTCORE:
-            context_model_cobra = _build_with_fastcore(
+            context_model_cobra: cobra.Model = _build_with_fastcore(
                 cobra_model=reference_model,
                 s_matrix=s_matrix,
                 lower_bounds=lower_bounds,
@@ -497,10 +504,8 @@ async def _build_model(  # noqa: C901
                 solver=solver,
             )
         case Algorithm.IMAT:
-            context_model_cobra: cobra.Model
-            context_model_cobra, flux_df = _build_with_imat(
-                cobra_model=reference_model,
-                s_matrix=s_matrix,
+            context_model_cobra: cobra.Model = _build_with_imat(
+                reference_model=reference_model,
                 lower_bounds=lower_bounds,
                 upper_bounds=upper_bounds,
                 expr_vector=expression_vector,
@@ -515,9 +520,8 @@ async def _build_model(  # noqa: C901
             flux_df.dropna(inplace=True)
             flux_df.to_csv(output_flux_result_filepath)
         case Algorithm.TINIT:
-            context_model_cobra = _build_with_tinit(
-                cobra_model=reference_model,
-                s_matrix=s_matrix,
+            context_model_cobra: cobra.Model = _build_with_tinit(
+                reference_model=reference_model,
                 lower_bounds=lower_bounds,
                 upper_bounds=upper_bounds,
                 expr_vector=expression_vector,
@@ -785,7 +789,7 @@ async def create_context_specific_model(  # noqa: C901
         env = gp.Env()
         if env.getParam("WLSACCESSID") == "" or env.getParam("WLSSECRET") == "":
             logger.critical(
-                "You have requested to use the Gurobi solver but license information cannot be found. "
+                "Gurobi solver requested, but license information cannot be found. "
                 "COMO will continue, but it is HIGHLY unlikely the resulting model will be valid."
             )
         # remove gurobi-related information, it is no longer required
