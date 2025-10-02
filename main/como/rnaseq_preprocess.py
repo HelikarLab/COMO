@@ -724,7 +724,7 @@ async def _process_como_input(
 
     await _write_counts_matrix(
         config_df=config_df,
-        como_context_dir=como_context_dir,
+        como_context_dir=Path(como_context_dir),
         output_counts_matrix_filepath=output_counts_matrix_filepath,
         rna=rna,
     )
@@ -762,7 +762,7 @@ async def _process(
                     _process_como_input(
                         context_name=context_name,
                         output_config_filepath=output_config_filepath,
-                        como_context_dir=como_context_dir,
+                        como_context_dir=Path(como_context_dir),
                         output_counts_matrix_filepath=output_matrix_filepath,
                         rna=rna,
                     )
