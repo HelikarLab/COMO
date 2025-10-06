@@ -51,7 +51,6 @@ dev = [
     "types-aiofiles>=24.1.0.20250822",
 ]
 
-
 [tool.hatch.version]
 path = "main/como/__init__.py"
 
@@ -63,14 +62,3 @@ allow-direct-references = true
 
 [tool.pytest.ini_options]
 pythonpath = ["main/src"]
-
-[tool.commitizen]
-name = "cz_conventional_commits"
-tag_format = "$version"
-version_scheme = "semver2"
-version_provider = "pep621"
-update_changelog_on_bump = true
-
-[tool.uv.sources]
-cobra = { git = "https://github.com/ripaul/cobrapy", rev = "hopsy-backend" }
-como = { workspace = true }

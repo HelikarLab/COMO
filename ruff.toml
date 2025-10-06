@@ -1,7 +1,6 @@
 line-length = 150
 extend-include = ["docs/**/*.py", "tests/**/*.py", "**/*.ipynb"]
 
-
 [format]
 quote-style = "double"
 docstring-code-format = true

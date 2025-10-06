@@ -4,10 +4,10 @@ import asyncio
 import contextlib
 import io
 import sys
+import typing
 from collections.abc import Iterator
-from io import TextIOWrapper
 from pathlib import Path
-from typing import Literal
+from typing import TextIO, TypeVar, cast, overload
 
 import aiofiles
 import numpy.typing as npt
@@ -24,6 +24,7 @@ from loguru import logger
 
 from como.data_types import LOG_FORMAT, Algorithm, LogLevel
 
+T = TypeVar("T")
 __all__ = ["split_gene_expression_data", "stringlist_to_list", "suppress_stdout"]
 
 
@@ -40,6 +41,7 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
 
     Returns:
         A list of strings. Example output: ['mat', 'xml', 'json']
+
     """
     if isinstance(stringlist, list):
         return stringlist
@@ -125,12 +127,12 @@ async def _format_determination(
 
     Returns:
         A pandas DataFrame
+
     """
     requested_output = [requested_output] if isinstance(requested_output, Output) else requested_output
     coercion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(columns=["Input Type"])
     coercion.columns = pd.Index(["input_value", *[o.value.replace(" ", "_").lower() for o in requested_output]])
     return coercion
-
 
 async def _read_file(
     path: Path | io.StringIO | None,
@@ -212,16 +214,126 @@ async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int 
             raise ValueError("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
 
 
-def _listify(value):
+@overload
+async def _read_file(path: None, h5ad_as_df: bool, **kwargs) -> None: ...
+
+
+@overload
+async def _read_file(path: pd.DataFrame, h5ad_as_df: bool, **kwargs) -> pd.DataFrame: ...
+
+
+@overload
+async def _read_file(path: sc.AnnData, h5ad_as_df: bool = False, **kwargs) -> sc.AnnData: ...
+
+def _num_rows(item: pd.DataFrame | npt.NDArray) -> int:
+    return item.shape[0]
+
+@overload
+async def _read_file(path: sc.AnnData, h5ad_as_df: bool = True, **kwargs) -> pd.DataFrame: ...
+
+
+async def _read_file(
+    path: Path | io.StringIO | pd.DataFrame | sc.AnnData | None,
+    h5ad_as_df: bool = True,
+    **kwargs,
+) -> pd.DataFrame | sc.AnnData | None:
+    """Asynchronously read a filepath and return a pandas DataFrame.
+
+    If the provided path is None, None will also be returned.
+    None may be provided to this function so that `asyncio.gather` can safely be used on all sources
+        (trna, mrna, scrna, proteomics) without needing to check if the user has provided those sources
+
+    Args:
+        path: The path to read from
+        h5ad_as_df: If True and the file is an h5ad, return a pandas DataFrame of the .X matrix instead of an AnnData object
+        kwargs: Additional arguments to pass to pandas.read_csv, pandas.read_excel, or scanpy.read_h5ad, depending on the filepath provided
+
+    Returns:
+        None, or a pandas DataFrame or AnnData
+
+    """
+    if isinstance(path, pd.DataFrame):
+        return path
+    elif isinstance(path, sc.AnnData):
+        return path.to_df().T if h5ad_as_df else path
+    elif isinstance(path, io.StringIO):
+        return pd.read_csv(path, **kwargs)
+    elif not path:
+        return None
+
+    if isinstance(path, Path) and not path.exists():
+        _log_and_raise_error(f"File {path} does not exist", error=FileNotFoundError, level=LogLevel.CRITICAL)
+
+    match path.suffix:
+        case ".csv" | ".tsv" | ".txt":
+            kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")  # set sep if not defined
+            async with aiofiles.open(path) as i_stream:
+                content = await i_stream.read()
+                return pd.read_csv(io.StringIO(content), **kwargs)
+        case ".xlsx" | ".xls":
+            return pd.read_excel(path, **kwargs)
+        case ".h5ad":
+            adata: sc.AnnData = sc.read_h5ad(path, **kwargs)
+            if h5ad_as_df:
+                df = adata.to_df().T
+                df.index.name = "gene_symbol"
+                df.reset_index(inplace=True)
+                return df
+            return adata
+        case _:
+            _log_and_raise_error(
+                f"Unknown file extension '{path.suffix}'. Valid options are '.tsv', '.csv', '.xlsx', '.xls', or '.h5ad'",
+                error=ValueError,
+                level=LogLevel.CRITICAL,
+            )
+
+
+async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int | str | Taxon) -> pd.DataFrame:
+    if isinstance(values, list):
+        gene_type = await determine_gene_type(values)
+        if all(v == "gene_symbol" for v in gene_type.values()):
+            return await gene_symbol_to_ensembl_and_gene_id(values, taxon=taxon_id)
+        elif all(v == "ensembl_gene_id" for v in gene_type.values()):
+            return await ensembl_to_gene_id_and_symbol(ids=values, taxon=taxon_id)
+        elif all(v == "entrez_gene_id" for v in gene_type.values()):
+            return await gene_id_to_ensembl_and_gene_symbol(ids=values, taxon=taxon_id)
+        else:
+            logger.critical("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
+            raise ValueError("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
+    else:
+        values: pd.DataFrame  # Re-define type to assist in type hinting
+        if "gene_symbol" in values:
+            return await get_missing_gene_data(values["gene_symbol"].tolist(), taxon_id=taxon_id)
+        elif "entrez_gene_id" in values:
+            return await get_missing_gene_data(values["entrez_gene_id"].tolist(), taxon_id=taxon_id)
+        elif "ensembl_gene_id" in values:
+            return await get_missing_gene_data(values["ensembl_gene_id"].tolist(), taxon_id=taxon_id)
+        else:
+            logger.critical("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
+            raise ValueError("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
+
+
+@overload
+def _listify(value: list[T]) -> list[T]: ...
+
+
+@overload
+def _listify(value: T) -> list[T]: ...
+
+
+def _listify(value: T | list[T]) -> list[T]:
     """Convert items into a list.
 
     Args:
-        value: The value to convert to a list
+        value: The value to convert to a list (if it isn't already)
 
     Returns:
-        A list containing `value`, unless it is already a list
+        A list of the provided value
+
     """
-    return [value] if not isinstance(value, list) else value
+    if isinstance(value, list):
+        return cast(list[T], value)  # does not actually do anything; signifies to type checker that return value is of type list[T]
+    return [value]
 
 
 def _num_rows(item: pd.DataFrame | npt.NDArray) -> int:
@@ -231,6 +343,37 @@ def _num_rows(item: pd.DataFrame | npt.NDArray) -> int:
 def _num_columns(item: pd.DataFrame | npt.NDArray) -> int:
     return item.shape[1]
 
+
+def return_placeholder_data() -> pd.DataFrame:
+    return pd.DataFrame(data=0, index=pd.Index(data=[0], name="entrez_gene_id"), columns=["expressed", "top"])
+
+
+def _set_up_logging(
+    level: LogLevel | str,
+    location: str | TextIO,
+    formatting: str = LOG_FORMAT,
+):
+    if isinstance(level, str):
+        level = LogLevel[level.upper()]
+    with contextlib.suppress(ValueError):
+        logger.remove(0)
+        logger.add(sink=location, level=level.value, format=formatting)
+
+
+def _log_and_raise_error(
+    message: str,
+    *,
+    error: type[BaseException],
+    level: LogLevel,
+) -> typing.NoReturn:
+    caller = logger.opt(depth=1)
+    match level:
+        case LogLevel.ERROR:
+            caller.error(message)
+        case LogLevel.CRITICAL:
+            caller.critical(message)
+        case _:
+            raise ValueError(f"When raising an error, LogLevel.ERROR or LogLevel.CRITICAL must be used. Got: {level}")
 
 def return_placeholder_data() -> pd.DataFrame:
     return pd.DataFrame(data=0, index=pd.Index(data=[0], name="entrez_gene_id"), columns=["expressed", "top"])
