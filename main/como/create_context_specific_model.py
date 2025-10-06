@@ -199,14 +199,14 @@ def _build_with_imat(
     upper_bounds: Sequence[float],
     expr_vector: npt.NDArray,
     expr_thresh: tuple[float, float],
-    force_gene_ids: Sequence[int],
+    force_reaction_indices: Sequence[int],
     solver: str,
 ) -> tuple[cobra.Model, pd.DataFrame]:
     expr_vector = np.array(expr_vector)
     properties = IMATProperties(
         exp_vector=expr_vector,
         exp_thresholds=expr_thresh,
-        core=force_gene_ids,
+        core=force_reaction_indices,
         epsilon=0.01,
         solver=solver.upper(),
     )
@@ -427,7 +427,7 @@ async def _build_model(  # noqa: C901
                 upper_bounds=upper_bounds,
                 expr_vector=expression_vector,
                 expr_thresh=expression_threshold,
-                force_gene_ids=force_reaction_indices,
+                force_reaction_indices=force_reaction_indices,
                 solver=solver,
             )
             imat_reactions = flux_df.rxn
