@@ -5,7 +5,7 @@ import json
 import re
 import sys
 from dataclasses import asdict, dataclass, field
-from io import StringIO, TextIOWrapper
+from io import TextIOWrapper
 from itertools import chain
 from pathlib import Path
 from typing import Final, Literal, cast
@@ -62,7 +62,7 @@ class _STARinformation:
             num_ambiguous = [int(i) for i in ambiguous.removesuffix("\n").split("\t")[1:]]
 
         df = await _read_file(
-            filepath,
+            path=filepath,
             sep="\t",
             header=None,
             skiprows=4,
