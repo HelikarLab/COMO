@@ -144,12 +144,15 @@ def _merge_logical_table(df: pd.DataFrame):
         set1 = set(multiple_entrez_ids[i].split("//"))
         multi_entrez_index.remove(i)
 
-        for j in multi_entrez_index:
+        multi_entrez_index_to_remove: set[int] = set()
+        for j in range(len(multi_entrez_index)):
             set2 = set(multiple_entrez_ids[j].split("//"))
             intersect = set1.intersection(set2)
             if bool(intersect):
                 set1 = set1.union(set2)
-                multi_entrez_index.remove(j)
+                multi_entrez_index_to_remove.add(j)
+        for index in multi_entrez_index_to_remove:
+            multi_entrez_index.pop(index)
 
         sortlist = list(set1)
         sortlist.sort(key=int)
