@@ -704,7 +704,8 @@ async def _process(
     """Save the results of the RNA-Seq tests to a CSV file."""
     output_boolean_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
 
-    rnaseq_matrix: pd.DataFrame = await _read_file(rnaseq_matrix_filepath)
+    rnaseq_matrix: pd.DataFrame = await _read_file(rnaseq_matrix_filepath, h5ad_as_df=True)
+
     if rnaseq_matrix_filepath.suffix == ".h5ad":
         conversion = await gene_symbol_to_ensembl_and_gene_id(symbols=rnaseq_matrix["gene_symbol"].tolist(), taxon=taxon)
         conversion.reset_index(inplace=True)
@@ -727,7 +728,6 @@ async def _process(
     )
 
     metrics = read_counts_results.metrics
-    entrez_gene_ids = read_counts_results.entrez_gene_ids
 
     metrics: NamedMetrics = filter_counts(
         context_name=context_name,
@@ -779,12 +779,14 @@ async def _process(
     top_df["prop"] = top_df["frequency"] / len(metrics)
     top_df = top_df[top_df["prop"] >= filtering_options.high_batch_ratio]
 
-    boolean_matrix = pd.DataFrame(data={"entrez_gene_id": entrez_gene_ids, "expressed": 0, "high": 0})
-    for gene in entrez_gene_ids:
-        if gene in expression_df["entrez_gene_id"]:
-            boolean_matrix.loc[gene, "expressed"] = 1
-        if gene in top_df["entrez_gene_id"]:
-            boolean_matrix.loc[gene, "high"] = 1
+    entrez_id_series = pd.Series(read_counts_results.entrez_gene_ids)
+    boolean_matrix = pd.DataFrame(
+        data={
+            "entrez_gene_id": read_counts_results.entrez_gene_ids,
+            "expressed": entrez_id_series.isin(expression_df["entrez_gene_id"]).astype(int),
+            "high": entrez_id_series.isin(top_df["entrez_gene_id"]).astype(int),
+        }
+    )
 
     expressed_count = len(boolean_matrix[boolean_matrix["expressed"] == 1])
     high_confidence_count = len(boolean_matrix[boolean_matrix["high"] == 1])
