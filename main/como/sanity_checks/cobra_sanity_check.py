@@ -243,9 +243,11 @@ def run_sanity_checks(model_closed: cobra.Model, selected_exchanges: list[str]):
 
     # Test if the model has flux through h[m] demand
     with model_closed as model_copy:
-        model_copy.add_reactions([
-            cobra.Reaction(id="DM_h[m]", name="DM_h[m]", upper_bound=1000)  # lower bound not specified in original code
-        ])
+        model_copy.add_reactions(
+            [
+                cobra.Reaction(id="DM_h[m]", name="DM_h[m]", upper_bound=1000)  # lower bound not specified in original code
+            ]
+        )
         solution = model_copy.optimize()
         table_check_row = ["Exchanges, sinks, and demands have lb = 0, test flux through DM_h[m] (max)"]
         if abs(solution.objective_value) > tol:
@@ -256,9 +258,11 @@ def run_sanity_checks(model_closed: cobra.Model, selected_exchanges: list[str]):
 
     # Test if the  model has flux through h[c] demand
     with model_closed as model_copy:
-        model_copy.add_reactions([
-            cobra.Reaction(id="DM_h[c]", name="DM_h[c]", upper_bound=1000)  # lower bound not specified in original code
-        ])
+        model_copy.add_reactions(
+            [
+                cobra.Reaction(id="DM_h[c]", name="DM_h[c]", upper_bound=1000)  # lower bound not specified in original code
+            ]
+        )
         solution: cobra.Solution = model_copy.optimize()
         table_check_row = ["Exchanges, sinks, and demands have lb = 0, test flux through DM_h[c] (max)"]
         if abs(solution.objective_value) > tol:
