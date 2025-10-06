@@ -6,8 +6,7 @@ import sys
 from collections.abc import Iterator
 from io import TextIOWrapper
 from pathlib import Path
-from typing import TypeVar, cast, overload
-from typing import Literal
+from typing import Literal, TypeVar, cast, overload
 
 import aiofiles
 import numpy.typing as npt
