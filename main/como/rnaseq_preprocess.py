@@ -808,15 +808,13 @@ async def rnaseq_preprocess(
         output_mrna_metadata_filepath: Path to the output mRNA config file (if in "create" mode)
         output_trna_count_matrix_filepath: The path to write total RNA count matrices
         output_mrna_count_matrix_filepath: The path to write messenger RNA count matrices
-        como_context_dir: If in "create" mode, the input path(s) to the COMO_input directory of the current context i.e., the directory containing "fragmentSizes", "geneCounts", "insertSizeMetrics", etc. directories
+        como_context_dir: If in "create" mode, the input path(s) to the COMO_input directory of the current context
+            i.e., the directory containing "fragmentSizes", "geneCounts", "insertSizeMetrics", etc. directories
         input_matrix_filepath: If in "provide" mode, the path(s) to the count matrices to be processed~
         cache: Should HTTP requests be cached
         log_level: The logging level
         log_location: The logging location
         create_gene_info_only: If True, only create the gene info file and skip general preprocessing steps
-    
-    Returns:
-        None
 
     """
     _set_up_logging(level=log_level, location=log_location)
