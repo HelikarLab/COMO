@@ -479,7 +479,7 @@ def zfpkm_plot(results: dict[str, _ZFPKMResult], *, output_png_dirpath: Path, pl
 
     """
     to_concat: list[pd.DataFrame] = [None] * len(results)  # type: ignore  # ignoring because None is not of type pd.DataFrame
-    for name, result in results.items():
+    for i, name, result in enumerate(results.items()):
         stddev: float = float(result.std_dev)
         x: npt.NDArray[float] = result.density.x.flatten()
         y: npt.NDArray[float] = result.density.y.flatten()
@@ -488,18 +488,8 @@ def zfpkm_plot(results: dict[str, _ZFPKMResult], *, output_png_dirpath: Path, pl
         max_fpkm: float = float(y.max())
         max_fitted: float = float(fitted.max())
         scale_fitted: float = fitted * max_fpkm / max_fitted
-        to_concat.append(pd.DataFrame({"sample_name": name, "log2fpkm": x, "fpkm_density": y, "fitted_density_scaled": scale_fitted}))
+        to_concat[i] = pd.DataFrame({"sample_name": name, "log2fpkm": x, "fpkm_density": y, "fitted_density_scaled": scale_fitted})
 
-        to_concat.append(
-            pd.DataFrame(
-                {
-                    "sample_name": [name] * len(x),
-                    "log2fpkm": x,
-                    "fpkm_density": y,
-                    "fitted_density_scaled": scale_fitted,
-                }
-            )
-        )
     mega_df = pd.concat(to_concat, ignore_index=True)
     mega_df.columns = pd.Series(data=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
     mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")
