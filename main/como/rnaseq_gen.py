@@ -360,7 +360,7 @@ def _zfpkm_calculation(
         column: A Pandas Series containing FPKM values for a single sample.
         peak_parameters: Parameters for peak identification in zFPKM calculation.
         bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
-      epsilon: A small value to add to FPKM values to prevent log2-divide-by-0 errors
+        epsilon: A small value to add to FPKM values to prevent log2-divide-by-0 errors
 
     Returns:
         A named tuple containing:
@@ -680,7 +680,7 @@ def zfpkm_filter(
         force_zfpkm_plot: Whether to force plotting of zFPKM results even if there are many samples.
         peak_parameters: Parameters for peak identification in zFPKM calculation.
         bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
-        output_png_filepath: Optional filepath to save the zFPKM plot.
+        output_png_dirpath: Optional directory path to save the zFPKM plot.
 
     Returns:
         A dictionary of filtered study metrics.
@@ -749,7 +749,7 @@ def filter_counts(
         force_zfpkm_plot: Whether to force plotting of zFPKM results even if there are many samples.
         peak_parameters: Parameters for peak identification in zFPKM calculation.
         bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
-        output_png_filepath: Optional filepath to save the zFPKM plot.
+        output_zfpkm_plot_dirpath: Optional directory path to save the zFPKM plot.
 
     Returns:
         A dictionary of filtered study metrics.
@@ -944,7 +944,8 @@ async def rnaseq_gen(  # noqa: C901
         input_metadata_filepath_or_df: The filepath or dataframe containing metadata information
         replicate_ratio: The percentage of replicates that a gene must appear in for a gene to be marked as "active" in a batch/study
         batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked as 'active"
-        high_replicate_ratio: The percentage of replicates that a gene must appear in for a gene to be marked "highly confident" in its expression in a batch/study
+        high_replicate_ratio: The percentage of replicates that a gene must appear in for a gene to be
+            marked "highly confident" in its expression in a batch/study
         high_batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked "highly confident" in its expression
         technique: The filtering technique to use
         zfpkm_peak_height: The height of the zFPKM peak
@@ -955,10 +956,7 @@ async def rnaseq_gen(  # noqa: C901
         log_level: The level of logging to output
         log_location: The location to write logs to
         output_zfpkm_plot_dirpath: Optional filepath to save zFPKM plots
-    
-    Returns:
-        None
-    :return: None
+
     """
     _set_up_logging(level=log_level, location=log_location)
 
