@@ -325,7 +325,7 @@ def _zfpkm_calculation(
          - Standard deviation is estimated based on the assumption that the right tail of the distribution
             This represents expressed genes) can be approximated by a half-normal distribution
 
-     zFPKM Transformation
+    zFPKM Transformation
         - Centers disbribution around 0 and scales it by the standard deviation.
             This makes it easier to compare gene expression across different samples
         - Represents the number of standard deviations away from the mean of the "inactive" gene distribution
@@ -334,6 +334,16 @@ def _zfpkm_calculation(
         - Research shows that a zFPKM value of -3 or greater can be used as
             a threshold for calling a gene as "active" and/or "expressed"
             : https://doi.org/10.1186/1471-2164-14-778
+
+    Args:
+          column: A pandas Series representing a single sample's FPKM values.
+          peak_parameters: Parameters for peak identification.
+          bandwidth: The bandwidth for the Kernel Density Estimation (KDE).
+          epsilon: A small value to add to FPKM values to prevent log2-divide-by-0 errors
+
+    Returns:
+            A named tuple containing the zFPKM values, density estimate, mean (mu), standard deviation, and maximum FPKM value.
+
     """
     log2values: npt.NDArray[float] = np.log2(column.values + epsilon)
 
@@ -415,11 +425,13 @@ def zfpkm_transform(
 def zfpkm_plot(results: dict[str, _ZFPKMResult], *, output_png_dirpath: Path, plot_xfloor: int = -4, subplot_titles: bool = True) -> None:
     """Plot the log2(FPKM) density and fitted Gaussian for each sample.
 
-    :param results: A dictionary of intermediate results from zfpkm_transform.
-    :param output_png_filepath: Output filepath location
-    :param: subplot_titles: Whether to display facet titles (sample names).
-    :param plot_xfloor: Lower limit for the x-axis.
-    :param subplot_titles: Whether to display facet titles (sample names).
+    Args:
+        results: A dictionary of intermediate results from zfpkm_transform.
+        output_png_dirpath: Output directory location
+        subplot_titles: Whether to display facet titles (sample names).
+        plot_xfloor: Lower limit for the x-axis.
+        subplot_titles: Whether to display facet titles (sample names).
+
     """
     to_concat: list[pd.DataFrame] = [None] * len(results)  # type: ignore  # ignoring because None is not of type pd.DataFrame
     for name, result in results.items():
@@ -624,9 +636,8 @@ def filter_counts(
     prep: RNAType,
     force_zfpkm_plot: bool,
     peak_parameters: PeakIdentificationParameters,
-    bandwidth: int,
-    output_png_filepath: Path | None = None,
     bandwidth: float,
+    output_zfpkm_plot_dirpath: Path | None = None,
 ) -> NamedMetrics:
     """Filter the count matrix based on the specified technique."""
     match technique:
@@ -797,9 +808,8 @@ async def rnaseq_gen(  # noqa: C901
     cutoff: int | float | None = None,
     force_zfpkm_plot: bool = False,
     log_level: LogLevel = LogLevel.INFO,
-    log_location: str | TextIOWrapper = sys.stderr,
-    output_zfpkm_png_filepath: Path | None = None,
     log_location: str | TextIO = sys.stderr,
+    output_zfpkm_plot_dirpath: Path | None = None,
 ) -> None:
     """Generate a list of active and high-confidence genes from a gene count matrix.
 
