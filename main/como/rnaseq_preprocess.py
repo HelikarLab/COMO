@@ -418,7 +418,7 @@ async def _create_config_df(  # noqa: C901
 
         fragment_label = f"{context_name}_{label}_fragment_size.txt"
         frag_paths = [p for p in aux_lookup["fragment"].values() if p.name == fragment_label]
-        if not frag_paths and prep != RNAType.TRNA.value:
+        if not frag_paths and prep.lower() != RNAType.TRNA.value.lower():
             logger.warning(f"No fragment file for '{label}'; defaulting to 100 bp (needed for zFPKM).")
             mean_frag = 100.0
         elif len(frag_paths) == 1 and layout == "single-end":
