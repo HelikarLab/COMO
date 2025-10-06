@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass, field
 from io import StringIO
 from itertools import chain
 from pathlib import Path
-from typing import Final, Literal, TextIO
+from typing import Final, Literal, TextIO, cast
 
 import aiofiles
 import numpy as np
@@ -343,7 +343,10 @@ async def _write_counts_matrix(
         A pandas DataFrame representing the final counts matrix.
     """
     study_metrics = _organize_gene_counts_files(data_dir=como_context_dir)
-    counts: list[pd.DataFrame] = await asyncio.gather(*[_create_sample_counts_matrix(metric) for metric in study_metrics])    counts: list[pd.DataFrame] = await asyncio.gather(*[_create_sample_counts_matrix(metric) for metric in study_metrics])
+    counts: list[pd.DataFrame] = cast(
+        typ=list[pd.DataFrame],
+        val=await asyncio.gather(*[_create_sample_counts_matrix(metric) for metric in study_metrics]),
+    )
 
     final_matrix = pd.DataFrame()
     for count in counts:
