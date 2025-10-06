@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import asyncio
 import contextlib
-import functools
 import io
 import sys
 import typing
 from collections.abc import Iterator
-from concurrent.futures import ThreadPoolExecutor
-from io import TextIOWrapper
 from pathlib import Path
 from typing import TextIO, TypeVar, cast, overload
 
+import aiofiles
 import numpy.typing as npt
 import pandas as pd
 import scanpy as sc
