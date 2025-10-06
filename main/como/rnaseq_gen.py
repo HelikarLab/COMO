@@ -8,17 +8,15 @@ from collections.abc import Callable
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from enum import Enum
-from io import TextIOWrapper
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, TextIO
 
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import seaborn as sns
-import sklearn
-import sklearn.neighbors
+import sklearn.preprocessing
 from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
 from pandas import DataFrame
@@ -51,14 +49,14 @@ class _StudyMetrics:
     study: str
     num_samples: int
     count_matrix: pd.DataFrame
-    fragment_lengths: npt.NDArray[np.float32]
+    fragment_lengths: npt.NDArray[float]
     sample_names: list[str]
     layout: list[LayoutMethod]
-    entrez_gene_ids: list[str]
-    gene_sizes: npt.NDArray[np.float32]
+    entrez_gene_ids: npt.NDArray[int]
+    gene_sizes: npt.NDArray[int]
     __normalization_matrix: pd.DataFrame = field(default_factory=pd.DataFrame)
     __z_score_matrix: pd.DataFrame = field(default_factory=pd.DataFrame)
-    __high_confidence_entrez_gene_ids: list[str] = field(default=list)
+    __high_confidence_entrez_gene_ids: list[str] = field(default_factory=list)
 
     def __post_init__(self):
         for layout in self.layout:
@@ -136,7 +134,7 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
     :param filter_func: THe function to filter the data by
     :return: A NumPy array of the filtered data.
     """
-    if not isinstance(data, (pd.DataFrame, npt.NDArray)):
+    if not isinstance(data, pd.DataFrame | npt.NDArray):
         _log_and_raise_error(
             f"Unsupported data type. Must be a Pandas DataFrame or a NumPy array, got '{type(data)}'",
             error=TypeError,
@@ -165,31 +163,29 @@ async def _build_matrix_results(
     conversion["ensembl_gene_id"] = conversion["ensembl_gene_id"].str.split(",")
     conversion = conversion.explode("ensembl_gene_id")
     conversion.reset_index(inplace=True, drop=True)
+    conversion = conversion[conversion["entrez_gene_id"] != "-"]  # drop missing entrez IDs
+    conversion["entrez_gene_id"] = conversion["entrez_gene_id"].astype(int)  # float32 is needed because np.nan is a float
 
-    merge_on = []
-    if "ensembl_gene_id" in matrix.columns and "ensembl_gene_id" in conversion.columns:
-        merge_on.append("ensembl_gene_id")
-    if "entrez_gene_id" in matrix.columns and "entrez_gene_id" in conversion.columns:
-        merge_on.append("entrez_gene_id")
-    if "gene_symbol" in matrix.columns and "gene_symbol" in conversion.columns:
-        merge_on.append("gene_symbol")
-
+    # merge_on should contain at least one of "ensembl_gene_id", "entrez_gene_id", or "gene_symbol"
+    merge_on: list[str] = list(set(matrix.columns).intersection(conversion.columns))
     if not merge_on:
         _log_and_raise_error(
-            "No columns to merge on. Tested 'ensembl_gene_id', 'entrez_gene_id', and 'gene_symbol'. Please check your input files.",
+            (
+                "No columns to merge on, unable to find at least one of `ensembl_gene_id`, `entrez_gene_id`, or `gene_symbol`. "
+                "Please check your input files."
+            ),
             error=ValueError,
             level=LogLevel.ERROR,
         )
+    if "entrez_gene_id" in matrix.columns:
+        matrix["entrez_gene_id"] = matrix["entrez_gene_id"].astype(int)
     matrix = matrix.merge(conversion, on=merge_on, how="left")
 
-    # Only include Entrez and Ensembl Gene IDs that are present in `gene_info`
-    matrix["entrez_gene_id"] = matrix["entrez_gene_id"].str.split("//")
-    matrix = matrix.explode("entrez_gene_id")
-    matrix = matrix.replace(to_replace="-", value=pd.NA).dropna()
-    matrix["entrez_gene_id"] = matrix["entrez_gene_id"].astype(int)
+    # drop rows that have `0` in `entrez_gene_id` column
+    matrix = matrix[matrix["entrez_gene_id"] != 0].reset_index(drop=True, inplace=False)
+    gene_info = gene_info[gene_info["entrez_gene_id"] != 0].reset_index(drop=True, inplace=False)
 
     gene_info = gene_info_migrations(gene_info)
-    gene_info = gene_info.replace(to_replace="-", value=pd.NA).dropna()
     gene_info["entrez_gene_id"] = gene_info["entrez_gene_id"].astype(int)
 
     counts_matrix = matrix.merge(
@@ -204,19 +200,19 @@ async def _build_matrix_results(
         how="inner",
     )
 
-    entrez_gene_ids: list[str] = gene_info["entrez_gene_id"].tolist()
+    entrez_gene_ids: npt.NDArray[int] = gene_info["entrez_gene_id"].to_numpy()
     metrics: NamedMetrics = {}
-    for study in metadata_df["study"].unique().tolist():
+    for study in metadata_df["study"].unique():
         study_sample_names = metadata_df[metadata_df["study"] == study]["sample_name"].tolist()
         layouts = metadata_df[metadata_df["study"] == study]["layout"].tolist()
         metrics[study] = _StudyMetrics(
             count_matrix=counts_matrix[counts_matrix.columns.intersection(study_sample_names)],
-            fragment_lengths=metadata_df[metadata_df["study"] == study]["fragment_length"].values,
+            fragment_lengths=metadata_df[metadata_df["study"] == study]["fragment_length"].values.astype(float),
             sample_names=study_sample_names,
             layout=[LayoutMethod(layout) for layout in layouts],
             num_samples=len(study_sample_names),
             entrez_gene_ids=entrez_gene_ids,
-            gene_sizes=np.array(gene_info["size"].values).astype(np.float32),
+            gene_sizes=gene_info["size"].values.astype(int),
             study=study,
         )
         metrics[study].fragment_lengths[np.isnan(metrics[study].fragment_lengths)] = 0
@@ -241,29 +237,26 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
     return metrics
 
 
-def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
+def _calculate_fpkm(metrics: NamedMetrics, scale: float = 1e6) -> NamedMetrics:
     """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary."""
     for study in metrics:
-        matrix_values = []
+        matrix_values: list[npt.NDArray[float]] = []
         for sample in range(metrics[study].num_samples):
             layout = metrics[study].layout[sample]
-            count_matrix: pd.DataFrame = metrics[study].count_matrix.iloc[:, sample].values.astype(np.float32)
-            gene_lengths = (
-                metrics[study].fragment_lengths[sample].astype(np.float32)
-                if layout == LayoutMethod.paired_end
-                else metrics[study].gene_sizes.astype(np.float32)
-            )
+            count_matrix: npt.NDArray[int] = metrics[study].count_matrix.iloc[:, sample].values
+
+            gene_lengths = metrics[study].fragment_lengths[sample] if layout == LayoutMethod.paired_end else metrics[study].gene_sizes.astype(int)
             gene_lengths_kb = gene_lengths / 1000.0
 
             match layout:
                 case LayoutMethod.paired_end:  # FPKM
-                    total_fragments = count_matrix.sum(axis=0)
+                    total_fragments: npt.NDArray[int] = count_matrix.sum(axis=0)
                     if total_fragments == 0:
-                        fragments_per_kilobase_million = np.nan
+                        fragments_per_kilobase_million: float = np.nan
                     else:
-                        counts_per_million = total_fragments / scale
-                        fragments_per_kilobase = count_matrix / gene_lengths_kb
-                        fragments_per_kilobase_million = fragments_per_kilobase / counts_per_million
+                        counts_per_million: npt.NDArray[float] = total_fragments / scale
+                        fragments_per_kilobase: npt.NDArray[float] = count_matrix / counts_per_million
+                        fragments_per_kilobase_million: npt.NDArray[float] = fragments_per_kilobase / gene_lengths_kb
                     matrix_values.append(fragments_per_kilobase_million)
                 case LayoutMethod.single_end:  # RPKM
                     reads_per_kilobase = count_matrix / gene_lengths_kb
@@ -296,7 +289,8 @@ def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
 def _zfpkm_calculation(
     column: pd.Series,
     peak_parameters: PeakIdentificationParameters,
-    bandwidth: int = 0.5,
+    bandwidth: float = 1.0,
+    epsilon: float = 1e-10,
 ) -> _ZFPKMResult:
     """Log2 Transformations.
 
@@ -331,7 +325,7 @@ def _zfpkm_calculation(
          - Standard deviation is estimated based on the assumption that the right tail of the distribution
             This represents expressed genes) can be approximated by a half-normal distribution
 
-     zFPKM Transformation
+    zFPKM Transformation
         - Centers disbribution around 0 and scales it by the standard deviation.
             This makes it easier to compare gene expression across different samples
         - Represents the number of standard deviations away from the mean of the "inactive" gene distribution
@@ -340,25 +334,41 @@ def _zfpkm_calculation(
         - Research shows that a zFPKM value of -3 or greater can be used as
             a threshold for calling a gene as "active" and/or "expressed"
             : https://doi.org/10.1186/1471-2164-14-778
-    """
-    values = column.values
-    refit: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(values.reshape(-1, 1))  # type: ignore
 
-    x_range = np.linspace(values.min(), values.max(), 2000)
-    density = np.exp(refit.score_samples(x_range.reshape(-1, 1)))
+    Args:
+          column: A pandas Series representing a single sample's FPKM values.
+          peak_parameters: Parameters for peak identification.
+          bandwidth: The bandwidth for the Kernel Density Estimation (KDE).
+          epsilon: A small value to add to FPKM values to prevent log2-divide-by-0 errors
+
+    Returns:
+            A named tuple containing the zFPKM values, density estimate, mean (mu), standard deviation, and maximum FPKM value.
+
+    """
+    log2values: npt.NDArray[float] = np.log2(column.values + epsilon)
+
+    # 1D KDE *always* has one feature and many samples. scikit-learn expects data in the format of (n_samples, n_features)
+    # Thus, we use `.reshape(-1, 1)` because we know there is a single feature
+    # Even though the data is FPKM of many genes for a single sample, it is still one feature over many samples
+    # `-1` indicates the unknown dimension (the number of samples)
+    # `1` indicates the known dimension (the number of genes [also known as features])
+    # https://scikit-learn.org/stable/auto_examples/neighbors/plot_kde_1d.html#sphx-glr-auto-examples-neighbors-plot-kde-1d-py
+    kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(log2values.reshape(-1, 1))
+
+    x_range: npt.NDArray[float] = np.linspace(log2values.min(), log2values.max(), 2000).reshape(-1, 1)
+    density: npt.NDArray[float] = np.exp(kde.score_samples(x_range))
     peaks, _ = find_peaks(density, height=peak_parameters.height, distance=peak_parameters.distance)
     peak_positions = x_range[peaks]
 
     mu = 0
     max_fpkm = 0
     stddev = 1
-
     if len(peaks) != 0:
         mu = peak_positions.max()
         max_fpkm = density[peaks[np.argmax(peak_positions)]]
-        u = values[values > mu].mean()
+        u = log2values[log2values > mu].mean()
         stddev = (u - mu) * np.sqrt(np.pi / 2)
-    zfpkm = pd.Series((values - mu) / stddev, dtype=np.float32, name=column.name)
+    zfpkm = pd.Series((log2values - mu) / stddev, dtype=float, name=column.name)
 
     return _ZFPKMResult(zfpkm=zfpkm, density=Density(x_range, density), mu=mu, std_dev=stddev, max_fpkm=max_fpkm)
 
@@ -366,7 +376,7 @@ def _zfpkm_calculation(
 def zfpkm_transform(
     fpkm_df: pd.DataFrame,
     peak_parameters: PeakIdentificationParameters,
-    bandwidth: int,
+    bandwidth: float,
     update_every_percent: float = 0.1,
 ) -> tuple[dict[str, _ZFPKMResult], DataFrame]:
     """Perform zFPKM calculation/transformation."""
@@ -420,41 +430,36 @@ def zfpkm_transform(
     return results, zfpkm_df
 
 
-def zfpkm_plot(results, *, output_png_filepath: Path, plot_xfloor: int = -4):
+def zfpkm_plot(results: dict[str, _ZFPKMResult], *, output_png_dirpath: Path, plot_xfloor: int = -4, subplot_titles: bool = True) -> None:
     """Plot the log2(FPKM) density and fitted Gaussian for each sample.
 
-    :param results: A dictionary of intermediate results from zfpkm_transform.
-    :param output_png_filepath: Output filepath location
-    :param: subplot_titles: Whether to display facet titles (sample names).
-    :param plot_xfloor: Lower limit for the x-axis.
-    :param subplot_titles: Whether to display facet titles (sample names).
+    Args:
+        results: A dictionary of intermediate results from zfpkm_transform.
+        output_png_dirpath: Output directory location
+        subplot_titles: Whether to display facet titles (sample names).
+        plot_xfloor: Lower limit for the x-axis.
+        subplot_titles: Whether to display facet titles (sample names).
+
     """
     to_concat: list[pd.DataFrame] = [None] * len(results)  # type: ignore  # ignoring because None is not of type pd.DataFrame
     for name, result in results.items():
-        stddev = result.std_dev
-        x = np.array(result.density.x)
-        y = np.array(result.density.y)
+        stddev: float = float(result.std_dev)
+        x: npt.NDArray[float] = result.density.x.flatten()
+        y: npt.NDArray[float] = result.density.y.flatten()
 
-        fitted = np.exp(-0.5 * ((x - result.mu) / stddev) ** 2) / (stddev * np.sqrt(2 * np.pi))
-        max_fpkm = y.max()
-        max_fitted = fitted.max()
-        scale_fitted = fitted * (max_fpkm / max_fitted)
+        fitted: npt.NDArray[float] = np.exp(-0.5 * ((x - result.mu) / stddev) ** 2) / (stddev * np.sqrt(2 * np.pi))
+        max_fpkm: float = float(y.max())
+        max_fitted: float = float(fitted.max())
+        scale_fitted: float = fitted * max_fpkm / max_fitted
+        to_concat.append(pd.DataFrame({"sample_name": name, "log2fpkm": x, "fpkm_density": y, "fitted_density_scaled": scale_fitted}))
 
-        to_concat.append(
-            pd.DataFrame(
-                {
-                    "sample_name": [name] * len(x),
-                    "log2fpkm": x,
-                    "fpkm_density": y,
-                    "fitted_density_scaled": scale_fitted,
-                }
-            )
-        )
     mega_df = pd.concat(to_concat, ignore_index=True)
     mega_df.columns = pd.Series(data=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
     mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")
 
-    _, axes = plt.subplots(nrows=len(results), ncols=1, figsize=(8, 4 * len(results)))
+    fig: plt.Figure
+    axes: list[plt.Axes]
+    fig, axes = plt.subplots(nrows=len(results), ncols=1, figsize=(8, 4 * len(results)))
     if len(results) == 1:
         axes = [axes]
 
@@ -466,16 +471,17 @@ def zfpkm_plot(results, *, output_png_filepath: Path, plot_xfloor: int = -4):
             group = sample_data[sample_data["source"] == source_type]
             sns.lineplot(data=group, x="log2fpkm", y="density", label=source_type, ax=axis)
 
+        if subplot_titles:
+            axis.set_title(f"Sample: {sample_name}")
         axis.set_xlim(plot_xfloor, sample_data["log2fpkm"].max())
         axis.set_xlabel("log2(FPKM)")
         axis.set_ylabel("density [scaled]")
         axis.legend(title="Source")
 
+    output_png_dirpath.mkdir(parents=True, exist_ok=True)
+    sample_name: str = next(iter(results.keys()))[:-2]  # Go from 'control1hr_S1R1' to 'control1hr_S1'
     plt.tight_layout()
-    if output_png_filepath.suffix != ".png":
-        logger.warning(f"Output filepath did not end in '.png', setting to '.png' now. Got: '{output_png_filepath.suffix}'")
-        output_png_filepath = output_png_filepath.with_suffix(".png")
-    plt.savefig(output_png_filepath)
+    plt.savefig(Path(output_png_dirpath, f"{sample_name}_zfpkm_density.png"))
 
 
 def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
@@ -512,7 +518,7 @@ def cpm_filter(
         #   thus, (0 / 1) * 1_000_000 = 0
         library_size[library_size == 0] = 1
 
-        output_filepath = config.result_dir / context_name / prep.value / f"CPM_Matrix_{prep.value}_{sample}.csv"
+        output_filepath = Path(config.result_dir, context_name, prep.value, f"CPM_Matrix_{prep.value}_{sample}.csv")
         output_filepath.parent.mkdir(parents=True, exist_ok=True)
         counts_per_million: pd.DataFrame = (counts / library_size) * 1_000_000
         counts_per_million.insert(0, "entrez_gene_ids", pd.Series(entrez_ids))
@@ -583,8 +589,8 @@ def zfpkm_filter(
     calculate_fpkm: bool,
     force_zfpkm_plot: bool,
     peak_parameters: PeakIdentificationParameters,
-    bandwidth: int,
-    output_png_filepath: Path | None,
+    bandwidth: float,
+    output_png_dirpath: Path | None,
 ) -> NamedMetrics:
     """Apply zFPKM filtering to the FPKM matrix for a given sample."""
     min_sample_expression = filtering_options.replicate_ratio
@@ -606,12 +612,10 @@ def zfpkm_filter(
                 "Not plotting zFPKM results because more than 10 plots would be created. "
                 "If you would like to plot them anyway, set 'force_zfpkm_plot' to True"
             )
-        elif output_png_filepath is None:
+        elif output_png_dirpath is None:
             logger.critical("Output zFPKM PNG filepath is None, set a path to plot zFPKM graphs")
         else:
-            output_png_filepath.parent.mkdir(parents=True, exist_ok=True)
-            output_png_filepath.unlink(missing_ok=True)
-            zfpkm_plot(results, output_png_filepath=output_png_filepath)
+            zfpkm_plot(results, output_png_dirpath=output_png_dirpath)
 
         metric.z_score_matrix = zfpkm_df
 
@@ -619,13 +623,13 @@ def zfpkm_filter(
         min_samples = round(min_sample_expression * len(zfpkm_df.columns))
         min_func = k_over_a(min_samples, cut_off)
         min_genes: npt.NDArray[bool] = genefilter(zfpkm_df, min_func)
-        metric.entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, min_genes, strict=True) if keep]
+        metric.entrez_gene_ids = [gene for gene, keep in zip(zfpkm_df.index, min_genes, strict=True) if keep]
 
         # determine which genes are confidently expressed
         top_samples = round(high_confidence_sample_expression * len(zfpkm_df.columns))
         top_func = k_over_a(top_samples, cut_off)
         top_genes: npt.NDArray[bool] = genefilter(zfpkm_df, top_func)
-        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, top_genes, strict=True) if keep]
+        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(zfpkm_df.index, top_genes, strict=True) if keep]
 
     return metrics
 
@@ -639,8 +643,8 @@ def filter_counts(
     prep: RNAType,
     force_zfpkm_plot: bool,
     peak_parameters: PeakIdentificationParameters,
-    bandwidth: int,
-    output_png_filepath: Path | None = None,
+    bandwidth: float,
+    output_zfpkm_plot_dirpath: Path | None = None,
 ) -> NamedMetrics:
     """Filter the count matrix based on the specified technique."""
     match technique:
@@ -656,7 +660,7 @@ def filter_counts(
                 force_zfpkm_plot=force_zfpkm_plot,
                 peak_parameters=peak_parameters,
                 bandwidth=bandwidth,
-                output_png_filepath=output_png_filepath,
+                output_png_dirpath=output_zfpkm_plot_dirpath,
             )
         case FilteringTechnique.UMI:
             # UMI filtering is the same as zFPKM filtering without calculating FPKM
@@ -667,7 +671,7 @@ def filter_counts(
                 force_zfpkm_plot=force_zfpkm_plot,
                 peak_parameters=peak_parameters,
                 bandwidth=bandwidth,
-                output_png_filepath=output_png_filepath,
+                output_png_dirpath=output_zfpkm_plot_dirpath,
             )
         case _:
             _log_and_raise_error(
@@ -692,15 +696,16 @@ async def _process(
     cut_off: int | float,
     force_zfpkm_plot: bool,
     peak_parameters: PeakIdentificationParameters,
-    bandwidth: int,
+    bandwidth: float,
     output_boolean_activity_filepath: Path,
     output_zscore_normalization_filepath: Path,
-    output_zfpkm_png_filepath: Path | None,
+    output_zfpkm_plot_dirpath: Path | None,
 ):
     """Save the results of the RNA-Seq tests to a CSV file."""
     output_boolean_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
 
-    rnaseq_matrix: pd.DataFrame = await _read_file(rnaseq_matrix_filepath)
+    rnaseq_matrix: pd.DataFrame = await _read_file(rnaseq_matrix_filepath, h5ad_as_df=True)
+
     if rnaseq_matrix_filepath.suffix == ".h5ad":
         conversion = await gene_symbol_to_ensembl_and_gene_id(symbols=rnaseq_matrix["gene_symbol"].tolist(), taxon=taxon)
         conversion.reset_index(inplace=True)
@@ -723,7 +728,6 @@ async def _process(
     )
 
     metrics = read_counts_results.metrics
-    entrez_gene_ids = read_counts_results.entrez_gene_ids
 
     metrics: NamedMetrics = filter_counts(
         context_name=context_name,
@@ -734,7 +738,7 @@ async def _process(
         force_zfpkm_plot=force_zfpkm_plot,
         peak_parameters=peak_parameters,
         bandwidth=bandwidth,
-        output_png_filepath=output_zfpkm_png_filepath,
+        output_zfpkm_plot_dirpath=output_zfpkm_plot_dirpath,
     )
 
     merged_zscore_df = pd.DataFrame()
@@ -775,12 +779,14 @@ async def _process(
     top_df["prop"] = top_df["frequency"] / len(metrics)
     top_df = top_df[top_df["prop"] >= filtering_options.high_batch_ratio]
 
-    boolean_matrix = pd.DataFrame(data={"entrez_gene_id": entrez_gene_ids, "expressed": 0, "high": 0})
-    for gene in entrez_gene_ids:
-        if gene in expression_df["entrez_gene_id"]:
-            boolean_matrix.loc[gene, "expressed"] = 1
-        if gene in top_df["entrez_gene_id"]:
-            boolean_matrix.loc[gene, "high"] = 1
+    entrez_id_series = pd.Series(read_counts_results.entrez_gene_ids)
+    boolean_matrix = pd.DataFrame(
+        data={
+            "entrez_gene_id": read_counts_results.entrez_gene_ids,
+            "expressed": entrez_id_series.isin(expression_df["entrez_gene_id"]).astype(int),
+            "high": entrez_id_series.isin(top_df["entrez_gene_id"]).astype(int),
+        }
+    )
 
     expressed_count = len(boolean_matrix[boolean_matrix["expressed"] == 1])
     high_confidence_count = len(boolean_matrix[boolean_matrix["high"] == 1])
@@ -801,18 +807,18 @@ async def rnaseq_gen(  # noqa: C901
     output_zscore_normalization_filepath: Path,
     input_metadata_filepath_or_df: Path | pd.DataFrame,
     replicate_ratio: float = 0.5,
-    high_replicate_ratio: float = 1.0,
+    high_replicate_ratio: float = 0.8,
     batch_ratio: float = 0.5,
-    high_batch_ratio: float = 1.0,
+    high_batch_ratio: float = 0.75,
     technique: FilteringTechnique | str = FilteringTechnique.ZFPKM,
     zfpkm_peak_height: float = 0.02,
     zfpkm_peak_distance: float = 1.0,
-    zfpkm_bandwidth: int = 1,
+    zfpkm_bandwidth: float = 1.0,
     cutoff: int | float | None = None,
     force_zfpkm_plot: bool = False,
     log_level: LogLevel = LogLevel.INFO,
-    log_location: str | TextIOWrapper = sys.stderr,
-    output_zfpkm_png_filepath: Path | None = None,
+    log_location: str | TextIO = sys.stderr,
+    output_zfpkm_plot_dirpath: Path | None = None,
 ) -> None:
     """Generate a list of active and high-confidence genes from a gene count matrix.
 
@@ -843,7 +849,7 @@ async def rnaseq_gen(  # noqa: C901
     :param force_zfpkm_plot: If too many samples exist, should plotting be done anyway?
     :param log_level: The level of logging to output
     :param log_location: The location to write logs to
-    :param output_zfpkm_png_filepath: Optional filepath to save zFPKM plots
+    :param output_zfpkm_plot_dirpath: Optional filepath to save zFPKM plots
     :return: None
     """
     _set_up_logging(level=log_level, location=log_location)
@@ -851,7 +857,7 @@ async def rnaseq_gen(  # noqa: C901
     technique = FilteringTechnique(technique) if isinstance(technique, str) else technique
     match technique:
         case FilteringTechnique.TPM:
-            cutoff = cutoff or 25
+            cutoff: int | float = cutoff or 25
             if cutoff < 1 or cutoff > 100:
                 _log_and_raise_error(
                     "Quantile must be between 1 - 100",
@@ -870,7 +876,7 @@ async def rnaseq_gen(  # noqa: C901
                 cutoff = "default"
 
         case FilteringTechnique.ZFPKM | FilteringTechnique.UMI:
-            cutoff = cutoff or -3
+            cutoff: int | float = cutoff or -3
         case _:
             _log_and_raise_error(
                 f"Technique must be one of {','.join(FilteringTechnique)}. Got: {technique.value}",
@@ -936,5 +942,5 @@ async def rnaseq_gen(  # noqa: C901
         bandwidth=zfpkm_bandwidth,
         output_boolean_activity_filepath=output_boolean_activity_filepath,
         output_zscore_normalization_filepath=output_zscore_normalization_filepath,
-        output_zfpkm_png_filepath=output_zfpkm_png_filepath,
+        output_zfpkm_plot_dirpath=output_zfpkm_plot_dirpath,
     )
