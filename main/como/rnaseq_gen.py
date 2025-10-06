@@ -347,8 +347,16 @@ def _zfpkm_calculation(
     """
     log2values: npt.NDArray[float] = np.log2(column.values + epsilon)
 
-    x_range = np.linspace(values.min(), values.max(), 2000)
-    density = np.exp(refit.score_samples(x_range.reshape(-1, 1)))
+    # 1D KDE *always* has one feature and many samples. scikit-learn expects data in the format of (n_samples, n_features)
+    # Thus, we use `.reshape(-1, 1)` because we know there is a single feature
+    # Even though the data is FPKM of many genes for a single sample, it is still one feature over many samples
+    # `-1` indicates the unknown dimension (the number of samples)
+    # `1` indicates the known dimension (the number of genes [also known as features])
+    # https://scikit-learn.org/stable/auto_examples/neighbors/plot_kde_1d.html#sphx-glr-auto-examples-neighbors-plot-kde-1d-py
+    kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(log2values.reshape(-1, 1))
+
+    x_range: npt.NDArray[float] = np.linspace(log2values.min(), log2values.max(), 2000).reshape(-1, 1)
+    density: npt.NDArray[float] = np.exp(kde.score_samples(x_range))
     peaks, _ = find_peaks(density, height=peak_parameters.height, distance=peak_parameters.distance)
     peak_positions = x_range[peaks]
 
