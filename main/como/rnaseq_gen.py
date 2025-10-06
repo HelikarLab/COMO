@@ -8,17 +8,15 @@ from collections.abc import Callable
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from enum import Enum
-from io import TextIOWrapper
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, TextIO
 
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import seaborn as sns
-import sklearn
-import sklearn.neighbors
+import sklearn.preprocessing
 from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
 from pandas import DataFrame
