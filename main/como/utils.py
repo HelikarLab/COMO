@@ -5,6 +5,7 @@ import contextlib
 import functools
 import io
 import sys
+import typing
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from io import TextIOWrapper
@@ -226,9 +227,27 @@ async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int 
             raise ValueError("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
 
 
-def _listify(value):
-    """Convert items into a list."""
-    return [value] if not isinstance(value, list) else value
+@overload
+def _listify(value: list[T]) -> list[T]: ...
+
+
+@overload
+def _listify(value: T) -> list[T]: ...
+
+
+def _listify(value: T | list[T]) -> list[T]:
+    """Convert items into a list.
+
+    Args:
+        value: The value to convert to a list (if it isn't already)
+
+    Returns:
+        A list of the provided value
+
+    """
+    if isinstance(value, list):
+        return cast(list[T], value)  # does not actually do anything; signifies to type checker that return value is of type list[T]
+    return [value]
 
 
 def _num_rows(item: pd.DataFrame | npt.NDArray) -> int:
@@ -245,7 +264,7 @@ def return_placeholder_data() -> pd.DataFrame:
 
 def _set_up_logging(
     level: LogLevel | str,
-    location: str | TextIOWrapper,
+    location: str | TextIO,
     formatting: str = LOG_FORMAT,
 ):
     if isinstance(level, str):
@@ -260,7 +279,7 @@ def _log_and_raise_error(
     *,
     error: type[BaseException],
     level: LogLevel,
-) -> None:
+) -> typing.NoReturn:
     caller = logger.opt(depth=1)
     match level:
         case LogLevel.ERROR:
