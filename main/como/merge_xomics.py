@@ -225,7 +225,7 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame, taxon_id: int) ->
     logger.trace(f"Querying MyGene for details on {len(transcriptomic_df)} genes")
     for i, detail in enumerate(
         await my_gene.query(
-            items=transcriptomic_df["entrez_gene_id"].tolist(),
+            items=transcriptomic_df["entrez_gene_id"].astype(int).tolist(),
             taxon=taxon_id,
             scopes="entrezgene",
         )
@@ -472,8 +472,8 @@ def _build_batches(
     scrna_metadata: pd.DataFrame | None,
     proteomic_metadata: pd.DataFrame | None,
 ) -> _BatchNames:
-    batch_names = _BatchNames(**{source.name.lower(): [] for source in SourceTypes})
-    for source, metadata in zip(SourceTypes, [trna_metadata, mrna_metadata, scrna_metadata, proteomic_metadata], strict=True):
+    batch_names = _BatchNames()
+    for source, metadata in zip(SourceTypes.__members__.values(), [trna_metadata, mrna_metadata, scrna_metadata, proteomic_metadata], strict=True):
         source: SourceTypes
         metadata: pd.DataFrame
         if metadata is None:
