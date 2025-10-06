@@ -70,20 +70,7 @@ async def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tu
             level=LogLevel.ERROR,
         )
 
-    match prep_method:
-        case RNAType.TRNA:
-            filename = f"{RNAType.TRNA.value}_{context_name}.csv"
-        case RNAType.MRNA:
-            filename = f"{RNAType.MRNA.value}_{context_name}.csv"
-        case RNAType.SCRNA:
-            filename = f"{RNAType.SCRNA.value}_{context_name}.csv"
-        case _:
-            _log_and_raise_error(
-                f"Unsupported RNA-seq library type: {prep_method.value}. Must be one of {', '.join(RNAType)}.",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
-
+    filename: str = f"{prep_method.value}_{context_name}.csv"
     save_filepath = config.result_dir / context_name / prep_method.value / filename
     if save_filepath.exists():
         logger.debug(f"Loading RNA-seq data from: {save_filepath}")
@@ -588,26 +575,20 @@ async def merge_xomics(  # noqa: C901
     ):
         _log_and_raise_error("No data was passed!", error=ValueError, level=LogLevel.ERROR)
 
-    if adjust_method not in AdjustmentMethod:
-        _log_and_raise_error(
-            f"Adjustment method must be one of {AdjustmentMethod}; got: {adjust_method}",
-            error=ValueError,
-            level=LogLevel.ERROR,
-        )
-
-    if expression_requirement < 1:
+    if expression_requirement and expression_requirement < 1:
         logger.warning(f"Expression requirement must be at least 1! Setting to the minimum of 1 now. Got: {expression_requirement}")
         expression_requirement = 1
 
     if expression_requirement is None:
-        expression_requirement = sum(
-            test is not None
-            for test in (
+        expression_requirement = sum(  # Get sum of non-None source inputs
+            1
+            for i in (
                 trna_matrix_or_filepath,
                 mrna_matrix_or_filepath,
                 scrna_matrix_or_filepath,
                 proteomic_matrix_or_filepath,
             )
+            if i
         )
         logger.debug(f"Expression requirement not specified; setting to {expression_requirement}")
 
