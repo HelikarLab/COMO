@@ -17,10 +17,10 @@ LOG_FORMAT = "<green>{time:YYYY-MM-DD HH:mm:ss}</> | <level>{level:<8}</> | <cya
 class AdjustmentMethod(str, Enum):
     """Adjustment method for expression requirement based on differences in number of provided data source types."""
 
-    PROGRESSIVE = "progressive"
-    REGRESSIVE = "regressive"
-    FLAT = "flat"
-    CUSTOM = "custom"
+    PROGRESSIVE = "PROGRESSIVE"
+    REGRESSIVE = "REGRESSIVE"
+    FLAT = "FLAT"
+    CUSTOM = "CUSTOM"
 
 
 class Algorithm(str, Enum):
@@ -33,16 +33,16 @@ class Algorithm(str, Enum):
 class FilteringTechnique(str, Enum):
     """RNA sequencing filtering capabilities."""
 
-    CPM = "cpm"
-    ZFPKM = "zfpkm"
-    TPM = "tpm"
-    UMI = "umi"
+    CPM = "CPM"
+    ZFPKM = "ZFPKM"
+    TPM = "TPM"
+    UMI = "UMI"
 
 
 class GeneIdentifier(str, Enum):
-    ENSEMBL_GENE_ID = "ensembl_gene_id"
-    ENTREZ_GENE_ID = "entrez_gene_id"
-    GENE_SYMBOL = "gene_symbol"
+    ENSEMBL_GENE_ID = "ENSEMBL_GENE_ID"
+    ENTREZ_GENE_ID = "ENTREZ_GENE_ID"
+    GENE_SYMBOL = "GENE_SYMBOL"
 
 
 class LogLevel(int, Enum):
@@ -57,9 +57,9 @@ class LogLevel(int, Enum):
 
 
 class RNAType(str, Enum):
-    TRNA = "total"
-    MRNA = "mrna"
-    SCRNA = "scrna"
+    TRNA = "TOTAL"
+    MRNA = "MRNA"
+    SCRNA = "SCRNA"
 
 
 class Solver(str, Enum):
@@ -72,10 +72,10 @@ class Solver(str, Enum):
 
 
 class SourceTypes(str, Enum):
-    TRNA = "trna"
-    MRNA = "mrna"
-    SCRNA = "scrna"
-    PROTEOMICS = "proteomics"
+    TRNA = "TRNA"
+    MRNA = "MRNA"
+    SCRNA = "SCRNA"
+    PROTEOMICS = "PROTEOMICS"
 
 
 class PeakIdentificationParameters(NamedTuple):
@@ -227,10 +227,10 @@ class _BaseDataType:
 
 @dataclass
 class _BatchNames(_BaseDataType):
-    trna: list[_BatchEntry]
-    mrna: list[_BatchEntry]
-    scrna: list[_BatchEntry]
-    proteomics: list[_BatchEntry]
+    trna: list[_BatchEntry] = field(default_factory=list)
+    mrna: list[_BatchEntry] = field(default_factory=list)
+    scrna: list[_BatchEntry] = field(default_factory=list)
+    proteomics: list[_BatchEntry] = field(default_factory=list)
 
 
 @dataclass
