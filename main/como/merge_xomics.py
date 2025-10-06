@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from io import TextIOWrapper
 from pathlib import Path
+from typing import TextIO, cast
 
 import numpy as np
 import pandas as pd
@@ -50,17 +50,8 @@ class _HighExpressionHeaderNames:
 
 
 # TODO: If function is no longer needed, remove?
-def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tuple[str, pd.DataFrame]:
-    """Load rnaseq results.
-
-    Args:
-        filename: Name of the file to load
-        context_name: Name of the context (e.g., tissue or cell type)
-        prep_method: The RNA-seq library preparation method (e.g., mRNA, total RNA, single-cell RNA)
-
-    Returns:
-        A tuple containing the context name and the loaded DataFrame±
-    """
+async def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tuple[str, pd.DataFrame]:
+    """Load rnaseq results."""
     logger.debug(f"Loading data for context '{context_name}' using preparation method '{prep_method.value}'")
     config = Config()
 
@@ -71,7 +62,7 @@ def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tuple[st
     if not filename or filename == "None":  # not using this data type, use empty dummy data matrix
         return load_dummy_dict()
 
-    inquiry_full_path = config.data_dir / "config_sheets" / filename
+    inquiry_full_path = Path(config.data_dir, "config_sheets", filename)
     if not inquiry_full_path.exists():
         _log_and_raise_error(
             f"Config file not found at {inquiry_full_path}",
@@ -79,20 +70,7 @@ def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tuple[st
             level=LogLevel.ERROR,
         )
 
-    match prep_method:
-        case RNAType.TRNA:
-            filename = f"{RNAType.TRNA.value}_{context_name}.csv"
-        case RNAType.MRNA:
-            filename = f"{RNAType.MRNA.value}_{context_name}.csv"
-        case RNAType.SCRNA:
-            filename = f"{RNAType.SCRNA.value}_{context_name}.csv"
-        case _:
-            _log_and_raise_error(
-                f"Unsupported RNA-seq library type: {prep_method.value}. Must be one of {', '.join(RNAType)}.",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
-
+    filename: str = f"{prep_method.value}_{context_name}.csv"
     save_filepath = config.result_dir / context_name / prep_method.value / filename
     if save_filepath.exists():
         logger.debug(f"Loading RNA-seq data from: {save_filepath}")
@@ -112,11 +90,8 @@ def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tuple[st
 def _merge_logical_table(df: pd.DataFrame):
     """Merge rows of Logical Table belonging to the same entrez_gene_id.
 
-    Args:
-        df: Pandas dataframe containing the logical table
-
-    Returns:
-        pandas dataframe of merged table
+    :param df: pandas dataframe of logical table
+    :return: pandas dataframe of merged table
     """
     # step 1: get all plural ENTREZ_GENE_IDs in the input table, extract unique IDs
     df.dropna(subset=["entrez_gene_id"], inplace=True)
@@ -140,14 +115,13 @@ def _merge_logical_table(df: pd.DataFrame):
 
         df = pd.concat([df, pd.DataFrame(duplicate_rows)], axis=0, ignore_index=True)
         df.drop(df[df["entrez_gene_id"] == i].index, inplace=True)
-    logger.trace(f"Shape after merging duplicated rows: {df.shape}")
+    logger.trace(f"Shape after merging duplciated rows: {df.shape}")
 
     full_entrez_id_sets: set[str] = set()
     entrez_dups_list: list[list[str]] = []
     multi_entrez_index = list(range(len(multiple_entrez_ids)))
 
     logger.trace("Starting to merge multiple entrez IDs")
-    temp_multi_entrez_index = multi_entrez_index.copy()
     for i in range(len(multiple_entrez_ids)):
         if i not in multi_entrez_index:
             continue
@@ -155,21 +129,19 @@ def _merge_logical_table(df: pd.DataFrame):
         logger.trace(f"Iterating through multi-entrez ids, index {i}")
 
         set1 = set(multiple_entrez_ids[i].split("//"))
-        temp_multi_entrez_index.remove(i)
+        multi_entrez_index.remove(i)
 
         for j in multi_entrez_index:
             set2 = set(multiple_entrez_ids[j].split("//"))
             intersect = set1.intersection(set2)
             if bool(intersect):
                 set1 = set1.union(set2)
-                temp_multi_entrez_index.remove(j)
+                multi_entrez_index.remove(j)
 
         sortlist = list(set1)
         sortlist.sort(key=int)
         new_entrez_id = " /// ".join(sortlist)
         full_entrez_id_sets.add(new_entrez_id)
-
-    multi_entrez_index = temp_multi_entrez_index.copy()
 
     logger.debug(f"Finished merging multiple entrez IDs, found {len(full_entrez_id_sets)} sets")
     entrez_dups_list.extend(i.split(" /// ") for i in full_entrez_id_sets)
@@ -208,12 +180,8 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame, taxon_id: int) ->
     The resulting dataframe will have its columns created in the order listed above
     It will return a pandas dataframe with this information
 
-    Args:
-        merged_df: A dataframe containing all active transcriptomic and proteomic genes
-        taxon_id: The NCBI taxonomy ID of the organism
-
-    Returns:
-        A dataframe with the above-listed columns
+    :param merged_df: A dataframe containing all active transcriptomic and proteomic genes
+    :return: A dataframe with the above-listed columns
     """
     # If _ExpressedHeaderNames.PROTEOMICS.value is in the dataframe, lower the required expression by 1
     # We are only trying to get details for transcriptomic data
@@ -257,7 +225,7 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame, taxon_id: int) ->
     logger.trace(f"Querying MyGene for details on {len(transcriptomic_df)} genes")
     for i, detail in enumerate(
         await my_gene.query(
-            items=transcriptomic_df["entrez_gene_id"].tolist(),
+            items=transcriptomic_df["entrez_gene_id"].astype(int).tolist(),
             taxon=taxon_id,
             scopes="entrezgene",
         )
@@ -504,8 +472,8 @@ def _build_batches(
     scrna_metadata: pd.DataFrame | None,
     proteomic_metadata: pd.DataFrame | None,
 ) -> _BatchNames:
-    batch_names = _BatchNames(**{source.name.lower(): [] for source in SourceTypes})
-    for source, metadata in zip(SourceTypes, [trna_metadata, mrna_metadata, scrna_metadata, proteomic_metadata], strict=True):
+    batch_names = _BatchNames()
+    for source, metadata in zip(SourceTypes.__members__.values(), [trna_metadata, mrna_metadata, scrna_metadata, proteomic_metadata], strict=True):
         source: SourceTypes
         metadata: pd.DataFrame
         if metadata is None:
@@ -579,7 +547,7 @@ async def merge_xomics(  # noqa: C901
     weighted_z_floor: int = -6,
     weighted_z_ceiling: int = 6,
     log_level: LogLevel = LogLevel.INFO,
-    log_location: str | TextIOWrapper = sys.stderr,
+    log_location: str | TextIO = sys.stderr,
 ):
     """Merge expression tables of multiple sources (RNA-seq, proteomics) into one."""
     _set_up_logging(level=log_level, location=log_location)
@@ -594,7 +562,7 @@ async def merge_xomics(  # noqa: C901
     }
     # fmt: on
     for source in source_data:
-        _validate_source_arguments(source, *source_data[source])
+        _validate_source_arguments(source, source_data[source])
 
     if all(
         file is None
@@ -607,26 +575,20 @@ async def merge_xomics(  # noqa: C901
     ):
         _log_and_raise_error("No data was passed!", error=ValueError, level=LogLevel.ERROR)
 
-    if adjust_method not in AdjustmentMethod:
-        _log_and_raise_error(
-            f"Adjustment method must be one of {AdjustmentMethod}; got: {adjust_method}",
-            error=ValueError,
-            level=LogLevel.ERROR,
-        )
-
-    if not expression_requirement or expression_requirement < 1:
+    if expression_requirement and expression_requirement < 1:
         logger.warning(f"Expression requirement must be at least 1! Setting to the minimum of 1 now. Got: {expression_requirement}")
         expression_requirement = 1
 
     if expression_requirement is None:
-        expression_requirement = sum(
-            test is not None
-            for test in (
+        expression_requirement = sum(  # Get sum of non-None source inputs
+            1
+            for i in (
                 trna_matrix_or_filepath,
                 mrna_matrix_or_filepath,
                 scrna_matrix_or_filepath,
                 proteomic_matrix_or_filepath,
             )
+            if i
         )
         logger.debug(f"Expression requirement not specified; setting to {expression_requirement}")
 
@@ -647,52 +609,52 @@ async def merge_xomics(  # noqa: C901
         output_figure_dirpath.mkdir(parents=True, exist_ok=True)
 
     # Build trna items
-    trna_matrix: pd.DataFrame | None
-    trna_boolean_matrix: pd.DataFrame | None
-    trna_metadata: pd.DataFrame | None
-    trna_matrix, trna_boolean_matrix, trna_metadata = await asyncio.gather(
-        *[
-            _read_file(trna_matrix_or_filepath),
-            _read_file(trna_boolean_matrix_or_filepath),
-            _read_file(trna_metadata_filepath_or_df),
-        ]
+    # `cast` helps type checkers know what types we are dealing with - costs no runtime performance
+    (trna_matrix, trna_boolean_matrix, trna_metadata) = cast(
+        typ=tuple[pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None],
+        val=await asyncio.gather(
+            *[
+                _read_file(trna_matrix_or_filepath, h5ad_as_df=True),
+                _read_file(trna_boolean_matrix_or_filepath, h5ad_as_df=True),
+                _read_file(trna_metadata_filepath_or_df, h5ad_as_df=True),
+            ]
+        ),
     )
 
     # Build mrna items
-    mrna_matrix: pd.DataFrame | None
-    mrna_boolean_matrix: pd.DataFrame | None
-    mrna_metadata: pd.DataFrame | None
-    mrna_matrix, mrna_boolean_matrix, mrna_metadata = await asyncio.gather(
-        *[
-            _read_file(mrna_matrix_or_filepath),
-            _read_file(mrna_boolean_matrix_or_filepath),
-            _read_file(mrna_metadata_filepath_or_df),
-        ]
+    (mrna_matrix, mrna_boolean_matrix, mrna_metadata) = cast(
+        typ=tuple[pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None],
+        val=await asyncio.gather(
+            *[
+                _read_file(mrna_matrix_or_filepath),
+                _read_file(mrna_boolean_matrix_or_filepath),
+                _read_file(mrna_metadata_filepath_or_df),
+            ]
+        ),
     )
 
     # build scrna items
-
-    scrna_matrix: pd.DataFrame | None
-    scrna_boolean_matrix: pd.DataFrame | None
-    scrna_metadata: pd.DataFrame | None
-    scrna_matrix, scrna_boolean_matrix, scrna_metadata = await asyncio.gather(
-        *[
-            _read_file(scrna_matrix_or_filepath),
-            _read_file(scrna_boolean_matrix_or_filepath),
-            _read_file(scrna_metadata_filepath_or_df),
-        ]
+    (scrna_matrix, scrna_boolean_matrix, scrna_metadata) = cast(
+        typ=tuple[pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None],
+        val=await asyncio.gather(
+            *[
+                _read_file(scrna_matrix_or_filepath),
+                _read_file(scrna_boolean_matrix_or_filepath),
+                _read_file(scrna_metadata_filepath_or_df),
+            ]
+        ),
     )
 
     # build proteomic items
-    proteomic_matrix: pd.DataFrame | None
-    proteomic_boolean_matrix: pd.DataFrame | None
-    proteomic_metadata: pd.DataFrame | None
-    proteomic_matrix, proteomic_boolean_matrix, proteomic_metadata = await asyncio.gather(
-        *[
-            _read_file(proteomic_matrix_or_filepath),
-            _read_file(proteomic_boolean_matrix_or_filepath),
-            _read_file(proteomic_metadata_filepath_or_df),
-        ]
+    (proteomic_matrix, proteomic_boolean_matrix, proteomic_metadata) = cast(
+        typ=tuple[pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None],
+        val=await asyncio.gather(
+            *[
+                _read_file(proteomic_matrix_or_filepath),
+                _read_file(proteomic_boolean_matrix_or_filepath),
+                _read_file(proteomic_metadata_filepath_or_df),
+            ]
+        ),
     )
 
     source_weights = _SourceWeights(trna=trna_weight, mrna=mrna_weight, scrna=scrna_weight, proteomics=proteomic_weight)

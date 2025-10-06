@@ -14,38 +14,38 @@ PATH_TYPE = str | Path
 LOG_FORMAT = "<green>{time:YYYY-MM-DD HH:mm:ss}</> | <level>{level:<8}</> | <cyan>{name}</>:<cyan>{line}</> - <level>{message}</>"
 
 
-class AdjustmentMethod(Enum):
+class AdjustmentMethod(str, Enum):
     """Adjustment method for expression requirement based on differences in number of provided data source types."""
 
-    PROGRESSIVE = "progressive"
-    REGRESSIVE = "regressive"
-    FLAT = "flat"
-    CUSTOM = "custom"
+    PROGRESSIVE = "PROGRESSIVE"
+    REGRESSIVE = "REGRESSIVE"
+    FLAT = "FLAT"
+    CUSTOM = "CUSTOM"
 
 
-class Algorithm(Enum):
+class Algorithm(str, Enum):
     GIMME = "GIMME"
     FASTCORE = "FASTCORE"
     IMAT = "IMAT"
     TINIT = "TINIT"
 
 
-class FilteringTechnique(Enum):
+class FilteringTechnique(str, Enum):
     """RNA sequencing filtering capabilities."""
 
-    CPM = "cpm"
-    ZFPKM = "zfpkm"
-    TPM = "tpm"
-    UMI = "umi"
+    CPM = "CPM"
+    ZFPKM = "ZFPKM"
+    TPM = "TPM"
+    UMI = "UMI"
 
 
-class GeneIdentifier(Enum):
-    ENSEMBL_GENE_ID = "ensembl_gene_id"
-    ENTREZ_GENE_ID = "entrez_gene_id"
-    GENE_SYMBOL = "gene_symbol"
+class GeneIdentifier(str, Enum):
+    ENSEMBL_GENE_ID = "ENSEMBL_GENE_ID"
+    ENTREZ_GENE_ID = "ENTREZ_GENE_ID"
+    GENE_SYMBOL = "GENE_SYMBOL"
 
 
-class LogLevel(Enum):
+class LogLevel(int, Enum):
     TRACE = 5
     DEBUG = 10
     INFO = 20
@@ -56,13 +56,13 @@ class LogLevel(Enum):
     NONE = 100
 
 
-class RNAType(Enum):
-    TRNA = "total"
-    MRNA = "mrna"
-    SCRNA = "scrna"
+class RNAType(str, Enum):
+    TRNA = "TOTAL"
+    MRNA = "MRNA"
+    SCRNA = "SCRNA"
 
 
-class Solver(Enum):
+class Solver(str, Enum):
     """Solver used to seed context specific model."""
 
     GLPK = "GLPK"
@@ -71,11 +71,11 @@ class Solver(Enum):
     GLPK_EXACT = "GLPK_EXACT"
 
 
-class SourceTypes(Enum):
-    TRNA = "trna"
-    MRNA = "mrna"
-    SCRNA = "scrna"
-    PROTEOMICS = "proteomics"
+class SourceTypes(str, Enum):
+    TRNA = "TRNA"
+    MRNA = "MRNA"
+    SCRNA = "SCRNA"
+    PROTEOMICS = "PROTEOMICS"
 
 
 class PeakIdentificationParameters(NamedTuple):
@@ -139,26 +139,12 @@ class CobraCompartments:
 
     @classmethod
     def get_shorthand(cls, longhand: str) -> str | None:
-        """Get the short-hand compartment name from the long-hand name.
-
-        Args:
-            longhand: The long-hand compartment name (e.g., 'cytoplasm', 'extracellular').
-
-        Returns:
-            The short-hand compartment name if found, None otherwise.
-        """
+        """Get the short-hand compartment name from the long-hand name."""
         return cls._REVERSE_LOOKUP.get(longhand.lower(), None)
 
     @classmethod
     def get_longhand(cls, shorthand: str) -> str | None:
-        """Get the long-hand compartment name from the short-hand name.
-
-        Args:
-            shorthand: The short-hand compartment name (e.g., 'c', 'e', 'm').
-
-        Returns:
-            The long-hand compartment name if found, None otherwise.
-        """
+        """Get the long-hand compartment name from the short-hand name."""
         longhand = cls.SHORTHAND.get(shorthand.lower(), None)
         return longhand[0] if longhand else None
 
@@ -206,11 +192,8 @@ class _BaseDataType:
     def __getitem__(self, value: str):
         """Access matrices using square bracket notation (e.g., `input_matrices['total_rna']`).
 
-        Args:
-            value: The name of the matrix to get ('trna', 'mrna', 'scrna', 'proteomics')
-
-        Returns:
-            The DataFrame if it exists, None otherwise.
+        :param value: The name of the matrix to get ('trna', 'mrna', 'scrna', 'proteomics')
+        :returns: The DataFrame if it exists, None otherwise.
         """
         self._validate_attribute(value)
         return getattr(self, value)
@@ -226,7 +209,7 @@ class _BaseDataType:
 
     def _validate_attribute(self, key):
         if key not in {i.value for i in SourceTypes._member_map_.values()}:
-            # Unable to use como.utils._log_and_raise_error because it results in a circular import
+            # Unable to use como.utils._log_and_raise_error becuase it results in a circular import
             message = f"{key} is not a valid attribute of {SourceTypes.__name__}; got '{key}'"
             logger.warning(message)
             raise ValueError(message)
@@ -244,10 +227,10 @@ class _BaseDataType:
 
 @dataclass
 class _BatchNames(_BaseDataType):
-    trna: list[_BatchEntry]
-    mrna: list[_BatchEntry]
-    scrna: list[_BatchEntry]
-    proteomics: list[_BatchEntry]
+    trna: list[_BatchEntry] = field(default_factory=list)
+    mrna: list[_BatchEntry] = field(default_factory=list)
+    scrna: list[_BatchEntry] = field(default_factory=list)
+    proteomics: list[_BatchEntry] = field(default_factory=list)
 
 
 @dataclass

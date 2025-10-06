@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import io
 import sys
 from collections.abc import Iterator
 from io import TextIOWrapper
 from pathlib import Path
+from typing import TypeVar, cast, overload
 from typing import Literal
 
 import aiofiles
@@ -24,6 +24,7 @@ from loguru import logger
 
 from como.data_types import LOG_FORMAT, Algorithm, LogLevel
 
+T = TypeVar("T")
 __all__ = ["split_gene_expression_data", "stringlist_to_list", "suppress_stdout"]
 
 
@@ -40,6 +41,7 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
 
     Returns:
         A list of strings. Example output: ['mat', 'xml', 'json']
+
     """
     if isinstance(stringlist, list):
         return stringlist
@@ -132,8 +134,32 @@ async def _format_determination(
     return coercion
 
 
+@overload
+async def _read_file(path: Path | io.StringIO, h5ad_as_df: bool = True, **kwargs) -> pd.DataFrame: ...
+
+
+@overload
+async def _read_file(path: Path | io.StringIO, h5ad_as_df: bool = False, **kwargs) -> pd.DataFrame | sc.AnnData: ...
+
+
+@overload
+async def _read_file(path: None, h5ad_as_df: bool, **kwargs) -> None: ...
+
+
+@overload
+async def _read_file(path: pd.DataFrame, h5ad_as_df: bool, **kwargs) -> pd.DataFrame: ...
+
+
+@overload
+async def _read_file(path: sc.AnnData, h5ad_as_df: bool = False, **kwargs) -> sc.AnnData: ...
+
+
+@overload
+async def _read_file(path: sc.AnnData, h5ad_as_df: bool = True, **kwargs) -> pd.DataFrame: ...
+
+
 async def _read_file(
-    path: Path | io.StringIO | None,
+    path: Path | io.StringIO | pd.DataFrame | sc.AnnData | None,
     h5ad_as_df: bool = True,
     **kwargs,
 ) -> pd.DataFrame | sc.AnnData | None:
@@ -145,39 +171,39 @@ async def _read_file(
 
     Args:
         path: The path to read from
-        h5ad_as_df: If True and the file is an h5ad, return a DataFrame of the .X matrix instead of an AnnData object
+        h5ad_as_df: If True and the file is an h5ad, return a pandas DataFrame of the .X matrix instead of an AnnData object
         kwargs: Additional arguments to pass to pandas.read_csv, pandas.read_excel, or scanpy.read_h5ad, depending on the filepath provided
 
     Returns:
         None, or a pandas DataFrame or AnnData
+
     """
-    if isinstance(path, (pd.DataFrame, sc.AnnData)):
+    if isinstance(path, pd.DataFrame):
         return path
-    if not path:
+    elif isinstance(path, sc.AnnData):
+        return path.to_df().T if h5ad_as_df else path
+    elif isinstance(path, io.StringIO):
+        return pd.read_csv(path, **kwargs)
+    elif not path:
         return None
 
     if isinstance(path, Path) and not path.exists():
         _log_and_raise_error(f"File {path} does not exist", error=FileNotFoundError, level=LogLevel.CRITICAL)
 
-    # StringIO is used if a CSV file is read using open() directly
-    if isinstance(path, io.StringIO):
-        return pd.read_csv(path, **kwargs)
-
     match path.suffix:
         case ".csv" | ".tsv" | ".txt":
-            if "sep" not in kwargs:
-                kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")
+            kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")  # set sep if not defined
             async with aiofiles.open(path) as i_stream:
                 content = await i_stream.read()
                 return pd.read_csv(io.StringIO(content), **kwargs)
         case ".xlsx" | ".xls":
-            return await asyncio.to_thread(pd.read_excel, path, **kwargs)
+            return pd.read_excel(path, **kwargs)
         case ".h5ad":
-            adata: sc.AnnData = await asyncio.to_thread(sc.read_h5ad, path, **kwargs)
+            adata: sc.AnnData = sc.read_h5ad(path, **kwargs)
             if h5ad_as_df:
                 df = adata.to_df().T
                 df.index.name = "gene_symbol"
-                df.reset_index(inplace=True, drop=False)
+                df.reset_index(inplace=True)
                 return df
             return adata
         case _:
@@ -186,7 +212,6 @@ async def _read_file(
                 error=ValueError,
                 level=LogLevel.CRITICAL,
             )
-            return None
 
 
 async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int | str | Taxon) -> pd.DataFrame:
@@ -214,16 +239,27 @@ async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int 
             raise ValueError("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
 
 
-def _listify(value):
+@overload
+def _listify(value: list[T]) -> list[T]: ...
+
+
+@overload
+def _listify(value: T) -> list[T]: ...
+
+
+def _listify(value: T | list[T]) -> list[T]:
     """Convert items into a list.
 
     Args:
-        value: The value to convert to a list
+        value: The value to convert to a list (if it isn't already)
 
     Returns:
-        A list containing `value`, unless it is already a list
+        A list of the provided value
+
     """
-    return [value] if not isinstance(value, list) else value
+    if isinstance(value, list):
+        return cast(list[T], value)  # does not actually do anything; signifies to type checker that return value is of type list[T]
+    return [value]
 
 
 def _num_rows(item: pd.DataFrame | npt.NDArray) -> int:

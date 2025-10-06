@@ -3,13 +3,14 @@ from __future__ import annotations
 import asyncio
 import functools
 import json
+import json
 import re
 import sys
 from dataclasses import asdict, dataclass, field
 from io import StringIO, TextIOWrapper
 from itertools import chain
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final, Literal, cast, TextIO
 
 import aiofiles
 import numpy as np
@@ -51,9 +52,10 @@ class _STARinformation:
             )
 
         async with aiofiles.open(filepath) as i_stream:
-            unmapped, multimapping, no_feature, ambiguous = await asyncio.gather(
-                *[i_stream.readline(), i_stream.readline(), i_stream.readline(), i_stream.readline()]
-            )
+            unmapped = await i_stream.readline()
+            multimapping = await i_stream.readline()
+            no_feature = await i_stream.readline()
+            ambiguous = await i_stream.readline()
 
             num_unmapped = [int(i) for i in unmapped.rstrip("\n").split("\t")[1:]]
             num_multimapping = [int(i) for i in multimapping.rstrip("\n").split("\t")[1:]]
@@ -246,9 +248,9 @@ async def _process_first_multirun_sample(strand_file: Path, all_counts_files: li
     sample_count = sample_count.fillna(value="0")
     sample_count["counts"] = sample_count["counts"].astype(np.float64)
 
-    count_sums = sample_count.groupby("ensembl_gene_id", as_index=False)["counts"].mean()
-    count_sums["counts"] = np.ceil(count_sums["counts"].astype(np.uint32))
-    count_sums.columns = ["ensembl_gene_id", _sample_name_from_filepath(strand_file)]
+    count_sums: pd.DataFrame = pd.DataFrame(sample_count.sum(axis=1, numeric_only=True))
+    count_sums.insert(0, "ensembl_gene_id", sample_count["ensembl_gene_id"])
+    count_sums.columns = pd.Index(["ensembl_gene_id", _sample_name_from_filepath(strand_file)])
     return count_sums
 
 
@@ -270,7 +272,7 @@ async def _process_standard_replicate(counts_file: Path, strand_file: Path, samp
         strand_information = "unstranded_rna_counts"
 
     sample_count = star_information.count_matrix[["ensembl_gene_id", strand_information]]
-    sample_count.columns = ["ensembl_gene_id", sample_name]
+    sample_count.columns = pd.Index(["ensembl_gene_id", sample_name])
     return sample_count
 
 
@@ -340,12 +342,13 @@ async def _write_counts_matrix(
         A pandas DataFrame representing the final counts matrix.
     """
     study_metrics = _organize_gene_counts_files(data_dir=como_context_dir)
-    counts: list[pd.DataFrame] = await asyncio.gather(*[_create_sample_counts_matrix(metric) for metric in study_metrics])
-    rna_specific_sample_names = set(config_df.loc[config_df["library_prep"] == rna.value, "sample_name"].tolist())
+    counts: list[pd.DataFrame] = await asyncio.gather(*[_create_sample_counts_matrix(metric) for metric in study_metrics])    counts: list[pd.DataFrame] = await asyncio.gather(*[_create_sample_counts_matrix(metric) for metric in study_metrics])
 
-    final_matrix: pd.DataFrame = functools.reduce(lambda left, right: pd.merge(left, right, on="ensembl_gene_id", how="outer"), counts)
-    final_matrix.fillna(value=0, inplace=True)
-    final_matrix.iloc[:, 1:] = final_matrix.iloc[:, 1:].astype(np.uint64)
+    final_matrix = pd.DataFrame()
+    for count in counts:
+        final_matrix = count if final_matrix.empty else pd.merge(final_matrix, count, on="ensembl_gene_id", how="outer")
+
+    rna_specific_sample_names = config_df.loc[config_df["library_prep"] == rna.value, "sample_name"].tolist()
     final_matrix = final_matrix[["ensembl_gene_id", *rna_specific_sample_names]]
 
     output_counts_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -674,7 +677,6 @@ async def _create_gene_info_file(
         index=list(range(len(gene_data))),
     )
     for i, data in enumerate(gene_data):
-        # ensembl_ids = data.get("genomic_pos.ensemblgene", "-")
         ensembl_ids = data.get("genomic_pos.ensemblgene", pd.NA)
         if isinstance(ensembl_ids, list):
             ensembl_ids = ensembl_ids[0]
@@ -785,7 +787,7 @@ async def rnaseq_preprocess(
     output_mrna_count_matrix_filepath: Path | None = None,
     cache: bool = True,
     log_level: LogLevel | str = LogLevel.INFO,
-    log_location: str | TextIOWrapper = sys.stderr,
+    log_location: str | TextIO = sys.stderr,
     *,
     create_gene_info_only: bool = False,
 ) -> None:
@@ -794,20 +796,24 @@ async def rnaseq_preprocess(
     Fetches additional gene information from a provided matrix or gene counts,
         or optionally creates this matrix using gene count files obtained using STAR aligner
 
-    :param context_name: The context/cell type being processed
-    :param taxon: The NCBI taxonomy ID
-    :param output_gene_info_filepath: Path to the output gene information CSV file
-    :param output_trna_metadata_filepath: Path to the output tRNA config file (if in "create" mode)
-    :param output_mrna_metadata_filepath: Path to the output mRNA config file (if in "create" mode)
-    :param output_trna_count_matrix_filepath: The path to write total RNA count matrices
-    :param output_mrna_count_matrix_filepath: The path to write messenger RNA count matrices
-    :param como_context_dir: If in "create" mode, the input path(s) to the COMO_input directory of the current context
-        i.e., the directory containing "fragmentSizes", "geneCounts", "insertSizeMetrics", etc. directories
-    :param input_matrix_filepath: If in "provide" mode, the path(s) to the count matrices to be processed~
-    :param cache: Should HTTP requests be cached
-    :param log_level: The logging level
-    :param log_location: The logging location
-    :param create_gene_info_only: If True, only create the gene info file and skip general preprocessing steps
+    Args:
+        context_name: The context/cell type being processed
+        taxon: The NCBI taxonomy ID
+        output_gene_info_filepath: Path to the output gene information CSV file
+        output_trna_metadata_filepath: Path to the output tRNA config file (if in "create" mode)
+        output_mrna_metadata_filepath: Path to the output mRNA config file (if in "create" mode)
+        output_trna_count_matrix_filepath: The path to write total RNA count matrices
+        output_mrna_count_matrix_filepath: The path to write messenger RNA count matrices
+        como_context_dir: If in "create" mode, the input path(s) to the COMO_input directory of the current context i.e., the directory containing "fragmentSizes", "geneCounts", "insertSizeMetrics", etc. directories
+        input_matrix_filepath: If in "provide" mode, the path(s) to the count matrices to be processed~
+        cache: Should HTTP requests be cached
+        log_level: The logging level
+        log_location: The logging location
+        create_gene_info_only: If True, only create the gene info file and skip general preprocessing steps
+    
+    Returns:
+        None
+
     """
     _set_up_logging(level=log_level, location=log_location)
 
@@ -835,28 +841,3 @@ async def rnaseq_preprocess(
         cache=cache,
         create_gene_info_only=create_gene_info_only,
     )
-
-
-async def _main():
-    context_name = "notreatment"
-    taxon = 9606
-    como_context_dir = Path("/Users/joshl/Projects/COMO/main/data/COMO_input/notreatment")
-    output_gene_info_filepath = Path("/Users/joshl/Projects/COMO/main/data/results/notreatment/gene_info.csv")
-    output_trna_metadata_filepath = Path("/Users/joshl/Projects/COMO/main/data/config_sheets/trna_config.xlsx")
-    output_trna_count_matrix_filepath = Path("/Users/joshl/Projects/COMO/main/data/results/notreatment/total-rna/totalrna_notreatment.csv")
-
-    await rnaseq_preprocess(
-        context_name=context_name,
-        taxon=taxon,
-        como_context_dir=como_context_dir,
-        input_matrix_filepath=None,
-        output_gene_info_filepath=output_gene_info_filepath,
-        output_trna_metadata_filepath=output_trna_metadata_filepath,
-        output_trna_count_matrix_filepath=output_trna_count_matrix_filepath,
-        cache=False,
-        log_level="INFO",
-    )
-
-
-if __name__ == "__main__":
-    asyncio.run(_main())
