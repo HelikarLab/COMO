@@ -9,6 +9,7 @@ from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from io import TextIOWrapper
 from pathlib import Path
+from typing import TextIO, TypeVar, cast, overload
 
 import numpy.typing as npt
 import pandas as pd
@@ -24,6 +25,7 @@ from loguru import logger
 
 from como.data_types import LOG_FORMAT, Algorithm, LogLevel
 
+T = TypeVar("T")
 __all__ = ["split_gene_expression_data", "stringlist_to_list", "suppress_stdout"]
 
 
@@ -119,8 +121,32 @@ async def _format_determination(
     return coercion
 
 
+@overload
+async def _read_file(path: Path | io.StringIO, h5ad_as_df: bool = True, **kwargs) -> pd.DataFrame: ...
+
+
+@overload
+async def _read_file(path: Path | io.StringIO, h5ad_as_df: bool = False, **kwargs) -> pd.DataFrame | sc.AnnData: ...
+
+
+@overload
+async def _read_file(path: None, h5ad_as_df: bool, **kwargs) -> None: ...
+
+
+@overload
+async def _read_file(path: pd.DataFrame, h5ad_as_df: bool, **kwargs) -> pd.DataFrame: ...
+
+
+@overload
+async def _read_file(path: sc.AnnData, h5ad_as_df: bool = False, **kwargs) -> sc.AnnData: ...
+
+
+@overload
+async def _read_file(path: sc.AnnData, h5ad_as_df: bool = True, **kwargs) -> pd.DataFrame: ...
+
+
 async def _read_file(
-    path: Path | io.StringIO | None,
+    path: Path | io.StringIO | pd.DataFrame | sc.AnnData | None,
     h5ad_as_df: bool = True,
     **kwargs,
 ) -> pd.DataFrame | sc.AnnData | None:
@@ -130,27 +156,32 @@ async def _read_file(
     None may be provided to this function so that `asyncio.gather` can safely be used on all sources
         (trna, mrna, scrna, proteomics) without needing to check if the user has provided those sources
 
-    :param path: The path to read from
-    :param kwargs: Additional arguments to pass to pandas.read_csv, pandas.read_excel,
-        or scanpy.read_h5ad, depending on the filepath provided
-    :return: None, or a pandas DataFrame or AnnData
+    Args:
+        path: The path to read from
+        h5ad_as_df: If True and the file is an h5ad, return a pandas DataFrame of the .X matrix instead of an AnnData object
+        kwargs: Additional arguments to pass to pandas.read_csv, pandas.read_excel, or scanpy.read_h5ad, depending on the filepath provided
+
+    Returns:
+        None, or a pandas DataFrame or AnnData
+
     """
-    if not path:
+    if isinstance(path, pd.DataFrame):
+        return path
+    elif isinstance(path, sc.AnnData):
+        return path.to_df().T if h5ad_as_df else path
+    elif isinstance(path, io.StringIO):
+        return pd.read_csv(path, **kwargs)
+    elif not path:
         return None
 
     if isinstance(path, Path) and not path.exists():
         _log_and_raise_error(f"File {path} does not exist", error=FileNotFoundError, level=LogLevel.CRITICAL)
 
-    # StringIO is used if a CSV file is read using open() directly
-    if isinstance(path, io.StringIO):
-        return pd.read_csv(path, **kwargs)
-
     match path.suffix:
         case ".csv" | ".tsv" | ".txt":
-            if "sep" not in kwargs:
-                kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")
-            with path.open("r") as i_stream:
-                content = i_stream.read()
+            kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")  # set sep if not defined
+            async with aiofiles.open(path) as i_stream:
+                content = await i_stream.read()
                 return pd.read_csv(io.StringIO(content), **kwargs)
         case ".xlsx" | ".xls":
             return pd.read_excel(path, **kwargs)
@@ -168,7 +199,6 @@ async def _read_file(
                 error=ValueError,
                 level=LogLevel.CRITICAL,
             )
-            return None
 
 
 async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int | str | Taxon) -> pd.DataFrame:
