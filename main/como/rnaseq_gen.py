@@ -463,16 +463,17 @@ def zfpkm_plot(results: dict[str, _ZFPKMResult], *, output_png_dirpath: Path, pl
             group = sample_data[sample_data["source"] == source_type]
             sns.lineplot(data=group, x="log2fpkm", y="density", label=source_type, ax=axis)
 
+        if subplot_titles:
+            axis.set_title(f"Sample: {sample_name}")
         axis.set_xlim(plot_xfloor, sample_data["log2fpkm"].max())
         axis.set_xlabel("log2(FPKM)")
         axis.set_ylabel("density [scaled]")
         axis.legend(title="Source")
 
+    output_png_dirpath.mkdir(parents=True, exist_ok=True)
+    sample_name: str = next(iter(results.keys()))[:-2]  # Go from 'control1hr_S1R1' to 'control1hr_S1'
     plt.tight_layout()
-    if output_png_filepath.suffix != ".png":
-        logger.warning(f"Output filepath did not end in '.png', setting to '.png' now. Got: '{output_png_filepath.suffix}'")
-        output_png_filepath = output_png_filepath.with_suffix(".png")
-    plt.savefig(output_png_filepath)
+    plt.savefig(Path(output_png_dirpath, f"{sample_name}_zfpkm_density.png"))
 
 
 def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
@@ -603,12 +604,10 @@ def zfpkm_filter(
                 "Not plotting zFPKM results because more than 10 plots would be created. "
                 "If you would like to plot them anyway, set 'force_zfpkm_plot' to True"
             )
-        elif output_png_filepath is None:
+        elif output_png_dirpath is None:
             logger.critical("Output zFPKM PNG filepath is None, set a path to plot zFPKM graphs")
         else:
-            output_png_filepath.parent.mkdir(parents=True, exist_ok=True)
-            output_png_filepath.unlink(missing_ok=True)
-            zfpkm_plot(results, output_png_filepath=output_png_filepath)
+            zfpkm_plot(results, output_png_dirpath=output_png_dirpath)
 
         metric.z_score_matrix = zfpkm_df
 
@@ -653,7 +652,7 @@ def filter_counts(
                 force_zfpkm_plot=force_zfpkm_plot,
                 peak_parameters=peak_parameters,
                 bandwidth=bandwidth,
-                output_png_filepath=output_png_filepath,
+                output_png_dirpath=output_zfpkm_plot_dirpath,
             )
         case FilteringTechnique.UMI:
             # UMI filtering is the same as zFPKM filtering without calculating FPKM
@@ -664,7 +663,7 @@ def filter_counts(
                 force_zfpkm_plot=force_zfpkm_plot,
                 peak_parameters=peak_parameters,
                 bandwidth=bandwidth,
-                output_png_filepath=output_png_filepath,
+                output_png_dirpath=output_zfpkm_plot_dirpath,
             )
         case _:
             _log_and_raise_error(
@@ -692,7 +691,7 @@ async def _process(
     bandwidth: float,
     output_boolean_activity_filepath: Path,
     output_zscore_normalization_filepath: Path,
-    output_zfpkm_png_filepath: Path | None,
+    output_zfpkm_plot_dirpath: Path | None,
 ):
     """Save the results of the RNA-Seq tests to a CSV file."""
     output_boolean_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -731,7 +730,7 @@ async def _process(
         force_zfpkm_plot=force_zfpkm_plot,
         peak_parameters=peak_parameters,
         bandwidth=bandwidth,
-        output_png_filepath=output_zfpkm_png_filepath,
+        output_zfpkm_plot_dirpath=output_zfpkm_plot_dirpath,
     )
 
     merged_zscore_df = pd.DataFrame()
@@ -840,7 +839,7 @@ async def rnaseq_gen(  # noqa: C901
     :param force_zfpkm_plot: If too many samples exist, should plotting be done anyway?
     :param log_level: The level of logging to output
     :param log_location: The location to write logs to
-    :param output_zfpkm_png_filepath: Optional filepath to save zFPKM plots
+    :param output_zfpkm_plot_dirpath: Optional filepath to save zFPKM plots
     :return: None
     """
     _set_up_logging(level=log_level, location=log_location)
@@ -933,5 +932,5 @@ async def rnaseq_gen(  # noqa: C901
         bandwidth=zfpkm_bandwidth,
         output_boolean_activity_filepath=output_boolean_activity_filepath,
         output_zscore_normalization_filepath=output_zscore_normalization_filepath,
-        output_zfpkm_png_filepath=output_zfpkm_png_filepath,
+        output_zfpkm_plot_dirpath=output_zfpkm_plot_dirpath,
     )
