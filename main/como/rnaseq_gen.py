@@ -418,10 +418,7 @@ def zfpkm_transform(
             - A DataFrame of zFPKM values with the same shape as the input fpkm_df.
     """
     if update_every_percent > 1:
-        logger.warning(
-            f"update_every_percent should be a decimal value between 0 and 1; got: {update_every_percent} - "
-            f"will convert to percentage"
-        )
+        logger.warning(f"update_every_percent should be a decimal value between 0 and 1; got: {update_every_percent} - will convert to percentage")
         update_every_percent /= 100
 
     total_samples = _num_columns(fpkm_df)
@@ -507,9 +504,8 @@ def zfpkm_plot(results: dict[str, _ZFPKMResult], *, output_png_dirpath: Path, pl
     mega_df.columns = pd.Series(data=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
     mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")
 
-    fig: plt.Figure
     axes: list[plt.Axes]
-    fig, axes = plt.subplots(nrows=len(results), ncols=1, figsize=(8, 4 * len(results)))
+    _, axes = plt.subplots(nrows=len(results), ncols=1, figsize=(8, 4 * len(results)))
     if len(results) == 1:
         axes = [axes]
 
