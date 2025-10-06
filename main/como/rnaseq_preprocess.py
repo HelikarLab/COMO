@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass, field
 from io import StringIO, TextIOWrapper
 from itertools import chain
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final, Literal, cast
 
 import aiofiles
 import numpy as np
@@ -424,7 +424,10 @@ async def _create_config_df(  # noqa: C901
         elif len(frag_paths) == 1 and layout == "single-end":
             mean_frag = 0.0
         else:  # 1-N files, paired end
-            dfs: list[pd.DataFrame] = await asyncio.gather(*[_read_file(f, sep="\t", on_bad_lines="skip") for f in frag_paths])
+            dfs: list[pd.DataFrame] = cast(
+                typ=list[pd.DataFrame],
+                val=await asyncio.gather(*[_read_file(f, sep="\t", on_bad_lines="skip") for f in frag_paths]),
+            )
             for df in dfs:
                 df["meanxcount"] = df["frag_mean"] * df["frag_count"]
                 counts = np.array([df["frag_count"].sum() for df in dfs])
