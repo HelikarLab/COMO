@@ -1,3 +1,4 @@
+from como import plot
 from como.data_types import AdjustmentMethod, Algorithm, CobraCompartments, FilteringTechnique, LogLevel, Solver
 from como.utils import stringlist_to_list
 

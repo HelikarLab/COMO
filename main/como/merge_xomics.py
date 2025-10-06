@@ -50,8 +50,18 @@ class _HighExpressionHeaderNames:
 
 
 # TODO: If function is no longer needed, remove?
-async def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tuple[str, pd.DataFrame]:
-    """Load rnaseq results."""
+def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tuple[str, pd.DataFrame]:
+    """Load rnaseq results.
+    
+    Args:
+        filename: Filename of the RNA-seq data
+        context_name: Name of the context
+        prep_method: Preparation method used for RNA-seq data
+        
+    Returns:
+        A tuple containing the context name and the RNA-seq data as a pandas DataFrame
+
+    """
     logger.debug(f"Loading data for context '{context_name}' using preparation method '{prep_method.value}'")
     config = Config()
 
@@ -90,8 +100,11 @@ async def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tu
 def _merge_logical_table(df: pd.DataFrame):
     """Merge rows of Logical Table belonging to the same entrez_gene_id.
 
-    :param df: pandas dataframe of logical table
-    :return: pandas dataframe of merged table
+    Args:
+        df: A logical/boolean table
+    
+    Returns:
+        pandas dataframe of merged table
     """
     # step 1: get all plural ENTREZ_GENE_IDs in the input table, extract unique IDs
     df.dropna(subset=["entrez_gene_id"], inplace=True)
@@ -131,12 +144,15 @@ def _merge_logical_table(df: pd.DataFrame):
         set1 = set(multiple_entrez_ids[i].split("//"))
         multi_entrez_index.remove(i)
 
-        for j in multi_entrez_index:
+        multi_entrez_index_to_remove: set[int] = set()
+        for j in range(len(multi_entrez_index)):
             set2 = set(multiple_entrez_ids[j].split("//"))
             intersect = set1.intersection(set2)
             if bool(intersect):
                 set1 = set1.union(set2)
-                multi_entrez_index.remove(j)
+                multi_entrez_index_to_remove.add(j)
+        for index in multi_entrez_index_to_remove:
+            multi_entrez_index.pop(index)
 
         sortlist = list(set1)
         sortlist.sort(key=int)
@@ -180,8 +196,13 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame, taxon_id: int) ->
     The resulting dataframe will have its columns created in the order listed above
     It will return a pandas dataframe with this information
 
-    :param merged_df: A dataframe containing all active transcriptomic and proteomic genes
-    :return: A dataframe with the above-listed columns
+    Args:
+        merged_df: A dataframe containing all active transcriptomic and proteomic genes
+        taxon_id: The NCBI taxonomy ID of the organism
+    
+    Returns:
+        A dataframe with the above-listed columns
+
     """
     # If _ExpressedHeaderNames.PROTEOMICS.value is in the dataframe, lower the required expression by 1
     # We are only trying to get details for transcriptomic data

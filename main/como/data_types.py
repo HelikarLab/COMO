@@ -14,7 +14,7 @@ PATH_TYPE = str | Path
 LOG_FORMAT = "<green>{time:YYYY-MM-DD HH:mm:ss}</> | <level>{level:<8}</> | <cyan>{name}</>:<cyan>{line}</> - <level>{message}</>"
 
 
-class AdjustmentMethod(str, Enum):
+class AdjustmentMethod(str, Enum):  # noqa: UP042
     """Adjustment method for expression requirement based on differences in number of provided data source types."""
 
     PROGRESSIVE = "PROGRESSIVE"
@@ -23,14 +23,14 @@ class AdjustmentMethod(str, Enum):
     CUSTOM = "CUSTOM"
 
 
-class Algorithm(str, Enum):
+class Algorithm(str, Enum):  # noqa: UP042
     GIMME = "GIMME"
     FASTCORE = "FASTCORE"
     IMAT = "IMAT"
     TINIT = "TINIT"
 
 
-class FilteringTechnique(str, Enum):
+class FilteringTechnique(str, Enum):  # noqa: UP042
     """RNA sequencing filtering capabilities."""
 
     CPM = "CPM"
@@ -39,7 +39,7 @@ class FilteringTechnique(str, Enum):
     UMI = "UMI"
 
 
-class GeneIdentifier(str, Enum):
+class GeneIdentifier(str, Enum):  # noqa: UP042
     ENSEMBL_GENE_ID = "ENSEMBL_GENE_ID"
     ENTREZ_GENE_ID = "ENTREZ_GENE_ID"
     GENE_SYMBOL = "GENE_SYMBOL"
@@ -56,13 +56,13 @@ class LogLevel(int, Enum):
     NONE = 100
 
 
-class RNAType(str, Enum):
+class RNAType(str, Enum):  # noqa: UP042
     TRNA = "TOTAL"
     MRNA = "MRNA"
     SCRNA = "SCRNA"
 
 
-class Solver(str, Enum):
+class Solver(str, Enum):  # noqa: UP042
     """Solver used to seed context specific model."""
 
     GLPK = "GLPK"
@@ -71,7 +71,7 @@ class Solver(str, Enum):
     GLPK_EXACT = "GLPK_EXACT"
 
 
-class SourceTypes(str, Enum):
+class SourceTypes(str, Enum):  # noqa: UP042
     TRNA = "TRNA"
     MRNA = "MRNA"
     SCRNA = "SCRNA"
@@ -139,12 +139,28 @@ class CobraCompartments:
 
     @classmethod
     def get_shorthand(cls, longhand: str) -> str | None:
-        """Get the short-hand compartment name from the long-hand name."""
+        """Get the short-hand compartment name from the long-hand name.
+
+        Args:
+            longhand: The long-hand compartment name (e.g., 'extracellular').
+
+        Returns:
+            The short-hand compartment name if found, None otherwise.
+
+        """
         return cls._REVERSE_LOOKUP.get(longhand.lower(), None)
 
     @classmethod
     def get_longhand(cls, shorthand: str) -> str | None:
-        """Get the long-hand compartment name from the short-hand name."""
+        """Get the long-hand compartment name from the short-hand name.
+
+        Args:
+            shorthand: The short-hand compartment name (e.g., 'e' for extracellular).
+
+        Returns:
+            The long-hand compartment name if found, None otherwise.
+
+        """
         longhand = cls.SHORTHAND.get(shorthand.lower(), None)
         return longhand[0] if longhand else None
 
@@ -192,8 +208,12 @@ class _BaseDataType:
     def __getitem__(self, value: str):
         """Access matrices using square bracket notation (e.g., `input_matrices['total_rna']`).
 
-        :param value: The name of the matrix to get ('trna', 'mrna', 'scrna', 'proteomics')
-        :returns: The DataFrame if it exists, None otherwise.
+        Args:
+            value: The name of the matrix to get ('trna', 'mrna', 'scrna', 'proteomics')
+
+        Returns:
+            The DataFrame if it exists, None otherwise.
+
         """
         self._validate_attribute(value)
         return getattr(self, value)

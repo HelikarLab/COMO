@@ -1,6 +1,7 @@
 line-length = 150
 extend-include = ["docs/**/*.py", "tests/**/*.py", "**/*.ipynb"]
 
+
 [format]
 quote-style = "double"
 docstring-code-format = true
@@ -40,6 +41,9 @@ ignore = [
     "TRY003",   # allow exception messages outside the `Exception` class
     "F401",     # allow unused imports
 ]
+
+[lint.pydocstyle]
+convention = "google"
 
 [lint.per-file-ignores]
 "tests/*" = [

@@ -3,10 +3,10 @@ from __future__ import annotations
 import contextlib
 import io
 import sys
-import typing
 from collections.abc import Iterator
+from io import TextIOWrapper
 from pathlib import Path
-from typing import TextIO, TypeVar, cast, overload
+from typing import Literal, TypeVar, cast, overload
 
 import aiofiles
 import numpy.typing as npt
@@ -66,34 +66,36 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
 
 def split_gene_expression_data(
     expression_data: pd.DataFrame,
+    identifier_column: Literal["ensembl_gene_id", "entrez_gene_id"],
     recon_algorithm: Algorithm | None = None,
-    entrez_as_index: bool = True,
-) -> pd.DataFrame:
+    *,
+    ensembl_as_index: bool = True,
+):
     """Split the gene expression data into single-gene and multiple-gene names.
 
-    Args:
+    Arg:
         expression_data: The gene expression data to map
+        identifier_column: The column containing the gene identifiers, either 'ensembl_gene_id'
         recon_algorithm: The recon algorithm used to generate the gene expression data
-        entrez_as_index: Should the 'entrez_gene_id' column be set as the index
+        ensembl_as_index: Should the 'ensembl_gene_id' column be set as
 
     Returns:
         A pandas DataFrame with the split gene expression data
-
     """
     expression_data.columns = [c.lower() for c in expression_data.columns]
     if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT}:
         expression_data.rename(columns={"combine_z": "active"}, inplace=True)
 
-    expression_data = expression_data[["entrez_gene_id", "active"]]
-    single_gene_names = expression_data[~expression_data["entrez_gene_id"].astype(str).str.contains("//")]
-    multiple_gene_names = expression_data[expression_data["entrez_gene_id"].astype(str).str.contains("//")]
-    split_gene_names = multiple_gene_names.assign(entrez_gene_id=multiple_gene_names["entrez_gene_id"].astype(str).str.split("///")).explode(
-        "entrez_gene_id"
+    expression_data = expression_data[[identifier_column, "active"]]
+    single_gene_names = expression_data[~expression_data[identifier_column].astype(str).str.contains("//")]
+    multiple_gene_names = expression_data[expression_data[identifier_column].astype(str).str.contains("//")]
+    split_gene_names = multiple_gene_names.assign(ensembl_gene_id=multiple_gene_names[identifier_column].astype(str).str.split("///")).explode(
+        identifier_column
     )
 
     gene_expressions = pd.concat([single_gene_names, split_gene_names], axis=0, ignore_index=True)
-    if entrez_as_index:
-        gene_expressions.set_index("entrez_gene_id", inplace=True)
+    if ensembl_as_index:
+        gene_expressions.set_index(identifier_column, inplace=True)
     return gene_expressions
 
 
@@ -117,14 +119,13 @@ async def _format_determination(
     """Determine the data type of the given input values (i.e., Entrez Gene ID, Gene Symbol, etc.).
 
     Args:
-        biodbnet: The BioDBNet to use for deter
+        biodbnet: The BioDBNet to use for determination
         requested_output: The data type to generate (of type `Output`)
         input_values: The input values to determine
         taxon: The Taxon ID
 
     Returns:
         A pandas DataFrame
-
     """
     requested_output = [requested_output] if isinstance(requested_output, Output) else requested_output
     coercion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(columns=["Input Type"])
@@ -274,7 +275,7 @@ def return_placeholder_data() -> pd.DataFrame:
 
 def _set_up_logging(
     level: LogLevel | str,
-    location: str | TextIO,
+    location: str | TextIOWrapper,
     formatting: str = LOG_FORMAT,
 ):
     if isinstance(level, str):
@@ -289,7 +290,7 @@ def _log_and_raise_error(
     *,
     error: type[BaseException],
     level: LogLevel,
-) -> typing.NoReturn:
+) -> None:
     caller = logger.opt(depth=1)
     match level:
         case LogLevel.ERROR:

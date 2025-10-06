@@ -40,6 +40,11 @@ def fast_leak_test(
         demand_test: If 'TRUE', demand reactions for all metabolites in the model are created
         tolerance: Tolerance level for determining significant flux
 
+    Returns:
+        leak_mets: List of exchange reactions for leaking metabolites
+        model_closed: Model structure that has been tested for leaks
+        flux_ex_v: Flux vector for computed exchange reactions in the closed model
+
     """
     model_closed = model.copy()
 

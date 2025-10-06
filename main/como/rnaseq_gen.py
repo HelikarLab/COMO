@@ -16,6 +16,8 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import seaborn as sns
+import sklearn
+import sklearn.neighbors
 import sklearn.preprocessing
 from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
@@ -130,9 +132,12 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
 
     This code is based on the `genefilter` function found in R's `genefilter` package: https://www.rdocumentation.org/packages/genefilter/versions/1.54.2/topics/genefilter
 
-    :param data: The data to filter
-    :param filter_func: THe function to filter the data by
-    :return: A NumPy array of the filtered data.
+    Arg:
+        data: The data to filter, either a Pandas DataFrame or a NumPy array.
+        filter_func: THe function to filter the data by
+
+    Returns:
+        A NumPy array of the filtered data.
     """
     if not isinstance(data, pd.DataFrame | npt.NDArray):
         _log_and_raise_error(
@@ -153,18 +158,19 @@ async def _build_matrix_results(
 ) -> _ReadMatrixResults:
     """Read the counts matrix and returns the results.
 
-    :param matrix: The gene counts matrix to process
-    :param metadata_df: The configuration dataframe related to the current context
-    :param taxon: The NCBI Taxon ID
-    :return: A dataclass `ReadMatrixResults`
+    Arg:
+        matrix: The gene counts matrix to process
+        metadata_df: The configuration dataframe related to the current context
+        taxon: The NCBI Taxon ID
+
+    Returns:
+        A dataclass `ReadMatrixResults`
     """
-    matrix.dropna(inplace=True)
+    matrix.dropna(subset="ensembl_gene_id", inplace=True)
     conversion = await ensembl_to_gene_id_and_symbol(ids=matrix["ensembl_gene_id"].tolist(), taxon=taxon)
     conversion["ensembl_gene_id"] = conversion["ensembl_gene_id"].str.split(",")
     conversion = conversion.explode("ensembl_gene_id")
     conversion.reset_index(inplace=True, drop=True)
-    conversion = conversion[conversion["entrez_gene_id"] != "-"]  # drop missing entrez IDs
-    conversion["entrez_gene_id"] = conversion["entrez_gene_id"].astype(int)  # float32 is needed because np.nan is a float
 
     # merge_on should contain at least one of "ensembl_gene_id", "entrez_gene_id", or "gene_symbol"
     merge_on: list[str] = list(set(matrix.columns).intersection(conversion.columns))
@@ -177,14 +183,14 @@ async def _build_matrix_results(
             error=ValueError,
             level=LogLevel.ERROR,
         )
+    matrix = matrix.merge(conversion, on=merge_on, how="left")
     if "entrez_gene_id" in matrix.columns:
         matrix["entrez_gene_id"] = matrix["entrez_gene_id"].astype(int)
     matrix = matrix.merge(conversion, on=merge_on, how="left")
-
     # drop rows that have `0` in `entrez_gene_id` column
     matrix = matrix[matrix["entrez_gene_id"] != 0].reset_index(drop=True, inplace=False)
-    gene_info = gene_info[gene_info["entrez_gene_id"] != 0].reset_index(drop=True, inplace=False)
 
+    gene_info = gene_info[gene_info["entrez_gene_id"] != 0].reset_index(drop=True, inplace=False)
     gene_info = gene_info_migrations(gene_info)
     gene_info["entrez_gene_id"] = gene_info["entrez_gene_id"].astype(int)
 
@@ -193,7 +199,6 @@ async def _build_matrix_results(
         on=["entrez_gene_id", "ensembl_gene_id"],
         how="inner",
     )
-
     gene_info = gene_info.merge(
         counts_matrix[["entrez_gene_id", "ensembl_gene_id"]],
         on=["entrez_gene_id", "ensembl_gene_id"],
@@ -222,7 +227,14 @@ async def _build_matrix_results(
 
 
 def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
-    """Calculate the Transcripts Per Million (TPM) for each sample in the metrics dictionary."""
+    """Calculate the Transcripts Per Million (TPM) for each sample in the metrics dictionary.
+
+    Args:
+        metrics: A dictionary of study metrics to calculate TPM for.
+
+    Returns:
+        A dictionary of study metrics with TPM calculated.
+    """
     for sample in metrics:
         count_matrix = metrics[sample].count_matrix
 
@@ -237,8 +249,16 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
     return metrics
 
 
-def _calculate_fpkm(metrics: NamedMetrics, scale: float = 1e6) -> NamedMetrics:
-    """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary."""
+def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
+    """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary.
+
+    Args:
+        metrics: A dictionary of study metrics to calculate FPKM for.
+        scale: The scaling factor for normalization (default is 1e6).
+
+    Returns:
+        A dictionary of study metrics with FPKM calculated.
+    """
     for study in metrics:
         matrix_values: list[npt.NDArray[float]] = []
         for sample in range(metrics[study].num_samples):
@@ -297,6 +317,7 @@ def _zfpkm_calculation(
     Stabilize the variance in the data to make the distribution more symmetric; this is helpful for Gaussian fitting
 
     Kernel Density Estimation (kde)
+        - SciKit Learn: https://scikit-learn.org/stable/modules/density.html
         - Non-parametric method to estimate the probability density function (PDF) of a random variable
         - Estimates the distribution of log2-transformed FPKM values
         - Bandwidth parameter controls the smoothness of the density estimate
@@ -336,14 +357,18 @@ def _zfpkm_calculation(
             : https://doi.org/10.1186/1471-2164-14-778
 
     Args:
-          column: A pandas Series representing a single sample's FPKM values.
-          peak_parameters: Parameters for peak identification.
-          bandwidth: The bandwidth for the Kernel Density Estimation (KDE).
-          epsilon: A small value to add to FPKM values to prevent log2-divide-by-0 errors
+        column: A Pandas Series containing FPKM values for a single sample.
+        peak_parameters: Parameters for peak identification in zFPKM calculation.
+        bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
+        epsilon: A small value to add to FPKM values to prevent log2-divide-by-0 errors
 
     Returns:
-            A named tuple containing the zFPKM values, density estimate, mean (mu), standard deviation, and maximum FPKM value.
-
+        A named tuple containing:
+            - zfpkm: A Pandas Series of zFPKM values for the input sample.
+            - density: A named tuple containing the x and y values of the KDE.
+            - mu: The mean of the "inactive" gene distribution.
+            - std_dev: The estimated standard deviation of the "inactive" gene distribution.
+            - max_fpkm: The maximum FPKM value at the identified peak.
     """
     log2values: npt.NDArray[float] = np.log2(column.values + epsilon)
 
@@ -379,7 +404,19 @@ def zfpkm_transform(
     bandwidth: float,
     update_every_percent: float = 0.1,
 ) -> tuple[dict[str, _ZFPKMResult], DataFrame]:
-    """Perform zFPKM calculation/transformation."""
+    """Perform zFPKM calculation/transformation.
+
+    Args:
+        fpkm_df: A DataFrame containing FPKM values with genes as rows and samples as columns.
+        peak_parameters: Parameters for peak identification in zFPKM calculation.
+        bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
+        update_every_percent: Frequency of progress updates as a decimal between 0 and 1 (e.g., 0.1 for every 10%).
+
+    Returns:
+        A tuple containing:
+            - A dictionary of intermediate results for each sample.
+            - A DataFrame of zFPKM values with the same shape as the input fpkm_df.
+    """
     if update_every_percent > 1:
         logger.warning(f"update_every_percent should be a decimal value between 0 and 1; got: {update_every_percent} - will convert to percentage")
         update_every_percent /= 100
@@ -442,7 +479,7 @@ def zfpkm_plot(results: dict[str, _ZFPKMResult], *, output_png_dirpath: Path, pl
 
     """
     to_concat: list[pd.DataFrame] = [None] * len(results)  # type: ignore  # ignoring because None is not of type pd.DataFrame
-    for name, result in results.items():
+    for i, name, result in enumerate(results.items()):
         stddev: float = float(result.std_dev)
         x: npt.NDArray[float] = result.density.x.flatten()
         y: npt.NDArray[float] = result.density.y.flatten()
@@ -451,15 +488,14 @@ def zfpkm_plot(results: dict[str, _ZFPKMResult], *, output_png_dirpath: Path, pl
         max_fpkm: float = float(y.max())
         max_fitted: float = float(fitted.max())
         scale_fitted: float = fitted * max_fpkm / max_fitted
-        to_concat.append(pd.DataFrame({"sample_name": name, "log2fpkm": x, "fpkm_density": y, "fitted_density_scaled": scale_fitted}))
+        to_concat[i] = pd.DataFrame({"sample_name": name, "log2fpkm": x, "fpkm_density": y, "fitted_density_scaled": scale_fitted})
 
     mega_df = pd.concat(to_concat, ignore_index=True)
     mega_df.columns = pd.Series(data=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
     mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")
 
-    fig: plt.Figure
     axes: list[plt.Axes]
-    fig, axes = plt.subplots(nrows=len(results), ncols=1, figsize=(8, 4 * len(results)))
+    _, axes = plt.subplots(nrows=len(results), ncols=1, figsize=(8, 4 * len(results)))
     if len(results) == 1:
         axes = [axes]
 
@@ -485,7 +521,14 @@ def zfpkm_plot(results: dict[str, _ZFPKMResult], *, output_png_dirpath: Path, pl
 
 
 def calculate_z_score(metrics: NamedMetrics) -> NamedMetrics:
-    """Calculate the z-score for each sample in the metrics dictionary."""
+    """Calculate the z-score for each sample in the metrics dictionary.
+
+    Args:
+        metrics: A dictionary of study metrics to calculate z-scores for.
+
+    Returns:
+        A dictionary of study metrics with z-scores calculated.
+    """
     for sample in metrics:
         log_matrix = np.log(metrics[sample].normalization_matrix)
         z_matrix = pd.DataFrame(data=sklearn.preprocessing.scale(log_matrix, axis=1), columns=metrics[sample].sample_names)
@@ -500,7 +543,17 @@ def cpm_filter(
     filtering_options: _FilteringOptions,
     prep: RNAType,
 ) -> NamedMetrics:
-    """Apply Counts Per Million (CPM) filtering to the count matrix for a given sample."""
+    """Apply Counts Per Million (CPM) filtering to the count matrix for a given sample.
+
+    Args:
+        context_name: The name of the context being processed.
+        metrics: A dictionary of study metrics to filter.
+        filtering_options: Options for filtering the count matrix.
+        prep: The RNA preparation type.
+
+    Returns:
+        A dictionary of filtered study metrics.
+    """
     config = Config()
     n_exp = filtering_options.replicate_ratio
     n_top = filtering_options.high_replicate_ratio
@@ -533,14 +586,26 @@ def cpm_filter(
         top_samples = round(n_top * len(counts.columns))  # noqa: F841
         test_bools = pd.DataFrame({"entrez_gene_ids": entrez_ids})
         for i in range(len(counts_per_million.columns)):
-            cutoff = 10e6 / (np.median(np.sum(counts[:, i]))) if cut_off == "default" else (1e6 * cut_off) / np.median(np.sum(counts[:, i]))
+            median_sum = np.float64(np.median(np.sum(counts[:, i])))
+            if cut_off == "default":  # noqa: SIM108
+                cutoff = np.float64(10e6) / median_sum
+            else:
+                cutoff = np.float64(1e6 * cut_off) / median_sum
             test_bools = test_bools.merge(counts_per_million[counts_per_million.iloc[:, i] > cutoff])
 
     return metrics
 
 
 def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringOptions) -> NamedMetrics:
-    """Apply quantile-based filtering to the TPM matrix for a given sample."""
+    """Apply quantile-based filtering to the TPM matrix for a given sample.
+
+    Args:
+        metrics: A dictionary of study metrics to filter.
+        filtering_options: Options for filtering the count matrix.
+
+    Returns:
+        A dictionary of filtered study metrics.
+    """
     # TODO: Write the TPM matrix to disk
 
     n_exp = filtering_options.replicate_ratio
@@ -592,7 +657,20 @@ def zfpkm_filter(
     bandwidth: float,
     output_png_dirpath: Path | None,
 ) -> NamedMetrics:
-    """Apply zFPKM filtering to the FPKM matrix for a given sample."""
+    """Apply zFPKM filtering to the FPKM matrix for a given sample.
+
+    Args:
+        metrics: A dictionary of study metrics to filter.
+        filtering_options: Options for filtering the count matrix.
+        calculate_fpkm: Whether to calculate FPKM from counts.
+        force_zfpkm_plot: Whether to force plotting of zFPKM results even if there are many samples.
+        peak_parameters: Parameters for peak identification in zFPKM calculation.
+        bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
+        output_png_dirpath: Optional directory path to save the zFPKM plot.
+
+    Returns:
+        A dictionary of filtered study metrics.
+    """
     min_sample_expression = filtering_options.replicate_ratio
     high_confidence_sample_expression = filtering_options.high_replicate_ratio
     cut_off = filtering_options.cut_off
@@ -646,7 +724,22 @@ def filter_counts(
     bandwidth: float,
     output_zfpkm_plot_dirpath: Path | None = None,
 ) -> NamedMetrics:
-    """Filter the count matrix based on the specified technique."""
+    """Filter the count matrix based on the specified technique.
+
+    Args:
+        context_name: The name of the context being processed.
+        metrics: A dictionary of study metrics to filter.
+        technique: The filtering technique to use.
+        filtering_options: Options for filtering the count matrix.
+        prep: The RNA preparation type.
+        force_zfpkm_plot: Whether to force plotting of zFPKM results even if there are many samples.
+        peak_parameters: Parameters for peak identification in zFPKM calculation.
+        bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
+        output_zfpkm_plot_dirpath: Optional directory path to save the zFPKM plot.
+
+    Returns:
+        A dictionary of filtered study metrics.
+    """
     match technique:
         case FilteringTechnique.CPM:
             return cpm_filter(context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep)
@@ -826,31 +919,30 @@ async def rnaseq_gen(  # noqa: C901
         then study/batch numbers are checked for consensus according to batch ratios.
     The zFPKM method is outlined here: https://pubmed.ncbi.nlm.nih.gov/24215113/
 
-    :param context_name: The name of the context being processed
-    :param input_rnaseq_filepath: The filepath to the gene count matrix
-    :param input_gene_info_filepath: The filepath to the gene info file
-    :param output_boolean_activity_filepath: The filepath to write the output gene count matrix
-    :param output_zscore_normalization_filepath: The filepath to write the output z-score normalization matrix
-    :param prep: The preparation method
-    :param taxon_id: The NCBI Taxon ID
-    :param input_metadata_filepath_or_df: The filepath or dataframe containing metadata information
-    :param replicate_ratio: The percentage of replicates that a gene must
-        appear in for a gene to be marked as "active" in a batch/study
-    :param batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked as 'active"
-    :param high_replicate_ratio: The percentage of replicates that a gene must
-        appear in for a gene to be marked "highly confident" in its expression in a batch/study
-    :param high_batch_ratio: The percentage of batches that a gene must
-        appear in for a gene to be marked "highly confident" in its expression
-    :param technique: The filtering technique to use
-    :param zfpkm_peak_height: The height of the zFPKM peak
-    :param zfpkm_peak_distance: The distance of the zFPKM peak
-    :param zfpkm_bandwidth: The bandwidth of the zFPKM
-    :param cutoff: The cutoff value to use for the provided filtering technique
-    :param force_zfpkm_plot: If too many samples exist, should plotting be done anyway?
-    :param log_level: The level of logging to output
-    :param log_location: The location to write logs to
-    :param output_zfpkm_plot_dirpath: Optional filepath to save zFPKM plots
-    :return: None
+    Arg:
+        context_name: The name of the context being processed
+        input_rnaseq_filepath: The filepath to the gene count matrix
+        input_gene_info_filepath: The filepath to the gene info file
+        output_boolean_activity_filepath: The filepath to write the output gene count matrix
+        output_zscore_normalization_filepath: The filepath to write the output z-score normalization matrix
+        prep: The preparation method
+        taxon_id: The NCBI Taxon ID
+        input_metadata_filepath_or_df: The filepath or dataframe containing metadata information
+        replicate_ratio: The percentage of replicates that a gene must appear in for a gene to be marked as "active" in a batch/study
+        batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked as 'active"
+        high_replicate_ratio: The percentage of replicates that a gene must appear in for a gene to be
+            marked "highly confident" in its expression in a batch/study
+        high_batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked "highly confident" in its expression
+        technique: The filtering technique to use
+        zfpkm_peak_height: The height of the zFPKM peak
+        zfpkm_peak_distance: The distance of the zFPKM peak
+        zfpkm_bandwidth: The bandwidth of the zFPKM
+        cutoff: The cutoff value to use for the provided filtering technique
+        force_zfpkm_plot: If too many samples exist, should plotting be done anyway?
+        log_level: The level of logging to output
+        log_location: The location to write logs to
+        output_zfpkm_plot_dirpath: Optional filepath to save zFPKM plots
+
     """
     _set_up_logging(level=log_level, location=log_location)
 
@@ -923,6 +1015,17 @@ async def rnaseq_gen(  # noqa: C901
             level=LogLevel.ERROR,
         )
 
+    # metadata_df["fragment_length"] = metadata_df["fragment_length"].astype(np.float32)
+    # metadata_df = metadata_df.groupby("sample_name", as_index=False).agg(
+    #     {
+    #         "sample_name": "first",
+    #         "fragment_length": "mean",
+    #         "layout": "first",
+    #         "strand": "first",
+    #         "study": "first",
+    #         "library_prep": "first",
+    #     }
+    # )
     logger.debug(f"Starting '{context_name}'")
     await _process(
         context_name=context_name,

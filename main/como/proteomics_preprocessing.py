@@ -29,7 +29,15 @@ class ZResult:
 
 
 def z_score_calc(abundance: pd.DataFrame, min_thresh: int) -> ZResult:
-    """Calculate Z-scores for protein abundance data."""
+    """Calculate Z-scores for protein abundance data.
+
+    Arg:
+        abundance: DataFrame with protein abundance data.
+        min_thresh: Minimum threshold for abundance values to be considered.
+
+    Returns:
+        A ZResult object containing Z-score transformed data and related statistics.
+    """
     values = abundance.values.copy() + 1
     log_abundance_filt = np.log2(values[values > min_thresh]).reshape((len(abundance), len(abundance.columns)))
     log_abundance = np.log2(values)
@@ -70,7 +78,17 @@ def z_score_calc(abundance: pd.DataFrame, min_thresh: int) -> ZResult:
 
 
 def lighten_color(red: int, green: int, blue: int, factor: float = 0.5) -> str:
-    """Lighten a color by a given factor."""
+    """Lighten a color by a given factor.
+
+    Args:
+        red: Red component (0-255).
+        green: Green component (0-255).
+        blue: Blue component (0-255).
+        factor: Factor by which to lighten the color (0.0 to 1.0).
+
+    Returns:
+        A string representing the lightened color in RGB format.
+    """
     # Convert RGB to HLS
     hue, lightness, saturation = colorsys.rgb_to_hls(red / 255.0, green / 255.0, blue / 255.0)
 
@@ -84,7 +102,17 @@ def lighten_color(red: int, green: int, blue: int, factor: float = 0.5) -> str:
 
 # Plotting function
 def plot_gaussian_fit(z_results: ZResult, facet_titles: bool = True, x_min: int = -4) -> go.Figure:
-    """Plot Gaussian fit for Z-score transformed data."""
+    """Plot Gaussian fit for Z-score transformed data.
+
+    Arg:
+        z_results: The results from the Z-score calculation.
+        facet_titles: Whether to show titles for each facet.
+        x_min: Minimum x-axis value for the plots.
+
+    Returns:
+        A Plotly Figure object containing the Gaussian fit plots.
+
+    """
     zfpkm = z_results.zfpkm
     x_range = z_results.x_range
     density = z_results.density
@@ -128,7 +156,7 @@ def protein_transform_main(
     output_z_score_matrix_filepath: Path,
 ) -> None:
     """Transform protein abundance data."""
-    abundance_df: pd.DataFrame = pd.read_csv(abundance_df) if isinstance(abundance_df, (str, Path)) else abundance_df.fillna(0)
+    abundance_df: pd.DataFrame = pd.read_csv(abundance_df) if isinstance(abundance_df, str | Path) else abundance_df.fillna(0)
     abundance_df = abundance_df[np.isfinite(abundance_df).all(axis=1)]  # Remove +/- infinity values
     z_transform: ZResult = z_score_calc(abundance_df, min_thresh=0)
 
