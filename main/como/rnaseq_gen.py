@@ -366,9 +366,9 @@ def _zfpkm_calculation(
     if len(peaks) != 0:
         mu = peak_positions.max()
         max_fpkm = density[peaks[np.argmax(peak_positions)]]
-        u = values[values > mu].mean()
+        u = log2values[log2values > mu].mean()
         stddev = (u - mu) * np.sqrt(np.pi / 2)
-    zfpkm = pd.Series((values - mu) / stddev, dtype=np.float32, name=column.name)
+    zfpkm = pd.Series((log2values - mu) / stddev, dtype=float, name=column.name)
 
     return _ZFPKMResult(zfpkm=zfpkm, density=Density(x_range, density), mu=mu, std_dev=stddev, max_fpkm=max_fpkm)
 
