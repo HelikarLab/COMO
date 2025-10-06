@@ -6,7 +6,7 @@ files=$(git diff --cached --name-only --diff-filter=ACM | grep '\.py$')
 if [ -z "$files" ]; then
   exit 0
 fi
-ruff check --no-fix $files
+ruff check --no-fix "$files"
 status=$?
 if [ $status -ne 0 ]; then
   echo "Ruff found issues. Commit aborted."
@@ -14,8 +14,8 @@ if [ $status -ne 0 ]; then
 fi
 
 # If `ruff check` is good, then format all staged files
-ruff check --fix --select I $files
-ruff format $files
+ruff check --fix --select I "$files"
+ruff format "$files"
 
 
 exit 0
