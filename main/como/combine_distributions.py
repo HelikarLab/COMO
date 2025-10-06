@@ -189,11 +189,13 @@ def _combine_z_distribution_for_context(
         var_name="source",
         value_name="zscore",
     )
-    combined_df = pd.DataFrame({
-        "ensembl_gene_id": z_matrix["ensembl_gene_id"],
-        "zscore": combined_z_matrix,
-        "source": "combined",
-    })
+    combined_df = pd.DataFrame(
+        {
+            "ensembl_gene_id": z_matrix["ensembl_gene_id"],
+            "zscore": combined_z_matrix,
+            "source": "combined",
+        }
+    )
     stack_df = pd.concat([stack_df, combined_df])
     # graph_zscore_distribution(
     #     df=stack_df,
