@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from io import TextIOWrapper
 from pathlib import Path
 from typing import TextIO, cast
 
@@ -561,7 +560,7 @@ async def merge_xomics(  # noqa: C901
     weighted_z_floor: int = -6,
     weighted_z_ceiling: int = 6,
     log_level: LogLevel = LogLevel.INFO,
-    log_location: str | TextIOWrapper = sys.stderr,
+    log_location: str | TextIO = sys.stderr,
 ):
     """Merge expression tables of multiple sources (RNA-seq, proteomics) into one."""
     _set_up_logging(level=log_level, location=log_location)
