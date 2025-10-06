@@ -7,8 +7,9 @@ from pathlib import Path
 
 from loguru import logger
 
-from . import Crux, FTPManager
-from .FileInformation import FileInformation
+from como.data_types import LogLevel
+from como.proteomics import Crux, FileInformation, FTPManager
+from como.utils import _log_and_raise_error
 
 
 class ArgParseFormatter(argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
@@ -158,20 +159,16 @@ class PopulateInformation:
             url_count = 0
 
             # Iterate through the URLs available
-            for url, study in zip(ftp_urls, studies):
-                ftp_data: FTPManager.Reader = FTPManager.Reader(
-                    root_link=url, file_extensions=self._preferred_extensions
-                )
+            for url, study in zip(ftp_urls, studies, strict=True):
+                ftp_data: FTPManager.Reader = FTPManager.Reader(root_link=url, file_extensions=self._preferred_extensions)
 
                 urls = list(ftp_data.files)
                 sizes = list(ftp_data.file_sizes)
                 url_count += len(urls)
 
                 # Iterate through all files and sizes found for url_##
-                for file, size in zip(urls, sizes):
-                    self.file_information.append(
-                        FileInformation(cell_type=cell_type, download_url=file, file_size=size, study=study)
-                    )
+                for file, size in zip(urls, sizes, strict=True):
+                    self.file_information.append(FileInformation(cell_type=cell_type, download_url=file, file_size=size, study=study))
 
     def print_download_size(self):
         """Print the total size to download if we must download data."""
@@ -208,12 +205,23 @@ class PopulateInformation:
                 current_info.set_replicate(replicate_value)
 
     def _collect_cell_type_information(self, cell_type: str) -> list[FileInformation]:
-        """Collect all FileInformation objects of a given cell type."""
+        """Collect all FileInformation objects of a given cell type.
+
+        Arg:
+            cell_type: The cell type to collect information for.
+
+        Returns:
+            A list of FileInformation objects matching the given cell type.
+        """
         return [information for information in self.file_information if information.cell_type == cell_type]
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse arguments from the command line."""
+    """Parse arguments from the command line.
+
+    Returns:
+        An argparse.Namespace object containing the parsed arguments.
+    """
     parser = argparse.ArgumentParser(
         prog="proteomics_preprocess.py",
         description="Download and analyze proteomics data from proteomeXchange\n"
@@ -308,21 +316,21 @@ def parse_args() -> argparse.Namespace:
 
     # Validte the input file exists
     if not Path(args.input_csv).is_file():
-        raise FileNotFoundError(f"Input file {args.input} does not exist!")
+        _log_and_raise_error(f"Input file {args.input} does not exist!", error=FileNotFoundError, level=LogLevel.ERROR)
 
     if args.core_count == "all":
         args.core_count = os.cpu_count()
     elif not str(args.core_count).isdigit():
-        raise ValueError(
-            f"Invalid option '{args.core_count}' for option '--cores'. Enter an integer or 'all' to use all cores"
+        _log_and_raise_error(
+            f"Invalid option '{args.core_count}' for option '--cores'. Enter an integer or 'all' to use all cores",
+            error=ValueError,
+            level=LogLevel.ERROR,
         )
+
     else:
         args.core_count = int(args.core_count)
         if args.core_count > os.cpu_count():
-            logger.info(
-                f"{args.core_count} cores not available, system only has {os.cpu_count()} cores. "
-                f"Setting '--cores' to {os.cpu_count()}"
-            )
+            logger.info(f"{args.core_count} cores not available, system only has {os.cpu_count()} cores. Setting '--cores' to {os.cpu_count()}")
             args.core_count = os.cpu_count()
 
     return args

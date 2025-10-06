@@ -77,7 +77,7 @@ class TestFTPManager:
         assert await client.quit() is None
 
     @pytest.mark.skip(reason="pyftpdlib is broken, no way to test this")
-    def test_reader(self, ftpserver, fixture_ftp_server, ftp_file_names):  # noqa: F811
+    def test_reader(self, ftpserver, fixture_ftp_server, ftp_file_names):
         # Use pytest_localftpserver and fixtures.fixture_ftp_server.fix
         # Now we can get login information for our local FTP server
         file_extensions: list[str] = ["raw"]
