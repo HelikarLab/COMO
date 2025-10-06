@@ -56,7 +56,7 @@ class _StudyMetrics:
     gene_sizes: npt.NDArray[int]
     __normalization_matrix: pd.DataFrame = field(default_factory=pd.DataFrame)
     __z_score_matrix: pd.DataFrame = field(default_factory=pd.DataFrame)
-    __high_confidence_entrez_gene_ids: list[str] = field(default=list)
+    __high_confidence_entrez_gene_ids: list[str] = field(default_factory=list)
 
     def __post_init__(self):
         for layout in self.layout:
