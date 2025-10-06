@@ -38,7 +38,12 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
     If '[' and ']' are present in the first and last items of the list,
         assume we are using the "old" method of providing context names
 
-    :param stringlist: The "string list" gathered from the command line. Example input: "['mat', 'xml', 'json']"
+    Args:
+        stringlist: The "string list" gathered from the command line. Example input: "['mat', 'xml', 'json']"
+
+    Returns:
+        A list of strings. Example output: ['mat', 'xml', 'json']
+
     """
     if isinstance(stringlist, list):
         return stringlist
@@ -66,13 +71,17 @@ def split_gene_expression_data(
     expression_data: pd.DataFrame,
     recon_algorithm: Algorithm | None = None,
     entrez_as_index: bool = True,
-):
+) -> pd.DataFrame:
     """Split the gene expression data into single-gene and multiple-gene names.
 
-    :param expression_data: The gene expression data to map
-    :param recon_algorithm: The recon algorithm used to generate the gene expression data
-    :param entrez_as_index: Should the 'entrez_gene_id' column be set as the index
-    :return:
+    Args:
+        expression_data: The gene expression data to map
+        recon_algorithm: The recon algorithm used to generate the gene expression data
+        entrez_as_index: Should the 'entrez_gene_id' column be set as the index
+
+    Returns:
+        A pandas DataFrame with the split gene expression data
+
     """
     expression_data.columns = [c.lower() for c in expression_data.columns]
     if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT}:
@@ -110,11 +119,15 @@ async def _format_determination(
 ) -> pd.DataFrame:
     """Determine the data type of the given input values (i.e., Entrez Gene ID, Gene Symbol, etc.).
 
-    :param biodbnet: The BioDBNet to use for deter
-    :param requested_output: The data type to generate (of type `Output`)
-    :param input_values: The input values to determine
-    :param taxon: The Taxon ID
-    :return: A pandas DataFrame
+    Args:
+        biodbnet: The BioDBNet to use for deter
+        requested_output: The data type to generate (of type `Output`)
+        input_values: The input values to determine
+        taxon: The Taxon ID
+
+    Returns:
+        A pandas DataFrame
+
     """
     requested_output = [requested_output] if isinstance(requested_output, Output) else requested_output
     coercion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(columns=["Input Type"])
