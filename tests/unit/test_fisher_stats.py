@@ -4,7 +4,7 @@ from como.stats.fisher_exact_test import FisherExactTest
 
 
 def test_fisher_stats():
-    reference_model = cobra.io.load_matlab_model("main/data/reference_models/GeneralModelUpdatedV3.mat")
+    reference_model = cobra.io.load_matlab_model("main/data/GeneralModelUpdatedV2.mat")
     scenario_model = cobra.io.read_sbml_model("tests/inputs/naiveB_model.xml")
     real = FisherExactTest.run(reference=reference_model, scenario=scenario_model, pathway="Glycolysis/gluconeogenesis")
 
