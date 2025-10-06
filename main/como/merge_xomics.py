@@ -62,7 +62,7 @@ async def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tu
     if not filename or filename == "None":  # not using this data type, use empty dummy data matrix
         return load_dummy_dict()
 
-    inquiry_full_path = config.data_dir / "config_sheets" / filename
+    inquiry_full_path = Path(config.data_dir, "config_sheets", filename)
     if not inquiry_full_path.exists():
         _log_and_raise_error(
             f"Config file not found at {inquiry_full_path}",
