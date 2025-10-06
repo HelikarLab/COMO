@@ -65,7 +65,7 @@ class _STARinformation:
             num_ambiguous = [int(i) for i in ambiguous.removesuffix("\n").split("\t")[1:]]
 
         df: pd.DataFrame = await read_file(
-            fiepath,
+            filepath,
             h5ad_as_df=True,
             sep="\t",
             header=None,
@@ -349,9 +349,9 @@ async def _write_counts_matrix(
     Returns:
         A pandas DataFrame representing the final counts matrix.
     """
-    counts: list[pd.DataFrame] = await asyncio.gather(*[
-        _create_sample_counts_matrix(metric) for metric in _organize_gene_counts_files(data_dir=como_context_dir)
-    ])
+    counts: list[pd.DataFrame] = await asyncio.gather(
+        *[_create_sample_counts_matrix(metric) for metric in _organize_gene_counts_files(data_dir=como_context_dir)]
+    )
     rna_specific_sample_names = set(config_df.loc[config_df["library_prep"] == rna.value, "sample_name"].tolist())
 
     final_matrix: pd.DataFrame = functools.reduce(lambda left, right: pd.merge(left, right, on="ensembl_gene_id", how="outer"), counts)
