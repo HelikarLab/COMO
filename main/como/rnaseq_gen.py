@@ -134,7 +134,7 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
     :param filter_func: THe function to filter the data by
     :return: A NumPy array of the filtered data.
     """
-    if not isinstance(data, (pd.DataFrame, npt.NDArray)):
+    if not isinstance(data, pd.DataFrame | npt.NDArray):
         _log_and_raise_error(
             f"Unsupported data type. Must be a Pandas DataFrame or a NumPy array, got '{type(data)}'",
             error=TypeError,
