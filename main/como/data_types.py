@@ -14,7 +14,7 @@ PATH_TYPE = str | Path
 LOG_FORMAT = "<green>{time:YYYY-MM-DD HH:mm:ss}</> | <level>{level:<8}</> | <cyan>{name}</>:<cyan>{line}</> - <level>{message}</>"
 
 
-class AdjustmentMethod(Enum):
+class AdjustmentMethod(str, Enum):
     """Adjustment method for expression requirement based on differences in number of provided data source types."""
 
     PROGRESSIVE = "progressive"
@@ -23,14 +23,14 @@ class AdjustmentMethod(Enum):
     CUSTOM = "custom"
 
 
-class Algorithm(Enum):
+class Algorithm(str, Enum):
     GIMME = "GIMME"
     FASTCORE = "FASTCORE"
     IMAT = "IMAT"
     TINIT = "TINIT"
 
 
-class FilteringTechnique(Enum):
+class FilteringTechnique(str, Enum):
     """RNA sequencing filtering capabilities."""
 
     CPM = "cpm"
@@ -39,13 +39,13 @@ class FilteringTechnique(Enum):
     UMI = "umi"
 
 
-class GeneIdentifier(Enum):
+class GeneIdentifier(str, Enum):
     ENSEMBL_GENE_ID = "ensembl_gene_id"
     ENTREZ_GENE_ID = "entrez_gene_id"
     GENE_SYMBOL = "gene_symbol"
 
 
-class LogLevel(Enum):
+class LogLevel(int, Enum):
     TRACE = 5
     DEBUG = 10
     INFO = 20
@@ -56,13 +56,13 @@ class LogLevel(Enum):
     NONE = 100
 
 
-class RNAType(Enum):
+class RNAType(str, Enum):
     TRNA = "total"
     MRNA = "mrna"
     SCRNA = "scrna"
 
 
-class Solver(Enum):
+class Solver(str, Enum):
     """Solver used to seed context specific model."""
 
     GLPK = "GLPK"
@@ -71,7 +71,7 @@ class Solver(Enum):
     GLPK_EXACT = "GLPK_EXACT"
 
 
-class SourceTypes(Enum):
+class SourceTypes(str, Enum):
     TRNA = "trna"
     MRNA = "mrna"
     SCRNA = "scrna"
