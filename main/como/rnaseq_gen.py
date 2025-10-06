@@ -623,13 +623,13 @@ def zfpkm_filter(
         min_samples = round(min_sample_expression * len(zfpkm_df.columns))
         min_func = k_over_a(min_samples, cut_off)
         min_genes: npt.NDArray[bool] = genefilter(zfpkm_df, min_func)
-        metric.entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, min_genes, strict=True) if keep]
+        metric.entrez_gene_ids = [gene for gene, keep in zip(zfpkm_df.index, min_genes, strict=True) if keep]
 
         # determine which genes are confidently expressed
         top_samples = round(high_confidence_sample_expression * len(zfpkm_df.columns))
         top_func = k_over_a(top_samples, cut_off)
         top_genes: npt.NDArray[bool] = genefilter(zfpkm_df, top_func)
-        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(metric.entrez_gene_ids, top_genes, strict=True) if keep]
+        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(zfpkm_df.index, top_genes, strict=True) if keep]
 
     return metrics
 
