@@ -477,12 +477,14 @@ def zfpkm_plot(results, *, output_png_filepath: Path, plot_xfloor: int = -4):
         scale_fitted = fitted * (max_fpkm / max_fitted)
 
         to_concat.append(
-            pd.DataFrame({
-                "sample_name": [name] * len(x),
-                "log2fpkm": x,
-                "fpkm_density": y,
-                "fitted_density_scaled": scale_fitted,
-            })
+            pd.DataFrame(
+                {
+                    "sample_name": [name] * len(x),
+                    "log2fpkm": x,
+                    "fpkm_density": y,
+                    "fitted_density_scaled": scale_fitted,
+                }
+            )
         )
     mega_df = pd.concat(to_concat, ignore_index=True)
     mega_df.columns = pd.Series(data=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
@@ -1002,14 +1004,16 @@ async def rnaseq_gen(  # noqa: C901
         )
 
     metadata_df["fragment_length"] = metadata_df["fragment_length"].astype(np.float32)
-    metadata_df = metadata_df.groupby("sample_name", as_index=False).agg({
-        "sample_name": "first",
-        "fragment_length": "mean",
-        "layout": "first",
-        "strand": "first",
-        "study": "first",
-        "library_prep": "first",
-    })
+    metadata_df = metadata_df.groupby("sample_name", as_index=False).agg(
+        {
+            "sample_name": "first",
+            "fragment_length": "mean",
+            "layout": "first",
+            "strand": "first",
+            "study": "first",
+            "library_prep": "first",
+        }
+    )
     logger.debug(f"Starting '{context_name}'")
     await _process(
         context_name=context_name,
