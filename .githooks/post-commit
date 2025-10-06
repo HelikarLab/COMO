@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Detect if COMO.ipynb exists in non-pushed git history
+# If it does, clear its cell outputs before committing
+NOTEBOOK="main/COMO.ipynb"
+if git diff-tree --no-commit-id --name-only -r HEAD | grep -q "^$NOTEBOOK$"; then
+  jupyter-nbconvert --clear-output --inplace "$NOTEBOOK"
+
+  # re-commit if the notebook was changed
+  if ! git diff --quiet "$NOTEBOOK"; then
+    git add "$NOTEBOOK"
+    git commit -m "Clear outputs from jupyter notebook"
+  fi
+fi

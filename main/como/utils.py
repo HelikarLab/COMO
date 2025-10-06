@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import asyncio
 import contextlib
-import functools
 import io
 import sys
+import typing
 from collections.abc import Iterator
-from concurrent.futures import ThreadPoolExecutor
-from io import TextIOWrapper
 from pathlib import Path
+from typing import TextIO, TypeVar, cast, overload
 
+import aiofiles
 import numpy.typing as npt
 import pandas as pd
 import scanpy as sc
@@ -24,6 +23,7 @@ from loguru import logger
 
 from como.data_types import LOG_FORMAT, Algorithm, LogLevel
 
+T = TypeVar("T")
 __all__ = ["split_gene_expression_data", "stringlist_to_list", "suppress_stdout"]
 
 
@@ -35,7 +35,12 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
     If '[' and ']' are present in the first and last items of the list,
         assume we are using the "old" method of providing context names
 
-    :param stringlist: The "string list" gathered from the command line. Example input: "['mat', 'xml', 'json']"
+    Args:
+        stringlist: The "string list" gathered from the command line. Example input: "['mat', 'xml', 'json']"
+
+    Returns:
+        A list of strings. Example output: ['mat', 'xml', 'json']
+
     """
     if isinstance(stringlist, list):
         return stringlist
@@ -63,13 +68,17 @@ def split_gene_expression_data(
     expression_data: pd.DataFrame,
     recon_algorithm: Algorithm | None = None,
     entrez_as_index: bool = True,
-):
+) -> pd.DataFrame:
     """Split the gene expression data into single-gene and multiple-gene names.
 
-    :param expression_data: The gene expression data to map
-    :param recon_algorithm: The recon algorithm used to generate the gene expression data
-    :param entrez_as_index: Should the 'entrez_gene_id' column be set as the index
-    :return:
+    Args:
+        expression_data: The gene expression data to map
+        recon_algorithm: The recon algorithm used to generate the gene expression data
+        entrez_as_index: Should the 'entrez_gene_id' column be set as the index
+
+    Returns:
+        A pandas DataFrame with the split gene expression data
+
     """
     expression_data.columns = [c.lower() for c in expression_data.columns]
     if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT}:
@@ -107,11 +116,15 @@ async def _format_determination(
 ) -> pd.DataFrame:
     """Determine the data type of the given input values (i.e., Entrez Gene ID, Gene Symbol, etc.).
 
-    :param biodbnet: The BioDBNet to use for deter
-    :param requested_output: The data type to generate (of type `Output`)
-    :param input_values: The input values to determine
-    :param taxon: The Taxon ID
-    :return: A pandas DataFrame
+    Args:
+        biodbnet: The BioDBNet to use for deter
+        requested_output: The data type to generate (of type `Output`)
+        input_values: The input values to determine
+        taxon: The Taxon ID
+
+    Returns:
+        A pandas DataFrame
+
     """
     requested_output = [requested_output] if isinstance(requested_output, Output) else requested_output
     coercion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(columns=["Input Type"])
@@ -119,8 +132,32 @@ async def _format_determination(
     return coercion
 
 
+@overload
+async def _read_file(path: Path | io.StringIO, h5ad_as_df: bool = True, **kwargs) -> pd.DataFrame: ...
+
+
+@overload
+async def _read_file(path: Path | io.StringIO, h5ad_as_df: bool = False, **kwargs) -> pd.DataFrame | sc.AnnData: ...
+
+
+@overload
+async def _read_file(path: None, h5ad_as_df: bool, **kwargs) -> None: ...
+
+
+@overload
+async def _read_file(path: pd.DataFrame, h5ad_as_df: bool, **kwargs) -> pd.DataFrame: ...
+
+
+@overload
+async def _read_file(path: sc.AnnData, h5ad_as_df: bool = False, **kwargs) -> sc.AnnData: ...
+
+
+@overload
+async def _read_file(path: sc.AnnData, h5ad_as_df: bool = True, **kwargs) -> pd.DataFrame: ...
+
+
 async def _read_file(
-    path: Path | io.StringIO | None,
+    path: Path | io.StringIO | pd.DataFrame | sc.AnnData | None,
     h5ad_as_df: bool = True,
     **kwargs,
 ) -> pd.DataFrame | sc.AnnData | None:
@@ -130,27 +167,32 @@ async def _read_file(
     None may be provided to this function so that `asyncio.gather` can safely be used on all sources
         (trna, mrna, scrna, proteomics) without needing to check if the user has provided those sources
 
-    :param path: The path to read from
-    :param kwargs: Additional arguments to pass to pandas.read_csv, pandas.read_excel,
-        or scanpy.read_h5ad, depending on the filepath provided
-    :return: None, or a pandas DataFrame or AnnData
+    Args:
+        path: The path to read from
+        h5ad_as_df: If True and the file is an h5ad, return a pandas DataFrame of the .X matrix instead of an AnnData object
+        kwargs: Additional arguments to pass to pandas.read_csv, pandas.read_excel, or scanpy.read_h5ad, depending on the filepath provided
+
+    Returns:
+        None, or a pandas DataFrame or AnnData
+
     """
-    if not path:
+    if isinstance(path, pd.DataFrame):
+        return path
+    elif isinstance(path, sc.AnnData):
+        return path.to_df().T if h5ad_as_df else path
+    elif isinstance(path, io.StringIO):
+        return pd.read_csv(path, **kwargs)
+    elif not path:
         return None
 
     if isinstance(path, Path) and not path.exists():
         _log_and_raise_error(f"File {path} does not exist", error=FileNotFoundError, level=LogLevel.CRITICAL)
 
-    # StringIO is used if a CSV file is read using open() directly
-    if isinstance(path, io.StringIO):
-        return pd.read_csv(path, **kwargs)
-
     match path.suffix:
         case ".csv" | ".tsv" | ".txt":
-            if "sep" not in kwargs:
-                kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")
-            with path.open("r") as i_stream:
-                content = i_stream.read()
+            kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")  # set sep if not defined
+            async with aiofiles.open(path) as i_stream:
+                content = await i_stream.read()
                 return pd.read_csv(io.StringIO(content), **kwargs)
         case ".xlsx" | ".xls":
             return pd.read_excel(path, **kwargs)
@@ -168,7 +210,6 @@ async def _read_file(
                 error=ValueError,
                 level=LogLevel.CRITICAL,
             )
-            return None
 
 
 async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int | str | Taxon) -> pd.DataFrame:
@@ -196,9 +237,27 @@ async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int 
             raise ValueError("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
 
 
-def _listify(value):
-    """Convert items into a list."""
-    return [value] if not isinstance(value, list) else value
+@overload
+def _listify(value: list[T]) -> list[T]: ...
+
+
+@overload
+def _listify(value: T) -> list[T]: ...
+
+
+def _listify(value: T | list[T]) -> list[T]:
+    """Convert items into a list.
+
+    Args:
+        value: The value to convert to a list (if it isn't already)
+
+    Returns:
+        A list of the provided value
+
+    """
+    if isinstance(value, list):
+        return cast(list[T], value)  # does not actually do anything; signifies to type checker that return value is of type list[T]
+    return [value]
 
 
 def _num_rows(item: pd.DataFrame | npt.NDArray) -> int:
@@ -215,7 +274,7 @@ def return_placeholder_data() -> pd.DataFrame:
 
 def _set_up_logging(
     level: LogLevel | str,
-    location: str | TextIOWrapper,
+    location: str | TextIO,
     formatting: str = LOG_FORMAT,
 ):
     if isinstance(level, str):
@@ -230,7 +289,7 @@ def _log_and_raise_error(
     *,
     error: type[BaseException],
     level: LogLevel,
-) -> None:
+) -> typing.NoReturn:
     caller = logger.opt(depth=1)
     match level:
         case LogLevel.ERROR:

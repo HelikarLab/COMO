@@ -199,14 +199,14 @@ def _build_with_imat(
     upper_bounds: Sequence[float],
     expr_vector: npt.NDArray,
     expr_thresh: tuple[float, float],
-    force_gene_ids: Sequence[int],
+    force_reaction_indices: Sequence[int],
     solver: str,
-) -> (cobra.Model, pd.DataFrame):
+) -> tuple[cobra.Model, pd.DataFrame]:
     expr_vector = np.array(expr_vector)
     properties = IMATProperties(
         exp_vector=expr_vector,
         exp_thresholds=expr_thresh,
-        core=force_gene_ids,
+        core=force_reaction_indices,
         epsilon=0.01,
         solver=solver.upper(),
     )
@@ -346,6 +346,7 @@ async def _build_model(  # noqa: C901
     if objective not in force_reactions:
         force_reactions.append(objective)
     reference_model = _set_boundaries(reference_model, boundary_reactions, lower_bounds, upper_bounds)
+    reference_model.objective = objective
     reference_model.solver = solver.lower()
 
     # check number of unsolvable reactions for reference model under media assumptions
@@ -426,7 +427,7 @@ async def _build_model(  # noqa: C901
                 upper_bounds=upper_bounds,
                 expr_vector=expression_vector,
                 expr_thresh=expression_threshold,
-                force_gene_ids=force_reaction_indices,
+                force_reaction_indices=force_reaction_indices,
                 solver=solver,
             )
             imat_reactions = flux_df.rxn

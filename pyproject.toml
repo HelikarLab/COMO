@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "COMO"
 dynamic = ["version"]
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<3.14"
 dependencies = [
     "aiofiles>=24.1.0",
     "aioftp>=0.23.1",
