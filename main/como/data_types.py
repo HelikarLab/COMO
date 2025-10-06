@@ -14,38 +14,38 @@ PATH_TYPE = str | Path
 LOG_FORMAT = "<green>{time:YYYY-MM-DD HH:mm:ss}</> | <level>{level:<8}</> | <cyan>{name}</>:<cyan>{line}</> - <level>{message}</>"
 
 
-class AdjustmentMethod(Enum):
+class AdjustmentMethod(str, Enum):
     """Adjustment method for expression requirement based on differences in number of provided data source types."""
 
-    PROGRESSIVE = "progressive"
-    REGRESSIVE = "regressive"
-    FLAT = "flat"
-    CUSTOM = "custom"
+    PROGRESSIVE = "PROGRESSIVE"
+    REGRESSIVE = "REGRESSIVE"
+    FLAT = "FLAT"
+    CUSTOM = "CUSTOM"
 
 
-class Algorithm(Enum):
+class Algorithm(str, Enum):
     GIMME = "GIMME"
     FASTCORE = "FASTCORE"
     IMAT = "IMAT"
     TINIT = "TINIT"
 
 
-class FilteringTechnique(Enum):
+class FilteringTechnique(str, Enum):
     """RNA sequencing filtering capabilities."""
 
-    CPM = "cpm"
-    ZFPKM = "zfpkm"
-    TPM = "tpm"
-    UMI = "umi"
+    CPM = "CPM"
+    ZFPKM = "ZFPKM"
+    TPM = "TPM"
+    UMI = "UMI"
 
 
-class GeneIdentifier(Enum):
-    ENSEMBL_GENE_ID = "ensembl_gene_id"
-    ENTREZ_GENE_ID = "entrez_gene_id"
-    GENE_SYMBOL = "gene_symbol"
+class GeneIdentifier(str, Enum):
+    ENSEMBL_GENE_ID = "ENSEMBL_GENE_ID"
+    ENTREZ_GENE_ID = "ENTREZ_GENE_ID"
+    GENE_SYMBOL = "GENE_SYMBOL"
 
 
-class LogLevel(Enum):
+class LogLevel(int, Enum):
     TRACE = 5
     DEBUG = 10
     INFO = 20
@@ -56,13 +56,13 @@ class LogLevel(Enum):
     NONE = 100
 
 
-class RNAType(Enum):
-    TRNA = "total"
-    MRNA = "mrna"
-    SCRNA = "scrna"
+class RNAType(str, Enum):
+    TRNA = "TOTAL"
+    MRNA = "MRNA"
+    SCRNA = "SCRNA"
 
 
-class Solver(Enum):
+class Solver(str, Enum):
     """Solver used to seed context specific model."""
 
     GLPK = "GLPK"
@@ -71,11 +71,11 @@ class Solver(Enum):
     GLPK_EXACT = "GLPK_EXACT"
 
 
-class SourceTypes(Enum):
-    TRNA = "trna"
-    MRNA = "mrna"
-    SCRNA = "scrna"
-    PROTEOMICS = "proteomics"
+class SourceTypes(str, Enum):
+    TRNA = "TRNA"
+    MRNA = "MRNA"
+    SCRNA = "SCRNA"
+    PROTEOMICS = "PROTEOMICS"
 
 
 class PeakIdentificationParameters(NamedTuple):
@@ -244,10 +244,10 @@ class _BaseDataType:
 
 @dataclass
 class _BatchNames(_BaseDataType):
-    trna: list[_BatchEntry]
-    mrna: list[_BatchEntry]
-    scrna: list[_BatchEntry]
-    proteomics: list[_BatchEntry]
+    trna: list[_BatchEntry] = field(default_factory=list)
+    mrna: list[_BatchEntry] = field(default_factory=list)
+    scrna: list[_BatchEntry] = field(default_factory=list)
+    proteomics: list[_BatchEntry] = field(default_factory=list)
 
 
 @dataclass

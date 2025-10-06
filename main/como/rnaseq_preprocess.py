@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import functools
 import json
 import re
 import sys
@@ -9,7 +8,7 @@ from dataclasses import asdict, dataclass, field
 from io import StringIO, TextIOWrapper
 from itertools import chain
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final, Literal, cast
 
 import aiofiles
 import numpy as np
@@ -167,6 +166,19 @@ async def _read_text(path: Path | None, *, default: str, lower: bool = False) ->
 
 def _sample_name_from_filepath(file: Path) -> str:
     return re.search(r".+_S\d+R\d+(r\d+)?", file.stem).group()
+
+
+def _require_one(paths: list[Path], kind: Literal["layout", "strand", "preparation", "fragment"], label: str) -> Path | None:
+    if len(paths) == 1:
+        return paths[0]
+    if len(paths) == 0:
+        return None
+    _log_and_raise_error(
+        f"Multiple matching {kind} files for {label}, make sure there is only one copy for each replicate in COMO_input",
+        error=ValueError,
+        level=LogLevel.ERROR,
+    )
+    return None  # explicit return None to satisfy type-check
 
 
 def _require_one(paths: list[Path], kind: Literal["layout", "strand", "preparation", "fragment"], label: str) -> Path | None:
@@ -448,20 +460,21 @@ async def _create_config_df(  # noqa: C901
 
         fragment_label = f"{context_name}_{label}_fragment_size.txt"
         frag_paths = [p for p in aux_lookup["fragment"].values() if p.name == fragment_label]
-        mean_frag = 100.0
-        if not frag_paths and prep != RNAType.TRNA.value:
+        if not frag_paths and prep.lower() != RNAType.TRNA.value.lower():
             logger.warning(f"No fragment file for '{label}'; defaulting to 100 bp (needed for zFPKM).")
             mean_frag = 100.0
         elif len(frag_paths) == 1 and layout == "single-end":
             mean_frag = 0.0
         else:  # 1-N files, paired end
-            dfs: list[pd.DataFrame] = await asyncio.gather(*[_read_file(f, sep="\t", on_bad_lines="skip") for f in frag_paths])
+            dfs: list[pd.DataFrame] = cast(
+                typ=list[pd.DataFrame],
+                val=await asyncio.gather(*[_read_file(f, sep="\t", on_bad_lines="skip") for f in frag_paths]),
+            )
             for df in dfs:
                 df["meanxcount"] = df["frag_mean"] * df["frag_count"]
                 counts = np.array([df["frag_count"].sum() for df in dfs])
                 means = np.array([(df["meanxcount"] / df["frag_count"].sum()).sum() for df in dfs])
                 mean_frag = float(np.average(means, weights=counts))
-
         rows.append(
             SampleConfiguration(
                 sample_name=sample_id,
@@ -680,7 +693,6 @@ async def _create_gene_info_file(
         index=list(range(len(gene_data))),
     )
     for i, data in enumerate(gene_data):
-        # ensembl_ids = data.get("genomic_pos.ensemblgene", "-")
         ensembl_ids = data.get("genomic_pos.ensemblgene", pd.NA)
         if isinstance(ensembl_ids, list):
             ensembl_ids = ensembl_ids[0]
@@ -821,7 +833,6 @@ async def rnaseq_preprocess(
 
     if como_context_dir:
         como_context_dir = como_context_dir.resolve()
-
     input_matrix_filepath = [i.resolve() for i in _listify(input_matrix_filepath)] if input_matrix_filepath else None
     output_trna_metadata_filepath = output_trna_metadata_filepath.resolve() if output_trna_metadata_filepath else None
     output_mrna_metadata_filepath = output_mrna_metadata_filepath.resolve() if output_mrna_metadata_filepath else None
