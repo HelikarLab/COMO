@@ -8,9 +8,12 @@ def test_fisher_stats():
     scenario_model = cobra.io.read_sbml_model("tests/inputs/naiveB_model.xml")
     real = FisherExactTest.run(reference=reference_model, scenario=scenario_model, pathway="Glycolysis/gluconeogenesis")
 
-    assert real.statistic == np.float64(4.321708185053381)
-    assert real.pvalue == np.float64(1.2883495211648955e-05)
-    assert real.a == 32
-    assert real.b == 10
-    assert real.c == 4496
-    assert real.d == 6072
+    assert real == FisherExactTest(
+        pathway="Glycolysis/gluconeogenesis",
+        statistic=np.float64(4.321708185053381),
+        pvalue=np.float64(1.2883495211648955e-05),
+        a=32,
+        b=10,
+        c=4496,
+        d=6072,
+    )
