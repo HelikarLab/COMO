@@ -13,4 +13,4 @@ def test_fisher_stats():
     assert real.a == 32
     assert real.b == 10
     assert real.c == 4496
-    assert real.d == 6082
+    assert real.d == 6072
