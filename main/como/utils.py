@@ -3,10 +3,9 @@ from __future__ import annotations
 import contextlib
 import io
 import sys
-import typing
 from collections.abc import Iterator
 from pathlib import Path
-from typing import TextIO, TypeVar, cast, overload
+from typing import Literal, NoReturn, TextIO, TypeVar, cast, overload
 
 import aiofiles
 import numpy.typing as npt
@@ -66,34 +65,36 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
 
 def split_gene_expression_data(
     expression_data: pd.DataFrame,
+    identifier_column: Literal["ensembl_gene_id", "entrez_gene_id"],
     recon_algorithm: Algorithm | None = None,
-    entrez_as_index: bool = True,
-) -> pd.DataFrame:
+    *,
+    ensembl_as_index: bool = True,
+):
     """Split the gene expression data into single-gene and multiple-gene names.
 
-    Args:
+    Arg:
         expression_data: The gene expression data to map
+        identifier_column: The column containing the gene identifiers, either 'ensembl_gene_id'
         recon_algorithm: The recon algorithm used to generate the gene expression data
-        entrez_as_index: Should the 'entrez_gene_id' column be set as the index
+        ensembl_as_index: Should the 'ensembl_gene_id' column be set as
 
     Returns:
         A pandas DataFrame with the split gene expression data
-
     """
     expression_data.columns = [c.lower() for c in expression_data.columns]
     if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT}:
         expression_data.rename(columns={"combine_z": "active"}, inplace=True)
 
-    expression_data = expression_data[["entrez_gene_id", "active"]]
-    single_gene_names = expression_data[~expression_data["entrez_gene_id"].astype(str).str.contains("//")]
-    multiple_gene_names = expression_data[expression_data["entrez_gene_id"].astype(str).str.contains("//")]
-    split_gene_names = multiple_gene_names.assign(entrez_gene_id=multiple_gene_names["entrez_gene_id"].astype(str).str.split("///")).explode(
-        "entrez_gene_id"
+    expression_data = cast(typ=pd.DataFrame, val=expression_data[[identifier_column, "active"]])
+    single_gene_names = expression_data[~expression_data[identifier_column].astype(str).str.contains("//")]
+    multiple_gene_names = expression_data[expression_data[identifier_column].astype(str).str.contains("//")]
+    split_gene_names = multiple_gene_names.assign(ensembl_gene_id=multiple_gene_names[identifier_column].astype(str).str.split("///")).explode(
+        identifier_column
     )
 
     gene_expressions = pd.concat([single_gene_names, split_gene_names], axis=0, ignore_index=True)
-    if entrez_as_index:
-        gene_expressions.set_index("entrez_gene_id", inplace=True)
+    if ensembl_as_index:
+        gene_expressions.set_index(identifier_column, inplace=True)
     return gene_expressions
 
 
@@ -117,7 +118,7 @@ async def _format_determination(
     """Determine the data type of the given input values (i.e., Entrez Gene ID, Gene Symbol, etc.).
 
     Args:
-        biodbnet: The BioDBNet to use for deter
+        biodbnet: The BioDBNet to use for determination
         requested_output: The data type to generate (of type `Output`)
         input_values: The input values to determine
         taxon: The Taxon ID
@@ -132,12 +133,29 @@ async def _format_determination(
     return coercion
 
 
-@overload
-async def _read_file(path: Path | io.StringIO, h5ad_as_df: bool = True, **kwargs) -> pd.DataFrame: ...
-
-
-@overload
-async def _read_file(path: Path | io.StringIO, h5ad_as_df: bool = False, **kwargs) -> pd.DataFrame | sc.AnnData: ...
+async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int | str | Taxon) -> pd.DataFrame:
+    if isinstance(values, list):
+        gene_type = await determine_gene_type(values)
+        if all(v == "gene_symbol" for v in gene_type.values()):
+            return await gene_symbol_to_ensembl_and_gene_id(values, taxon=taxon_id)
+        elif all(v == "ensembl_gene_id" for v in gene_type.values()):
+            return await ensembl_to_gene_id_and_symbol(ids=values, taxon=taxon_id)
+        elif all(v == "entrez_gene_id" for v in gene_type.values()):
+            return await gene_id_to_ensembl_and_gene_symbol(ids=values, taxon=taxon_id)
+        else:
+            logger.critical("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
+            raise ValueError("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
+    else:
+        values: pd.DataFrame  # Re-define type to assist in type hinting
+        if "gene_symbol" in values:
+            return await get_missing_gene_data(values["gene_symbol"].tolist(), taxon_id=taxon_id)
+        elif "entrez_gene_id" in values:
+            return await get_missing_gene_data(values["entrez_gene_id"].tolist(), taxon_id=taxon_id)
+        elif "ensembl_gene_id" in values:
+            return await get_missing_gene_data(values["ensembl_gene_id"].tolist(), taxon_id=taxon_id)
+        else:
+            logger.critical("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
+            raise ValueError("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
 
 
 @overload
@@ -150,6 +168,10 @@ async def _read_file(path: pd.DataFrame, h5ad_as_df: bool, **kwargs) -> pd.DataF
 
 @overload
 async def _read_file(path: sc.AnnData, h5ad_as_df: bool = False, **kwargs) -> sc.AnnData: ...
+
+
+def _num_rows(item: pd.DataFrame | npt.NDArray) -> int:
+    return item.shape[0]
 
 
 @overload
@@ -189,7 +211,7 @@ async def _read_file(
         _log_and_raise_error(f"File {path} does not exist", error=FileNotFoundError, level=LogLevel.CRITICAL)
 
     match path.suffix:
-        case ".csv" | ".tsv" | ".txt":
+        case ".csv" | ".tsv" | ".txt" | ".tab":
             kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")  # set sep if not defined
             async with aiofiles.open(path) as i_stream:
                 content = await i_stream.read()
@@ -210,31 +232,6 @@ async def _read_file(
                 error=ValueError,
                 level=LogLevel.CRITICAL,
             )
-
-
-async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int | str | Taxon) -> pd.DataFrame:
-    if isinstance(values, list):
-        gene_type = await determine_gene_type(values)
-        if all(v == "gene_symbol" for v in gene_type.values()):
-            return await gene_symbol_to_ensembl_and_gene_id(values, taxon=taxon_id)
-        elif all(v == "ensembl_gene_id" for v in gene_type.values()):
-            return await ensembl_to_gene_id_and_symbol(ids=values, taxon=taxon_id)
-        elif all(v == "entrez_gene_id" for v in gene_type.values()):
-            return await gene_id_to_ensembl_and_gene_symbol(ids=values, taxon=taxon_id)
-        else:
-            logger.critical("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
-            raise ValueError("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
-    else:
-        values: pd.DataFrame  # Re-define type to assist in type hinting
-        if "gene_symbol" in values:
-            return await get_missing_gene_data(values["gene_symbol"].tolist(), taxon_id=taxon_id)
-        elif "entrez_gene_id" in values:
-            return await get_missing_gene_data(values["entrez_gene_id"].tolist(), taxon_id=taxon_id)
-        elif "ensembl_gene_id" in values:
-            return await get_missing_gene_data(values["ensembl_gene_id"].tolist(), taxon_id=taxon_id)
-        else:
-            logger.critical("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
-            raise ValueError("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
 
 
 @overload
@@ -289,14 +286,14 @@ def _log_and_raise_error(
     *,
     error: type[BaseException],
     level: LogLevel,
-) -> typing.NoReturn:
+) -> NoReturn:
     caller = logger.opt(depth=1)
     match level:
         case LogLevel.ERROR:
             caller.error(message)
+            raise error(message)
         case LogLevel.CRITICAL:
             caller.critical(message)
+            raise error(message)
         case _:
             raise ValueError(f"When raising an error, LogLevel.ERROR or LogLevel.CRITICAL must be used. Got: {level}")
-
-    raise error(message)

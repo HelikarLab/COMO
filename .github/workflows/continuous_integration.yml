@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [ "3.10", "3.11", "3.12", "3.13" ]
+        python-version: [ "3.11", "3.12", "3.13" ]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,7 +27,7 @@ jobs:
         run: uv sync --python "${{ matrix.python-version }}" --all-extras --dev
 
       - name: Run tests
-        run: uv run --python "${{ matrix.python-version }}" pytest --cov --junitxml=junit.xml -o junit_family=legacy
+        run: uv run --python "${{ matrix.python-version }}" pytest
 
       - name: Cache Clear
         run: uv cache prune --ci

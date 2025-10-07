@@ -205,12 +205,23 @@ class PopulateInformation:
                 current_info.set_replicate(replicate_value)
 
     def _collect_cell_type_information(self, cell_type: str) -> list[FileInformation]:
-        """Collect all FileInformation objects of a given cell type."""
+        """Collect all FileInformation objects of a given cell type.
+
+        Arg:
+            cell_type: The cell type to collect information for.
+
+        Returns:
+            A list of FileInformation objects matching the given cell type.
+        """
         return [information for information in self.file_information if information.cell_type == cell_type]
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse arguments from the command line."""
+    """Parse arguments from the command line.
+
+    Returns:
+        An argparse.Namespace object containing the parsed arguments.
+    """
     parser = argparse.ArgumentParser(
         prog="proteomics_preprocess.py",
         description="Download and analyze proteomics data from proteomeXchange\n"
