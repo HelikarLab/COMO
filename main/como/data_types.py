@@ -139,12 +139,26 @@ class CobraCompartments:
 
     @classmethod
     def get_shorthand(cls, longhand: str) -> str | None:
-        """Get the short-hand compartment name from the long-hand name."""
+        """Get the short-hand compartment name from the long-hand name.
+
+        Args:
+            longhand: The long-hand compartment name (e.g., 'cytoplasm', 'extracellular').
+
+        Returns:
+            The short-hand compartment name if found, None otherwise.
+        """
         return cls._REVERSE_LOOKUP.get(longhand.lower(), None)
 
     @classmethod
     def get_longhand(cls, shorthand: str) -> str | None:
-        """Get the long-hand compartment name from the short-hand name."""
+        """Get the long-hand compartment name from the short-hand name.
+
+        Args:
+            shorthand: The short-hand compartment name (e.g., 'c', 'e', 'm').
+
+        Returns:
+            The long-hand compartment name if found, None otherwise.
+        """
         longhand = cls.SHORTHAND.get(shorthand.lower(), None)
         return longhand[0] if longhand else None
 
@@ -192,8 +206,11 @@ class _BaseDataType:
     def __getitem__(self, value: str):
         """Access matrices using square bracket notation (e.g., `input_matrices['total_rna']`).
 
-        :param value: The name of the matrix to get ('trna', 'mrna', 'scrna', 'proteomics')
-        :returns: The DataFrame if it exists, None otherwise.
+        Args:
+            value: The name of the matrix to get ('trna', 'mrna', 'scrna', 'proteomics')
+
+        Returns:
+            The DataFrame if it exists, None otherwise.
         """
         self._validate_attribute(value)
         return getattr(self, value)
@@ -209,7 +226,7 @@ class _BaseDataType:
 
     def _validate_attribute(self, key):
         if key not in {i.value for i in SourceTypes._member_map_.values()}:
-            # Unable to use como.utils._log_and_raise_error becuase it results in a circular import
+            # Unable to use como.utils._log_and_raise_error because it results in a circular import
             message = f"{key} is not a valid attribute of {SourceTypes.__name__}; got '{key}'"
             logger.warning(message)
             raise ValueError(message)

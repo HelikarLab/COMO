@@ -41,6 +41,9 @@ ignore = [
     "F401",     # allow unused imports
 ]
 
+[lint.pydocstyle]
+convention = "google"
+
 [lint.per-file-ignores]
 "tests/*" = [
     "D101",     # allow undocumented public class

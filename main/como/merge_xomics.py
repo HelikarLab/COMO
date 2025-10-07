@@ -50,8 +50,17 @@ class _HighExpressionHeaderNames:
 
 
 # TODO: If function is no longer needed, remove?
-async def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tuple[str, pd.DataFrame]:
-    """Load rnaseq results."""
+def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tuple[str, pd.DataFrame]:
+    """Load rnaseq results.
+
+    Args:
+        filename: Name of the file to load
+        context_name: Name of the context (e.g., tissue or cell type)
+        prep_method: The RNA-seq library preparation method (e.g., mRNA, total RNA, single-cell RNA)
+
+    Returns:
+        A tuple containing the context name and the loaded DataFrame±
+    """
     logger.debug(f"Loading data for context '{context_name}' using preparation method '{prep_method.value}'")
     config = Config()
 
@@ -90,8 +99,11 @@ async def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tu
 def _merge_logical_table(df: pd.DataFrame):
     """Merge rows of Logical Table belonging to the same entrez_gene_id.
 
-    :param df: pandas dataframe of logical table
-    :return: pandas dataframe of merged table
+    Args:
+        df: Pandas dataframe containing the logical table
+
+    Returns:
+        pandas dataframe of merged table
     """
     # step 1: get all plural ENTREZ_GENE_IDs in the input table, extract unique IDs
     df.dropna(subset=["entrez_gene_id"], inplace=True)
@@ -115,7 +127,7 @@ def _merge_logical_table(df: pd.DataFrame):
 
         df = pd.concat([df, pd.DataFrame(duplicate_rows)], axis=0, ignore_index=True)
         df.drop(df[df["entrez_gene_id"] == i].index, inplace=True)
-    logger.trace(f"Shape after merging duplciated rows: {df.shape}")
+    logger.trace(f"Shape after merging duplicated rows: {df.shape}")
 
     full_entrez_id_sets: set[str] = set()
     entrez_dups_list: list[list[str]] = []
@@ -129,14 +141,14 @@ def _merge_logical_table(df: pd.DataFrame):
         logger.trace(f"Iterating through multi-entrez ids, index {i}")
 
         set1 = set(multiple_entrez_ids[i].split("//"))
-        multi_entrez_index.remove(i)
+        temp_multi_entrez_index.remove(i)
 
         for j in multi_entrez_index:
             set2 = set(multiple_entrez_ids[j].split("//"))
             intersect = set1.intersection(set2)
             if bool(intersect):
                 set1 = set1.union(set2)
-                multi_entrez_index.remove(j)
+                temp_multi_entrez_index.remove(j)
 
         sortlist = list(set1)
         sortlist.sort(key=int)
@@ -180,8 +192,12 @@ async def _get_transcriptmoic_details(merged_df: pd.DataFrame, taxon_id: int) ->
     The resulting dataframe will have its columns created in the order listed above
     It will return a pandas dataframe with this information
 
-    :param merged_df: A dataframe containing all active transcriptomic and proteomic genes
-    :return: A dataframe with the above-listed columns
+    Args:
+        merged_df: A dataframe containing all active transcriptomic and proteomic genes
+        taxon_id: The NCBI taxonomy ID of the organism
+
+    Returns:
+        A dataframe with the above-listed columns
     """
     # If _ExpressedHeaderNames.PROTEOMICS.value is in the dataframe, lower the required expression by 1
     # We are only trying to get details for transcriptomic data

@@ -74,7 +74,7 @@ def knock_out_simulation(
         drug_db = drug_db[drug_db["moa"].str.lower().str.contains("inhibitor")]
         drug_target_genes = pd.DataFrame(columns=["Gene ID"])
         drug_target_genes["Gene ID"] = drug_db["Gene ID"].astype(str)
-        drug_target_genes.replace("-", np.nan, inplace=True)
+        drug_target_genes.replace("-", pd.NA, inplace=True)
         drug_target_genes.dropna(axis=0, inplace=True)
         drug_target_genes.to_csv(inhibitors_filepath, header=True, sep="\t", index=False)
         print(f"Inhibitors file written to: {inhibitors_filepath}")
