@@ -367,7 +367,6 @@ async def _write_counts_matrix(
     final_matrix = final_matrix[["ensembl_gene_id", *rna_specific_sample_names]]
 
     output_counts_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
-    final_matrix.dropna(inplace=True)
     final_matrix.to_csv(output_counts_matrix_filepath, index=False)
     logger.success(f"Wrote gene count matrix for '{rna.value}' RNA at '{output_counts_matrix_filepath}'")
     return final_matrix
@@ -682,7 +681,7 @@ async def _create_gene_info_file(
             )
 
         # Remove NA values from entrez_gene_id dataframe column
-        return conversion["entrez_gene_id"].dropna().tolist()
+        return conversion["entrez_gene_id"].tolist()
 
     logger.info("Fetching gene info - this can take up to 5 minutes depending on the number of genes and your internet connection")
     genes = set(chain.from_iterable(await asyncio.gather(*[read_counts(f) for f in counts_matrix_filepaths])))
@@ -709,7 +708,6 @@ async def _create_gene_info_file(
 
     gene_info = gene_info[((~gene_info["entrez_gene_id"].isna()) & (~gene_info["ensembl_gene_id"].isna()) & (~gene_info["gene_symbol"].isna()))]
     gene_info.sort_values(by="ensembl_gene_id", inplace=True)
-    gene_info.dropna(inplace=True)
 
     output_filepath.parent.mkdir(parents=True, exist_ok=True)
     gene_info.to_csv(output_filepath, index=False)
