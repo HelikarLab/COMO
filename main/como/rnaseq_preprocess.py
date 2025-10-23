@@ -459,6 +459,7 @@ async def _create_config_df(  # noqa: C901
 
         fragment_label = f"{context_name}_{label}_fragment_size.txt"
         frag_paths = [p for p in aux_lookup["fragment"].values() if p.name == fragment_label]
+        print(f"HERE: {prep}")
         if not frag_paths and prep.lower() != RNAType.TRNA.value.lower():
             logger.warning(f"No fragment file for '{label}'; defaulting to 100 bp (needed for zFPKM).")
             mean_frag = 100.0
@@ -705,8 +706,6 @@ async def _create_gene_info_file(
         gene_info.at[i, "entrez_gene_id"] = data.get("entrezgene", pd.NA)
         gene_info.at[i, "ensembl_gene_id"] = ensembl_ids
         gene_info.at[i, "size"] = end_pos - start_pos
-
-    gene_info = gene_info[((~gene_info["entrez_gene_id"].isna()) & (~gene_info["ensembl_gene_id"].isna()) & (~gene_info["gene_symbol"].isna()))]
     gene_info.sort_values(by="ensembl_gene_id", inplace=True)
 
     output_filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -855,10 +854,10 @@ async def rnaseq_preprocess(
 async def _main():
     context_name = "notreatment"
     taxon = 9606
-    como_context_dir = Path("/Users/joshl/Projects/COMO/main/data/COMO_input/notreatment")
-    output_gene_info_filepath = Path("/Users/joshl/Projects/COMO/main/data/results/notreatment/gene_info.csv")
+    como_context_dir = Path("/Users/joshl/Projects/COMO/main/data/COMO_input/naiveB")
+    output_gene_info_filepath = Path("/Users/joshl/Projects/COMO/main/data/results/naiveB/gene_info_fixed.csv")
     output_trna_metadata_filepath = Path("/Users/joshl/Projects/COMO/main/data/config_sheets/trna_config.xlsx")
-    output_trna_count_matrix_filepath = Path("/Users/joshl/Projects/COMO/main/data/results/notreatment/total-rna/totalrna_notreatment.csv")
+    output_trna_count_matrix_filepath = Path("/Users/joshl/Projects/COMO/main/data/results/naiveB/total-rna/totalrna_naiveB.csv")
 
     await rnaseq_preprocess(
         context_name=context_name,
