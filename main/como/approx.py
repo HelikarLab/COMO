@@ -84,14 +84,13 @@ def _regularize_values(
     if callable(ties):
         agg_fn = ties
     else:
+        # fmt: off
         if ties in ("mean", "avg", "average"):
             agg_fn = np.mean
         elif ties in ("first", "left"):
-
             def agg_fn(a):
                 return a[0]
         elif ties in ("last", "right"):
-
             def agg_fn(a):
                 return a[-1]
         elif ties == "min":
@@ -104,6 +103,7 @@ def _regularize_values(
             agg_fn = np.sum
         else:
             raise ValueError("Unsupported `ties`; use a callable or one of 'mean', 'first', 'last', 'min', 'max', 'median', 'sum'.")
+        # fmt: on
 
     # Find unique x values and their indices/counts
     unique_x, start_idx, counts = np.unique(x_sorted, return_index=True, return_counts=True)
