@@ -596,10 +596,10 @@ async def merge_xomics(  # noqa: C901
 
     # fmt: off
     source_data = {
-        SourceTypes.TRNA: (trna_matrix_or_filepath, trna_boolean_matrix_or_filepath, trna_metadata_filepath_or_df, output_trna_activity_filepath),
-        SourceTypes.MRNA: (mrna_matrix_or_filepath, mrna_boolean_matrix_or_filepath, mrna_metadata_filepath_or_df, output_mrna_activity_filepath),
-        SourceTypes.SCRNA: (scrna_matrix_or_filepath, scrna_boolean_matrix_or_filepath, scrna_metadata_filepath_or_df, output_scrna_activity_filepath),  # noqa: E501
-        SourceTypes.PROTEOMICS: (proteomic_matrix_or_filepath, proteomic_boolean_matrix_or_filepath, proteomic_metadata_filepath_or_df, output_proteomic_activity_filepath),  # noqa: E501
+        SourceTypes.trna: (trna_matrix_or_filepath, trna_boolean_matrix_or_filepath, trna_metadata_filepath_or_df, output_trna_activity_filepath),
+        SourceTypes.mrna: (mrna_matrix_or_filepath, mrna_boolean_matrix_or_filepath, mrna_metadata_filepath_or_df, output_mrna_activity_filepath),
+        SourceTypes.scrna: (scrna_matrix_or_filepath, scrna_boolean_matrix_or_filepath, scrna_metadata_filepath_or_df, output_scrna_activity_filepath),  # noqa: E501
+        SourceTypes.proteomics: (proteomic_matrix_or_filepath, proteomic_boolean_matrix_or_filepath, proteomic_metadata_filepath_or_df, output_proteomic_activity_filepath),  # noqa: E501
     }
     # fmt: on
     for source in source_data:
