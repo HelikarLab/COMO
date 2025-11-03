@@ -513,7 +513,16 @@ def _build_batches(
             continue
 
         metadata: pd.DataFrame  # Re-assign type to assist in type hinting
-        for batch_num, study in enumerate(sorted(metadata["study"].unique()), start=1):
+        for study in sorted(metadata["study"].unique()):
+            batch_search = re.search(r"\d+", study)
+            if not batch_search:
+                _log_and_raise_error(
+                    message=f"Unable to find batch number in study name. Expected a digit in the study value: {study}",
+                    error=ValueError,
+                    level=LogLevel.ERROR,
+                )
+
+            batch_num = int(batch_search.group(0))  # ty: ignore[possibly-missing-attribute]
             study_sample_names = metadata[metadata["study"] == study]["sample_name"].tolist()
             batch_names[source.value].append(_BatchEntry(batch_num=batch_num, sample_names=study_sample_names))
             logger.debug(f"Found {len(study_sample_names)} sample names for study '{study}', batch number {batch_num}")
