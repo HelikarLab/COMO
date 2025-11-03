@@ -367,7 +367,6 @@ async def _write_counts_matrix(
     final_matrix = final_matrix[["ensembl_gene_id", *rna_specific_sample_names]]
 
     output_counts_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
-    final_matrix.dropna(inplace=True)
     final_matrix.to_csv(output_counts_matrix_filepath, index=False)
     logger.success(f"Wrote gene count matrix for '{rna.value}' RNA at '{output_counts_matrix_filepath}'")
     return final_matrix
@@ -460,6 +459,7 @@ async def _create_config_df(  # noqa: C901
 
         fragment_label = f"{context_name}_{label}_fragment_size.txt"
         frag_paths = [p for p in aux_lookup["fragment"].values() if p.name == fragment_label]
+        print(f"HERE: {prep}")
         if not frag_paths and prep.lower() != RNAType.TRNA.value.lower():
             logger.warning(f"No fragment file for '{label}'; defaulting to 100 bp (needed for zFPKM).")
             mean_frag = 100.0
@@ -682,7 +682,7 @@ async def _create_gene_info_file(
             )
 
         # Remove NA values from entrez_gene_id dataframe column
-        return conversion["entrez_gene_id"].dropna().tolist()
+        return conversion["entrez_gene_id"].tolist()
 
     logger.info("Fetching gene info - this can take up to 5 minutes depending on the number of genes and your internet connection")
     genes = set(chain.from_iterable(await asyncio.gather(*[read_counts(f) for f in counts_matrix_filepaths])))
@@ -706,10 +706,7 @@ async def _create_gene_info_file(
         gene_info.at[i, "entrez_gene_id"] = data.get("entrezgene", pd.NA)
         gene_info.at[i, "ensembl_gene_id"] = ensembl_ids
         gene_info.at[i, "size"] = end_pos - start_pos
-
-    gene_info = gene_info[((~gene_info["entrez_gene_id"].isna()) & (~gene_info["ensembl_gene_id"].isna()) & (~gene_info["gene_symbol"].isna()))]
     gene_info.sort_values(by="ensembl_gene_id", inplace=True)
-    gene_info.dropna(inplace=True)
 
     output_filepath.parent.mkdir(parents=True, exist_ok=True)
     gene_info.to_csv(output_filepath, index=False)
@@ -857,10 +854,10 @@ async def rnaseq_preprocess(
 async def _main():
     context_name = "notreatment"
     taxon = 9606
-    como_context_dir = Path("/Users/joshl/Projects/COMO/main/data/COMO_input/notreatment")
-    output_gene_info_filepath = Path("/Users/joshl/Projects/COMO/main/data/results/notreatment/gene_info.csv")
+    como_context_dir = Path("/Users/joshl/Projects/COMO/main/data/COMO_input/naiveB")
+    output_gene_info_filepath = Path("/Users/joshl/Projects/COMO/main/data/results/naiveB/gene_info_fixed.csv")
     output_trna_metadata_filepath = Path("/Users/joshl/Projects/COMO/main/data/config_sheets/trna_config.xlsx")
-    output_trna_count_matrix_filepath = Path("/Users/joshl/Projects/COMO/main/data/results/notreatment/total-rna/totalrna_notreatment.csv")
+    output_trna_count_matrix_filepath = Path("/Users/joshl/Projects/COMO/main/data/results/naiveB/total-rna/totalrna_naiveB.csv")
 
     await rnaseq_preprocess(
         context_name=context_name,

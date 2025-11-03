@@ -1,0 +1,16 @@
+from _typeshed import Incomplete
+from ast import NodeTransformer
+from cobra import Gene as Gene, Model as Model
+from cobra.util import get_context as get_context
+
+class _GeneEscaper(NodeTransformer):
+    def visit_Name(self, node: Gene) -> Gene: ...
+
+def escape_ID(model: Model) -> None: ...
+
+class _Renamer(NodeTransformer):
+    rename_dict: Incomplete
+    def __init__(self, rename_dict: dict[str, str], **kwargs) -> None: ...
+    def visit_Name(self, node: Gene) -> Gene: ...
+
+def rename_genes(model: Model, rename_dict: dict[str, str]) -> None: ...
