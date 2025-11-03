@@ -2,11 +2,11 @@ from pathlib import Path
 
 import aioftp
 import pytest
+
 from como.proteomics.Crux import MZMLtoSQT, RAWtoMZML, SQTtoCSV
 from como.proteomics.FileInformation import FileInformation
 from como.proteomics.FTPManager import Download, Reader, aioftp_client
 from como.proteomics.proteomics_preprocess import ParseCSVInput, PopulateInformation
-
 from tests.fixtures.fixture_ftp_server import fixture_ftp_server, ftp_file_names
 
 
