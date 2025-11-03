@@ -803,27 +803,14 @@ async def _process(
         output_zfpkm_plot_dirpath=output_zfpkm_plot_dirpath,
     )
 
-    merged_zscore_df = pd.DataFrame()
-    expressed_genes: list[str] = []
-    top_genes: list[str] = []
-    for metric in metrics.values():
-        expressed_genes.extend(metric.entrez_gene_ids)
-        top_genes.extend(metric.high_confidence_entrez_gene_ids)
-
-        merged_zscore_df = (
-            metric.z_score_matrix
-            if merged_zscore_df.empty
-            else merged_zscore_df.merge(
-                metric.z_score_matrix,
-                how="outer",
-                left_index=True,
-                right_index=True,
-            )
-        )
-    merged_zscore_df[merged_zscore_df.isna()] = -4
+    merged_zscore_df = pd.concat([m.z_score_matrix[m.z_score_matrix.index != "-"] for m in metrics.values()], axis="columns")
+    merged_zscore_df.fillna(-4, inplace=True)
+    expressed_genes: list[str] = list(itertools.chain.from_iterable(m.entrez_gene_ids for m in metrics.values()))
+    top_genes: list[str] = list(itertools.chain.from_iterable(m.high_confidence_entrez_gene_ids for m in metrics.values()))
 
     # If any of the normalization metrics are not empty, write the normalized metrics to disk
     if not all(metric.normalization_matrix.empty for metric in metrics.values()):
+        merged_zscore_df: pd.DataFrame = merged_zscore_df.reindex(columns=sorted(merged_zscore_df))
         merged_zscore_df.to_csv(output_zscore_normalization_filepath, index=True)
         logger.success(f"Wrote z-score normalization matrix to {output_zscore_normalization_filepath}")
     else:
