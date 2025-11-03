@@ -664,15 +664,13 @@ async def _create_gene_info_file(
     The gene information file will be created by reading each matrix filepath in the provided list
     """
 
-    async def read_counts(file: Path) -> list[str]:
+    async def read_ensembl_gene_ids(file: Path) -> list[str]:
         data = await _read_file(file, h5ad_as_df=False)
-
+        if isinstance(data, pd.DataFrame):
+            data: pd.DataFrame
+            return data["ensembl_gene_id"].tolist()
         try:
-            conversion = await (
-                ensembl_to_gene_id_and_symbol(ids=data["ensembl_gene_id"].tolist(), taxon=taxon)
-                if isinstance(data, pd.DataFrame)
-                else gene_symbol_to_ensembl_and_gene_id(symbols=data.var_names.tolist(), taxon=taxon)
-            )
+            conversion = await gene_symbol_to_ensembl_and_gene_id(symbols=data.var_names.tolist(), taxon=taxon)
         except json.JSONDecodeError:
             _log_and_raise_error(
                 f"Got a JSON decode error for file '{counts_matrix_filepaths}'",
@@ -681,32 +679,48 @@ async def _create_gene_info_file(
             )
 
         # Remove NA values from entrez_gene_id dataframe column
-        return conversion["entrez_gene_id"].tolist()
+        return conversion["ensembl_gene_id"].tolist()
 
     logger.info("Fetching gene info - this can take up to 5 minutes depending on the number of genes and your internet connection")
-    genes = set(chain.from_iterable(await asyncio.gather(*[read_counts(f) for f in counts_matrix_filepaths])))
-    gene_data = await MyGene(cache=cache).query(items=list(genes), taxon=taxon, scopes="entrezgene")
+
+    ensembl_ids: set[str] = set(chain.from_iterable(await asyncio.gather(*[read_ensembl_gene_ids(f) for f in counts_matrix_filepaths])))
+    gene_data: list[dict[str, str | int | list[str] | list[int] | None]] = await MyGene(cache=cache).query(
+        items=list(ensembl_ids),
+        taxon=taxon,
+        scopes="ensemblgene",
+    )
     gene_info: pd.DataFrame = pd.DataFrame(
         data=None,
-        columns=["ensembl_gene_id", "gene_symbol", "entrez_gene_id", "size"],
-        index=list(range(len(gene_data))),
+        columns=pd.Index(data=["ensembl_gene_id", "gene_symbol", "entrez_gene_id", "size"]),
+        index=pd.Index(data=list(range(len(ensembl_ids)))),
     )
+
     for i, data in enumerate(gene_data):
-        ensembl_ids = data.get("genomic_pos.ensemblgene", pd.NA)
-        if isinstance(ensembl_ids, list):
-            ensembl_ids = ensembl_ids[0]
+        data: dict[str, str | int | list[str] | list[int] | None]
+        ensembl_genes: str | list[str] = cast(str | list[str], data.get("ensembl.gene", "-"))
+        start_pos: int | list[int] = cast(int | list[int], data.get("genomic_pos.start", 0))
+        end_pos: int | list[int] = cast(int | list[int], data.get("genomic_pos.end", 0))
 
-        start_pos = data.get("genomic_pos.start", 0)
-        start_pos: int = int(sum(start_pos) / len(start_pos)) if isinstance(start_pos, list) else int(start_pos)
-        end_pos = data.get("genomic_pos.end", 0)
-        end_pos: int = int(sum(end_pos) / len(end_pos)) if isinstance(end_pos, list) else int(end_pos)
+        avg_start: int | float = sum(start_pos) / len(start_pos) if isinstance(start_pos, list) else start_pos
+        avg_end: int | float = sum(end_pos) / len(end_pos) if isinstance(end_pos, list) else end_pos
+        size: int = int(avg_end - avg_start)
 
-        gene_info.at[i, "gene_symbol"] = data.get("symbol", pd.NA)
-        gene_info.at[i, "entrez_gene_id"] = data.get("entrezgene", pd.NA)
-        gene_info.at[i, "ensembl_gene_id"] = ensembl_ids
-        gene_info.at[i, "size"] = end_pos - start_pos
-    gene_info.sort_values(by="ensembl_gene_id", inplace=True)
+        gene_info.at[i, "gene_symbol"] = data.get("symbol", "-")
+        gene_info.at[i, "entrez_gene_id"] = data.get("entrezgene", "-")
+        gene_info.at[i, "ensembl_gene_id"] = ",".join(ensembl_genes) if isinstance(ensembl_genes, list) else ensembl_genes
+        gene_info.at[i, "size"] = size if size > 0 else -1
 
+    gene_info["size"] = gene_info["size"].astype(str)  # replace no-length values with "-" to match rows where every value is "-"
+    gene_info["size"] = gene_info["size"].replace("-1", "-")
+    gene_info = cast(pd.DataFrame, gene_info[~(gene_info == "-").all(axis=1)])  # remove rows where every value is "-"
+
+    gene_info["ensembl_gene_id"] = gene_info["ensembl_gene_id"].str.split(",")  # extend lists into multiple rows
+    gene_info = gene_info.explode(column=["ensembl_gene_id"])
+    gene_info["size"] = gene_info["size"].astype(int)
+    # we would set `entrez_gene_id` to int here as well, but not all ensembl ids are mapped to entrez ids,
+    #   and as a result, there are still "-" values in the entrez id column that cannot be converted to an integer
+
+    gene_info: pd.DataFrame = cast(pd.DataFrame, gene_info.sort_values(by="ensembl_gene_id"))
     output_filepath.parent.mkdir(parents=True, exist_ok=True)
     gene_info.to_csv(output_filepath, index=False)
     logger.success(f"Gene Info file written at '{output_filepath}'")
@@ -728,7 +742,7 @@ async def _process_como_input(
         rna=rna,
     )
     with pd.ExcelWriter(output_config_filepath) as writer:
-        subset_config = config_df[config_df["library_prep"] == rna.value]
+        subset_config = config_df[config_df["library_prep"].str.lower() == rna.value.lower()]
         subset_config.to_excel(writer, sheet_name=context_name, header=True, index=False)
 
 
