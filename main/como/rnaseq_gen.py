@@ -616,9 +616,9 @@ def zfpkm_filter(
     filtering_options: _FilteringOptions,
     calculate_fpkm: bool,
     force_zfpkm_plot: bool,
-    peak_parameters: PeakIdentificationParameters,
-    bandwidth: float,
-    output_png_filepath: Path | None,
+    min_peak_height: float,
+    min_peak_distance: int,
+    output_png_dirpath: Path | None,
 ) -> NamedMetrics:
     """Apply zFPKM filtering to the FPKM matrix for a given sample.
 
@@ -627,9 +627,9 @@ def zfpkm_filter(
         filtering_options: Options for filtering the count matrix.
         calculate_fpkm: Whether to calculate FPKM from counts.
         force_zfpkm_plot: Whether to force plotting of zFPKM results even if there are many samples.
-        peak_parameters: Parameters for peak identification in zFPKM calculation.
-        bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
-        output_png_filepath: Optional filepath to save the zFPKM plot.
+        min_peak_height: Minimum peak height for zFPKM peak identification.
+        min_peak_distance: Minimum peak distance for zFPKM peak identification.
+        output_png_dirpath: Optional directory path to save zFPKM plots.
 
     Returns:
         A dictionary of filtered study metrics.
@@ -643,9 +643,15 @@ def zfpkm_filter(
         metric: _StudyMetrics
         # if fpkm was not calculated, the normalization matrix will be empty; collect the count matrix instead
         matrix = metric.count_matrix if metric.normalization_matrix.empty else metric.normalization_matrix
-        matrix = matrix[matrix.sum(axis=1) > 0]  # remove rows (genes) that have no counts across all samples
 
-        results, zfpkm_df = zfpkm_transform(matrix, peak_parameters=peak_parameters, bandwidth=bandwidth)
+        # TODO: 2025-OCT-31: Re-evaluate whether to remove rows with all 0 counts
+        # matrix = matrix[matrix.sum(axis=1) > 0]  # remove rows (genes) that have no counts across all samples
+
+        results, zfpkm_df = zfpkm_transform(
+            fpkm_df=matrix,
+            min_peak_height=min_peak_height,
+            min_peak_distance=min_peak_distance,
+        )
         zfpkm_df[(matrix == 0) | (zfpkm_df.isna())] = -4
 
         if len(results) > 10 and not force_zfpkm_plot:
@@ -683,8 +689,8 @@ def filter_counts(
     filtering_options: _FilteringOptions,
     prep: RNAType,
     force_zfpkm_plot: bool,
-    peak_parameters: PeakIdentificationParameters,
-    bandwidth: float,
+    zfpkm_min_peak_height: float,
+    zfpkm_min_peak_distance: int,
     output_zfpkm_plot_dirpath: Path | None = None,
 ) -> NamedMetrics:
     """Filter the count matrix based on the specified technique.
@@ -696,8 +702,8 @@ def filter_counts(
         filtering_options: Options for filtering the count matrix.
         prep: The RNA preparation type.
         force_zfpkm_plot: Whether to force plotting of zFPKM results even if there are many samples.
-        peak_parameters: Parameters for peak identification in zFPKM calculation.
-        bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
+        zfpkm_min_peak_height: Minimum peak height for zFPKM peak identification.
+        zfpkm_min_peak_distance: Minimum peak distance for zFPKM peak identification.
         output_zfpkm_plot_dirpath: Optional filepath to save the zFPKM plot.
 
     Returns:
@@ -714,8 +720,8 @@ def filter_counts(
                 filtering_options=filtering_options,
                 calculate_fpkm=True,
                 force_zfpkm_plot=force_zfpkm_plot,
-                peak_parameters=peak_parameters,
-                bandwidth=bandwidth,
+                min_peak_height=zfpkm_min_peak_height,
+                min_peak_distance=zfpkm_min_peak_distance,
                 output_png_dirpath=output_zfpkm_plot_dirpath,
             )
         case FilteringTechnique.UMI:
@@ -725,8 +731,8 @@ def filter_counts(
                 filtering_options=filtering_options,
                 calculate_fpkm=False,
                 force_zfpkm_plot=force_zfpkm_plot,
-                peak_parameters=peak_parameters,
-                bandwidth=bandwidth,
+                min_peak_height=zfpkm_min_peak_height,
+                min_peak_distance=zfpkm_min_peak_distance,
                 output_png_dirpath=output_zfpkm_plot_dirpath,
             )
         case _:
@@ -751,8 +757,8 @@ async def _process(
     technique: FilteringTechnique,
     cut_off: int | float,
     force_zfpkm_plot: bool,
-    peak_parameters: PeakIdentificationParameters,
-    bandwidth: float,
+    zfpkm_min_peak_height: float,
+    zfpkm_min_peak_distance: int,
     output_boolean_activity_filepath: Path,
     output_zscore_normalization_filepath: Path,
     output_zfpkm_plot_dirpath: Path | None,
@@ -792,8 +798,8 @@ async def _process(
         filtering_options=filtering_options,
         prep=prep,
         force_zfpkm_plot=force_zfpkm_plot,
-        peak_parameters=peak_parameters,
-        bandwidth=bandwidth,
+        zfpkm_min_peak_height=zfpkm_min_peak_height,
+        zfpkm_min_peak_distance=zfpkm_min_peak_distance,
         output_zfpkm_plot_dirpath=output_zfpkm_plot_dirpath,
     )
 
