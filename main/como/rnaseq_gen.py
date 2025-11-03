@@ -861,9 +861,8 @@ async def rnaseq_gen(  # noqa: C901
     batch_ratio: float = 0.5,
     high_batch_ratio: float = 0.75,
     technique: FilteringTechnique | str = FilteringTechnique.ZFPKM,
-    zfpkm_peak_height: float = 0.02,
-    zfpkm_peak_distance: float = 1.0,
-    zfpkm_bandwidth: float = 1.0,
+    zfpkm_min_peak_height: float = 0.02,
+    zfpkm_min_peak_distance: int = 1,
     cutoff: int | float | None = None,
     force_zfpkm_plot: bool = False,
     log_level: LogLevel = LogLevel.INFO,
@@ -892,9 +891,8 @@ async def rnaseq_gen(  # noqa: C901
     :param high_batch_ratio: The percentage of batches that a gene must
         appear in for a gene to be marked "highly confident" in its expression
     :param technique: The filtering technique to use
-    :param zfpkm_peak_height: The height of the zFPKM peak
-    :param zfpkm_peak_distance: The distance of the zFPKM peak
-    :param zfpkm_bandwidth: The bandwidth of the zFPKM
+    :param zfpkm_min_peak_height: The height of the zFPKM peak
+    :param zfpkm_min_peak_distance: The distance of the zFPKM peak
     :param cutoff: The cutoff value to use for the provided filtering technique
     :param force_zfpkm_plot: If too many samples exist, should plotting be done anyway?
     :param log_level: The level of logging to output
@@ -988,8 +986,8 @@ async def rnaseq_gen(  # noqa: C901
         technique=technique,
         cut_off=cutoff,
         force_zfpkm_plot=force_zfpkm_plot,
-        peak_parameters=PeakIdentificationParameters(height=zfpkm_peak_height, distance=zfpkm_peak_distance),
-        bandwidth=zfpkm_bandwidth,
+        zfpkm_min_peak_height=zfpkm_min_peak_height,
+        zfpkm_min_peak_distance=zfpkm_min_peak_distance,
         output_boolean_activity_filepath=output_boolean_activity_filepath,
         output_zscore_normalization_filepath=output_zscore_normalization_filepath,
         output_zfpkm_plot_dirpath=output_zfpkm_plot_dirpath,
