@@ -168,6 +168,11 @@ async def _build_matrix_results(
     """
     matrix.dropna(subset="ensembl_gene_id", inplace=True)
     conversion = await ensembl_to_gene_id_and_symbol(ids=matrix["ensembl_gene_id"].tolist(), taxon=taxon)
+
+    # If any one column was
+    if any(conversion[col].eq("-").all() for col in conversion.columns):
+        logger.critical(f"Conversion of Ensembl Gene IDs to Entrez IDs and Gene Symbols was empty - is '{taxon}' the correct taxon ID for this data?")
+
     conversion["ensembl_gene_id"] = conversion["ensembl_gene_id"].str.split(",")
     conversion = conversion.explode("ensembl_gene_id")
     conversion.reset_index(inplace=True, drop=True)
