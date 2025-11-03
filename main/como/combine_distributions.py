@@ -94,7 +94,7 @@ def _combine_z_distribution_for_batch(
 def _combine_z_distribution_for_source(
     merged_source_data: pd.DataFrame,
     context_name: str,
-    num_replicates: int,
+    replicates_per_batch: Sequence[int],
     output_combined_matrix_filepath: Path,
     output_figure_filepath: Path,
     weighted_z_floor: int = -6,
@@ -267,7 +267,7 @@ async def _begin_combining_distributions(
         merged_source_results: pd.DataFrame = _combine_z_distribution_for_source(
             merged_source_data=merged_batch_results,
             context_name=context_name,
-            num_replicates=sum(batch.num_samples for batch in batch_names[source.value]),
+            replicates_per_batch=replicates_per_batch,
             output_combined_matrix_filepath=(
                 output_filepaths[source.value].parent / f"{context_name}_{source.value}_combined_zscore_distribution.csv"
             ),
