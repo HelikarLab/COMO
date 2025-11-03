@@ -103,13 +103,14 @@ def _combine_z_distribution_for_source(
     """Combine z-score distributions across batches for a single source.
 
     Args:
-        merged_source_data: DataFrame with 'ensembl_gene_id' and batch columns.
-        context_name: Name of the context (e.g., tissue or condition).
-        num_replicates: Number of replicates (samples) for weighting.
-        output_combined_matrix_filepath: Path to save the combined z-score matrix.
-        output_figure_filepath: Path to save the z-score distribution figure.
-        weighted_z_floor: Minimum z-score value after combining.
-        weighted_z_ceiling: Maximum z-score value after combining.
+        merged_source_data : DataFrame with columns: ["ensembl_gene_id", <batch1>, <batch2>, ...]. Each batch column contains the within-batch combined z for that gene.
+        context_name: tissue or condition name
+        replicates_per_batch: vector of replicate counts per batch, aligned exactly to the order of
+            batch columns in `merged_source_data.iloc[:, 1:]`.
+        output_combined_matrix_filepath: directory to write combined z-score figures
+        output_figure_filepath: filepath to write z-score figure
+        weighted_z_floor: lower bound to clip z-scores
+        weighted_z_ceiling : upper bound to clip z-scores
 
     Returns:
           A pandas dataframe of the weighted z-distributions
