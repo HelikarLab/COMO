@@ -21,11 +21,11 @@ class ZResult:
     """Dataclass to store results of Z-score calculation."""
 
     zfpkm: pd.DataFrame
-    x_range: pd.DataFrame  # npt.NDArray[np.float64]
-    density: pd.DataFrame  # npt.NDArray[np.float64]
-    mu: npt.NDArray[np.float64]
-    std_dev: npt.NDArray[np.float64]
-    max_fpkm_peak: npt.NDArray[np.float64]
+    x_range: pd.DataFrame  # npt.NDArray[float]
+    density: pd.DataFrame  # npt.NDArray[float]
+    mu: npt.NDArray[float]
+    std_dev: npt.NDArray[float]
+    max_fpkm_peak: npt.NDArray[float]
 
 
 def z_score_calc(abundance: pd.DataFrame, min_thresh: int) -> ZResult:
@@ -42,11 +42,11 @@ def z_score_calc(abundance: pd.DataFrame, min_thresh: int) -> ZResult:
     log_abundance_filt = np.log2(values[values > min_thresh]).reshape((len(abundance), len(abundance.columns)))
     log_abundance = np.log2(values)
 
-    # np.zeros((1000, len(abundance.columns)), dtype=np.float64),
+    # np.zeros((1000, len(abundance.columns)), dtype=float),
     z_result = ZResult(
-        zfpkm=pd.DataFrame(data=np.nan * np.ones_like(values), index=abundance.index, columns=abundance.columns, dtype=np.float64),
-        x_range=pd.DataFrame(data=np.zeros((1000, len(abundance.columns))), columns=abundance.columns, dtype=np.float64),
-        density=pd.DataFrame(data=np.zeros((1000, len(abundance.columns))), columns=abundance.columns, dtype=np.float64),
+        zfpkm=pd.DataFrame(data=np.nan * np.ones_like(values), index=abundance.index, columns=abundance.columns, dtype=float),
+        x_range=pd.DataFrame(data=np.zeros((1000, len(abundance.columns))), columns=abundance.columns, dtype=float),
+        density=pd.DataFrame(data=np.zeros((1000, len(abundance.columns))), columns=abundance.columns, dtype=float),
         mu=np.zeros(len(abundance.columns)),
         std_dev=np.zeros(len(abundance.columns)),
         max_fpkm_peak=np.zeros(len(abundance.columns)),

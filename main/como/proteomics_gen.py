@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import itertools
 import sys
-from io import TextIOWrapper
 from pathlib import Path
+from typing import TextIO, cast
 
 import numpy as np
 import pandas as pd
-from fast_bioservices.biodbnet import BioDBNet, Input, Output
+from bioservices import BioDBNet
+from fast_bioservices.biodbnet import Input, Output  # BioDBNet
 from loguru import logger
 
-from como.data_types import LOG_FORMAT, LogLevel
+from como.data_types import LogLevel
 from como.project import Config
 from como.proteomics_preprocessing import protein_transform_main
 from como.utils import _log_and_raise_error, _set_up_logging, return_placeholder_data
@@ -27,16 +29,25 @@ def process_proteomics_data(path: Path) -> pd.DataFrame:
     """
     # Preprocess data, drop na, duplicate ';' in symbol,
     matrix: pd.DataFrame = pd.read_csv(path)
-    if "gene_symbol" not in matrix.columns:
+    gene_symbol_colname = [col for col in matrix.columns if "symbol" in col]
+    if len(gene_symbol_colname) == 0:
         _log_and_raise_error(
             "No gene_symbol column found in proteomics data.",
             error=ValueError,
             level=LogLevel.ERROR,
         )
-
+    if len(gene_symbol_colname) > 1:
+        _log_and_raise_error(
+            "Multiple gene_symbol columns found in proteomics data.",
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
+    symbol_col = gene_symbol_colname[0]
+    matrix = matrix.rename(columns={symbol_col: "gene_symbol"})
     matrix["gene_symbol"] = matrix["gene_symbol"].astype(str)
     matrix.dropna(subset=["gene_symbol"], inplace=True)
-    matrix = matrix.assign(gene_symbol=matrix["gene_symbol"].str.split(";")).explode("gene_symbol")
+    matrix["gene_symbol"] = matrix["gene_symbol"].str.split(":")
+    matrix = matrix.explode(column=["gene_symbol"])
     return matrix
 
 
@@ -54,12 +65,23 @@ async def load_gene_symbol_map(gene_symbols: list[str], entrez_map: Path | None 
     if entrez_map and entrez_map.exists():
         df = pd.read_csv(entrez_map, index_col="gene_symbol")
     else:
-        biodbnet = BioDBNet()
-        df = await biodbnet.async_db2db(
-            values=gene_symbols,
-            input_db=Input.GENE_SYMBOL,
-            output_db=[Output.GENE_ID, Output.ENSEMBL_GENE_ID],
-        )
+        dataframes: list[pd.DataFrame] = []
+        step_size: int = 300
+        biodbnet = BioDBNet(cache=True)
+        biodbnet.services.settings.TIMEOUT = 60
+        for i in range(0, len(gene_symbols), step_size):
+            # Operations: Goes from gene_symbols=["A", "B;C", "D"] -> gene.split=[["A"], ["B", "C"], ["D"]] -> chain.from_iterable["A", "B", "C", "D"]
+            chunk: list[str] = list(itertools.chain.from_iterable(gene.split(";") for gene in gene_symbols[i : i + step_size]))
+            dataframes.append(
+                biodbnet.db2db(
+                    input_values=chunk,
+                    input_db=Input.GENE_SYMBOL.value,
+                    output_db=[Output.GENE_ID.value, Output.ENSEMBL_GENE_ID.value],
+                    taxon=9606,
+                )
+            )
+        df = pd.concat(dataframes, axis="columns")
+        print(df)
         df.loc[df["gene_id"].isna(), ["gene_id"]] = np.nan
         df.to_csv(entrez_map, index_label="gene_symbol")
 
@@ -186,7 +208,7 @@ async def proteomics_gen(
     high_confidence_batch_ratio: float = 0.7,
     quantile: int = 25,
     log_level: LogLevel = LogLevel.INFO,
-    log_location: str | TextIOWrapper = sys.stderr,
+    log_location: str | TextIO = sys.stderr,
 ):
     """Generate proteomics data."""
     _set_up_logging(level=log_level, location=log_location)
@@ -227,13 +249,12 @@ async def proteomics_gen(
 
     config_df = pd.read_excel(config_filepath, sheet_name=context_name)
     matrix: pd.DataFrame = process_proteomics_data(matrix_filepath)
-
     groups = config_df["group"].unique().tolist()
 
     for group in groups:
         indices = np.where([g == group for g in config_df["group"]])
         sample_columns = [*np.take(config_df["sample_name"].to_numpy(), indices).ravel().tolist(), "gene_symbol"]
-        matrix = matrix.loc[:, sample_columns]
+        matrix = cast(pd.DataFrame, matrix.loc[:, sample_columns])
 
         symbols_to_gene_ids = await load_gene_symbol_map(
             gene_symbols=matrix["gene_symbol"].tolist(),

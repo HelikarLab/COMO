@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import multiprocessing
 import sys
 import time
@@ -8,9 +9,8 @@ from collections.abc import Callable
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from enum import Enum
-from io import TextIOWrapper
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, TextIO, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,11 +22,11 @@ import sklearn.neighbors
 from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
 from pandas import DataFrame
-from scipy.signal import find_peaks
-from sklearn.neighbors import KernelDensity
 
 from como.data_types import FilteringTechnique, LogLevel, PeakIdentificationParameters, RNAType
+from como.density import density
 from como.migrations import gene_info_migrations
+from como.peak_finder import find_peaks
 from como.project import Config
 from como.utils import _log_and_raise_error, _num_columns, _read_file, _set_up_logging
 
@@ -99,7 +99,7 @@ class _ZFPKMResult(NamedTuple):
     density: Density
     mu: float
     std_dev: float
-    max_fpkm: float
+    fpkm_at_mu: float
 
 
 class _ReadMatrixResults(NamedTuple):
@@ -139,7 +139,7 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
     Returns:
         A NumPy array of the filtered data.
     """
-    if not isinstance(data, pd.DataFrame | npt.NDArray):
+    if not isinstance(data, pd.DataFrame | np.ndarray):
         _log_and_raise_error(
             f"Unsupported data type. Must be a Pandas DataFrame or a NumPy array, got '{type(data)}'",
             error=TypeError,
@@ -166,18 +166,18 @@ async def _build_matrix_results(
     Returns:
         A dataclass `ReadMatrixResults`
     """
-    matrix.dropna(subset="ensembl_gene_id", inplace=True)
     conversion = await ensembl_to_gene_id_and_symbol(ids=matrix["ensembl_gene_id"].tolist(), taxon=taxon)
 
-    # If any one column was
-    if any(conversion[col].eq("-").all() for col in conversion.columns):
+    # If all columns are empty, it is indicative that the incorrect taxon id was provided
+    if all(conversion[col].eq("-").all() for col in conversion.columns):
         logger.critical(f"Conversion of Ensembl Gene IDs to Entrez IDs and Gene Symbols was empty - is '{taxon}' the correct taxon ID for this data?")
 
-    conversion["ensembl_gene_id"] = conversion["ensembl_gene_id"].str.split(",")
-    conversion = conversion.explode("ensembl_gene_id")
-    conversion.reset_index(inplace=True, drop=True)
-    conversion = conversion[conversion["entrez_gene_id"] != "-"]  # drop missing entrez IDs
-    conversion["entrez_gene_id"] = conversion["entrez_gene_id"].astype(int)  # float32 is needed because np.nan is a float
+    # 2025-NOV-3: commented out `conversion` types to evaluate if it can be skipped
+    # conversion["ensembl_gene_id"] = conversion["ensembl_gene_id"].str.split(",")
+    # conversion = conversion.explode("ensembl_gene_id")
+    # conversion.reset_index(inplace=True, drop=True)
+    # conversion = conversion[conversion["entrez_gene_id"] != "-"]  # drop missing entrez IDs
+    # conversion["entrez_gene_id"] = conversion["entrez_gene_id"].astype(int)  # float32 is needed because np.nan is a float
 
     # merge_on should contain at least one of "ensembl_gene_id", "entrez_gene_id", or "gene_symbol"
     merge_on: list[str] = list(set(matrix.columns).intersection(conversion.columns))
@@ -195,11 +195,11 @@ async def _build_matrix_results(
     matrix = matrix.merge(conversion, on=merge_on, how="left")
 
     # drop rows that have `0` in `entrez_gene_id` column
-    matrix = matrix[matrix["entrez_gene_id"] != 0].reset_index(drop=True, inplace=False)
-    gene_info = gene_info[gene_info["entrez_gene_id"] != 0].reset_index(drop=True, inplace=False)
+    # matrix = matrix[matrix["entrez_gene_id"] != 0].reset_index(drop=True, inplace=False)
+    # gene_info = gene_info[gene_info["entrez_gene_id"] != 0].reset_index(drop=True, inplace=False)
 
     gene_info = gene_info_migrations(gene_info)
-    gene_info["entrez_gene_id"] = gene_info["entrez_gene_id"].astype(int)
+    # gene_info["entrez_gene_id"] = gene_info["entrez_gene_id"].astype(int)
 
     counts_matrix = matrix.merge(
         gene_info[["entrez_gene_id", "ensembl_gene_id"]],
@@ -219,7 +219,7 @@ async def _build_matrix_results(
         study_sample_names = metadata_df[metadata_df["study"] == study]["sample_name"].tolist()
         layouts = metadata_df[metadata_df["study"] == study]["layout"].tolist()
         metrics[study] = _StudyMetrics(
-            count_matrix=counts_matrix[counts_matrix.columns.intersection(study_sample_names)],
+            count_matrix=cast(pd.DataFrame, counts_matrix[counts_matrix.columns.intersection(study_sample_names)]),
             fragment_lengths=metadata_df[metadata_df["study"] == study]["fragment_length"].values.astype(float),
             sample_names=study_sample_names,
             layout=[LayoutMethod(layout) for layout in layouts],
@@ -257,7 +257,7 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
     return metrics
 
 
-def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
+def _calculate_fpkm(metrics: NamedMetrics, scale: float = 1e6) -> NamedMetrics:
     """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary.
 
     Args:
@@ -272,11 +272,11 @@ def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
 
         for sample in range(metrics[study].num_samples):
             layout = metrics[study].layout[sample]
-            count_matrix: npt.NDArray[np.float32] = metrics[study].count_matrix.iloc[:, sample].values
+            count_matrix: npt.NDArray[float] = metrics[study].count_matrix.iloc[:, sample].values
             gene_lengths = (
-                metrics[study].fragment_lengths[sample].astype(np.float32)
+                metrics[study].fragment_lengths[sample].astype(float)
                 if layout == LayoutMethod.paired_end
-                else metrics[study].gene_sizes.astype(np.float32)
+                else metrics[study].gene_sizes.astype(float)
             )
             gene_lengths_kb = gene_lengths / 1000.0
 
@@ -318,107 +318,59 @@ def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
     return metrics
 
 
-def _zfpkm_calculation(
-    column: pd.Series,
-    peak_parameters: PeakIdentificationParameters,
-    bandwidth: float = 1.0,
-    epsilon: float = 1e-10,
-) -> _ZFPKMResult:
-    """Log2 Transformations.
+def _zfpkm_calculation(col_fpkm: pd.Series, min_peak_height: float, min_peak_distance: int):
+    """ZFPKM Transformations.
 
-    Stabilize the variance in the data to make the distribution more symmetric; this is helpful for Gaussian fitting
+    This function reproduces R's `zFPKM::zFPKM` function.
 
-    Kernel Density Estimation (kde)
-        - SciKit Learn: https://scikit-learn.org/stable/modules/density.html
-        - Non-parametric method to estimate the probability density function (PDF) of a random variable
-        - Estimates the distribution of log2-transformed FPKM values
-        - Bandwidth parameter controls the smoothness of the density estimate
-        - KDE Explanation
-            - A way to smooth a histogram to get a better idea of the underlying distribution of the data
-            - Given a set of data points, we want to understand how they are distributed.
-                Histograms can be useful, but are sensitive to bin size and number
-            - The KDE places a "kernel" - a small symmetric function (i.e., Gaussian curve) - at each data point
-            - The "kernel" acts as a weight, giving more weight to points closer to the center of the kernel,
-                and less weight to points farther away
-            - Kernel functions are summed along each point on the x-axis
-            - A smooth curve is created that represents the estimated density of the data
-
-    Peak Finding
-        - Identifies that are above a certain height and separated by a minimum distance
-        - Represent potential local maxima in the distribution
-
-    Peak Selection
-        - The peak with the highest x-value (from log2-FPKM) is chosen as the mean (mu)
-            of the "inactive" gene distribution
-        - The peak representing unexpressed or inactive genes should be at a lower FPKM
-            value compared to the peak representing expressed genes
-
-    Standard Deviation Estimation
-         - The mean of log2-FPKM values are greater than the calculated mu
-         - Standard deviation is estimated based on the assumption that the right tail of the distribution
-            This represents expressed genes) can be approximated by a half-normal distribution
-
-    zFPKM Transformation
-        - Centers disbribution around 0 and scales it by the standard deviation.
-            This makes it easier to compare gene expression across different samples
-        - Represents the number of standard deviations away from the mean of the "inactive" gene distribution
-        - Higher zFPKM values indicate higher expression levels relative to the "inactive" peak
-        - A zFPKM value of 0 represents the mean of the "inactive" distribution
-        - Research shows that a zFPKM value of -3 or greater can be used as
-            a threshold for calling a gene as "active" and/or "expressed"
-            : https://doi.org/10.1186/1471-2164-14-778
+    References:
+        1) zFPKM implementation in R: https://github.com/ronammar/zFPKM
+        2) zFPKM publication: https://doi.org/10.1186/1471-2164-14-778
 
     Args:
-          column: A pandas Series representing a single sample's FPKM values.
-          peak_parameters: Parameters for peak identification.
-          bandwidth: The bandwidth for the Kernel Density Estimation (KDE).
-          epsilon: A small value to add to FPKM values to prevent log2-divide-by-0 errors
+        col_fpkm: The raw FPKM values to perform zFPKM on
+        min_peak_distance: Minimum distance between peaks; passed on to `find_peaks` function
+        min_peak_height: Minimum height of peaks; passed on to `find_peaks` function
 
     Returns:
-            A named tuple containing the zFPKM values, density estimate, mean (mu), standard deviation, and maximum FPKM value.
-
+        A named tuple containing the zFPKM values, density estimate, mean (mu), standard deviation, and maximum FPKM value.
     """
-    log2values: npt.NDArray[float] = np.log2(column.values + epsilon)
+    # Ignore np.log2(0) errors; we know this will happen, and are removing non-finite values in the density calculation
+    # This is required in order to match R's zFPKM calculations, as R's `density` function removes NA values.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        log2fpkm: npt.NDArray[float] = np.log2(col_fpkm.values).astype(float)
+    d = density(log2fpkm)
 
-    # 1D KDE *always* has one feature and many samples. scikit-learn expects data in the format of (n_samples, n_features)
-    # Thus, we use `.reshape(-1, 1)` because we know there is a single feature
-    # Even though the data is FPKM of many genes for a single sample, it is still one feature over many samples
-    # `-1` indicates the unknown dimension (the number of samples)
-    # `1` indicates the known dimension (the number of genes [also known as features])
-    # https://scikit-learn.org/stable/auto_examples/neighbors/plot_kde_1d.html#sphx-glr-auto-examples-neighbors-plot-kde-1d-py
-    kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(log2values.reshape(-1, 1))
+    peaks: pd.DataFrame = find_peaks(d.y_grid, min_peak_height=min_peak_height, min_peak_distance=min_peak_distance)
+    peak_positions = d.x_grid[peaks["peak_idx"].astype(int).tolist()]
 
-    x_range: npt.NDArray[float] = np.linspace(log2values.min(), log2values.max(), 2000).reshape(-1, 1)
-    density: npt.NDArray[float] = np.exp(kde.score_samples(x_range))
-    peaks, _ = find_peaks(density, height=peak_parameters.height, distance=peak_parameters.distance)
-    peak_positions = x_range[peaks]
-
-    mu = 0
-    max_fpkm = 0
-    stddev = 1
-    if len(peaks) != 0:
-        mu = peak_positions.max()
-        max_fpkm = density[peaks[np.argmax(peak_positions)]]
-        u = log2values[log2values > mu].mean()
-        stddev = (u - mu) * np.sqrt(np.pi / 2)
-    zfpkm = pd.Series((log2values - mu) / stddev, dtype=float, name=column.name)
-
-    return _ZFPKMResult(zfpkm=zfpkm, density=Density(x_range, density), mu=mu, std_dev=stddev, max_fpkm=max_fpkm)
+    sd = 1.0
+    mu = 0.0
+    fpkm_at_mu = 0.0
+    if peak_positions.size > 0:
+        mu = float(peak_positions.max())
+        u = float(log2fpkm[log2fpkm > mu].mean())
+        fpkm_at_mu = float(d.y_grid[int(peaks.loc[np.argmax(peak_positions), "peak_idx"])])
+        sd = float((u - mu) * np.sqrt(np.pi / 2))
+    zfpkm = pd.Series((log2fpkm - mu) / sd, dtype=float, name=col_fpkm.name, index=col_fpkm.index)
+    return _ZFPKMResult(zfpkm=zfpkm, density=Density(d.x_grid, d.y_grid), mu=mu, std_dev=sd, fpkm_at_mu=fpkm_at_mu)
 
 
 def zfpkm_transform(
     fpkm_df: pd.DataFrame,
-    peak_parameters: PeakIdentificationParameters,
-    bandwidth: float,
+    min_peak_height: float = 0.02,
+    min_peak_distance: int = 1,
     update_every_percent: float = 0.1,
+    remove_na: bool = True,
 ) -> tuple[dict[str, _ZFPKMResult], DataFrame]:
     """Perform zFPKM calculation/transformation.
 
     Args:
         fpkm_df: A DataFrame containing FPKM values with genes as rows and samples as columns.
-        peak_parameters: Parameters for peak identification in zFPKM calculation.
-        bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
+        min_peak_height: Minimum height of peaks; passed on to `find_peaks` function.
+        min_peak_distance: Minimum distance between peaks; passed on to `find_peaks` function.
         update_every_percent: Frequency of progress updates as a decimal between 0 and 1 (e.g., 0.1 for every 10%).
+        remove_na: Whether to remove NaN & blank values from the input DataFrame before processing.
 
     Returns:
         A tuple containing:
@@ -443,16 +395,18 @@ def zfpkm_transform(
     zfpkm_series: list[pd.Series] = []
     results: dict[str, _ZFPKMResult] = {}
 
+    slim_fpkm_df: pd.DataFrame = cast(pd.DataFrame, fpkm_df[fpkm_df.index != "-"] if remove_na else fpkm_df)
     with ProcessPoolExecutor(max_workers=cores) as pool:
         futures: list[Future[_ZFPKMResult]] = [
             pool.submit(
                 _zfpkm_calculation,
-                column=fpkm_df[column],
-                peak_parameters=peak_parameters,
-                bandwidth=bandwidth,
+                col_fpkm=fpkm_df[column],
+                min_peak_height=min_peak_height,
+                min_peak_distance=min_peak_distance,
             )
-            for column in fpkm_df
+            for column in slim_fpkm_df
         ]
+
         for i, future in enumerate(as_completed(futures)):
             result = future.result()
             key = str(result.zfpkm.name)
@@ -486,20 +440,20 @@ def zfpkm_plot(results: dict[str, _ZFPKMResult], *, output_png_dirpath: Path, pl
         subplot_titles: Whether to display facet titles (sample names).
 
     """
-    to_concat: list[pd.DataFrame] = [None] * len(results)  # type: ignore  # ignoring because None is not of type pd.DataFrame
+    to_concat: list[pd.DataFrame] = []
     for name, result in results.items():
         stddev: float = float(result.std_dev)
         x: npt.NDArray[float] = result.density.x.flatten()
         y: npt.NDArray[float] = result.density.y.flatten()
 
         fitted: npt.NDArray[float] = np.exp(-0.5 * ((x - result.mu) / stddev) ** 2) / (stddev * np.sqrt(2 * np.pi))
-        max_fpkm: float = float(y.max())
+        fpkm_at_mu: float = result.fpkm_at_mu
         max_fitted: float = float(fitted.max())
-        scale_fitted: float = fitted * max_fpkm / max_fitted
-        to_concat.append(pd.DataFrame({"sample_name": name, "log2fpkm": x, "fpkm_density": y, "fitted_density_scaled": scale_fitted}))
+        scale_fitted: float = fitted * fpkm_at_mu / max_fitted
+        to_concat.append(pd.DataFrame({"sample_name": name, "log2fpkm": x, "fpkm_density": y, "zfpkm_density": scale_fitted}))
 
     mega_df = pd.concat(to_concat, ignore_index=True)
-    mega_df.columns = pd.Series(data=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
+    mega_df.columns = pd.Series(data=["sample_name", "log2fpkm", "fpkm_density", "zfpkm_density"])
     mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")
 
     fig: plt.Figure
@@ -573,7 +527,7 @@ def cpm_filter(
     for sample, metric in metrics.items():
         counts: pd.DataFrame = metric.count_matrix
         entrez_ids: list[str] = metric.entrez_gene_ids
-        library_size: pd.DataFrame = counts.sum(axis=1)
+        library_size: pd.DataFrame = cast(pd.DataFrame, counts.sum(axis=1))
 
         # For library_sizes equal to 0, add 1 to prevent divide by 0
         # This will not impact the final counts per million calculation because the original counts are still 0
@@ -595,11 +549,11 @@ def cpm_filter(
         top_samples = round(n_top * len(counts.columns))  # noqa: F841
         test_bools = pd.DataFrame({"entrez_gene_ids": entrez_ids})
         for i in range(len(counts_per_million.columns)):
-            median_sum = np.float64(np.median(np.sum(counts[:, i])))
+            median_sum = float(np.median(np.sum(counts[:, i])))
             if cut_off == "default":  # noqa: SIM108
-                cutoff = np.float64(10e6) / median_sum
+                cutoff = float(10e6 / median_sum)
             else:
-                cutoff = np.float64(1e6 * cut_off) / median_sum
+                cutoff = float(1e6 * cut_off) / median_sum
             test_bools = test_bools.merge(counts_per_million[counts_per_million.iloc[:, i] > cutoff])
 
     return metrics
@@ -645,8 +599,8 @@ def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
         # Only keep `entrez_gene_ids` that pass `min_genes`
         metric.entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, min_genes, strict=True) if keep]
         metric.gene_sizes = np.array(gene for gene, keep in zip(gene_size, min_genes, strict=True) if keep)
-        metric.count_matrix = metric.count_matrix.iloc[min_genes, :]
-        metric.normalization_matrix = metrics[sample].normalization_matrix.iloc[min_genes, :]
+        metric.count_matrix = cast(pd.DataFrame, metric.count_matrix.iloc[min_genes, :])
+        metric.normalization_matrix = cast(pd.DataFrame, metrics[sample].normalization_matrix.iloc[min_genes, :])
 
         keep_top_genes = [gene for gene, keep in zip(entrez_ids, top_genes, strict=True) if keep]
         metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, keep_top_genes, strict=True) if keep]
@@ -662,9 +616,9 @@ def zfpkm_filter(
     filtering_options: _FilteringOptions,
     calculate_fpkm: bool,
     force_zfpkm_plot: bool,
-    peak_parameters: PeakIdentificationParameters,
-    bandwidth: float,
-    output_png_filepath: Path | None,
+    min_peak_height: float,
+    min_peak_distance: int,
+    output_png_dirpath: Path | None,
 ) -> NamedMetrics:
     """Apply zFPKM filtering to the FPKM matrix for a given sample.
 
@@ -673,9 +627,9 @@ def zfpkm_filter(
         filtering_options: Options for filtering the count matrix.
         calculate_fpkm: Whether to calculate FPKM from counts.
         force_zfpkm_plot: Whether to force plotting of zFPKM results even if there are many samples.
-        peak_parameters: Parameters for peak identification in zFPKM calculation.
-        bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
-        output_png_filepath: Optional filepath to save the zFPKM plot.
+        min_peak_height: Minimum peak height for zFPKM peak identification.
+        min_peak_distance: Minimum peak distance for zFPKM peak identification.
+        output_png_dirpath: Optional directory path to save zFPKM plots.
 
     Returns:
         A dictionary of filtered study metrics.
@@ -689,9 +643,15 @@ def zfpkm_filter(
         metric: _StudyMetrics
         # if fpkm was not calculated, the normalization matrix will be empty; collect the count matrix instead
         matrix = metric.count_matrix if metric.normalization_matrix.empty else metric.normalization_matrix
-        matrix = matrix[matrix.sum(axis=1) > 0]  # remove rows (genes) that have no counts across all samples
 
-        results, zfpkm_df = zfpkm_transform(matrix, peak_parameters=peak_parameters, bandwidth=bandwidth)
+        # TODO: 2025-OCT-31: Re-evaluate whether to remove rows with all 0 counts
+        # matrix = matrix[matrix.sum(axis=1) > 0]  # remove rows (genes) that have no counts across all samples
+
+        results, zfpkm_df = zfpkm_transform(
+            fpkm_df=matrix,
+            min_peak_height=min_peak_height,
+            min_peak_distance=min_peak_distance,
+        )
         zfpkm_df[(matrix == 0) | (zfpkm_df.isna())] = -4
 
         if len(results) > 10 and not force_zfpkm_plot:
@@ -729,8 +689,8 @@ def filter_counts(
     filtering_options: _FilteringOptions,
     prep: RNAType,
     force_zfpkm_plot: bool,
-    peak_parameters: PeakIdentificationParameters,
-    bandwidth: float,
+    zfpkm_min_peak_height: float,
+    zfpkm_min_peak_distance: int,
     output_zfpkm_plot_dirpath: Path | None = None,
 ) -> NamedMetrics:
     """Filter the count matrix based on the specified technique.
@@ -742,8 +702,8 @@ def filter_counts(
         filtering_options: Options for filtering the count matrix.
         prep: The RNA preparation type.
         force_zfpkm_plot: Whether to force plotting of zFPKM results even if there are many samples.
-        peak_parameters: Parameters for peak identification in zFPKM calculation.
-        bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
+        zfpkm_min_peak_height: Minimum peak height for zFPKM peak identification.
+        zfpkm_min_peak_distance: Minimum peak distance for zFPKM peak identification.
         output_zfpkm_plot_dirpath: Optional filepath to save the zFPKM plot.
 
     Returns:
@@ -760,8 +720,8 @@ def filter_counts(
                 filtering_options=filtering_options,
                 calculate_fpkm=True,
                 force_zfpkm_plot=force_zfpkm_plot,
-                peak_parameters=peak_parameters,
-                bandwidth=bandwidth,
+                min_peak_height=zfpkm_min_peak_height,
+                min_peak_distance=zfpkm_min_peak_distance,
                 output_png_dirpath=output_zfpkm_plot_dirpath,
             )
         case FilteringTechnique.UMI:
@@ -771,8 +731,8 @@ def filter_counts(
                 filtering_options=filtering_options,
                 calculate_fpkm=False,
                 force_zfpkm_plot=force_zfpkm_plot,
-                peak_parameters=peak_parameters,
-                bandwidth=bandwidth,
+                min_peak_height=zfpkm_min_peak_height,
+                min_peak_distance=zfpkm_min_peak_distance,
                 output_png_dirpath=output_zfpkm_plot_dirpath,
             )
         case _:
@@ -797,8 +757,8 @@ async def _process(
     technique: FilteringTechnique,
     cut_off: int | float,
     force_zfpkm_plot: bool,
-    peak_parameters: PeakIdentificationParameters,
-    bandwidth: float,
+    zfpkm_min_peak_height: float,
+    zfpkm_min_peak_distance: int,
     output_boolean_activity_filepath: Path,
     output_zscore_normalization_filepath: Path,
     output_zfpkm_plot_dirpath: Path | None,
@@ -838,32 +798,19 @@ async def _process(
         filtering_options=filtering_options,
         prep=prep,
         force_zfpkm_plot=force_zfpkm_plot,
-        peak_parameters=peak_parameters,
-        bandwidth=bandwidth,
+        zfpkm_min_peak_height=zfpkm_min_peak_height,
+        zfpkm_min_peak_distance=zfpkm_min_peak_distance,
         output_zfpkm_plot_dirpath=output_zfpkm_plot_dirpath,
     )
 
-    merged_zscore_df = pd.DataFrame()
-    expressed_genes: list[str] = []
-    top_genes: list[str] = []
-    for metric in metrics.values():
-        expressed_genes.extend(metric.entrez_gene_ids)
-        top_genes.extend(metric.high_confidence_entrez_gene_ids)
-
-        merged_zscore_df = (
-            metric.z_score_matrix
-            if merged_zscore_df.empty
-            else merged_zscore_df.merge(
-                metric.z_score_matrix,
-                how="outer",
-                left_index=True,
-                right_index=True,
-            )
-        )
-    merged_zscore_df[merged_zscore_df.isna()] = -4
+    merged_zscore_df = pd.concat([m.z_score_matrix[m.z_score_matrix.index != "-"] for m in metrics.values()], axis="columns")
+    merged_zscore_df.fillna(-4, inplace=True)
+    expressed_genes: list[str] = list(itertools.chain.from_iterable(m.entrez_gene_ids for m in metrics.values()))
+    top_genes: list[str] = list(itertools.chain.from_iterable(m.high_confidence_entrez_gene_ids for m in metrics.values()))
 
     # If any of the normalization metrics are not empty, write the normalized metrics to disk
     if not all(metric.normalization_matrix.empty for metric in metrics.values()):
+        merged_zscore_df: pd.DataFrame = merged_zscore_df.reindex(columns=sorted(merged_zscore_df))
         merged_zscore_df.to_csv(output_zscore_normalization_filepath, index=True)
         logger.success(f"Wrote z-score normalization matrix to {output_zscore_normalization_filepath}")
     else:
@@ -893,7 +840,8 @@ async def _process(
     expressed_count = len(boolean_matrix[boolean_matrix["expressed"] == 1])
     high_confidence_count = len(boolean_matrix[boolean_matrix["high"] == 1])
 
-    boolean_matrix.dropna(subset="entrez_gene_id", inplace=True)
+    # TODO: 2025-OCT-31: commented out dropping entrez ids, should this be kept?
+    # boolean_matrix.dropna(subset="entrez_gene_id", inplace=True)
     boolean_matrix.to_csv(output_boolean_activity_filepath, index=False)
     logger.info(f"{context_name} - Found {expressed_count} expressed genes, {high_confidence_count} of which are confidently expressed")
     logger.success(f"Wrote boolean matrix to {output_boolean_activity_filepath}")
@@ -913,9 +861,8 @@ async def rnaseq_gen(  # noqa: C901
     batch_ratio: float = 0.5,
     high_batch_ratio: float = 0.75,
     technique: FilteringTechnique | str = FilteringTechnique.ZFPKM,
-    zfpkm_peak_height: float = 0.02,
-    zfpkm_peak_distance: float = 1.0,
-    zfpkm_bandwidth: float = 1.0,
+    zfpkm_min_peak_height: float = 0.02,
+    zfpkm_min_peak_distance: int = 1,
     cutoff: int | float | None = None,
     force_zfpkm_plot: bool = False,
     log_level: LogLevel = LogLevel.INFO,
@@ -944,9 +891,8 @@ async def rnaseq_gen(  # noqa: C901
     :param high_batch_ratio: The percentage of batches that a gene must
         appear in for a gene to be marked "highly confident" in its expression
     :param technique: The filtering technique to use
-    :param zfpkm_peak_height: The height of the zFPKM peak
-    :param zfpkm_peak_distance: The distance of the zFPKM peak
-    :param zfpkm_bandwidth: The bandwidth of the zFPKM
+    :param zfpkm_min_peak_height: The height of the zFPKM peak
+    :param zfpkm_min_peak_distance: The distance of the zFPKM peak
     :param cutoff: The cutoff value to use for the provided filtering technique
     :param force_zfpkm_plot: If too many samples exist, should plotting be done anyway?
     :param log_level: The level of logging to output
@@ -1040,8 +986,8 @@ async def rnaseq_gen(  # noqa: C901
         technique=technique,
         cut_off=cutoff,
         force_zfpkm_plot=force_zfpkm_plot,
-        peak_parameters=PeakIdentificationParameters(height=zfpkm_peak_height, distance=zfpkm_peak_distance),
-        bandwidth=zfpkm_bandwidth,
+        zfpkm_min_peak_height=zfpkm_min_peak_height,
+        zfpkm_min_peak_distance=zfpkm_min_peak_distance,
         output_boolean_activity_filepath=output_boolean_activity_filepath,
         output_zscore_normalization_filepath=output_zscore_normalization_filepath,
         output_zfpkm_plot_dirpath=output_zfpkm_plot_dirpath,

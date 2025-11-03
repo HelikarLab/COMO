@@ -20,12 +20,12 @@ def test_mannwhitney_stats(expected_result: pd.DataFrame, cores: int):
     df1 = pd.DataFrame(
         index=list(range(size)),
         columns=list(range(cols)),
-        data=gen.normal(loc=0, size=size * cols).reshape(size, cols).astype(np.float32),
+        data=gen.normal(loc=0, size=size * cols).reshape(size, cols).astype(float),
     )
     df2 = pd.DataFrame(
         index=list(range(size)),
         columns=list(range(cols)),
-        data=gen.normal(loc=1, size=size * cols).reshape(size, cols).astype(np.float32),
+        data=gen.normal(loc=1, size=size * cols).reshape(size, cols).astype(float),
     )
 
     real_result = MannWhitneyUTest.run(df1, df2, cores=cores)

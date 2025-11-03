@@ -40,9 +40,9 @@ class FilteringTechnique(str, Enum):
 
 
 class GeneIdentifier(str, Enum):
-    ENSEMBL_GENE_ID = "ENSEMBL_GENE_ID"
-    ENTREZ_GENE_ID = "ENTREZ_GENE_ID"
-    GENE_SYMBOL = "GENE_SYMBOL"
+    ensembl_gene_id = "ensembl_gene_id"
+    entrez_gene_id = "entrez_gene_id"
+    gene_symbol = "gene_symbol"
 
 
 class LogLevel(int, Enum):
@@ -72,15 +72,15 @@ class Solver(str, Enum):
 
 
 class SourceTypes(str, Enum):
-    TRNA = "TRNA"
-    MRNA = "MRNA"
-    SCRNA = "SCRNA"
-    PROTEOMICS = "PROTEOMICS"
+    trna = "trna"
+    mrna = "mrna"
+    scrna = "scrna"
+    proteomics = "proteomics"
 
 
 class PeakIdentificationParameters(NamedTuple):
-    height: float
-    distance: float
+    height: float = 0.02
+    distance: float = 1.0
 
 
 class CobraCompartments:

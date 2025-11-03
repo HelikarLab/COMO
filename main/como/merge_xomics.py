@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import sys
 from pathlib import Path
 from typing import TextIO, cast
@@ -10,9 +11,7 @@ import pandas as pd
 from fast_bioservices.biothings.mygene import MyGene
 from loguru import logger
 
-from como.combine_distributions import (
-    _begin_combining_distributions,
-)
+from como.combine_distributions import _begin_combining_distributions
 from como.data_types import (
     AdjustmentMethod,
     LogLevel,
@@ -107,7 +106,7 @@ def _merge_logical_table(df: pd.DataFrame):
     """
     # step 1: get all plural ENTREZ_GENE_IDs in the input table, extract unique IDs
     df.dropna(subset=["entrez_gene_id"], inplace=True)
-    df["entrez_gene_id"] = df["entrez_gene_id"].astype(str).str.replace(" /// ", "//").astype(str)
+    df.loc[:, "entrez_gene_id"] = df.loc[:, "entrez_gene_id"].astype(str).str.replace(" /// ", "//").astype(str)
 
     id_list: list[str] = df.loc[~df["entrez_gene_id"].str.contains("//"), "entrez_gene_id"].tolist()  # Collect "single" ids, like "123"
     multiple_entrez_ids: list[str] = df.loc[
@@ -288,6 +287,8 @@ async def _merge_xomics(
         expression_list.append(expressed_sourcetype)
         high_confidence_list.append(high_expressed_sourcetype)
         matrix.rename(columns={"expressed": expressed_sourcetype, "high": high_expressed_sourcetype}, inplace=True)
+        matrix = cast(pd.DataFrame, matrix[matrix["entrez_gene_id"] != "-"])
+        matrix.loc[:, "entrez_gene_id"] = matrix.loc[:, "entrez_gene_id"].astype(int)
         merge_data = matrix if merge_data.empty else merge_data.merge(matrix, on="entrez_gene_id", how="outer")
 
     logger.trace(f"Shape of merged data before merging logical tables: {merge_data.shape}")
@@ -366,15 +367,24 @@ async def _update_missing_data(input_matrices: _InputMatrices, taxon_id: int) ->
         if matrix is not None:
             # fmt: off
             existing_data = (
-                "gene_symbol" if "gene_symbol" in matrix
-                else "entrez_gene_id" if "entrez_gene_id" in matrix
+                "gene_symbol" if "gene_symbol" in matrix.columns
+                else "entrez_gene_id" if "entrez_gene_id" in matrix.columns
                 else "ensembl_gene_id"
             )
             # fmt: on
             logger.trace(f"Merging conversion data for {matrix_name}, existing id column is: {existing_data}")
+            # input_matrices[matrix_name][existing_data] = input_matrices[matrix_name][existing_data].astype(str)
+            if existing_data == "entrez_gene_id":
+                input_matrices[matrix_name]["entrez_gene_id"] = input_matrices[matrix_name]["entrez_gene_id"].astype(int)
+                conversion.index = conversion.index.astype(int)
+
             input_matrices[matrix_name] = (
-                input_matrices[matrix_name].merge(conversion, how="left", on=[existing_data]).dropna().reset_index(drop=True)
+                input_matrices[matrix_name].merge(conversion, how="left", left_on=existing_data, right_index=True).reset_index(drop=True)
             )
+
+            # input_matrices[matrix_name] = (
+            #     input_matrices[matrix_name].merge(conversion, how="left", left_index=True, right_index=True).dropna().reset_index(drop=True)
+            # )
 
     logger.debug("Updated missing genomic data")
     return input_matrices
@@ -440,6 +450,12 @@ async def _process(
         adjusted_expression_requirement = expression_requirement - (4 - num_sources)
     elif adjust_method == AdjustmentMethod.FLAT:
         adjusted_expression_requirement = expression_requirement
+    else:
+        _log_and_raise_error(
+            message=f"Unknown `adjust_method`: {adjust_method}.",
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
     logger.debug(f"Adjusted expression requirement: {adjusted_expression_requirement}")
 
     if adjusted_expression_requirement != expression_requirement:
@@ -497,7 +513,16 @@ def _build_batches(
             continue
 
         metadata: pd.DataFrame  # Re-assign type to assist in type hinting
-        for batch_num, study in enumerate(sorted(metadata["study"].unique()), start=1):
+        for study in sorted(metadata["study"].unique()):
+            batch_search = re.search(r"\d+", study)
+            if not batch_search:
+                _log_and_raise_error(
+                    message=f"Unable to find batch number in study name. Expected a digit in the study value: {study}",
+                    error=ValueError,
+                    level=LogLevel.ERROR,
+                )
+
+            batch_num = int(batch_search.group(0))  # ty: ignore[possibly-missing-attribute]
             study_sample_names = metadata[metadata["study"] == study]["sample_name"].tolist()
             batch_names[source.value].append(_BatchEntry(batch_num=batch_num, sample_names=study_sample_names))
             logger.debug(f"Found {len(study_sample_names)} sample names for study '{study}', batch number {batch_num}")
@@ -571,10 +596,10 @@ async def merge_xomics(  # noqa: C901
 
     # fmt: off
     source_data = {
-        SourceTypes.TRNA: (trna_matrix_or_filepath, trna_boolean_matrix_or_filepath, trna_metadata_filepath_or_df, output_trna_activity_filepath),
-        SourceTypes.MRNA: (mrna_matrix_or_filepath, mrna_boolean_matrix_or_filepath, mrna_metadata_filepath_or_df, output_mrna_activity_filepath),
-        SourceTypes.SCRNA: (scrna_matrix_or_filepath, scrna_boolean_matrix_or_filepath, scrna_metadata_filepath_or_df, output_scrna_activity_filepath),  # noqa: E501
-        SourceTypes.PROTEOMICS: (proteomic_matrix_or_filepath, proteomic_boolean_matrix_or_filepath, proteomic_metadata_filepath_or_df, output_proteomic_activity_filepath),  # noqa: E501
+        SourceTypes.trna: (trna_matrix_or_filepath, trna_boolean_matrix_or_filepath, trna_metadata_filepath_or_df, output_trna_activity_filepath),
+        SourceTypes.mrna: (mrna_matrix_or_filepath, mrna_boolean_matrix_or_filepath, mrna_metadata_filepath_or_df, output_mrna_activity_filepath),
+        SourceTypes.scrna: (scrna_matrix_or_filepath, scrna_boolean_matrix_or_filepath, scrna_metadata_filepath_or_df, output_scrna_activity_filepath),  # noqa: E501
+        SourceTypes.proteomics: (proteomic_matrix_or_filepath, proteomic_boolean_matrix_or_filepath, proteomic_metadata_filepath_or_df, output_proteomic_activity_filepath),  # noqa: E501
     }
     # fmt: on
     for source in source_data:

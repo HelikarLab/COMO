@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import itertools
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -134,7 +135,7 @@ async def _format_determination(
 
 
 async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int | str | Taxon) -> pd.DataFrame:
-    if isinstance(values, list):
+    if isinstance(values, list) and not isinstance(values, pd.DataFrame):  # second isinstance required for static type check to be happy
         gene_type = await determine_gene_type(values)
         if all(v == "gene_symbol" for v in gene_type.values()):
             return await gene_symbol_to_ensembl_and_gene_id(values, taxon=taxon_id)
@@ -143,39 +144,71 @@ async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int 
         elif all(v == "entrez_gene_id" for v in gene_type.values()):
             return await gene_id_to_ensembl_and_gene_symbol(ids=values, taxon=taxon_id)
         else:
-            logger.critical("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
-            raise ValueError("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
-    else:
-        values: pd.DataFrame  # Re-define type to assist in type hinting
-        if "gene_symbol" in values:
-            return await get_missing_gene_data(values["gene_symbol"].tolist(), taxon_id=taxon_id)
-        elif "entrez_gene_id" in values:
-            return await get_missing_gene_data(values["entrez_gene_id"].tolist(), taxon_id=taxon_id)
-        elif "ensembl_gene_id" in values:
-            return await get_missing_gene_data(values["ensembl_gene_id"].tolist(), taxon_id=taxon_id)
+            _log_and_raise_error(
+                message="Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)",
+                error=ValueError,
+                level=LogLevel.CRITICAL,
+            )
+    elif isinstance(values, pd.DataFrame):
+        # raise error if duplicate column names exist
+        if any(values.columns.duplicated(keep=False)):
+            duplicate_cols = values.columns[values.columns.duplicated(keep=False)].unique().tolist()
+            _log_and_raise_error(
+                message=f"Duplicate column names exist! This will result in an error processing data. Duplicates: {','.join(duplicate_cols)}",
+                error=ValueError,
+                level=LogLevel.CRITICAL,
+            )
+        if "gene_symbol" in itertools.chain(values.columns, [values.index.name]):
+            return await get_missing_gene_data(
+                values["gene_symbol"].tolist() if "gene_symbol" in values.columns else values.index.tolist(),
+                taxon_id=taxon_id,
+            )
+        elif "entrez_gene_id" in itertools.chain(values.columns, [values.index.name]):
+            return await get_missing_gene_data(
+                values["entrez_gene_id"].tolist() if "entrez_gene_id" in values.columns else values.index.tolist(),
+                taxon_id=taxon_id,
+            )
+        elif "ensembl_gene_id" in itertools.chain(values.columns, [values.index.name]):
+            return await get_missing_gene_data(
+                values["ensembl_gene_id"].tolist() if "ensembl_gene_id" in values.columns else values.index.tolist(),
+                taxon_id=taxon_id,
+            )
         else:
-            logger.critical("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
-            raise ValueError("Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.")
+            _log_and_raise_error(
+                message="Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.",
+                error=ValueError,
+                level=LogLevel.CRITICAL,
+            )
+    else:
+        _log_and_raise_error(
+            message=f"Values must be a list of strings or a pandas DataFrame, got: {type(values)}",
+            error=TypeError,
+            level=LogLevel.CRITICAL,
+        )
 
 
 @overload
-async def _read_file(path: None, h5ad_as_df: bool, **kwargs) -> None: ...
+async def _read_file(path: None, h5ad_as_df: Literal[True] | Literal[False], **kwargs) -> None: ...
 
 
 @overload
-async def _read_file(path: pd.DataFrame, h5ad_as_df: bool, **kwargs) -> pd.DataFrame: ...
+async def _read_file(path: pd.DataFrame, h5ad_as_df: Literal[True] | Literal[False], **kwargs) -> pd.DataFrame: ...
 
 
 @overload
-async def _read_file(path: sc.AnnData, h5ad_as_df: bool = False, **kwargs) -> sc.AnnData: ...
-
-
-def _num_rows(item: pd.DataFrame | npt.NDArray) -> int:
-    return item.shape[0]
+async def _read_file(path: sc.AnnData, h5ad_as_df: Literal[False] = False, **kwargs) -> sc.AnnData: ...
 
 
 @overload
-async def _read_file(path: sc.AnnData, h5ad_as_df: bool = True, **kwargs) -> pd.DataFrame: ...
+async def _read_file(path: sc.AnnData, h5ad_as_df: Literal[True] = True, **kwargs) -> pd.DataFrame: ...
+
+
+@overload
+async def _read_file(path: Path, h5ad_as_df: Literal[False] = False, **kwargs) -> pd.DataFrame | sc.AnnData: ...
+
+
+@overload
+async def _read_file(path: Path, h5ad_as_df: Literal[True] = True, **kwargs) -> pd.DataFrame: ...
 
 
 async def _read_file(
