@@ -1,0 +1,9 @@
+import numpy as np
+import pandas as pd
+from cobra import Model as Model
+from scipy.sparse import dok_matrix, lil_matrix
+from typing import NamedTuple
+
+def create_stoichiometric_matrix(model: Model, array_type: str = 'dense', dtype: np.dtype | None = None) -> np.ndarray | dok_matrix | lil_matrix | pd.DataFrame: ...
+def nullspace(A: np.ndarray, atol: float = 1e-13, rtol: float = 0.0) -> np.ndarray: ...
+def constraint_matrices(model: Model, array_type: str = 'dense', zero_tol: float = 1e-06) -> NamedTuple: ...
