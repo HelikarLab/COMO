@@ -359,12 +359,12 @@ async def _write_counts_matrix(
     """
     study_metrics = _organize_gene_counts_files(data_dir=como_context_dir)
     counts: list[pd.DataFrame] = await asyncio.gather(*[_create_sample_counts_matrix(metric) for metric in study_metrics])
-    rna_specific_sample_names = set(config_df.loc[config_df["library_prep"] == rna.value, "sample_name"].tolist())
+    rna_specific_sample_names = set(config_df.loc[config_df["library_prep"].str.lower() == rna.value.lower(), "sample_name"].tolist())
 
     final_matrix: pd.DataFrame = functools.reduce(lambda left, right: pd.merge(left, right, on="ensembl_gene_id", how="outer"), counts)
     final_matrix.fillna(value=0, inplace=True)
     final_matrix.iloc[:, 1:] = final_matrix.iloc[:, 1:].astype(np.uint64)
-    final_matrix = final_matrix[["ensembl_gene_id", *rna_specific_sample_names]]
+    final_matrix = cast(pd.DataFrame, final_matrix[["ensembl_gene_id", *rna_specific_sample_names]])
 
     output_counts_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
     final_matrix.to_csv(output_counts_matrix_filepath, index=False)
@@ -459,7 +459,6 @@ async def _create_config_df(  # noqa: C901
 
         fragment_label = f"{context_name}_{label}_fragment_size.txt"
         frag_paths = [p for p in aux_lookup["fragment"].values() if p.name == fragment_label]
-        print(f"HERE: {prep}")
         if not frag_paths and prep.lower() != RNAType.TRNA.value.lower():
             logger.warning(f"No fragment file for '{label}'; defaulting to 100 bp (needed for zFPKM).")
             mean_frag = 100.0
