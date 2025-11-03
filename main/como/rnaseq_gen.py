@@ -358,16 +358,16 @@ def _zfpkm_calculation(col_fpkm: pd.Series, min_peak_height: float, min_peak_dis
 
 def zfpkm_transform(
     fpkm_df: pd.DataFrame,
-    peak_parameters: PeakIdentificationParameters,
-    bandwidth: float,
+    min_peak_height: float = 0.02,
+    min_peak_distance: int = 1,
     update_every_percent: float = 0.1,
 ) -> tuple[dict[str, _ZFPKMResult], DataFrame]:
     """Perform zFPKM calculation/transformation.
 
     Args:
         fpkm_df: A DataFrame containing FPKM values with genes as rows and samples as columns.
-        peak_parameters: Parameters for peak identification in zFPKM calculation.
-        bandwidth: The bandwidth for kernel density estimation in zFPKM calculation.
+        min_peak_height: Minimum height of peaks; passed on to `find_peaks` function.
+        min_peak_distance: Minimum distance between peaks; passed on to `find_peaks` function.
         update_every_percent: Frequency of progress updates as a decimal between 0 and 1 (e.g., 0.1 for every 10%).
 
     Returns:
@@ -398,12 +398,13 @@ def zfpkm_transform(
         futures: list[Future[_ZFPKMResult]] = [
             pool.submit(
                 _zfpkm_calculation,
-                column=fpkm_df[column],
-                peak_parameters=peak_parameters,
-                bandwidth=bandwidth,
+                col_fpkm=fpkm_df[column],
+                min_peak_height=min_peak_height,
+                min_peak_distance=min_peak_distance,
             )
-            for column in fpkm_df
+            for column in slim_fpkm_df
         ]
+
         for i, future in enumerate(as_completed(futures)):
             result = future.result()
             key = str(result.zfpkm.name)
