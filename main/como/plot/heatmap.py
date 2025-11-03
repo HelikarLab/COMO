@@ -30,7 +30,7 @@ def condition_vs_pathway(
         The resulting `matpotlib.pyplt.Figure` object
     """
     plot_df: pd.DataFrame = data.copy() if copy_df else data
-    plot_df = plot_df.astype(np.float32)
+    plot_df = plot_df.astype(float)
     fig = plt.figure(figsize=(100, 40), dpi=175)
 
     if exclude_zero_flux_pathways:

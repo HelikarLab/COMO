@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import collections
+import os
 import re
 import sys
-from collections.abc import Sequence
+from collections.abc import Coroutine, Sequence
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Literal, TextIO, cast
+from typing import Any, Literal, TextIO, cast
 
 import cobra
 import cobra.util.array
@@ -15,14 +17,16 @@ import numpy.typing as npt
 import pandas as pd
 from cobra import Model
 from cobra.flux_analysis import pfba
+from fast_bioservices.common import Taxon
+from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol
 from loguru import logger
 from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
 from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.imat import IMAT, IMATProperties
 from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
 
-from como.data_types import Algorithm, BoundaryReactions, BuildResults, CobraCompartments, LogLevel, Solver
-from como.utils import _log_and_raise_error, read_file, set_up_logging, split_gene_expression_data
+from como.data_types import Algorithm, CobraCompartments, LogLevel, Solver, _BoundaryReactions, _BuildResults
+from como.utils import _log_and_raise_error, _read_file, _set_up_logging, split_gene_expression_data
 
 
 def _correct_bracket(rule: str, name: str) -> str:
@@ -168,13 +172,13 @@ def _feasibility_test(model_cobra: cobra.Model, step: str):
 
 def _build_with_gimme(
     reference_model: cobra.Model,
-    lower_bounds: Sequence[float | np.floating],
-    upper_bounds: Sequence[float | np.floating],
+    lower_bounds: Sequence[float] | npt.NDArray[float],
+    upper_bounds: Sequence[float] | npt.NDArray[float],
     idx_objective: int,
-    expr_vector: npt.NDArray[np.floating],
+    expr_vector: npt.NDArray[float],
 ):
     model_reconstruction = reference_model.copy()
-    s_matrix: npt.NDArray[np.floating] = cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction)
+    s_matrix: list[float] = list(cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction))
     # `Becker and Palsson (2008). Context-specific metabolic networks are
     # consistent with experiments. PLoS Comput. Biol. 4, e1000082.`
     properties = GIMMEProperties(
@@ -184,7 +188,7 @@ def _build_with_gimme(
         preprocess=True,
         flux_threshold=0.9,
     )
-    algorithm = GIMME(s_matrix, lower_bounds, upper_bounds, properties)
+    algorithm = GIMME(s_matrix, list(lower_bounds), list(upper_bounds), properties)
     gene_activity = algorithm.run()
     reaction_ids = [r.id for r in model_reconstruction.reactions]
     to_remove_ids = [reaction_ids[r] for r in np.where(gene_activity == 0)[0]]
@@ -219,26 +223,27 @@ def _build_with_fastcore(cobra_model, s_matrix, lower_bounds, upper_bounds, exp_
 
 def _build_with_imat(
     reference_model: cobra.Model,
-    lower_bounds: Sequence[float],
-    upper_bounds: Sequence[float],
+    lower_bounds: Sequence[float] | npt.NDArray[float],
+    upper_bounds: Sequence[float] | npt.NDArray[float],
     expr_vector: npt.NDArray,
     expr_thresh: tuple[float, float],
-    force_gene_indices: Sequence[int],
+    force_reaction_indices: Sequence[int],
     solver: str,
 ) -> cobra.Model:
     properties: IMATProperties = IMATProperties(
         exp_vector=expr_vector,
         exp_thresholds=expr_thresh,
-        core=force_gene_indices,
+        # core=np.array(force_gene_indices).tolist(),
+        core=list(force_reaction_indices),  # `list()` is required because imat uses `if core:`; this returns an error on numpy arrays
         epsilon=0.01,
         solver=solver.upper(),
     )
 
     # Creating a copy of the model ensures we don't make any in-place modifications by accident
     # Using cobra to create the stoichiometry matrix means we have less work to do
-    force_gene_indices = np.array(force_gene_indices, dtype=np.uint16)
+    force_reaction_indices = np.array(force_reaction_indices, dtype=np.uint16)
     model_reconstruction: cobra.Model = reference_model.copy()
-    s_matrix: npt.NDArray[np.floating] = cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction)
+    s_matrix: npt.NDArray[float] = cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction)
     algorithm: IMAT = IMAT(S=s_matrix, lb=np.array(lower_bounds), ub=np.array(upper_bounds), properties=properties)
     rxns_from_imat: npt.NDArray[np.uint16] = algorithm.run().astype(np.uint16)
 
@@ -246,11 +251,7 @@ def _build_with_imat(
     all_rxn_ids: npt.NDArray[str] = np.array([r.id for r in model_reconstruction.reactions], dtype=object)
     all_rxn_indices: npt.NDArray[np.uint16] = np.array(range(len(model_reconstruction.reactions)), dtype=np.uint16)
 
-    # Collect reactions to keep by creating a unique set of reactions from the iMAT algorithm and force-include reactions
-    # dtype is set to uint16 because indices will not be below 0 or be greater than 65,535 (max size of uint16),
-    #   because only ~10,000 reactions exist in Recon3D
-    # Unsafe casting is OK because of these facts.
-    rxn_indices_to_keep: npt.NDArray[np.uint16] = np.unique(np.concatenate([rxns_from_imat, force_gene_indices], dtype=np.uint16))
+    rxn_indices_to_keep: npt.NDArray[int] = np.unique(np.concatenate([rxns_from_imat, force_reaction_indices], dtype=int))
 
     # Reaction indices to exclude from the model are thus reactions that are not marked to be included in the model
     # Assume unique is false because every value that is in `rxn_indices_to_keep` is included in `all_rxn_indices`
@@ -277,7 +278,7 @@ def _build_with_tinit(
         no_reverse_loops=True,
     )
     model_reconstruction = reference_model.copy()
-    s_matrix: npt.NDArray[np.floating] = cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction).astype(np.float64)
+    s_matrix: npt.NDArray[float] = np.asarray(cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction), dtype=float)
     algorithm = tINIT(s_matrix, lower_bounds, upper_bounds, properties)
     algorithm.preprocessing()
     algorithm.build_problem()
@@ -290,6 +291,7 @@ async def _map_expression_to_reaction(
     recon_algorithm: Algorithm,
     low_thresh: float,
     high_thresh: float,
+    taxon: int | str | Taxon,
 ) -> collections.OrderedDict[str, int]:
     """Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules.
 
@@ -301,6 +303,7 @@ async def _map_expression_to_reaction(
         recon_algorithm: Algorithm to use for reconstruction (GIMME, FASTCORE, iMAT, or tINIT)
         low_thresh: Low expression threshold for algorithms that require it (iMAT, tINIT)
         high_thresh: High expression threshold for algorithms that require it (iMAT, tINIT)
+        taxon: Taxon ID or Taxon object for gene ID conversion.
 
     Returns:
         An ordered dictionary mapping reaction IDs to their corresponding expression values.
@@ -308,7 +311,7 @@ async def _map_expression_to_reaction(
     Raises:
         ValueError: If neither 'entrez_gene_id' nor 'ensembl_gene_id' columns are found in the gene expression file.
     """
-    expression_data = await read_file(gene_expression_file)
+    expression_data = await _read_file(gene_expression_file)
     identifier_column = next((col for col in ("entrez_gene_id", "ensembl_gene_id") if col in expression_data.columns), "")
 
     if not identifier_column:
@@ -320,6 +323,14 @@ async def _map_expression_to_reaction(
         identifier_column=cast(Literal["ensembl_gene_id", "entrez_gene_id"], identifier_column),
         recon_algorithm=recon_algorithm,
     )
+
+    # convert ensembl IDs to entrez ids to map expression data to reactions in the reference model
+    if identifier_column == "ensembl_gene_id":
+        conversion = await ensembl_to_gene_id_and_symbol(ids=gene_activity.index.tolist(), taxon=taxon)
+        gene_activity = gene_activity.merge(conversion, how="left", left_index=True, right_on="ensembl_gene_id")
+        gene_activity = gene_activity.set_index(keys=["entrez_gene_id"])
+        gene_activity = gene_activity.drop(columns=["ensembl_gene_id", "gene_symbol"])
+
     reaction_expression = collections.OrderedDict()
 
     # fmt: off
@@ -346,7 +357,7 @@ async def _map_expression_to_reaction(
             activity = gene_activity.at[gene_id, "active"] if gene_id in gene_activity.index else f"{default_expression!s}"
             # replace gene_id with activity, using optional whitespace before and after the gene id
             # Do not replace the whitespace (if it exists) before and after the gene ID
-            gene_reaction_rule = re.sub(pattern=rf"\b{gene_id}\b", repl=activity, string=gene_reaction_rule)
+            gene_reaction_rule = re.sub(pattern=rf"\b{gene_id}\b", repl=str(activity), string=str(gene_reaction_rule))
 
         try:
             # We are using eval here because ast.literal_eval is unable to process an evaluable such as `max(-4, 0, 1)`
@@ -362,7 +373,24 @@ async def _map_expression_to_reaction(
     return reaction_expression
 
 
-async def _build_model(  # noqa: C901
+def _read_reference_model(filepath: Path) -> cobra.Model:
+    match filepath.suffix:
+        case ".mat":
+            reference_model = cobra.io.load_matlab_model(filepath)
+        case ".xml" | ".sbml":
+            reference_model = cobra.io.read_sbml_model(filepath)
+        case ".json":
+            reference_model = cobra.io.load_json_model(filepath)
+        case _:
+            _log_and_raise_error(
+                f"Reference model format must be .xml, .mat, or .json; found '{filepath.suffix}'",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
+    return reference_model
+
+
+async def _build_model(
     general_model_file: Path,
     gene_expression_file: Path,
     recon_algorithm: Algorithm,
@@ -376,9 +404,10 @@ async def _build_model(  # noqa: C901
     low_thresh: float,
     high_thresh: float,
     output_flux_result_filepath: Path,
+    taxon: int | str | Taxon,
     *,
     force_boundary_rxn_inclusion: bool,
-) -> BuildResults:
+) -> _BuildResults:
     """Seed a context specific reference_model.
 
     Core reactions are determined from GPR associations with gene expression logicals.
@@ -400,25 +429,13 @@ async def _build_model(  # noqa: C901
         low_thresh: Low expression threshold for algorithms that require it (iMAT, tINIT)
         high_thresh: High expression threshold for algorithms that require it (iMAT, tINIT)
         output_flux_result_filepath: Path to save flux results (for iMAT only)
+        taxon: Taxon ID or Taxon object for gene ID conversion.
         force_boundary_rxn_inclusion: If True, ensure that all boundary reactions are included in the final model.
 
     Returns:
         A _BuildResults object containing the context-specific model, list of expression indices used, and a DataFrame of infeasible reactions.
     """
-    reference_model: cobra.Model
-    match general_model_file.suffix:
-        case ".mat":
-            reference_model = cobra.io.load_matlab_model(general_model_file)
-        case (".xml", ".sbml"):
-            reference_model = cobra.io.read_sbml_model(general_model_file)
-        case ".json":
-            reference_model = cobra.io.load_json_model(general_model_file)
-        case _:
-            _log_and_raise_error(
-                f"Reference model format must be .xml, .mat, or .json; found '{general_model_file.suffix}'",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+    reference_model: cobra.Model = _read_reference_model(general_model_file)
 
     if objective not in force_reactions:
         force_reactions.append(objective)
@@ -429,23 +446,21 @@ async def _build_model(  # noqa: C901
     # inconsistent_reactions, cobra_model = _feasibility_test(cobra_model, "before_seeding")
     inconsistent_reactions = []
     s_matrix = cobra.util.array.create_stoichiometric_matrix(reference_model, array_type="dense")
-    lower_bounds = []
-    upper_bounds = []
-    reaction_ids = []
-    for reaction in reference_model.reactions:
+    lower_bounds: list[int] = []
+    upper_bounds: list[int] = []
+    reaction_ids: list[str] = []
+    for i, reaction in enumerate(reference_model.reactions):
+        # if reaction.id in boundary_reactions:
+        #     lower_bounds.append()
         lower_bounds.append(reaction.lower_bound)
         upper_bounds.append(reaction.upper_bound)
         reaction_ids.append(reaction.id)
 
     # get expressed reactions
     reaction_expression: collections.OrderedDict[str, int] = await _map_expression_to_reaction(
-        reference_model,
-        gene_expression_file,
-        recon_algorithm,
-        high_thresh=high_thresh,
-        low_thresh=low_thresh,
+        reference_model, gene_expression_file, recon_algorithm, high_thresh=high_thresh, low_thresh=low_thresh, taxon=taxon
     )
-    expression_vector: npt.NDArray[np.int32] = np.array(list(reaction_expression.values()), dtype=np.int32)
+    expression_vector: npt.NDArray[float] = np.array(list(reaction_expression.values()), dtype=float)
 
     for rxn in force_reactions:
         if rxn not in reaction_ids:
@@ -486,6 +501,16 @@ async def _build_model(  # noqa: C901
     expression_threshold = (low_thresh, high_thresh)
 
     match recon_algorithm:
+        case Algorithm.IMAT:
+            context_model_cobra: cobra.Model = _build_with_imat(
+                reference_model=reference_model,
+                lower_bounds=lower_bounds,
+                upper_bounds=upper_bounds,
+                expr_vector=expression_vector,
+                expr_thresh=expression_threshold,
+                force_reaction_indices=force_reaction_indices,
+                solver=solver,
+            )
         case Algorithm.GIMME:
             context_model_cobra: cobra.Model = _build_with_gimme(
                 reference_model=reference_model,
@@ -503,22 +528,12 @@ async def _build_model(  # noqa: C901
                 exp_idx_list=expression_vector_indices,
                 solver=solver,
             )
-        case Algorithm.IMAT:
-            context_model_cobra: cobra.Model = _build_with_imat(
-                reference_model=reference_model,
-                lower_bounds=lower_bounds,
-                upper_bounds=upper_bounds,
-                expr_vector=expression_vector,
-                expr_thresh=expression_threshold,
-                force_gene_indices=force_reaction_indices,
-                solver=solver,
-            )
             context_model_cobra.objective = objective
             flux_sol: cobra.Solution = context_model_cobra.optimize()
             fluxes: pd.Series = flux_sol.fluxes
             model_reactions: list[str] = [reaction.id for reaction in context_model_cobra.reactions]
             reaction_intersections: set[str] = set(fluxes.index).intersection(model_reactions)
-            flux_df: pd.DataFrame = fluxes[~fluxes.index.isin(reaction_intersections)]
+            flux_df: pd.DataFrame = cast(pd.DataFrame, fluxes[~fluxes.index.isin(reaction_intersections)])
             flux_df.dropna(inplace=True)
             flux_df.to_csv(output_flux_result_filepath)
         case Algorithm.TINIT:
@@ -552,7 +567,7 @@ async def _build_model(  # noqa: C901
         axis=0,
     )
 
-    return BuildResults(
+    return _BuildResults(
         model=context_model_cobra,
         expression_index_list=expression_vector_indices,
         infeasible_reactions=inconsistent_and_infeasible_reactions,
@@ -562,7 +577,7 @@ async def _build_model(  # noqa: C901
 async def _create_df(path: Path, *, lowercase_col_names: bool = False) -> pd.DataFrame:
     if path.suffix not in {".csv", ".tsv"}:
         raise ValueError(f"File must be a .csv or .tsv file, got '{path.suffix}'")
-    df: pd.DataFrame = await read_file(path=path, header=0, sep="," if path.suffix == ".csv" else "\t", h5ad_as_df=True)
+    df: pd.DataFrame = await _read_file(path=path, header=0, sep="," if path.suffix == ".csv" else "\t", h5ad_as_df=True)
 
     if not isinstance(df, pd.DataFrame):
         _log_and_raise_error(
@@ -576,7 +591,7 @@ async def _create_df(path: Path, *, lowercase_col_names: bool = False) -> pd.Dat
     return df
 
 
-async def _collect_boundary_reactions(path: Path) -> BoundaryReactions:
+async def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
     df: pd.DataFrame = await _create_df(path, lowercase_col_names=True)
     for column in df.columns:
         if column not in [
@@ -612,39 +627,48 @@ async def _collect_boundary_reactions(path: Path) -> BoundaryReactions:
         shorthand_compartment = CobraCompartments.get_shorthand(reaction_compartment[i])
         reactions[i] = f"{boundary_map.get(boundary)}_{reaction_abbreviation[i]}[{shorthand_compartment}]"
 
-    return BoundaryReactions(
+    return _BoundaryReactions(
         reactions=reactions,
         lower_bounds=df["minimum reaction rate"].tolist(),
         upper_bounds=df["maximum reaction rate"].tolist(),
     )
 
 
-def _write_model_to_disk(context_name: str, model: cobra.Model, output_filepaths: list[Path]) -> None:
+async def _write_model_to_disk(
+    context_name: str,
+    model: cobra.Model,
+    output_filepaths: list[Path],
+    mat_suffix: set[str],
+    json_suffix: set[str],
+    xml_suffix: set[str],
+) -> None:
+    tasks: set[Coroutine[Any, Any, None]] = set()
     for path in output_filepaths:
         path.parent.mkdir(parents=True, exist_ok=True)
-        if path.suffix == ".mat":
-            cobra.io.save_matlab_model(model=model, file_name=path)
-        elif path.suffix == ".json":
-            cobra.io.save_json_model(model=model, filename=path, pretty=True)
-        elif path.suffix in {".sbml", ".xml"}:
-            cobra.io.write_sbml_model(cobra_model=model, filename=path)
+        if path.suffix in mat_suffix:
+            tasks.add(asyncio.to_thread(cobra.io.save_matlab_model, model=model, file_name=path))
+        elif path.suffix in json_suffix:
+            tasks.add(asyncio.to_thread(cobra.io.save_json_model, model=model, filename=path, pretty=True))
+        elif path.suffix in xml_suffix:
+            tasks.add(asyncio.to_thread(cobra.io.write_sbml_model, model=model, filename=path))
         else:
             _log_and_raise_error(
                 f"Invalid output model filetype. Should be one of .xml, .sbml, .mat, or .json. Got '{path.suffix}'",
                 error=ValueError,
                 level=LogLevel.ERROR,
             )
-        logger.success(f"Saved metabolic model for context '{context_name}' to '{path}'")
+        logger.success(f"Will save metabolic model for context '{context_name}' to: '{path}'")
+    await asyncio.gather(*tasks)
 
 
 async def create_context_specific_model(  # noqa: C901
     context_name: str,
+    taxon: int | str | Taxon,
     reference_model: Path,
     active_genes_filepath: Path,
     output_infeasible_reactions_filepath: Path,
     output_flux_result_filepath: Path,
     output_model_filepaths: Path | list[Path],
-    output_filetypes: list[str] | None = None,
     output_fastcore_expression_index_filepath: Path | None = None,
     objective: str = "biomass_reaction",
     boundary_rxns_filepath: str | Path | None = None,
@@ -663,12 +687,12 @@ async def create_context_specific_model(  # noqa: C901
 
     Args:
         context_name: Name of the context-specific model.
+        taxon: NCBI taxonomy ID or name for the organism of interest.
         reference_model: Path to the general genome-scale metabolic model file (.xml, .mat, or .json).
         active_genes_filepath: Path to the gene expression data file (csv, tsv, or Excel).
         output_infeasible_reactions_filepath: Path to save infeasible reactions (csv).
         output_flux_result_filepath: Path to save flux results (csv).
         output_model_filepaths: Path or list of paths to save the context-specific model (.xml, .mat, or .json).
-        output_filetypes: List of file types to save the model as ('xml', 'mat', 'json').
         output_fastcore_expression_index_filepath: Path to save Fastcore expression indices (txt). Required if using Fastcore.
         objective: Objective function reaction ID.
         boundary_rxns_filepath: Optional path to boundary reactions file (csv, tsv, or Excel).
@@ -685,22 +709,9 @@ async def create_context_specific_model(  # noqa: C901
     Raises:
         ImportError: If Gurobi solver is selected but gurobipy is not installed.
     """
+    _set_up_logging(level=log_level, location=log_location)
     boundary_rxns_filepath: Path | None = Path(boundary_rxns_filepath) if boundary_rxns_filepath else None
-    set_up_logging(level=log_level, location=log_location)
     output_model_filepaths = [output_model_filepaths] if isinstance(output_model_filepaths, Path) else output_model_filepaths
-    for path in output_model_filepaths:
-        if path.suffix not in {".mat", ".xml", ".sbml", ".json"}:
-            _log_and_raise_error(
-                f"Invalid output model filetype. Should be one of .xml, .sbml, .mat, or .json. Got '{path.suffix}'",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
-    if len(output_model_filepaths) != len(output_model_filepaths):
-        _log_and_raise_error(
-            "The number of output model filepaths must be the same as the number of output flux result filepaths",
-            error=ValueError,
-            level=LogLevel.ERROR,
-        )
 
     if not reference_model.exists():
         _log_and_raise_error(
@@ -727,15 +738,6 @@ async def create_context_specific_model(  # noqa: C901
             level=LogLevel.ERROR,
         )
 
-    output_filetypes = ["mat"] if output_filetypes is None else output_filetypes
-    for output_type in output_filetypes:
-        if output_type not in {"xml", "mat", "json"}:
-            _log_and_raise_error(
-                f"Output file type {output_type} not recognized. Must be one of: 'xml', 'mat', 'json'",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
-
     if algorithm not in Algorithm:
         _log_and_raise_error(
             f"Algorithm {algorithm} not supported. Use one of {', '.join(a.value for a in Algorithm)}",
@@ -750,6 +752,16 @@ async def create_context_specific_model(  # noqa: C901
             level=LogLevel.ERROR,
         )
 
+    mat_suffix, json_suffix, xml_suffix = {".mat"}, {".json"}, {".sbml", ".xml"}
+    if any(path.suffix not in {*mat_suffix, *json_suffix, *xml_suffix} for path in output_model_filepaths):
+        invalid_suffix = "\n".join(path for path in output_model_filepaths if path.suffix not in {*mat_suffix, *json_suffix, *xml_suffix})
+        _log_and_raise_error(
+            f"Invalid output filetype. Should be 'xml', 'sbml', 'mat', or 'json'. Got:\n{invalid_suffix}'",
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
+
+    boundary_reactions = None
     if boundary_rxns_filepath:
         boundary_reactions = await _collect_boundary_reactions(boundary_rxns_filepath)
 
@@ -779,42 +791,43 @@ async def create_context_specific_model(  # noqa: C901
 
     # Test that gurobi is using a valid license file
     if solver == Solver.GUROBI:
-        # test if gurobi is available
-        try:
-            import gurobipy as gp
-        except ImportError as e:
-            logger.error(
-                "The gurobi solver requires the gurobipy package to be installed. "
-                "Please install gurobipy and try again. "
-                "This can be done by installing the 'gurobi' optional dependency."
-            )
-            raise ImportError from e
+        from importlib.util import find_spec
 
-        env = gp.Env()
-        if env.getParam("WLSACCESSID") == "" or env.getParam("WLSSECRET") == "":
+        gurobi_present = find_spec("gurobipy")
+        if not gurobi_present:
+            _log_and_raise_error(
+                message=(
+                    "The gurobi solver requires the gurobipy package to be installed. "
+                    "Please install gurobipy and try again. "
+                    "This can be done by installing the 'gurobi' optional dependency."
+                ),
+                error=ImportError,
+                level=LogLevel.ERROR,
+            )
+
+        if not Path(f"{os.environ['HOME']}/gurobi.lic").exists():
             logger.critical(
                 "Gurobi solver requested, but license information cannot be found. "
                 "COMO will continue, but it is HIGHLY unlikely the resulting model will be valid."
             )
-        # remove gurobi-related information, it is no longer required
-        del env, gp
 
-    logger.info(f"Creating '{context_name}' model using '{algorithm.value}' reconstruction and '{solver.value}' solver")
-    build_results: BuildResults = await _build_model(
+    logger.info(f"context='{context_name}', reconstruction method='{algorithm.value}', solver='{solver.value}'")
+    build_results: _BuildResults = await _build_model(
         general_model_file=reference_model,
         gene_expression_file=active_genes_filepath,
         recon_algorithm=algorithm,
         objective=objective,
-        boundary_reactions=boundary_reactions.reactions,
+        boundary_reactions=boundary_reactions.reactions if boundary_reactions else [],
         exclude_reactions=exclude_rxns,
         force_reactions=force_rxns,
-        lower_bounds=boundary_reactions.lower_bounds,
-        upper_bounds=boundary_reactions.upper_bounds,
+        lower_bounds=boundary_reactions.lower_bounds if boundary_reactions else [],
+        upper_bounds=boundary_reactions.upper_bounds if boundary_reactions else [],
         solver=solver.value.lower(),
         low_thresh=low_threshold,
         high_thresh=high_threshold,
         output_flux_result_filepath=output_flux_result_filepath,
         force_boundary_rxn_inclusion=force_boundary_rxn_inclusion,
+        taxon=taxon,
     )
 
     build_results.infeasible_reactions.dropna(inplace=True)
@@ -825,7 +838,14 @@ async def create_context_specific_model(  # noqa: C901
         fastcore_df.dropna(inplace=True)
         fastcore_df.to_csv(output_fastcore_expression_index_filepath, index=False)
 
-    _write_model_to_disk(context_name=context_name, model=build_results.model, output_filepaths=output_model_filepaths)
-    logger.debug(f"Number of Genes: {len(build_results.model.genes):,}")
-    logger.debug(f"Number of Metabolites: {len(build_results.model.metabolites):,}")
-    logger.debug(f"Number of Reactions: {len(build_results.model.reactions):,}")
+    await _write_model_to_disk(
+        context_name=context_name,
+        model=build_results.model,
+        output_filepaths=output_model_filepaths,
+        mat_suffix=mat_suffix,
+        json_suffix=json_suffix,
+        xml_suffix=xml_suffix,
+    )
+    logger.info(
+        f"context={context_name}, reactions={len(build_results.model.reactions)}, genes={len(build_results.model.genes)}, metabolites={len(build_results.model.metabolites)}"
+    )

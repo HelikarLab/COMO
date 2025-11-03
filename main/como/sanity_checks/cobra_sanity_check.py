@@ -134,7 +134,7 @@ def preprocess(model_path: Path, solver: Literal["glpk", "cplex", "gurobi"] = "g
     modelexchanges_ids: list[str] = [rxn.id for rxn in model_closed.reactions if re.search(pattern=r"^(EX|DM|sink)_", string=rxn.id)]
 
     # Step 2: Matrix-based method to find selected_exchanges reactions (single metabolite, 1 entry)
-    s_matrix: npt.NDArray[np.floating] = cobra.util.array.create_stoichiometric_matrix(model_closed)
+    s_matrix: npt.NDArray[float] = cobra.util.array.create_stoichiometric_matrix(model_closed)
 
     # Step 2: Convert it to a sparse CSC matrix to optimize memory usage and performance
     s_sparse = csc_matrix(s_matrix)

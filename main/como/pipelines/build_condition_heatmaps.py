@@ -140,7 +140,7 @@ def group_reactions_by_pathway(models: cobra.Model | list[cobra.Model], flux_df:
     # for condition in flux_df.index:
     #     for pathway, reactions in pathways_by_reaction.items():
     #         pathway_flux.loc[condition, pathway] = flux_df.loc[condition, list(reactions)].sum()
-    pathway_fluxes: dict[str, pd.Series[npt.NDArray[np.floating]]] = {}
+    pathway_fluxes: dict[str, pd.Series[npt.NDArray[float]]] = {}
     for pathway, reactions in pathways_by_reaction.items():
         reactions_in_df = list(reactions.intersection(flux_df.columns))
         if reactions_in_df:
