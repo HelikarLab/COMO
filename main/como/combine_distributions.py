@@ -125,39 +125,50 @@ def _combine_z_distribution_for_source(
     output_combined_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
     output_figure_filepath.parent.mkdir(parents=True, exist_ok=True)
 
-    logger.trace(f"Found {_num_columns(merged_source_data) - 1} samples for context '{context_name}' to combine")
-    values = merged_source_data.iloc[:, 1:].values
-    mask = ~np.isnan(values)
-    masked_values = np.where(mask, values, 0)  # Replace NaN with 0
-    masked_num_replicates = np.where(mask, num_replicates, 0)
+    # alidate alignment between columns and replicate vector
+    batch_column_names: list[str] = list(merged_source_data.columns)
+    expected_num_batches = len(batch_column_names)
+    if expected_num_batches != len(replicates_per_batch):
+        raise ValueError(
+            f"[{context_name}] Mismatch between number of batch columns "
+            f"({expected_num_batches}: {batch_column_names}) and length of "
+            f"replicates_per_batch ({len(replicates_per_batch)}: {list(replicates_per_batch)})."
+        )
 
-    weights = masked_num_replicates / np.sum(masked_num_replicates, axis=1, keepdims=True)
-    numerator = np.sum(weights * masked_values, axis=1)
-    denominator = np.sqrt(np.sum(weights**2, axis=1))
-    weighted_matrix = numerator / denominator
-    weighted_matrix = np.clip(weighted_matrix, weighted_z_floor, weighted_z_ceiling)
-    logger.trace("Finished combining z-distribution")
-    # merge_df = pd.concat([merged_source_data, pd.Series(weighted_matrix, name="combined")], axis=1)
-    weighted_matrix = pd.DataFrame(
-        {
-            "ensembl_gene_id": merged_source_data["ensembl_gene_id"],
-            "combine_z": weighted_matrix,
-        }
+    logger.trace(
+        f"[{context_name}] Combining {expected_num_batches} batches with replicate counts: {dict(zip(batch_column_names, replicates_per_batch))}"
     )
 
-    # stack_df = pd.melt(
-    #     merge_df,
-    #     id_vars=["ensembl_gene_id"],
-    #     value_vars=merge_df.columns[1:],  # all other columns are values
-    #     var_name="source",
-    #     value_name="zscore",
-    # )
-    # graph_zscore_distribution(
-    #     df=stack_df,
-    #     title=f"Combined Z-score Distribution for {context_name}",
-    #     output_filepath=output_figure_filepath,
-    # )
-    return weighted_matrix
+    # extract values and build masks (shape is in gene x batch)
+    gene_by_batch_values: np.ndarray = merged_source_data.to_numpy(dtype=float)
+    present_mask: np.ndarray = ~np.isnan(gene_by_batch_values)
+
+    # per-batch weights from replicate counts, normalized over all batches
+    replicates_per_batch_array: np.ndarray = np.asarray(replicates_per_batch, dtype=float)
+    total_replicates: float = replicates_per_batch_array.sum()
+    if total_replicates <= 0.0:
+        raise ValueError(f"[{context_name}] Sum of replicates_per_batch must be > 0; got {total_replicates}.")
+    base_weights_per_batch: np.ndarray = replicates_per_batch_array / total_replicates  # shape: (B,)
+
+    # drop NA columns per gene by zeroing their weights
+    masked_weights_per_batch: np.ndarray = np.where(present_mask, base_weights_per_batch, 0.0)  # (G,B)
+    masked_values: np.ndarray = np.where(present_mask, gene_by_batch_values, 0.0)  # (G,B)
+
+    # weighted z combine per gene: sum(w*x)/sqrt(sum(w^2)), with NA rows → NaN
+    numerator_per_gene: np.ndarray = np.sum(masked_weights_per_batch * masked_values, axis=1)  # (G,)
+    denominator_per_gene: np.ndarray = np.sqrt(np.sum(masked_weights_per_batch**2, axis=1))  # (G,)
+    combined_z_per_gene: np.ndarray = np.divide(
+        numerator_per_gene,
+        denominator_per_gene,
+        out=np.full_like(numerator_per_gene, np.nan, dtype=float),
+        where=denominator_per_gene != 0.0,
+    )
+
+    combined_z_per_gene = np.clip(combined_z_per_gene, weighted_z_floor, weighted_z_ceiling)
+
+    logger.trace(f"[{context_name}] Finished combining batch z-distributions for source.")
+
+    return pd.DataFrame({"combine_z": combined_z_per_gene}, index=merged_source_data.index)
 
 
 def _combine_z_distribution_for_context(
@@ -171,14 +182,30 @@ def _combine_z_distribution_for_context(
         logger.warning("No zscore results exist, returning empty dataframe")
         return pd.DataFrame({"ensembl_gene_id": [], "combine_z": []})
 
-    z_matrices = [
-        res.z_score_matrix.set_index("ensembl_gene_id").rename(columns=dict.fromkeys(res.z_score_matrix.columns[1:], res.type.value))
-        for res in zscore_results
-    ]
-    z_matrix = pd.concat(z_matrices, axis=1, join="outer").reset_index()
+    z_matrices: list[pd.DataFrame] = []
+    for res in zscore_results:
+        matrix = res.z_score_matrix.copy()
+        if len(matrix.columns) > 1:
+            _log_and_raise_error(
+                f"Expected a single column for combined z-score dataframe for data '{res.type.value.lower()}'. Got '{len(matrix.columns)}' columns",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
+
+        matrix.columns = [res.type.value.lower()]
+        matrix = cast(pd.DataFrame, matrix.loc[matrix.index != "-"])
+
+        # if the matrix has duplicate ids (i.e., multiple entrez ids map to a single ensembl id, etc.)
+        #   take the mean value of them to remove the duplicates
+        if not matrix.index.is_unique:
+            # matrix = cast(pd.DataFrame, matrix.groupby(level=0).mean())
+            matrix = cast(pd.DataFrame, matrix.groupby(level=0).max())
+        z_matrices.append(matrix)
+
+    z_matrix = pd.concat(z_matrices, axis="columns", join="outer", ignore_index=False)
     if _num_columns(z_matrix) <= 1:
         logger.trace(f"Only 1 source exists for '{context}', returning dataframe as-is becuase no data exists to combine")
-        z_matrix.columns = ["ensembl_gene_id", "combine_z"]
+        z_matrix.columns = ["combine_z"]
         return z_matrix
 
     values = z_matrix.iloc[:, 1:].values
@@ -191,7 +218,7 @@ def _combine_z_distribution_for_context(
     numerator = np.sum(normalized_weights * masked_values, axis=1)
     denominator = np.sqrt(np.sum(normalized_weights**2, axis=1))
     combined_z_matrix = numerator / denominator
-    combined_z_matrix = np.clip(combined_z_matrix, weighted_z_floor, weighted_z_ceiling)
+    combined_z_matrix = np.clip(combined_z_matrix, weighted_z_floor, weighted_z_ceiling, dtype=float)
     combined_z_matrix_df = pd.DataFrame(
         {
             "ensembl_gene_id": z_matrix["ensembl_gene_id"],
@@ -199,21 +226,21 @@ def _combine_z_distribution_for_context(
         }
     )
 
-    stack_df = pd.melt(
-        z_matrix,
-        id_vars=["ensembl_gene_id"],
-        value_vars=z_matrix.columns[1:],
-        var_name="source",
-        value_name="zscore",
-    )
-    combined_df = pd.DataFrame(
-        {
-            "ensembl_gene_id": z_matrix["ensembl_gene_id"],
-            "zscore": combined_z_matrix,
-            "source": "combined",
-        }
-    )
-    stack_df = pd.concat([stack_df, combined_df])
+    # combined_df = pd.DataFrame(
+    #     {
+    #         "ensembl_gene_id": z_matrix.index,
+    #         "zscore": combined_z_matrix,
+    #         "source": "combined",
+    #     }
+    # )
+    # stack_df = pd.melt(
+    #     z_matrix,
+    #     id_vars=["ensembl_gene_id"],
+    #     value_vars=z_matrix.columns[1:],
+    #     var_name="source",
+    #     value_name="zscore",
+    # )
+    # stack_df = pd.concat([stack_df, combined_df])
     # graph_zscore_distribution(
     #     df=stack_df,
     #     title=f"Combined Z-score Distribution for {context}",
