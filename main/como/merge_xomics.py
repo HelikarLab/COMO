@@ -450,6 +450,12 @@ async def _process(
         adjusted_expression_requirement = expression_requirement - (4 - num_sources)
     elif adjust_method == AdjustmentMethod.FLAT:
         adjusted_expression_requirement = expression_requirement
+    else:
+        _log_and_raise_error(
+            message=f"Unknown `adjust_method`: {adjust_method}.",
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
     logger.debug(f"Adjusted expression requirement: {adjusted_expression_requirement}")
 
     if adjusted_expression_requirement != expression_requirement:
