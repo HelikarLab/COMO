@@ -447,13 +447,13 @@ def zfpkm_plot(results: dict[str, _ZFPKMResult], *, output_png_dirpath: Path, pl
         y: npt.NDArray[float] = result.density.y.flatten()
 
         fitted: npt.NDArray[float] = np.exp(-0.5 * ((x - result.mu) / stddev) ** 2) / (stddev * np.sqrt(2 * np.pi))
-        max_fpkm: float = float(y.max())
+        fpkm_at_mu: float = result.fpkm_at_mu
         max_fitted: float = float(fitted.max())
-        scale_fitted: float = fitted * max_fpkm / max_fitted
-        to_concat.append(pd.DataFrame({"sample_name": name, "log2fpkm": x, "fpkm_density": y, "fitted_density_scaled": scale_fitted}))
+        scale_fitted: float = fitted * fpkm_at_mu / max_fitted
+        to_concat.append(pd.DataFrame({"sample_name": name, "log2fpkm": x, "fpkm_density": y, "zfpkm_density": scale_fitted}))
 
     mega_df = pd.concat(to_concat, ignore_index=True)
-    mega_df.columns = pd.Series(data=["sample_name", "log2fpkm", "fpkm_density", "fitted_density_scaled"])
+    mega_df.columns = pd.Series(data=["sample_name", "log2fpkm", "fpkm_density", "zfpkm_density"])
     mega_df = mega_df.melt(id_vars=["log2fpkm", "sample_name"], var_name="source", value_name="density")
 
     fig: plt.Figure
