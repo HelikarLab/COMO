@@ -440,7 +440,7 @@ def zfpkm_plot(results: dict[str, _ZFPKMResult], *, output_png_dirpath: Path, pl
         subplot_titles: Whether to display facet titles (sample names).
 
     """
-    to_concat: list[pd.DataFrame] = [None] * len(results)  # type: ignore  # ignoring because None is not of type pd.DataFrame
+    to_concat: list[pd.DataFrame] = []
     for name, result in results.items():
         stddev: float = float(result.std_dev)
         x: npt.NDArray[float] = result.density.x.flatten()
