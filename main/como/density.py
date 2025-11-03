@@ -6,9 +6,8 @@ from typing import Literal, NamedTuple, cast
 
 import numpy as np
 import numpy.typing as npt
-from scipy.interpolate import interp1d
 
-from como.approx import approx
+from como.approx import Approx, approx
 
 
 class DensityResult(NamedTuple):
@@ -116,7 +115,7 @@ def dnorm(x: float, mean: NUMBER = 0.0, sd: NUMBER = 1.0, log: bool = False, fas
     # underflow boundary
     boundary = np.sqrt(-2.0 * m_ln2 * (dbl_min_exp + 1 - dbl_mant_dig))
     if a > boundary:
-        return float(0.0)
+        return 0.0
 
     # Now, to get full accuracy, split x into two parts,
     #   x = x1+x2, such that |x2| <= 2^-16.
@@ -228,12 +227,15 @@ def density(
         elif kernel == "optcosine":
             return np.sqrt(1 - 8 / np.pi**2) * np.pi**2 / 16
 
+    if kernel != "gaussian":
+        raise NotImplementedError(f"Only 'gaussian' kernel is implemented; got '{kernel}'")
+
     x: npt.NDArray[float] = np.asarray(x, dtype=float)
 
     has_weights = weights is not None
     weights: npt.NDArray[float] | None = np.asarray(weights, float) if weights is not None else None
-    if has_weights and (weights is not None and weights.size != n):
-        raise ValueError(f"The length of provided weights does not match the length of x: {weights.size} != {n}")
+    if has_weights and (weights is not None and weights.size != x.size):
+        raise ValueError(f"The length of provided weights does not match the length of x: {weights.size} != {x.size}")
 
     x_na: npt.NDArray[np.bool_] = np.isnan(x)
     if np.any(x_na):
@@ -286,8 +288,9 @@ def density(
     if bw_calc <= 0:
         raise ValueError("Bandwidth 'bw' must be positive.")
 
-    from_ = float(from_ or min(x) - cut * bw_calc)
-    to_ = float(to_ or max(x) + cut * bw_calc)
+    # have to use `... if ... else` because `0` is falsey, resulting in the right-half being used instead of the user-provided value
+    from_ = float(from_ if from_ is not None else min(x) - cut * bw_calc)
+    to_ = float(to_ if to_ is not None else max(x) + cut * bw_calc)
 
     if not np.isfinite(from_):
         raise ValueError("'from_' is not finite.")
@@ -313,11 +316,11 @@ def density(
 
     # xp=known x-coords, fp=known y-cords, x=unknown x-coords; returns interpolated (e.g., unknown) y-coords
     interp_x: npt.NDArray[float] = np.linspace(from_, to_, num=n_user)
-    interp_y: npt.NDArray[float] = approx(xords, kords, interp_x)
+    interp_y: Approx = approx(xords, kords, interp_x)
 
     return DensityResult(
         x=interp_x,
-        y=interp_y["y"],
+        y=interp_y.y,
         x_grid=xords,
         y_grid=kords,
         bw=bw_calc,
