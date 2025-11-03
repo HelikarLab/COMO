@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import multiprocessing
 import sys
 import time
@@ -8,9 +9,8 @@ from collections.abc import Callable
 from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from enum import Enum
-from io import TextIOWrapper
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, TextIO, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,11 +22,11 @@ import sklearn.neighbors
 from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
 from pandas import DataFrame
-from scipy.signal import find_peaks
-from sklearn.neighbors import KernelDensity
 
 from como.data_types import FilteringTechnique, LogLevel, PeakIdentificationParameters, RNAType
+from como.density import density
 from como.migrations import gene_info_migrations
+from como.peak_finder import find_peaks
 from como.project import Config
 from como.utils import _log_and_raise_error, _num_columns, _read_file, _set_up_logging
 

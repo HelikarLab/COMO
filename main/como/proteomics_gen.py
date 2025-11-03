@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import itertools
 import sys
-from io import TextIOWrapper
 from pathlib import Path
+from typing import TextIO, cast
 
 import numpy as np
 import pandas as pd
-from fast_bioservices.biodbnet import BioDBNet, Input, Output
+from bioservices import BioDBNet
+from fast_bioservices.biodbnet import Input, Output  # BioDBNet
 from loguru import logger
 
-from como.data_types import LOG_FORMAT, LogLevel
+from como.data_types import LogLevel
 from como.project import Config
 from como.proteomics_preprocessing import protein_transform_main
 from como.utils import _log_and_raise_error, _set_up_logging, return_placeholder_data

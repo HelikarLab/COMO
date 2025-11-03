@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import itertools
 import sys
 from collections.abc import Iterator
 from pathlib import Path

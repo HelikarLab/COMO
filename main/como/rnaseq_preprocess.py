@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import json
 import re
 import sys
@@ -14,7 +15,7 @@ import aiofiles
 import numpy as np
 import pandas as pd
 from fast_bioservices.biothings.mygene import MyGene
-from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol_to_ensembl_and_gene_id
+from fast_bioservices.pipeline import gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
 
 from como.data_types import PATH_TYPE, LogLevel, RNAType
