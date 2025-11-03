@@ -1,9 +1,22 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import Literal, NamedTuple
 
 import numpy as np
+import numpy.typing as npt
+
+
+class RegularizedArray(NamedTuple):
+    x: npt.NDArray[np.number]
+    y: npt.NDArray[np.number]
+    not_na: npt.NDArray[bool]
+    kept_na: bool
+
+
+class Approx(NamedTuple):
+    x: npt.NDArray[float]
+    y: npt.NDArray[float]
 
 
 def _coerce_to_float_array(a):
@@ -39,8 +52,7 @@ def _regularize_values(x: np.ndarray, y: np.ndarray, ties, na_rm: bool) -> dict[
         kept_na = np.isnan(y).any()
 
     if x.size == 0:
-        # THIS IS THE CORRECTED LINE:
-        return {"x": x, "y": y, "not_na": np.array([], dtype=bool), "kept_na": kept_na}
+        return RegularizedArray(x=x, y=y, not_na=np.array([], dtype=bool), kept_na=kept_na)
 
     # Use a stable sort (mergesort) to match R's order()
     order = np.argsort(x, kind="mergesort")
@@ -88,6 +100,7 @@ def _regularize_values(x: np.ndarray, y: np.ndarray, ties, na_rm: bool) -> dict[
     # Check if any NaNs remain in the *aggregated* y values
     kept_na_final = np.any(~not_na) if np.any(np.isnan(y_agg)) else False
     return {"x": unique_x, "y": y_agg, "not_na": not_na, "kept_na": kept_na_final}
+    return RegularizedArray(x=unique_x, y=y_agg, not_na=not_na, kept_na=kept_na_final)
 
 
 def approx(
@@ -102,7 +115,7 @@ def approx(
     f: float = 0.0,
     ties: str | Callable[[np.ndarray], float] = "mean",
     na_rm: bool = True,
-) -> dict[str, np.ndarray]:
+) -> Approx:
     """Faithful Python port of R's `approx` function.
 
     This implementation aims to replicate the behavior of R's `approx`
@@ -133,7 +146,7 @@ def approx(
                are propagated.
 
     Returns:
-        dict with:
+        `Approx` class with:
           - 'x': numpy array of xout used
           - 'y': numpy array of interpolated values
     """
@@ -179,6 +192,7 @@ def approx(
     x_reg = r["x"]
     y_reg = r["y"]
     not_na_mask = r["not_na"]
+    r: RegularizedArray = _regularize_values(x_arr, y_arr, na_rm=na_rm, ties=ties)
     # no_na is True if we don't have to worry about NAs in y_reg
     no_na = na_rm or (not r["kept_na"])
     # nx is the number of *valid* (non-NA) points for interpolation
@@ -307,4 +321,4 @@ def approx(
         res[mid_mask] = res_mid
 
     yout[mask_valid] = res
-    return {"x": xout_arr, "y": yout}
+    return Approx(x=xout_arr, y=yout)
