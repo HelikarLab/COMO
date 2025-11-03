@@ -1,0 +1,6 @@
+from .abstract_model_repository import AbstractModelRepository as AbstractModelRepository
+
+class Cobrapy(AbstractModelRepository):
+    name: str
+    def __init__(self, **kwargs) -> None: ...
+    def get_sbml(self, model_id: str) -> bytes: ...

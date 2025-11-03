@@ -13,14 +13,14 @@ __all__ = ["MannWhitneyUTest"]
 
 @dataclass(frozen=True, kw_only=True, slots=True)
 class MannWhitneyUTest(BaseTwoSample[MW_RESULT]):
-    _fields: ClassVar[dict[str, type]] = {"statistic": np.float64, "pvalue": np.float64}
+    _fields: ClassVar[dict[str, type]] = {"statistic": float, "pvalue": float}
 
     reaction_ids: list[str]
-    statistic: npt.NDArray[np.float64]
-    pvalue: npt.NDArray[np.float64]
+    statistic: npt.NDArray[float]
+    pvalue: npt.NDArray[float]
 
     @staticmethod
-    def _worker(a: npt.NDArray[np.floating], b: npt.NDArray[np.floating], **kwargs) -> MW_RESULT:
+    def _worker(a: npt.NDArray[float], b: npt.NDArray[float], **kwargs) -> MW_RESULT:
         """Calculate the MWU statistic.
 
         Args:
@@ -32,7 +32,7 @@ class MannWhitneyUTest(BaseTwoSample[MW_RESULT]):
             A tuple of (statistic, pvalue)
         """
         res = mannwhitneyu(x=a, y=b, **kwargs)
-        return np.float64(res.statistic), np.float64(res.pvalue)
+        return float(res.statistic), float(res.pvalue)
 
     @classmethod
     def run(
@@ -67,7 +67,7 @@ class MannWhitneyUTest(BaseTwoSample[MW_RESULT]):
             cores=cores,
             worker_kwargs={"alternative": alternative, "use_continuity": use_continuity, "axis": axis, "method": method},
         )
-        return cls(reaction_ids=all_reactions, statistic=results["statistic"].astype(np.float64), pvalue=results["pvalue"].astype(np.float64))
+        return cls(reaction_ids=all_reactions, statistic=results["statistic"].astype(float), pvalue=results["pvalue"].astype(float))
 
     @property
     def df(self) -> pd.DataFrame:

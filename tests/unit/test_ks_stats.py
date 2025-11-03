@@ -1,13 +1,14 @@
 import numpy as np
 import pandas as pd
 import pytest
+
 from como.stats.ks_test import KSTest
 
 
 @pytest.fixture
 def expected_result() -> pd.DataFrame:
     df = pd.read_csv("tests/inputs/expected_ks_results.csv", index_col=0)
-    df["statistic_sign"] = df["statistic_sign"].astype(np.int8)
+    df["statistic_sign"] = df["statistic_sign"].astype(int)
     return df
 
 
@@ -21,12 +22,12 @@ def test_ks_stats(expected_result: pd.DataFrame, cores: int):
     df1 = pd.DataFrame(
         index=list(range(size)),
         columns=list(range(cols)),
-        data=gen.normal(loc=0, size=size * cols).reshape(size, cols).astype(np.float32),
+        data=gen.normal(loc=0, size=size * cols).reshape(size, cols).astype(float),
     )
     df2 = pd.DataFrame(
         index=list(range(size)),
         columns=list(range(cols)),
-        data=gen.normal(loc=1, size=size * cols).reshape(size, cols).astype(np.float32),
+        data=gen.normal(loc=1, size=size * cols).reshape(size, cols).astype(float),
     )
 
     real_result = KSTest.run(df1, df2, cores=cores)

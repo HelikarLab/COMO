@@ -14,20 +14,20 @@ __all__ = ["KSTest"]
 @dataclass(frozen=True, kw_only=True, slots=True)
 class KSTest(BaseTwoSample[KS_RESULT]):
     _fields: ClassVar[dict[str, type]] = {
-        "statistic": np.float64,
-        "pvalue": np.float64,
-        "statistic_location": np.float64,
-        "statistic_sign": np.uint8,
+        "statistic": float,
+        "pvalue": float,
+        "statistic_location": float,
+        "statistic_sign": int,
     }
 
     reaction_ids: list[str]
-    statistic: npt.NDArray[np.float64]
-    pvalue: npt.NDArray[np.float64]
-    statistic_location: npt.NDArray[np.float64]
-    statistic_sign: npt.NDArray[np.int8]
+    statistic: npt.NDArray[float]
+    pvalue: npt.NDArray[float]
+    statistic_location: npt.NDArray[float]
+    statistic_sign: npt.NDArray[int]
 
     @staticmethod
-    def _worker(a: npt.NDArray[np.floating], b: npt.NDArray[np.floating], **kwargs) -> KS_RESULT:
+    def _worker(a: npt.NDArray[float], b: npt.NDArray[float], **kwargs) -> KS_RESULT:
         """Calculate the KS statistic.
 
         Args:
@@ -78,10 +78,10 @@ class KSTest(BaseTwoSample[KS_RESULT]):
         )
         return cls(
             reaction_ids=all_reactions,
-            statistic=results["statistic"].astype(np.float64),
-            pvalue=results["pvalue"].astype(np.float64),
-            statistic_location=results["statistic_location"].astype(np.float64),
-            statistic_sign=results["statistic_sign"].astype(np.int8),
+            statistic=results["statistic"].astype(float),
+            pvalue=results["pvalue"].astype(float),
+            statistic_location=results["statistic_location"].astype(float),
+            statistic_sign=results["statistic_sign"].astype(int),
         )
 
     @property

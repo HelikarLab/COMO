@@ -27,7 +27,7 @@ def fast_leak_test(
     model: cobra.Model,
     test_reactions: Iterable[str],
     demand_test,
-    tolerance: np.float16 = 1e-6,
+    tolerance: float = 1e-6,
 ):
     """Run a Fast Leak Test.
 

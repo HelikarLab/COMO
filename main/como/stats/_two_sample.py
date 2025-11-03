@@ -9,8 +9,8 @@ import pandas as pd
 
 T_BASE_SAMPLE = TypeVar("T_BASE_SAMPLE", bound="BaseTwoSample")
 T_ALTERNATIVE = Literal["greater", "less", "two-sided"]
-KS_RESULT = tuple[np.floating, np.floating, np.floating, np.int8]
-MW_RESULT = tuple[np.floating, np.floating]
+KS_RESULT = tuple[float, float, float, int]
+MW_RESULT = tuple[float, float]
 TEST_RESULT = TypeVar("TEST_RESULT", KS_RESULT, MW_RESULT)
 
 __all__ = ["BaseTwoSample"]
@@ -21,7 +21,7 @@ class BaseTwoSample(ABC, Generic[TEST_RESULT]):
 
     @staticmethod
     @abstractmethod
-    def _worker(a: npt.NDArray[np.floating], b: npt.NDArray[np.floating], **kwargs) -> TEST_RESULT: ...
+    def _worker(a: npt.NDArray[float], b: npt.NDArray[float], **kwargs) -> TEST_RESULT: ...
 
     @property
     @abstractmethod
@@ -40,10 +40,10 @@ class BaseTwoSample(ABC, Generic[TEST_RESULT]):
         df2: pd.DataFrame,
         cores: int = 1,
         worker_kwargs: dict | None = None,
-    ) -> tuple[list[str], Mapping[str, npt.NDArray[np.float64 | np.uint8]]]:
+    ) -> tuple[list[str], Mapping[str, npt.NDArray[float | np.uint8]]]:
         all_reactions = list(set(df1.columns) & set(df2.columns))
-        array_a = df1[all_reactions].to_numpy(dtype=np.float64, copy=False)
-        array_b = df2[all_reactions].to_numpy(dtype=np.float64, copy=False)
+        array_a = df1[all_reactions].to_numpy(dtype=float, copy=False)
+        array_b = df2[all_reactions].to_numpy(dtype=float, copy=False)
         n = len(all_reactions)
 
         results = {field: np.empty(n, dtype=np.dtype(dtype)) for field, dtype in cls._fields.items()}
