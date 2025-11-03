@@ -106,7 +106,7 @@ def _merge_logical_table(df: pd.DataFrame):
     """
     # step 1: get all plural ENTREZ_GENE_IDs in the input table, extract unique IDs
     df.dropna(subset=["entrez_gene_id"], inplace=True)
-    df["entrez_gene_id"] = df["entrez_gene_id"].astype(str).str.replace(" /// ", "//").astype(str)
+    df.loc[:, "entrez_gene_id"] = df.loc[:, "entrez_gene_id"].astype(str).str.replace(" /// ", "//").astype(str)
 
     id_list: list[str] = df.loc[~df["entrez_gene_id"].str.contains("//"), "entrez_gene_id"].tolist()  # Collect "single" ids, like "123"
     multiple_entrez_ids: list[str] = df.loc[
@@ -287,6 +287,8 @@ async def _merge_xomics(
         expression_list.append(expressed_sourcetype)
         high_confidence_list.append(high_expressed_sourcetype)
         matrix.rename(columns={"expressed": expressed_sourcetype, "high": high_expressed_sourcetype}, inplace=True)
+        matrix = cast(pd.DataFrame, matrix[matrix["entrez_gene_id"] != "-"])
+        matrix.loc[:, "entrez_gene_id"] = matrix.loc[:, "entrez_gene_id"].astype(int)
         merge_data = matrix if merge_data.empty else merge_data.merge(matrix, on="entrez_gene_id", how="outer")
 
     logger.trace(f"Shape of merged data before merging logical tables: {merge_data.shape}")
