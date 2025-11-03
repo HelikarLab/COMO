@@ -61,28 +61,26 @@ def _combine_z_distribution_for_batch(
         logger.trace(f"A single sample exists for batch '{batch.batch_num}'. Returning as-is because no additional combining can be done")
         return matrix
 
-    values = matrix.iloc[:, 1:].values
-    weighted_matrix = np.sum(values, axis=1) / np.sqrt(values.shape[1])
-    weighted_matrix = np.clip(weighted_matrix, weighted_z_floor, weighted_z_ceiling).astype(np.int8)
+    values = matrix.values
+    weighted_matrix = np.clip(
+        a=np.sum(values, axis=1) / np.sqrt(values.shape[1]),  # calculate a weighted matrix
+        a_min=weighted_z_floor,
+        a_max=weighted_z_ceiling,
+    ).astype(float)
 
-    merge_df = pd.concat([matrix, pd.Series(weighted_matrix, name="combined")], axis=1)
-    weighted_matrix = pd.DataFrame(
-        {
-            "ensembl_gene_id": matrix["ensembl_gene_id"],
-            "combine_z": weighted_matrix,
-        },
-    )
-    stack_df = pd.melt(
-        merge_df,
-        id_vars=["ensembl_gene_id"],
-        # Get all columns except ensembl_gene_id
-        value_vars=[col for col in merge_df.columns if col not in GeneIdentifier._member_map_],
-        var_name="source",
-        value_name="zscore",
-    )
-    if len(stack_df["source"].unique()) > 10:
-        stack_df = stack_df[stack_df["source"] == "combined"]
+    weighted_matrix = pd.DataFrame({"combine_z": weighted_matrix}, index=matrix.index)
 
+    # merge_df = pd.concat([matrix, pd.Series(weighted_matrix, name="combined")], axis=1)
+    # stack_df = pd.melt(
+    #     merge_df,
+    #     id_vars=["ensembl_gene_id"],
+    #     # Get all 'data' columns
+    #     value_vars=[col for col in merge_df.columns if col not in GeneIdentifier._member_map_],
+    #     var_name="source",
+    #     value_name="zscore",
+    # )
+    # if len(stack_df["source"].unique()) > 10:
+    #     stack_df = stack_df[stack_df["source"] == "combined"]
     # graph_zscore_distribution(
     #     stack_df,
     #     title=f"Combined Z-score Distribution for {context_name} - batch #{batch.batch_num}",
