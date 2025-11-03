@@ -840,7 +840,8 @@ async def _process(
     expressed_count = len(boolean_matrix[boolean_matrix["expressed"] == 1])
     high_confidence_count = len(boolean_matrix[boolean_matrix["high"] == 1])
 
-    boolean_matrix.dropna(subset="entrez_gene_id", inplace=True)
+    # TODO: 2025-OCT-31: commented out dropping entrez ids, should this be kept?
+    # boolean_matrix.dropna(subset="entrez_gene_id", inplace=True)
     boolean_matrix.to_csv(output_boolean_activity_filepath, index=False)
     logger.info(f"{context_name} - Found {expressed_count} expressed genes, {high_confidence_count} of which are confidently expressed")
     logger.success(f"Wrote boolean matrix to {output_boolean_activity_filepath}")
