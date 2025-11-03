@@ -192,23 +192,23 @@ async def _read_file(path: None, h5ad_as_df: Literal[True] | Literal[False], **k
 
 
 @overload
-async def _read_file(path: None, h5ad_as_df: bool, **kwargs) -> None: ...
+async def _read_file(path: pd.DataFrame, h5ad_as_df: Literal[True] | Literal[False], **kwargs) -> pd.DataFrame: ...
 
 
 @overload
-async def _read_file(path: pd.DataFrame, h5ad_as_df: bool, **kwargs) -> pd.DataFrame: ...
+async def _read_file(path: sc.AnnData, h5ad_as_df: Literal[False] = False, **kwargs) -> sc.AnnData: ...
 
 
 @overload
-async def _read_file(path: sc.AnnData, h5ad_as_df: bool = False, **kwargs) -> sc.AnnData: ...
-
-
-def _num_rows(item: pd.DataFrame | npt.NDArray) -> int:
-    return item.shape[0]
+async def _read_file(path: sc.AnnData, h5ad_as_df: Literal[True] = True, **kwargs) -> pd.DataFrame: ...
 
 
 @overload
-async def _read_file(path: sc.AnnData, h5ad_as_df: bool = True, **kwargs) -> pd.DataFrame: ...
+async def _read_file(path: Path, h5ad_as_df: Literal[False] = False, **kwargs) -> pd.DataFrame | sc.AnnData: ...
+
+
+@overload
+async def _read_file(path: Path, h5ad_as_df: Literal[True] = True, **kwargs) -> pd.DataFrame: ...
 
 
 async def _read_file(
