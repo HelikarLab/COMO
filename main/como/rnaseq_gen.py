@@ -361,6 +361,7 @@ def zfpkm_transform(
     min_peak_height: float = 0.02,
     min_peak_distance: int = 1,
     update_every_percent: float = 0.1,
+    remove_na: bool = True,
 ) -> tuple[dict[str, _ZFPKMResult], DataFrame]:
     """Perform zFPKM calculation/transformation.
 
@@ -369,6 +370,7 @@ def zfpkm_transform(
         min_peak_height: Minimum height of peaks; passed on to `find_peaks` function.
         min_peak_distance: Minimum distance between peaks; passed on to `find_peaks` function.
         update_every_percent: Frequency of progress updates as a decimal between 0 and 1 (e.g., 0.1 for every 10%).
+        remove_na: Whether to remove NaN & blank values from the input DataFrame before processing.
 
     Returns:
         A tuple containing:
