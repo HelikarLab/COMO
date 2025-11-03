@@ -219,7 +219,7 @@ async def _build_matrix_results(
         study_sample_names = metadata_df[metadata_df["study"] == study]["sample_name"].tolist()
         layouts = metadata_df[metadata_df["study"] == study]["layout"].tolist()
         metrics[study] = _StudyMetrics(
-            count_matrix=counts_matrix[counts_matrix.columns.intersection(study_sample_names)],
+            count_matrix=cast(pd.DataFrame, counts_matrix[counts_matrix.columns.intersection(study_sample_names)]),
             fragment_lengths=metadata_df[metadata_df["study"] == study]["fragment_length"].values.astype(float),
             sample_names=study_sample_names,
             layout=[LayoutMethod(layout) for layout in layouts],
@@ -393,6 +393,7 @@ def zfpkm_transform(
     zfpkm_series: list[pd.Series] = []
     results: dict[str, _ZFPKMResult] = {}
 
+    slim_fpkm_df: pd.DataFrame = cast(pd.DataFrame, fpkm_df[fpkm_df.index != "-"] if remove_na else fpkm_df)
     with ProcessPoolExecutor(max_workers=cores) as pool:
         futures: list[Future[_ZFPKMResult]] = [
             pool.submit(
@@ -523,7 +524,7 @@ def cpm_filter(
     for sample, metric in metrics.items():
         counts: pd.DataFrame = metric.count_matrix
         entrez_ids: list[str] = metric.entrez_gene_ids
-        library_size: pd.DataFrame = counts.sum(axis=1)
+        library_size: pd.DataFrame = cast(pd.DataFrame, counts.sum(axis=1))
 
         # For library_sizes equal to 0, add 1 to prevent divide by 0
         # This will not impact the final counts per million calculation because the original counts are still 0
@@ -595,8 +596,8 @@ def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
         # Only keep `entrez_gene_ids` that pass `min_genes`
         metric.entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, min_genes, strict=True) if keep]
         metric.gene_sizes = np.array(gene for gene, keep in zip(gene_size, min_genes, strict=True) if keep)
-        metric.count_matrix = metric.count_matrix.iloc[min_genes, :]
-        metric.normalization_matrix = metrics[sample].normalization_matrix.iloc[min_genes, :]
+        metric.count_matrix = cast(pd.DataFrame, metric.count_matrix.iloc[min_genes, :])
+        metric.normalization_matrix = cast(pd.DataFrame, metrics[sample].normalization_matrix.iloc[min_genes, :])
 
         keep_top_genes = [gene for gene, keep in zip(entrez_ids, top_genes, strict=True) if keep]
         metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, keep_top_genes, strict=True) if keep]
