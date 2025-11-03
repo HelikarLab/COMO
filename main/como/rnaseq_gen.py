@@ -166,18 +166,18 @@ async def _build_matrix_results(
     Returns:
         A dataclass `ReadMatrixResults`
     """
-    matrix.dropna(subset="ensembl_gene_id", inplace=True)
     conversion = await ensembl_to_gene_id_and_symbol(ids=matrix["ensembl_gene_id"].tolist(), taxon=taxon)
 
-    # If any one column was
-    if any(conversion[col].eq("-").all() for col in conversion.columns):
+    # If all columns are empty, it is indicative that the incorrect taxon id was provided
+    if all(conversion[col].eq("-").all() for col in conversion.columns):
         logger.critical(f"Conversion of Ensembl Gene IDs to Entrez IDs and Gene Symbols was empty - is '{taxon}' the correct taxon ID for this data?")
 
-    conversion["ensembl_gene_id"] = conversion["ensembl_gene_id"].str.split(",")
-    conversion = conversion.explode("ensembl_gene_id")
-    conversion.reset_index(inplace=True, drop=True)
-    conversion = conversion[conversion["entrez_gene_id"] != "-"]  # drop missing entrez IDs
-    conversion["entrez_gene_id"] = conversion["entrez_gene_id"].astype(int)  # float32 is needed because np.nan is a float
+    # 2025-NOV-3: commented out `conversion` types to evaluate if it can be skipped
+    # conversion["ensembl_gene_id"] = conversion["ensembl_gene_id"].str.split(",")
+    # conversion = conversion.explode("ensembl_gene_id")
+    # conversion.reset_index(inplace=True, drop=True)
+    # conversion = conversion[conversion["entrez_gene_id"] != "-"]  # drop missing entrez IDs
+    # conversion["entrez_gene_id"] = conversion["entrez_gene_id"].astype(int)  # float32 is needed because np.nan is a float
 
     # merge_on should contain at least one of "ensembl_gene_id", "entrez_gene_id", or "gene_symbol"
     merge_on: list[str] = list(set(matrix.columns).intersection(conversion.columns))
@@ -195,11 +195,11 @@ async def _build_matrix_results(
     matrix = matrix.merge(conversion, on=merge_on, how="left")
 
     # drop rows that have `0` in `entrez_gene_id` column
-    matrix = matrix[matrix["entrez_gene_id"] != 0].reset_index(drop=True, inplace=False)
-    gene_info = gene_info[gene_info["entrez_gene_id"] != 0].reset_index(drop=True, inplace=False)
+    # matrix = matrix[matrix["entrez_gene_id"] != 0].reset_index(drop=True, inplace=False)
+    # gene_info = gene_info[gene_info["entrez_gene_id"] != 0].reset_index(drop=True, inplace=False)
 
     gene_info = gene_info_migrations(gene_info)
-    gene_info["entrez_gene_id"] = gene_info["entrez_gene_id"].astype(int)
+    # gene_info["entrez_gene_id"] = gene_info["entrez_gene_id"].astype(int)
 
     counts_matrix = matrix.merge(
         gene_info[["entrez_gene_id", "ensembl_gene_id"]],
