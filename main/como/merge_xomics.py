@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import sys
 from pathlib import Path
 from typing import TextIO, cast
@@ -10,9 +11,7 @@ import pandas as pd
 from fast_bioservices.biothings.mygene import MyGene
 from loguru import logger
 
-from como.combine_distributions import (
-    _begin_combining_distributions,
-)
+from como.combine_distributions import _begin_combining_distributions
 from como.data_types import (
     AdjustmentMethod,
     LogLevel,
