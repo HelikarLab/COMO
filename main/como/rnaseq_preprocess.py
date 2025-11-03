@@ -74,7 +74,6 @@ class _STARinformation:
                 "second_read_transcription_strand",
             ],
         )
-        df = df[~df["ensembl_gene_id"].isna()]
         return _STARinformation(
             num_unmapped=num_unmapped,
             num_multimapping=num_multimapping,
