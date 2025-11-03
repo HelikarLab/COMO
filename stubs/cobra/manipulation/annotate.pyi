@@ -1,0 +1,3 @@
+from cobra import Model as Model
+
+def add_SBO(model: Model) -> None: ...

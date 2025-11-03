@@ -1,0 +1,9 @@
+from .annotations import compartment_shortlist as compartment_shortlist, excludes as excludes, sbo_terms as sbo_terms
+from _typeshed import Incomplete
+from cobra import Model as Model, Reaction as Reaction
+
+logger: Incomplete
+
+def find_external_compartment(model: Model) -> str: ...
+def is_boundary_type(reaction: Reaction, boundary_type: str, external_compartment: str) -> bool: ...
+def find_boundary_types(model: Model, boundary_type: str, external_compartment: str | None = None) -> list['Reaction']: ...
