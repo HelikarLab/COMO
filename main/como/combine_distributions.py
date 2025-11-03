@@ -115,10 +115,12 @@ def _combine_z_distribution_for_source(
     Returns:
           A pandas dataframe of the weighted z-distributions
     """
-    if _num_columns(merged_source_data) <= 2:
-        logger.warning("A single source exists, returning matrix as-is because no additional combining can be done")
-        merged_source_data.columns = ["ensembl_gene_id", "combine_z"]
-        return merged_source_data
+    # If only one batch column exists, return as-is (rename like R path-through).
+    if _num_columns(merged_source_data) <= 1:
+        logger.warning("A single batch exists for this source; returning matrix as-is.")
+        out_df = merged_source_data.copy()
+        out_df.columns = ["combine_z"]
+        return out_df
 
     output_combined_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
     output_figure_filepath.parent.mkdir(parents=True, exist_ok=True)
