@@ -367,15 +367,24 @@ async def _update_missing_data(input_matrices: _InputMatrices, taxon_id: int) ->
         if matrix is not None:
             # fmt: off
             existing_data = (
-                "gene_symbol" if "gene_symbol" in matrix
-                else "entrez_gene_id" if "entrez_gene_id" in matrix
+                "gene_symbol" if "gene_symbol" in matrix.columns
+                else "entrez_gene_id" if "entrez_gene_id" in matrix.columns
                 else "ensembl_gene_id"
             )
             # fmt: on
             logger.trace(f"Merging conversion data for {matrix_name}, existing id column is: {existing_data}")
+            # input_matrices[matrix_name][existing_data] = input_matrices[matrix_name][existing_data].astype(str)
+            if existing_data == "entrez_gene_id":
+                input_matrices[matrix_name]["entrez_gene_id"] = input_matrices[matrix_name]["entrez_gene_id"].astype(int)
+                conversion.index = conversion.index.astype(int)
+
             input_matrices[matrix_name] = (
-                input_matrices[matrix_name].merge(conversion, how="left", on=[existing_data]).dropna().reset_index(drop=True)
+                input_matrices[matrix_name].merge(conversion, how="left", left_on=existing_data, right_index=True).reset_index(drop=True)
             )
+
+            # input_matrices[matrix_name] = (
+            #     input_matrices[matrix_name].merge(conversion, how="left", left_index=True, right_index=True).dropna().reset_index(drop=True)
+            # )
 
     logger.debug("Updated missing genomic data")
     return input_matrices
