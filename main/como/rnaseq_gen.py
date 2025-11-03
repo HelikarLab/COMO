@@ -99,7 +99,7 @@ class _ZFPKMResult(NamedTuple):
     density: Density
     mu: float
     std_dev: float
-    max_fpkm: float
+    fpkm_at_mu: float
 
 
 class _ReadMatrixResults(NamedTuple):
@@ -257,7 +257,7 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
     return metrics
 
 
-def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
+def _calculate_fpkm(metrics: NamedMetrics, scale: float = 1e6) -> NamedMetrics:
     """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary.
 
     Args:
@@ -318,92 +318,42 @@ def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
     return metrics
 
 
-def _zfpkm_calculation(
-    column: pd.Series,
-    peak_parameters: PeakIdentificationParameters,
-    bandwidth: float = 1.0,
-    epsilon: float = 1e-10,
-) -> _ZFPKMResult:
-    """Log2 Transformations.
+def _zfpkm_calculation(col_fpkm: pd.Series, min_peak_height: float, min_peak_distance: int):
+    """ZFPKM Transformations.
 
-    Stabilize the variance in the data to make the distribution more symmetric; this is helpful for Gaussian fitting
+    This function reproduces R's `zFPKM::zFPKM` function.
 
-    Kernel Density Estimation (kde)
-        - SciKit Learn: https://scikit-learn.org/stable/modules/density.html
-        - Non-parametric method to estimate the probability density function (PDF) of a random variable
-        - Estimates the distribution of log2-transformed FPKM values
-        - Bandwidth parameter controls the smoothness of the density estimate
-        - KDE Explanation
-            - A way to smooth a histogram to get a better idea of the underlying distribution of the data
-            - Given a set of data points, we want to understand how they are distributed.
-                Histograms can be useful, but are sensitive to bin size and number
-            - The KDE places a "kernel" - a small symmetric function (i.e., Gaussian curve) - at each data point
-            - The "kernel" acts as a weight, giving more weight to points closer to the center of the kernel,
-                and less weight to points farther away
-            - Kernel functions are summed along each point on the x-axis
-            - A smooth curve is created that represents the estimated density of the data
-
-    Peak Finding
-        - Identifies that are above a certain height and separated by a minimum distance
-        - Represent potential local maxima in the distribution
-
-    Peak Selection
-        - The peak with the highest x-value (from log2-FPKM) is chosen as the mean (mu)
-            of the "inactive" gene distribution
-        - The peak representing unexpressed or inactive genes should be at a lower FPKM
-            value compared to the peak representing expressed genes
-
-    Standard Deviation Estimation
-         - The mean of log2-FPKM values are greater than the calculated mu
-         - Standard deviation is estimated based on the assumption that the right tail of the distribution
-            This represents expressed genes) can be approximated by a half-normal distribution
-
-    zFPKM Transformation
-        - Centers disbribution around 0 and scales it by the standard deviation.
-            This makes it easier to compare gene expression across different samples
-        - Represents the number of standard deviations away from the mean of the "inactive" gene distribution
-        - Higher zFPKM values indicate higher expression levels relative to the "inactive" peak
-        - A zFPKM value of 0 represents the mean of the "inactive" distribution
-        - Research shows that a zFPKM value of -3 or greater can be used as
-            a threshold for calling a gene as "active" and/or "expressed"
-            : https://doi.org/10.1186/1471-2164-14-778
+    References:
+        1) zFPKM implementation in R: https://github.com/ronammar/zFPKM
+        2) zFPKM publication: https://doi.org/10.1186/1471-2164-14-778
 
     Args:
-          column: A pandas Series representing a single sample's FPKM values.
-          peak_parameters: Parameters for peak identification.
-          bandwidth: The bandwidth for the Kernel Density Estimation (KDE).
-          epsilon: A small value to add to FPKM values to prevent log2-divide-by-0 errors
+        col_fpkm: The raw FPKM values to perform zFPKM on
+        min_peak_distance: Minimum distance between peaks; passed on to `find_peaks` function
+        min_peak_height: Minimum height of peaks; passed on to `find_peaks` function
 
     Returns:
-            A named tuple containing the zFPKM values, density estimate, mean (mu), standard deviation, and maximum FPKM value.
-
+        A named tuple containing the zFPKM values, density estimate, mean (mu), standard deviation, and maximum FPKM value.
     """
-    log2values: npt.NDArray[float] = np.log2(column.values + epsilon)
+    # Ignore np.log2(0) errors; we know this will happen, and are removing non-finite values in the density calculation
+    # This is required in order to match R's zFPKM calculations, as R's `density` function removes NA values.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        log2fpkm: npt.NDArray[float] = np.log2(col_fpkm.values).astype(float)
+    d = density(log2fpkm)
 
-    # 1D KDE *always* has one feature and many samples. scikit-learn expects data in the format of (n_samples, n_features)
-    # Thus, we use `.reshape(-1, 1)` because we know there is a single feature
-    # Even though the data is FPKM of many genes for a single sample, it is still one feature over many samples
-    # `-1` indicates the unknown dimension (the number of samples)
-    # `1` indicates the known dimension (the number of genes [also known as features])
-    # https://scikit-learn.org/stable/auto_examples/neighbors/plot_kde_1d.html#sphx-glr-auto-examples-neighbors-plot-kde-1d-py
-    kde: KernelDensity = KernelDensity(kernel="gaussian", bandwidth=bandwidth).fit(log2values.reshape(-1, 1))
+    peaks: pd.DataFrame = find_peaks(d.y_grid, min_peak_height=min_peak_height, min_peak_distance=min_peak_distance)
+    peak_positions = d.x_grid[peaks["peak_idx"].astype(int).tolist()]
 
-    x_range: npt.NDArray[float] = np.linspace(log2values.min(), log2values.max(), 2000).reshape(-1, 1)
-    density: npt.NDArray[float] = np.exp(kde.score_samples(x_range))
-    peaks, _ = find_peaks(density, height=peak_parameters.height, distance=peak_parameters.distance)
-    peak_positions = x_range[peaks]
-
-    mu = 0
-    max_fpkm = 0
-    stddev = 1
-    if len(peaks) != 0:
-        mu = peak_positions.max()
-        max_fpkm = density[peaks[np.argmax(peak_positions)]]
-        u = log2values[log2values > mu].mean()
-        stddev = (u - mu) * np.sqrt(np.pi / 2)
-    zfpkm = pd.Series((log2values - mu) / stddev, dtype=float, name=column.name)
-
-    return _ZFPKMResult(zfpkm=zfpkm, density=Density(x_range, density), mu=mu, std_dev=stddev, max_fpkm=max_fpkm)
+    sd = 1.0
+    mu = 0.0
+    fpkm_at_mu = 0.0
+    if peak_positions.size > 0:
+        mu = float(peak_positions.max())
+        u = float(log2fpkm[log2fpkm > mu].mean())
+        fpkm_at_mu = float(d.y_grid[int(peaks.loc[np.argmax(peak_positions), "peak_idx"])])
+        sd = float((u - mu) * np.sqrt(np.pi / 2))
+    zfpkm = pd.Series((log2fpkm - mu) / sd, dtype=float, name=col_fpkm.name, index=col_fpkm.index)
+    return _ZFPKMResult(zfpkm=zfpkm, density=Density(d.x_grid, d.y_grid), mu=mu, std_dev=sd, fpkm_at_mu=fpkm_at_mu)
 
 
 def zfpkm_transform(
