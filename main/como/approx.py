@@ -84,24 +84,23 @@ def _regularize_values(
     if callable(ties):
         agg_fn = ties
     else:
-        ties_str = "mean" if ties is None else str(ties).lower()
-        if ties_str in ("mean", "avg", "average"):
+        if ties in ("mean", "avg", "average"):
             agg_fn = np.mean
-        elif ties_str in ("first", "left"):
+        elif ties in ("first", "left"):
 
             def agg_fn(a):
                 return a[0]
-        elif ties_str in ("last", "right"):
+        elif ties in ("last", "right"):
 
             def agg_fn(a):
                 return a[-1]
-        elif ties_str == "min":
+        elif ties == "min":
             agg_fn = np.min
-        elif ties_str == "max":
+        elif ties == "max":
             agg_fn = np.max
-        elif ties_str == "median":
+        elif ties == "median":
             agg_fn = np.median
-        elif ties_str == "sum":
+        elif ties == "sum":
             agg_fn = np.sum
         else:
             raise ValueError("Unsupported `ties`; use a callable or one of 'mean', 'first', 'last', 'min', 'max', 'median', 'sum'.")
