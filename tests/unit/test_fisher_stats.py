@@ -10,8 +10,8 @@ def test_fisher_stats():
 
     assert real == FisherExactTest(
         pathway="Glycolysis/gluconeogenesis",
-        statistic=np.float64(4.321708185053381),
-        pvalue=np.float64(1.2883495211648955e-05),
+        statistic=4.321708185053381,
+        pvalue=1.2883495211648955e-05,
         a=32,
         b=10,
         c=4496,

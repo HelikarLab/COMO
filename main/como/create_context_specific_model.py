@@ -168,13 +168,13 @@ def _feasibility_test(model_cobra: cobra.Model, step: str):
 
 def _build_with_gimme(
     reference_model: cobra.Model,
-    lower_bounds: Sequence[float | np.floating],
-    upper_bounds: Sequence[float | np.floating],
+    lower_bounds: Sequence[float] | npt.NDArray[float],
+    upper_bounds: Sequence[float] | npt.NDArray[float],
     idx_objective: int,
-    expr_vector: npt.NDArray[np.floating],
+    expr_vector: npt.NDArray[float],
 ):
     model_reconstruction = reference_model.copy()
-    s_matrix: npt.NDArray[np.floating] = cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction)
+    s_matrix: list[float] = list(cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction))
     # `Becker and Palsson (2008). Context-specific metabolic networks are
     # consistent with experiments. PLoS Comput. Biol. 4, e1000082.`
     properties = GIMMEProperties(
@@ -184,7 +184,7 @@ def _build_with_gimme(
         preprocess=True,
         flux_threshold=0.9,
     )
-    algorithm = GIMME(s_matrix, lower_bounds, upper_bounds, properties)
+    algorithm = GIMME(s_matrix, list(lower_bounds), list(upper_bounds), properties)
     gene_activity = algorithm.run()
     reaction_ids = [r.id for r in model_reconstruction.reactions]
     to_remove_ids = [reaction_ids[r] for r in np.where(gene_activity == 0)[0]]
@@ -219,26 +219,27 @@ def _build_with_fastcore(cobra_model, s_matrix, lower_bounds, upper_bounds, exp_
 
 def _build_with_imat(
     reference_model: cobra.Model,
-    lower_bounds: Sequence[float],
-    upper_bounds: Sequence[float],
+    lower_bounds: Sequence[float] | npt.NDArray[float],
+    upper_bounds: Sequence[float] | npt.NDArray[float],
     expr_vector: npt.NDArray,
     expr_thresh: tuple[float, float],
-    force_gene_indices: Sequence[int],
+    force_reaction_indices: Sequence[int],
     solver: str,
 ) -> cobra.Model:
     properties: IMATProperties = IMATProperties(
         exp_vector=expr_vector,
         exp_thresholds=expr_thresh,
-        core=force_gene_indices,
+        # core=np.array(force_gene_indices).tolist(),
+        core=list(force_reaction_indices),  # `list()` is required because imat uses `if core:`; this returns an error on numpy arrays
         epsilon=0.01,
         solver=solver.upper(),
     )
 
     # Creating a copy of the model ensures we don't make any in-place modifications by accident
     # Using cobra to create the stoichiometry matrix means we have less work to do
-    force_gene_indices = np.array(force_gene_indices, dtype=np.uint16)
+    force_reaction_indices = np.array(force_reaction_indices, dtype=np.uint16)
     model_reconstruction: cobra.Model = reference_model.copy()
-    s_matrix: npt.NDArray[np.floating] = cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction)
+    s_matrix: npt.NDArray[float] = cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction)
     algorithm: IMAT = IMAT(S=s_matrix, lb=np.array(lower_bounds), ub=np.array(upper_bounds), properties=properties)
     rxns_from_imat: npt.NDArray[np.uint16] = algorithm.run().astype(np.uint16)
 
@@ -246,11 +247,7 @@ def _build_with_imat(
     all_rxn_ids: npt.NDArray[str] = np.array([r.id for r in model_reconstruction.reactions], dtype=object)
     all_rxn_indices: npt.NDArray[np.uint16] = np.array(range(len(model_reconstruction.reactions)), dtype=np.uint16)
 
-    # Collect reactions to keep by creating a unique set of reactions from the iMAT algorithm and force-include reactions
-    # dtype is set to uint16 because indices will not be below 0 or be greater than 65,535 (max size of uint16),
-    #   because only ~10,000 reactions exist in Recon3D
-    # Unsafe casting is OK because of these facts.
-    rxn_indices_to_keep: npt.NDArray[np.uint16] = np.unique(np.concatenate([rxns_from_imat, force_gene_indices], dtype=np.uint16))
+    rxn_indices_to_keep: npt.NDArray[int] = np.unique(np.concatenate([rxns_from_imat, force_reaction_indices], dtype=int))
 
     # Reaction indices to exclude from the model are thus reactions that are not marked to be included in the model
     # Assume unique is false because every value that is in `rxn_indices_to_keep` is included in `all_rxn_indices`
@@ -277,7 +274,7 @@ def _build_with_tinit(
         no_reverse_loops=True,
     )
     model_reconstruction = reference_model.copy()
-    s_matrix: npt.NDArray[np.floating] = cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction).astype(np.float64)
+    s_matrix: npt.NDArray[float] = np.asarray(cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction), dtype=float)
     algorithm = tINIT(s_matrix, lower_bounds, upper_bounds, properties)
     algorithm.preprocessing()
     algorithm.build_problem()
@@ -445,7 +442,7 @@ async def _build_model(  # noqa: C901
         high_thresh=high_thresh,
         low_thresh=low_thresh,
     )
-    expression_vector: npt.NDArray[np.int32] = np.array(list(reaction_expression.values()), dtype=np.int32)
+    expression_vector: npt.NDArray[float] = np.array(list(reaction_expression.values()), dtype=float)
 
     for rxn in force_reactions:
         if rxn not in reaction_ids:

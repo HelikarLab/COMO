@@ -139,7 +139,7 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
     Returns:
         A NumPy array of the filtered data.
     """
-    if not isinstance(data, pd.DataFrame | npt.NDArray):
+    if not isinstance(data, pd.DataFrame | np.ndarray):
         _log_and_raise_error(
             f"Unsupported data type. Must be a Pandas DataFrame or a NumPy array, got '{type(data)}'",
             error=TypeError,
@@ -272,11 +272,11 @@ def _calculate_fpkm(metrics: NamedMetrics, scale: int = 1e6) -> NamedMetrics:
 
         for sample in range(metrics[study].num_samples):
             layout = metrics[study].layout[sample]
-            count_matrix: npt.NDArray[np.float32] = metrics[study].count_matrix.iloc[:, sample].values
+            count_matrix: npt.NDArray[float] = metrics[study].count_matrix.iloc[:, sample].values
             gene_lengths = (
-                metrics[study].fragment_lengths[sample].astype(np.float32)
+                metrics[study].fragment_lengths[sample].astype(float)
                 if layout == LayoutMethod.paired_end
-                else metrics[study].gene_sizes.astype(np.float32)
+                else metrics[study].gene_sizes.astype(float)
             )
             gene_lengths_kb = gene_lengths / 1000.0
 
@@ -595,11 +595,11 @@ def cpm_filter(
         top_samples = round(n_top * len(counts.columns))  # noqa: F841
         test_bools = pd.DataFrame({"entrez_gene_ids": entrez_ids})
         for i in range(len(counts_per_million.columns)):
-            median_sum = np.float64(np.median(np.sum(counts[:, i])))
+            median_sum = float(np.median(np.sum(counts[:, i])))
             if cut_off == "default":  # noqa: SIM108
-                cutoff = np.float64(10e6) / median_sum
+                cutoff = float(10e6 / median_sum)
             else:
-                cutoff = np.float64(1e6 * cut_off) / median_sum
+                cutoff = float(1e6 * cut_off) / median_sum
             test_bools = test_bools.merge(counts_per_million[counts_per_million.iloc[:, i] > cutoff])
 
     return metrics
