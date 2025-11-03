@@ -849,28 +849,3 @@ async def rnaseq_preprocess(
         cache=cache,
         create_gene_info_only=create_gene_info_only,
     )
-
-
-async def _main():
-    context_name = "notreatment"
-    taxon = 9606
-    como_context_dir = Path("/Users/joshl/Projects/COMO/main/data/COMO_input/naiveB")
-    output_gene_info_filepath = Path("/Users/joshl/Projects/COMO/main/data/results/naiveB/gene_info_fixed.csv")
-    output_trna_metadata_filepath = Path("/Users/joshl/Projects/COMO/main/data/config_sheets/trna_config.xlsx")
-    output_trna_count_matrix_filepath = Path("/Users/joshl/Projects/COMO/main/data/results/naiveB/total-rna/totalrna_naiveB.csv")
-
-    await rnaseq_preprocess(
-        context_name=context_name,
-        taxon=taxon,
-        como_context_dir=como_context_dir,
-        input_matrix_filepath=None,
-        output_gene_info_filepath=output_gene_info_filepath,
-        output_trna_metadata_filepath=output_trna_metadata_filepath,
-        output_trna_count_matrix_filepath=output_trna_count_matrix_filepath,
-        cache=False,
-        log_level="INFO",
-    )
-
-
-if __name__ == "__main__":
-    asyncio.run(_main())
