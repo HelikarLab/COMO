@@ -272,27 +272,54 @@ async def _begin_combining_distributions(
             logger.critical(f"Invalid source; got '{source.value}', expected 'trna', 'mrna', 'scrna', or 'proteomics'.")
             raise ValueError("Invalid source")
 
-        batch_results = await asyncio.gather(
-            *[
+        batch_results: list[pd.DataFrame] = []
+        for batch in batch_names[source.value]:
+            batch: _BatchEntry
+            matrix_subset = cast(pd.DataFrame, matrix[[GeneIdentifier.ensembl_gene_id.value, *batch.sample_names]])
+            matrix_subset = matrix_subset.set_index(keys=[GeneIdentifier.ensembl_gene_id.value], drop=True)
+
+            output_fp = output_filepaths[source.value].parent / f"{source.value}_batch{batch.batch_num}_combined_z_distrobution_{context_name}.csv"
+            batch_results.append(
                 _combine_z_distribution_for_batch(
                     context_name=context_name,
                     batch=batch,
-                    matrix=matrix[[GeneIdentifier.ENSEMBL_GENE_ID.value, *batch.sample_names]],
+                    matrix=matrix_subset,
                     source=source,
-                    output_combined_matrix_filepath=(
-                        output_filepaths[source.value].parent / f"{context_name}_{source.value}_batch{batch.batch_num}_combined_z_distribution.csv"
-                    ),
+                    output_combined_matrix_filepath=output_fp,
                     output_figure_dirpath=output_figure_dirpath,
                     weighted_z_floor=weighted_z_floor,
                     weighted_z_ceiling=weighted_z_ceiling,
                 )
-                for batch in batch_names[source.value]
-            ]
-        )
+            )
 
-        merged_batch_results = pd.DataFrame()
-        for df in batch_results:
-            merged_batch_results = df if merged_batch_results.empty else merged_batch_results.merge(df, on="ensembl_gene_id", how="outer")
+        index_name: str = (
+            "ensembl_gene_id"
+            if all(df.index.name == "ensembl_gene_id" for df in batch_results)
+            else "entrez_gene_id"
+            if all(df.index.name == "entrez_gene_id" for df in batch_results)
+            else "gene_symbol"
+            if all(df.index.name == "gene_symbol" for df in batch_results)
+            else ""
+        )
+        if not index_name:
+            _log_and_raise_error(
+                f"Unable to find common gene identifier across batches for source '{source.value}' in context '{context_name}'",
+                error=ValueError,
+                level=LogLevel.ERROR,
+            )
+        merged_batch_results = pd.concat(batch_results, axis="columns")
+        merged_batch_results.index.name = index_name
+
+        replicates_by_batch_num_map: dict[str, int] = {str(batch.batch_num): batch.num_samples for batch in batch_names[source.value]}
+        batch_column_names: list[str] = list(merged_batch_results.columns)
+        replicates_per_batch: list[int] = []
+        for col in batch_column_names:
+            key = str(col)
+            if key not in replicates_by_batch_num_map:
+                raise KeyError(
+                    f"Missing replicate count for batch column '{col}' in source '{source.value}'. Known: {list(replicates_by_batch_num_map.keys())}"
+                )
+            replicates_per_batch.append(replicates_by_batch_num_map[key])
 
         merged_source_results: pd.DataFrame = _combine_z_distribution_for_source(
             merged_source_data=merged_batch_results,
@@ -312,7 +339,7 @@ async def _begin_combining_distributions(
                 weight=source_weights[source.value],
             )
         )
-        merged_source_results.to_csv(output_filepaths[source.value], index=False)
+        merged_source_results.to_csv(output_filepaths[source.value], index=True)
         logger.success(f"Wrote z-scores for source '{source.value}' in context '{context_name}' to '{output_filepaths[source.value]}'")
 
     logger.trace(f"Combining z-score distributions for all sources in context '{context_name}'")
@@ -321,5 +348,5 @@ async def _begin_combining_distributions(
         zscore_results=z_score_results,
         output_graph_filepath=output_figure_dirpath / f"{context_name}_combined_omics_distribution.pdf",
     )
-    merged_context_results.to_csv(output_final_model_scores, index=False)
-    logger.success(f"Finished combining z-scores for context '{context_name}'")
+    merged_context_results.to_csv(output_final_model_scores, index=True)
+    logger.success(f"Wrote combined z-scores for context '{context_name}' to {output_final_model_scores}")
