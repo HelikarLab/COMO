@@ -221,7 +221,7 @@ def _combine_z_distribution_for_context(
     combined_z_matrix = np.clip(combined_z_matrix, weighted_z_floor, weighted_z_ceiling, dtype=float)
     combined_z_matrix_df = pd.DataFrame(
         {
-            "ensembl_gene_id": z_matrix["ensembl_gene_id"],
+            "ensembl_gene_id": z_matrix.index,
             "combine_z": combined_z_matrix,
         }
     )
