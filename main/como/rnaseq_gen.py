@@ -472,17 +472,19 @@ def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
         min_func = k_over_a(min_samples, 0.9)
         top_func = k_over_a(top_samples, 0.9)
 
-        min_genes: npt.NDArray[bool] = genefilter(boolean_expression, min_func)
-        top_genes: npt.NDArray[bool] = genefilter(boolean_expression, top_func)
+        min_genes: npt.NDArray[np.bool] = genefilter(boolean_expression, min_func)
+        top_genes: npt.NDArray[np.bool] = genefilter(boolean_expression, top_func)
 
         # Only keep `entrez_gene_ids` that pass `min_genes`
         metric.entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, min_genes, strict=True) if keep]
-        metric.gene_sizes = np.array(gene for gene, keep in zip(gene_size, min_genes, strict=True) if keep)
+        metric.gene_sizes = np.asarray(gene for gene, keep in zip(gene_size, min_genes, strict=True) if keep)
         metric.count_matrix = cast(pd.DataFrame, metric.count_matrix.iloc[min_genes, :])
         metric.normalization_matrix = cast(pd.DataFrame, metrics[sample].normalization_matrix.iloc[min_genes, :])
 
         keep_top_genes = [gene for gene, keep in zip(entrez_ids, top_genes, strict=True) if keep]
-        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(entrez_ids, keep_top_genes, strict=True) if keep]
+        metric.high_confidence_entrez_gene_ids = [
+            gene for gene, keep in zip(entrez_ids, keep_top_genes, strict=True) if keep
+        ]
 
     metrics = calculate_z_score(metrics)
 
