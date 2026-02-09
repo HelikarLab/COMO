@@ -351,7 +351,9 @@ def _write_counts_matrix(
         config_df.loc[config_df["library_prep"].str.lower() == rna.value.lower(), "sample_name"].tolist()
     )
 
-    final_matrix: pd.DataFrame = functools.reduce(lambda left, right: pd.merge(left, right, on="ensembl_gene_id", how="outer"), counts)
+    final_matrix: pd.DataFrame = functools.reduce(
+        lambda left, right: pd.merge(left, right, on="ensembl_gene_id", how="outer"), counts
+    )
     final_matrix.fillna(value=0, inplace=True)
     final_matrix.iloc[:, 1:] = final_matrix.iloc[:, 1:].astype(int)
     final_matrix = cast(pd.DataFrame, final_matrix[["ensembl_gene_id", *rna_specific_sample_names]])
@@ -687,42 +689,61 @@ async def _create_gene_info_file(
         conversion = conversion[~conversion["ensembl_gene_id"].isna()]
         return conversion["ensembl_gene_id"].tolist()
 
-    logger.info("Fetching gene info - this can take up to 5 minutes depending on the number of genes and your internet connection")
+    logger.info(
+        "Fetching gene info - this can take up to 5 minutes depending on the number of genes and your internet connection"
+    )
 
-    ensembl_ids: set[str] = set(chain.from_iterable(await asyncio.gather(*[read_ensembl_gene_ids(f) for f in counts_matrix_filepaths])))
+    ensembl_ids: set[str] = set(
+        chain.from_iterable(await asyncio.gather(*[read_ensembl_gene_ids(f) for f in counts_matrix_filepaths]))
+    )
     gene_data: list[dict[str, str | int | list[str] | list[int] | None]] = await MyGene(cache=cache).query(
         items=list(ensembl_ids),
         taxon=taxon,
         scopes="ensemblgene",
     )
-    gene_info: pd.DataFrame = pd.DataFrame(
-        data=None,
-        columns=pd.Index(data=["ensembl_gene_id", "gene_symbol", "entrez_gene_id", "size"]),
-        index=pd.Index(data=list(range(len(ensembl_ids)))),
-    )
+
+    n = len(gene_data)
+    all_gene_symbols: list[str] = ["-"] * n
+    all_entrez_ids: list[str | int] = ["-"] * n
+    all_ensembl_ids: list[str] = ["-"] * n
+    all_sizes: list[int] = [-1] * n
+
+    def _avg_pos(value: int | list[int] | None) -> int:
+        if value is None:
+            return 0
+        if isinstance(value, list):
+            return int(sum(value) / len(value)) if value else 0
+        return int(value)
 
     for i, data in enumerate(gene_data):
         data: dict[str, str | int | list[str] | list[int] | None]
-        ensembl_genes: str | list[str] = cast(str | list[str], data.get("ensembl.gene", "-"))
-        start_pos: int | list[int] = cast(int | list[int], data.get("genomic_pos.start", 0))
-        end_pos: int | list[int] = cast(int | list[int], data.get("genomic_pos.end", 0))
 
-        avg_start: int | float = sum(start_pos) / len(start_pos) if isinstance(start_pos, list) else start_pos
-        avg_end: int | float = sum(end_pos) / len(end_pos) if isinstance(end_pos, list) else end_pos
-        size: int = int(avg_end - avg_start)
+        start = _avg_pos(data.get("genomic_pos.start", 0))
+        end = _avg_pos(data.get("genomic_pos.end", 0))
+        size = end - start
 
-        gene_info.at[i, "gene_symbol"] = data.get("symbol", "-")
-        gene_info.at[i, "entrez_gene_id"] = data.get("entrezgene", "-")
-        gene_info.at[i, "ensembl_gene_id"] = ",".join(ensembl_genes) if isinstance(ensembl_genes, list) else ensembl_genes
-        gene_info.at[i, "size"] = size if size > 0 else -1
+        ensembl_id: int = data.get("ensembl.gene", "-")
+        all_ensembl_ids[i] = (
+            ",".join(map(str, ensembl_id)) if isinstance(ensembl_id, list) and ensembl_id else ensembl_id
+        )
+        all_gene_symbols[i] = str(data.get("symbol", "-"))
+        all_entrez_ids[i] = str(data.get("entrezgene", "-"))
+        all_sizes[i] = size if size > 0 else -1
 
-    gene_info["size"] = gene_info["size"].astype(str)  # replace no-length values with "-" to match rows where every value is "-"
-    gene_info["size"] = gene_info["size"].replace("-1", "-")
-    gene_info = cast(pd.DataFrame, gene_info[~(gene_info == "-").all(axis=1)])  # remove rows where every value is "-"
+    gene_info: pd.DataFrame = pd.DataFrame(
+        {
+            "ensembl_gene_id": all_ensembl_ids,
+            "gene_symbol": all_gene_symbols,
+            "entrez_gene_id": all_entrez_ids,
+            "size": all_sizes,
+        }
+    )
+
+    # remove rows where every gene size value is -1 (not available)
+    gene_info = gene_info[~(gene_info == -1).all(axis=1)]
 
     gene_info["ensembl_gene_id"] = gene_info["ensembl_gene_id"].str.split(",")  # extend lists into multiple rows
     gene_info = gene_info.explode(column=["ensembl_gene_id"])
-    gene_info["size"] = gene_info["size"].astype(int)
     # we would set `entrez_gene_id` to int here as well, but not all ensembl ids are mapped to entrez ids,
     #   and as a result, there are still "-" values in the entrez id column that cannot be converted to an integer
 
