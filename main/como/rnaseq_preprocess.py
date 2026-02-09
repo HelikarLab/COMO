@@ -1,19 +1,23 @@
 from __future__ import annotations
 
 import asyncio
+import csv
 import functools
+import io
 import json
 import re
 import sys
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
-from io import TextIOWrapper
 from itertools import chain
 from pathlib import Path
 from typing import Final, Literal, cast
 
-import aiofiles
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
+import pandera.pandas as pa
+import pandera.typing.pandas as pat
 from fast_bioservices.biothings.mygene import MyGene
 from fast_bioservices.pipeline import gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
