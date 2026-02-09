@@ -684,6 +684,7 @@ async def _create_gene_info_file(
             )
 
         # Remove NA values from entrez_gene_id dataframe column
+        conversion = conversion[~conversion["ensembl_gene_id"].isna()]
         return conversion["ensembl_gene_id"].tolist()
 
     logger.info("Fetching gene info - this can take up to 5 minutes depending on the number of genes and your internet connection")
