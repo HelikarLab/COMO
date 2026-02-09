@@ -529,34 +529,38 @@ def zfpkm_filter(
         metric: _StudyMetrics
         # if fpkm was not calculated, the normalization matrix will be empty; collect the count matrix instead
         matrix = metric.count_matrix if metric.normalization_matrix.empty else metric.normalization_matrix
+        if not isinstance(matrix, pd.DataFrame):
+            raise TypeError(f"Expected a pandas.DataFrame for zFPKM filtering, got: '{type(matrix)}'")
 
         # TODO: 2025-OCT-31: Re-evaluate whether to remove rows with all 0 counts
         # matrix = matrix[matrix.sum(axis=1) > 0]  # remove rows (genes) that have no counts across all samples
 
-        results, zfpkm_df = zfpkm_transform(
-            fpkm_df=matrix,
-            min_peak_height=min_peak_height,
-            min_peak_distance=min_peak_distance,
-        )
-        zfpkm_df[(matrix == 0) | (zfpkm_df.isna())] = -4
+        matrix.replace(to_replace=np.nan, value=0.0, inplace=True)
+        if force_negative_to_zero:
+            matrix[matrix < 0] = 0.0
 
-        if len(results) > 10 and not force_zfpkm_plot:
+        zfpkm_df, zfpkm_results = zFPKM(matrix)
+
+        if len(zfpkm_results) > 25 and not force_zfpkm_plot:
             logger.warning(
-                "Not plotting zFPKM results because more than 10 plots would be created. "
+                "Not plotting zFPKM results because more than 25 plots would be created. "
                 "If you would like to plot them anyway, set 'force_zfpkm_plot' to True"
             )
         elif output_png_dirpath is None:
             logger.critical("Output zFPKM PNG filepath is None, set a path to plot zFPKM graphs")
         else:
-            zfpkm_plot(results, output_png_dirpath=output_png_dirpath)
+            sample_name = zfpkm_results[0].name.split("_")[0]  # go from 'control1hr_S1R1' to 'control1hr'
+            zfpkm_plot(zfpkm_results, save_filepath=output_png_dirpath / f"{sample_name}_zfpkm_density.png")
 
         metric.z_score_matrix = zfpkm_df
 
         # determine which genes are expressed
         min_samples = round(min_sample_expression * len(zfpkm_df.columns))
         min_func = k_over_a(min_samples, cut_off)
-        min_genes: npt.NDArray[bool] = genefilter(zfpkm_df, min_func)
-        metric.entrez_gene_ids = [gene for gene, keep in zip(zfpkm_df.index, min_genes, strict=True) if keep]
+        min_genes: npt.NDArray[np.bool] = genefilter(zfpkm_df, min_func)
+        metric.entrez_gene_ids = np.asarray(
+            [g_id for g_id, keep in zip(zfpkm_df.index, min_genes, strict=True) if keep], dtype=int
+        )
 
         # determine which genes are confidently expressed
         top_samples = round(high_confidence_sample_expression * len(zfpkm_df.columns))
@@ -578,6 +582,7 @@ def filter_counts(
     zfpkm_min_peak_height: float,
     zfpkm_min_peak_distance: int,
     output_zfpkm_plot_dirpath: Path | None = None,
+    force_negative_to_zero: bool = False,
 ) -> NamedMetrics:
     """Filter the count matrix based on the specified technique.
 
@@ -591,6 +596,8 @@ def filter_counts(
         zfpkm_min_peak_height: Minimum peak height for zFPKM peak identification.
         zfpkm_min_peak_distance: Minimum peak distance for zFPKM peak identification.
         output_zfpkm_plot_dirpath: Optional filepath to save the zFPKM plot.
+    :param force_negative_to_zero: Should negative values be forcibly set to 0?
+            This could happen as a result of normalization producing negative near-zero values (e.g., -0.001)
 
     Returns:
         A dictionary of filtered study metrics.
@@ -609,6 +616,7 @@ def filter_counts(
                 min_peak_height=zfpkm_min_peak_height,
                 min_peak_distance=zfpkm_min_peak_distance,
                 output_png_dirpath=output_zfpkm_plot_dirpath,
+                force_negative_to_zero=force_negative_to_zero,
             )
         case FilteringTechnique.UMI:
             # UMI filtering is the same as zFPKM filtering without calculating FPKM
