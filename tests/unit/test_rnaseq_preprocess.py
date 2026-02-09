@@ -52,9 +52,9 @@ def test_sample_name_from_filepath(any_como_input_filepath: Path):
 def test_organize_gene_counts_files(como_input_data_directory: Path):
     metric: _StudyMetrics
     for metric in _organize_gene_counts_files(como_input_data_directory):
-        assert len(metric.sample_names) == metric.num_samples == len(metric.count_files) == len(metric.strand_files)
+        assert len(metric.sample_names) == metric.num_samples == len(metric.quant_files) == len(metric.strand_files)
 
-        for file in metric.count_files:
+        for file in metric.quant_files:
             assert f"/{metric.study_name}/" in file.as_posix()
             assert "geneCounts" in file.as_posix()
             assert file.suffix == ".tab"
