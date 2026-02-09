@@ -5,7 +5,8 @@ import pytest
 from _pytest.fixtures import SubRequest
 
 _fragment_size_filepaths = list(Path("main/data/COMO_input").absolute().rglob("*fragment_size*.txt"))
-_gene_count_filepaths = list(Path("main/data/COMO_input").absolute().rglob("*.tab"))
+_quant_filepaths = list(Path("main/data/COMO_input").absolute().rglob("*.sf"))
+# _gene_count_filepaths = list(Path("main/data/COMO_input").absolute().rglob("*.tab"))
 _insert_size_filepaths = list(Path("main/data/COMO_input").absolute().rglob("*_insert_size.txt"))
 _layout_filepaths = list(Path("main/data/COMO_input").absolute().rglob("*_layout.txt"))
 _preparation_method_filepaths = list(Path("main/data/COMO_input").absolute().rglob("*_prep_method.txt"))
@@ -27,14 +28,14 @@ def fragment_size_filepath(request: SubRequest) -> Path:
     return request.param
 
 
-@pytest.fixture(params=_gene_count_filepaths)
-def gene_count_filepath(request: SubRequest) -> Path:
+@pytest.fixture(params=_quant_filepaths)
+def quant_filepaths(request: SubRequest) -> Path:
     return request.param
 
 
 @pytest.fixture
 def all_gene_count_filepaths() -> list[Path]:
-    return _gene_count_filepaths
+    return _quant_filepaths
 
 
 @pytest.fixture(params=_insert_size_filepaths)
@@ -62,7 +63,7 @@ def strand_filepath(request: SubRequest) -> Path:
         file
         for filepaths in [
             _fragment_size_filepaths,
-            _gene_count_filepaths,
+            _quant_filepaths,
             _insert_size_filepaths,
             _layout_filepaths,
             _preparation_method_filepaths,

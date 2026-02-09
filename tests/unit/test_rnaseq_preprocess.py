@@ -64,9 +64,8 @@ def test_organize_gene_counts_files(como_input_data_directory: Path):
             assert file.suffix == ".txt"
 
 
-@pytest.mark.asyncio
-async def test_process_first_multirun_sample(strand_filepath: Path, all_gene_count_filepaths: list[Path]):
-    result: pd.DataFrame = await _process_first_multirun_sample(strand_filepath, all_gene_count_filepaths)
+def test_process_first_multirun_sample(strand_filepath: Path, all_gene_count_filepaths: list[Path]):
+    result: pd.DataFrame = _process_first_multirun_sample(strand_filepath, all_gene_count_filepaths)
     assert result.columns[0] == "ensembl_gene_id"
     assert len(result.columns) == 2
     assert result.columns.tolist()[1] in strand_filepath.as_posix()
