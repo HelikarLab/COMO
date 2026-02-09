@@ -466,8 +466,10 @@ def tpm_quantile_filter(*, metrics: NamedMetrics, filtering_options: _FilteringO
         top_samples = round(n_top * len(tpm_matrix.columns))
 
         tpm_quantile = tpm_matrix[tpm_matrix > 0]
-        quantile_cutoff = np.quantile(a=tpm_quantile.values, q=1 - (cut_off / 100), axis=0)  # Compute quantile across columns
-        boolean_expression = pd.DataFrame(data=tpm_matrix > quantile_cutoff, index=tpm_matrix.index, columns=tpm_matrix.columns).astype(int)
+        quantile_cutoff = np.quantile(a=tpm_quantile.values, q=1 - (cut_off / 100), axis=0)
+        boolean_expression = pd.DataFrame(
+            data=tpm_matrix > quantile_cutoff, index=tpm_matrix.index, columns=tpm_matrix.columns
+        ).astype(int)
 
         min_func = k_over_a(min_samples, 0.9)
         top_func = k_over_a(top_samples, 0.9)
