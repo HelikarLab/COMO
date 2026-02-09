@@ -149,12 +149,13 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
 
 
 async def _build_matrix_results(
+    matrix: pd.DataFrame | sc.AnnData,
     *,
-    matrix: pd.DataFrame,
     gene_info: pd.DataFrame,
     metadata_df: pd.DataFrame,
+    fragment_df: pd.DataFrame | None,
     taxon: int,
-) -> _ReadMatrixResults:
+) -> tuple[NamedMetrics, list[int]]:
     """Read the counts matrix and returns the results.
 
     Arg:
