@@ -502,6 +502,7 @@ def zfpkm_filter(
     min_peak_height: float,
     min_peak_distance: int,
     output_png_dirpath: Path | None,
+    force_negative_to_zero: bool = False,
 ) -> NamedMetrics:
     """Apply zFPKM filtering to the FPKM matrix for a given sample.
 
@@ -513,6 +514,8 @@ def zfpkm_filter(
         min_peak_height: Minimum peak height for zFPKM peak identification.
         min_peak_distance: Minimum peak distance for zFPKM peak identification.
         output_png_dirpath: Optional directory path to save zFPKM plots.
+        force_negative_to_zero: Should negative values be forcibly set to 0?
+            This could happen as a result of normalization producing negative near-zero values (e.g., -0.001)
 
     Returns:
         A dictionary of filtered study metrics.
