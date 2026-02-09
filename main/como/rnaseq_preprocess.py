@@ -326,7 +326,7 @@ def _create_sample_counts_matrix(metrics: _StudyMetrics) -> pd.DataFrame:
     return counts
 
 
-async def _write_counts_matrix(
+def _write_counts_matrix(
     *,
     config_df: pd.DataFrame,
     fragment_lengths: pd.DataFrame,
@@ -367,7 +367,7 @@ async def _write_counts_matrix(
     return final_matrix
 
 
-async def _create_config_df(  # noqa: C901
+def _create_config_df(  # noqa: C901
     context_name: str,
     /,
     como_context_dir: Path,
@@ -670,7 +670,7 @@ async def _create_gene_info_file(
     """
 
     async def read_ensembl_gene_ids(file: Path) -> list[str]:
-        data = await _read_file(file, h5ad_as_df=False)
+        data = _read_file(file, h5ad_as_df=False)
         if isinstance(data, pd.DataFrame):
             data: pd.DataFrame
             return data["ensembl_gene_id"].tolist()
@@ -731,7 +731,7 @@ async def _create_gene_info_file(
     logger.success(f"Gene Info file written at '{output_filepath}'")
 
 
-async def _process_como_input(
+def _process_como_input(
     context_name: str,
     output_config_filepath: Path,
     como_context_dir: Path,
@@ -741,7 +741,7 @@ async def _process_como_input(
 ) -> None:
     config_df, fragment_lengths = _create_config_df(context_name, como_context_dir=como_context_dir)
 
-    await _write_counts_matrix(
+    _write_counts_matrix(
         config_df=config_df,
         fragment_lengths=fragment_lengths,
         como_context_dir=como_context_dir,
