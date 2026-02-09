@@ -261,14 +261,13 @@ def _process_first_multirun_sample(strand_file: Path, all_quant_files: list[Path
         )
 
     # Set na values to 0
-    sample_count = sample_count.fillna(value="0")
+    sample_count = sample_count.fillna(value=0)
     sample_count["counts"] = sample_count["counts"].astype(float)
 
-    count_sums = sample_count.groupby("ensembl_gene_id", as_index=False)["counts"].mean()
-    count_sums["counts"] = np.ceil(count_sums["counts"].astype(np.uint32))
-    count_sums.columns = ["ensembl_gene_id", _sample_name_from_filepath(strand_file)]
-    return count_sums
-
+    count_avg = sample_count.groupby("ensembl_gene_id", as_index=False)["counts"].mean()
+    count_avg["counts"] = np.ceil(count_avg["counts"].astype(int))
+    count_avg.columns = ["ensembl_gene_id", _sample_name_from_filepath(strand_file)]
+    return count_avg
 
 
 def _process_standard_replicate(counts_file: Path, strand_file: Path, sample_name: str):
