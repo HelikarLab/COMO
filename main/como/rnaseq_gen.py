@@ -53,8 +53,8 @@ class _StudyMetrics:
     fragment_lengths: npt.NDArray[np.floating] | None
     sample_names: list[str]
     layout: list[LayoutMethod]
-    entrez_gene_ids: npt.NDArray[int]
-    gene_sizes: npt.NDArray[int]
+    entrez_gene_ids: npt.NDArray[np.integer]
+    gene_sizes: npt.NDArray[np.integer]
     __normalization_matrix: pd.DataFrame = field(default_factory=pd.DataFrame)
     __z_score_matrix: pd.DataFrame | sc.AnnData | None = field(default=None)
     __high_confidence_entrez_gene_ids: list[str] = field(default_factory=list)
