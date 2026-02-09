@@ -6,6 +6,7 @@ quote-style = "double"
 docstring-code-format = true
 
 [lint]
+extend-fixable = ["I001"]
 # Linting rules: https://docs.astral.sh/ruff/rules/
 unfixable = [
     "F401", # warn about, but do not remove, unused imports
