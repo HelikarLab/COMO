@@ -49,14 +49,14 @@ class LayoutMethod(Enum):
 class _StudyMetrics:
     study: str
     num_samples: int
-    count_matrix: pd.DataFrame
-    fragment_lengths: npt.NDArray[float]
+    count_matrix: pd.DataFrame | sc.AnnData
+    fragment_lengths: npt.NDArray[np.floating] | None
     sample_names: list[str]
     layout: list[LayoutMethod]
     entrez_gene_ids: npt.NDArray[int]
     gene_sizes: npt.NDArray[int]
     __normalization_matrix: pd.DataFrame = field(default_factory=pd.DataFrame)
-    __z_score_matrix: pd.DataFrame = field(default_factory=pd.DataFrame)
+    __z_score_matrix: pd.DataFrame | sc.AnnData | None = field(default=None)
     __high_confidence_entrez_gene_ids: list[str] = field(default_factory=list)
 
     def __post_init__(self):
@@ -77,11 +77,11 @@ class _StudyMetrics:
         self.__normalization_matrix = value
 
     @property
-    def z_score_matrix(self) -> pd.DataFrame:
+    def z_score_matrix(self) -> pd.DataFrame | sc.AnnData | None:
         return self.__z_score_matrix
 
     @z_score_matrix.setter
-    def z_score_matrix(self, value: pd.DataFrame) -> None:
+    def z_score_matrix(self, value: pd.DataFrame | sc.AnnData) -> None:
         self.__z_score_matrix = value
 
     @property
@@ -111,9 +111,10 @@ NamedMetrics = dict[str, _StudyMetrics]
 
 
 def k_over_a(k: int, a: float) -> Callable[[npt.NDArray], bool]:
-    """Return a function that filters rows of an array based on the sum of elements being greater than or equal to A at least k times.
+    """Filter rows of an array based on the sum of elements being greater than or equal to A at least k times.
 
-    This code is based on the `kOverA` function found in R's `genefilter` package: https://www.rdocumentation.org/packages/genefilter/versions/1.54.2/topics/kOverA
+    This code is based on the `kOverA` function found in R's `genefilter` package
+    https://www.rdocumentation.org/packages/genefilter/versions/1.54.2/topics/kOverA
 
     :param k: The minimum number of times the sum of elements must be greater than or equal to A.
     :param a: The value to compare the sum of elements to.
@@ -121,7 +122,7 @@ def k_over_a(k: int, a: float) -> Callable[[npt.NDArray], bool]:
     """
 
     def filter_func(row: npt.NDArray) -> bool:
-        return np.sum(row >= a) >= k
+        return bool(np.sum(row >= a) >= k)
 
     return filter_func
 
@@ -168,20 +169,35 @@ async def _build_matrix_results(
     """
     conversion = await ensembl_to_gene_id_and_symbol(ids=matrix["ensembl_gene_id"].tolist(), taxon=taxon)
 
-    # If all columns are empty, it is indicative that the incorrect taxon id was provided
-    if all(conversion[col].eq("-").all() for col in conversion.columns):
-        logger.critical(f"Conversion of Ensembl Gene IDs to Entrez IDs and Gene Symbols was empty - is '{taxon}' the correct taxon ID for this data?")
+        matrix.var = matrix.var.reset_index(drop=False, names=["gene_symbol"])
+        conversion = await gene_symbol_to_ensembl_and_gene_id(symbols=matrix.var["gene_symbol"].tolist(), taxon=taxon)
+    else:
+        if "ensembl_gene_id" not in matrix.columns:
+            _log_and_raise_error(
+                message="'ensembl_gene_id' column not found in the provided DataFrame.",
+                error=ValueError,
+                level=LogLevel.CRITICAL,
+            )
+        conversion: pd.DataFrame = await ensembl_to_gene_id_and_symbol(
+            ids=matrix["ensembl_gene_id"].tolist(), taxon=taxon
+        )
+    # If the entrez gene id column is empty, it is indicative that the incorrect taxon id was provided
+    if conversion["entrez_gene_id"].eq("-").all():
+        logger.critical(
+            f"Conversion of Ensembl Gene IDs to Entrez IDs and Gene Symbols was empty - "
+            f"is '{taxon}' the correct taxon ID for this data?"
+        )
+    conversion["ensembl_gene_id"] = conversion["ensembl_gene_id"].str.split(",")
+    conversion = conversion.explode("ensembl_gene_id")
+    conversion = conversion[conversion["entrez_gene_id"] != "-"]
+    conversion["entrez_gene_id"] = conversion["entrez_gene_id"]
+    conversion = conversion.reset_index(drop=False)
 
-    # 2025-NOV-3: commented out `conversion` types to evaluate if it can be skipped
-    # conversion["ensembl_gene_id"] = conversion["ensembl_gene_id"].str.split(",")
-    # conversion = conversion.explode("ensembl_gene_id")
-    # conversion.reset_index(inplace=True, drop=True)
-    # conversion = conversion[conversion["entrez_gene_id"] != "-"]  # drop missing entrez IDs
-    # conversion["entrez_gene_id"] = conversion["entrez_gene_id"].astype(int)  # float32 is needed because np.nan is a float
-
-    # merge_on should contain at least one of "ensembl_gene_id", "entrez_gene_id", or "gene_symbol"
-    merge_on: list[str] = list(set(matrix.columns).intersection(conversion.columns))
-    if not merge_on:
+    # conversion_merge_on should contain at least one of "ensembl_gene_id", "entrez_gene_id", or "gene_symbol"
+    conversion_merge_on: list[str] = list(
+        set(matrix.columns if isinstance(matrix, pd.DataFrame) else matrix.var.columns) & set(conversion.columns)
+    )
+    if not conversion_merge_on:
         _log_and_raise_error(
             (
                 "No columns to merge on, unable to find at least one of `ensembl_gene_id`, `entrez_gene_id`, or `gene_symbol`. "
@@ -190,48 +206,91 @@ async def _build_matrix_results(
             error=ValueError,
             level=LogLevel.ERROR,
         )
-    if "entrez_gene_id" in matrix.columns:
-        matrix["entrez_gene_id"] = matrix["entrez_gene_id"].astype(int)
-    matrix = matrix.merge(conversion, on=merge_on, how="left")
 
-    # drop rows that have `0` in `entrez_gene_id` column
-    # matrix = matrix[matrix["entrez_gene_id"] != 0].reset_index(drop=True, inplace=False)
-    # gene_info = gene_info[gene_info["entrez_gene_id"] != 0].reset_index(drop=True, inplace=False)
+    if isinstance(matrix, pd.DataFrame):
+        if "entrez_gene_id" in matrix.columns:
+            matrix["entrez_gene_id"] = matrix["entrez_gene_id"].astype(int)
+        matrix = matrix.merge(conversion, on=conversion_merge_on, how="left")
+    elif isinstance(matrix, sc.AnnData):
+        if "entrez_gene_id" in matrix.var.columns:
+            matrix.var["entrez_gene_id"] = matrix.var["entrez_gene_id"].astype(int)
+        matrix.var = matrix.var.merge(conversion, on=conversion_merge_on, how="left")
 
     gene_info = gene_info_migrations(gene_info)
-    # gene_info["entrez_gene_id"] = gene_info["entrez_gene_id"].astype(int)
+    gene_info = gene_info[gene_info["entrez_gene_id"] != "-"]
+    gene_info.loc[:, "entrez_gene_id"] = gene_info.loc[:, "entrez_gene_id"].astype(int)
 
-    counts_matrix = matrix.merge(
-        gene_info[["entrez_gene_id", "ensembl_gene_id"]],
-        on=["entrez_gene_id", "ensembl_gene_id"],
-        how="inner",
+    gene_info_merge_on: list[str] = list(
+        set(matrix.columns if isinstance(matrix, pd.DataFrame) else matrix.var.columns) & set(gene_info.columns)
     )
 
-    gene_info = gene_info.merge(
-        counts_matrix[["entrez_gene_id", "ensembl_gene_id"]],
-        on=["entrez_gene_id", "ensembl_gene_id"],
-        how="inner",
-    )
+    if "entrez_gene_id" in gene_info_merge_on:
+        gene_info = gene_info[~gene_info["entrez_gene_id"].isna()]
+        gene_info["entrez_gene_id"] = gene_info["entrez_gene_id"].astype(int)
 
-    entrez_gene_ids: npt.NDArray[int] = gene_info["entrez_gene_id"].to_numpy()
+        if isinstance(matrix, pd.DataFrame):
+            matrix = matrix[~matrix["entrez_gene_id"].isna()]
+            matrix["entrez_gene_id"] = matrix["entrez_gene_id"].astype(int)
+        elif isinstance(matrix, sc.AnnData):
+            if isinstance(matrix.var, XDataArray):
+                raise TypeError("Expected matrix.var object to be 'pd.DataFrame', got 'anndata.compat.XDataArray'")
+            matrix = matrix[:, ~matrix.var["entrez_gene_id"].isna()]
+            matrix.var["entrez_gene_id"] = matrix.var["entrez_gene_id"].astype(int)
+
+    if isinstance(matrix, pd.DataFrame):
+        matrix = matrix.merge(gene_info, on=gene_info_merge_on, how="inner")
+    elif isinstance(matrix, sc.AnnData):
+        if not isinstance(matrix.var, pd.DataFrame):
+            raise TypeError(f"Expected matrix.var object to be 'pd.DataFrame', got '{type(matrix.var)}'")
+        matrix.var["original_index"] = matrix.var.index
+        new_var = matrix.var.merge(gene_info, on=gene_info_merge_on, how="inner")
+        new_matrix = matrix[:, new_var["original_index"]].copy()
+        new_matrix.var = new_var
+        new_matrix.var = new_matrix.var.drop(columns=["original_index"])
+        new_matrix.var.reset_index(drop=True)
+        matrix = new_matrix
+
+        non_duplicates = ~matrix.var.duplicated(subset=matrix.var.columns, keep="first")
+        matrix = matrix[:, non_duplicates].copy()
+
     metrics: NamedMetrics = {}
     for study in metadata_df["study"].unique():
-        study_sample_names = metadata_df[metadata_df["study"] == study]["sample_name"].tolist()
-        layouts = metadata_df[metadata_df["study"] == study]["layout"].tolist()
+        study_sample_names: list[str] = metadata_df[metadata_df["study"] == study]["sample_name"].tolist()
+        layouts: list[str] = metadata_df[metadata_df["study"] == study]["layout"].tolist()
+
+        if isinstance(matrix, pd.DataFrame):
+            subset = matrix.set_index(keys=["entrez_gene_id"], drop=True)
+            subset = subset[subset.columns.intersection(study_sample_names)]
+            subset.index = subset.index.astype(int)
+            entrez_gene_ids = subset.index.to_numpy(copy=False)
+            gene_sizes = matrix["size"].to_numpy(dtype=int, copy=False)
+        elif isinstance(matrix, sc.AnnData):
+            # matrix.var = matrix.var.set_index(keys=["entrez_gene_id"], drop=True)
+            subset = matrix[matrix.obs_names.intersection(study_sample_names)]
+            entrez_gene_ids = subset.var["entrez_gene_id"].to_numpy(dtype=int)
+            gene_sizes = subset.var["size"].to_numpy(dtype=int)
+        else:
+            _log_and_raise_error(
+                message=f"Matrix must be a pandas DataFrame or scanpy AnnData object, got: '{type(matrix)}'.",
+                error=TypeError,
+                level=LogLevel.CRITICAL,
+            )
+
+        frag_lengths = None
+        if fragment_df is not None:
+            frag_lengths = fragment_df["effective_length"].to_numpy(dtype=np.float64)
         metrics[study] = _StudyMetrics(
-            count_matrix=cast(pd.DataFrame, counts_matrix[counts_matrix.columns.intersection(study_sample_names)]),
-            fragment_lengths=metadata_df[metadata_df["study"] == study]["fragment_length"].values.astype(float),
+            count_matrix=subset,
+            fragment_lengths=frag_lengths,
             sample_names=study_sample_names,
             layout=[LayoutMethod(layout) for layout in layouts],
             num_samples=len(study_sample_names),
             entrez_gene_ids=entrez_gene_ids,
-            gene_sizes=gene_info["size"].values.astype(int),
+            gene_sizes=gene_sizes,
             study=study,
         )
-        metrics[study].fragment_lengths[np.isnan(metrics[study].fragment_lengths)] = 0
-        metrics[study].count_matrix.index = pd.Index(entrez_gene_ids, name="entrez_gene_id")
 
-    return _ReadMatrixResults(metrics=metrics, entrez_gene_ids=gene_info["entrez_gene_id"].tolist())
+    return metrics, gene_info["entrez_gene_id"].astype(int).tolist()
 
 
 def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
@@ -243,13 +302,21 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
     Returns:
         A dictionary of study metrics with TPM calculated.
     """
-    for sample in metrics:
-        count_matrix = metrics[sample].count_matrix
+    for sample, metric in metrics.items():
+        if isinstance(metric.count_matrix, sc.AnnData):
+            adata = metric.count_matrix
+            gene_sizes = pd.Series(metric.gene_sizes, index=adata.var_names)
+            counts_df = pd.DataFrame(
+                data=np.asarray(adata.X.toarray() if sparse.issparse(adata.X) else adata.X),
+                index=adata.var_names,
+                columns=adata.obs_names,
+            )
+        else:
+            counts_df = metric.count_matrix
+            gene_sizes = pd.Series(metric.gene_sizes)
 
-        gene_sizes = pd.Series(metrics[sample].gene_sizes, index=count_matrix.index)
-        adjusted_counts = count_matrix.add(1e-6)
-
-        tpm_matrix = adjusted_counts.divide(gene_sizes, axis=0)  # (count + 1) / gene_length
+        adjusted_counts = counts_df.add(1e-6)
+        tpm_matrix = adjusted_counts.div(gene_sizes, axis=0)  # (count + 1) / gene_length
         tpm_matrix = tpm_matrix.div(tpm_matrix.sum(axis=0), axis=1)  # normalize by total
         tpm_matrix = tpm_matrix.mul(1e6)  # scale to per-million
         metrics[sample].normalization_matrix = tpm_matrix
