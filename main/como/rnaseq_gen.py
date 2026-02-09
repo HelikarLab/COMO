@@ -586,16 +586,17 @@ def filter_counts(
 ) -> NamedMetrics:
     """Filter the count matrix based on the specified technique.
 
-    Args:
-        context_name: The name of the context being processed.
-        metrics: A dictionary of study metrics to filter.
-        technique: The filtering technique to use.
-        filtering_options: Options for filtering the count matrix.
-        prep: The RNA preparation type.
-        force_zfpkm_plot: Whether to force plotting of zFPKM results even if there are many samples.
-        zfpkm_min_peak_height: Minimum peak height for zFPKM peak identification.
-        zfpkm_min_peak_distance: Minimum peak distance for zFPKM peak identification.
-        output_zfpkm_plot_dirpath: Optional filepath to save the zFPKM plot.
+    :param context_name: The name of the context being processed.
+    :param metrics: A dictionary of study metrics to filter.
+    :param technique: The filtering technique to use.
+    :param filtering_options: Options for filtering the count matrix.
+    :param prep: The RNA preparation type.
+    :param force_zfpkm_plot: Whether to force plotting of zFPKM results even if there are many samples.
+    :param zfpkm_min_peak_height: Minimum peak height for zFPKM peak identification.
+    :param zfpkm_min_peak_distance: Minimum peak distance for zFPKM peak identification.
+    :param umi_target_sum: The target sum for UMI normalization.
+    :param umi_perform_normalization: Whether to perform normalization before UMI filtering.
+    :param output_zfpkm_plot_dirpath: Optional filepath to save the zFPKM plot.
     :param force_negative_to_zero: Should negative values be forcibly set to 0?
             This could happen as a result of normalization producing negative near-zero values (e.g., -0.001)
 
@@ -642,6 +643,7 @@ async def _process(
     rnaseq_matrix_filepath: Path,
     metadata_df: pd.DataFrame,
     gene_info_df: pd.DataFrame,
+    fragment_df: pd.DataFrame | None,
     prep: RNAType,
     taxon: int,
     replicate_ratio: float,
@@ -656,18 +658,12 @@ async def _process(
     output_boolean_activity_filepath: Path,
     output_zscore_normalization_filepath: Path,
     output_zfpkm_plot_dirpath: Path | None,
+    force_negative_to_zero: bool,
 ):
     """Save the results of the RNA-Seq tests to a CSV file."""
     output_boolean_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
 
-    rnaseq_matrix: pd.DataFrame = await _read_file(rnaseq_matrix_filepath, h5ad_as_df=True)
-
-    if rnaseq_matrix_filepath.suffix == ".h5ad":
-        conversion = await gene_symbol_to_ensembl_and_gene_id(symbols=rnaseq_matrix["gene_symbol"].tolist(), taxon=taxon)
-        conversion.reset_index(inplace=True)
-        rnaseq_matrix = rnaseq_matrix.merge(conversion, how="left", on="gene_symbol")
-        rnaseq_matrix.replace(to_replace=pd.NA, value="-")
-
+    rnaseq_matrix: pd.DataFrame | sc.AnnData = _read_file(rnaseq_matrix_filepath, h5ad_as_df=False)
     filtering_options = _FilteringOptions(
         replicate_ratio=replicate_ratio,
         batch_ratio=batch_ratio,
@@ -676,16 +672,14 @@ async def _process(
         high_batch_ratio=high_batch_ratio,
     )
 
-    read_counts_results: _ReadMatrixResults = await _build_matrix_results(
-        matrix=rnaseq_matrix,
+    metrics, entrez_gene_ids = await _build_matrix_results(
+        rnaseq_matrix,
         gene_info=gene_info_df,
         metadata_df=metadata_df,
+        fragment_df=fragment_df,
         taxon=taxon,
     )
-
-    metrics = read_counts_results.metrics
-
-    metrics: NamedMetrics = filter_counts(
+    metrics = filter_counts(
         context_name=context_name,
         metrics=metrics,
         technique=technique,
@@ -695,25 +689,41 @@ async def _process(
         zfpkm_min_peak_height=zfpkm_min_peak_height,
         zfpkm_min_peak_distance=zfpkm_min_peak_distance,
         output_zfpkm_plot_dirpath=output_zfpkm_plot_dirpath,
+        force_negative_to_zero=force_negative_to_zero,
     )
 
-    merged_zscore_df = pd.concat([m.z_score_matrix[m.z_score_matrix.index != "-"] for m in metrics.values()], axis="columns")
-    merged_zscore_df.fillna(-4, inplace=True)
-    expressed_genes: list[str] = list(itertools.chain.from_iterable(m.entrez_gene_ids for m in metrics.values()))
-    top_genes: list[str] = list(itertools.chain.from_iterable(m.high_confidence_entrez_gene_ids for m in metrics.values()))
-
-    # If any of the normalization metrics are not empty, write the normalized metrics to disk
-    if not all(metric.normalization_matrix.empty for metric in metrics.values()):
-        merged_zscore_df: pd.DataFrame = merged_zscore_df.reindex(columns=sorted(merged_zscore_df))
-        merged_zscore_df.to_csv(output_zscore_normalization_filepath, index=True)
-        logger.success(f"Wrote z-score normalization matrix to {output_zscore_normalization_filepath}")
-    else:
-        logger.warning(
-            "Not writing z-score normalization matrix because no normalization matrices exist. This is expected if you are using UMI filtering."
+    if isinstance(rnaseq_matrix, pd.DataFrame):
+        merged_zscores = pd.concat(
+            [m.z_score_matrix[m.z_score_matrix.index != "-"] for m in metrics.values()], axis="columns"
         )
 
+        merged_zscores.index.name = (
+            "entrez_gene_id"
+            if merged_zscores.index.astype(str).str.isdigit().all()
+            else "ensembl_gene_id"
+            if merged_zscores.index.astype(str).str.startswith("ENS").all()
+            else "gene_symbol"
+        )
+
+        merged_zscores = merged_zscores.reindex(columns=sorted(merged_zscores.columns))
+        merged_zscores = merged_zscores.groupby("entrez_gene_id").mean()
+        merged_zscores.to_csv(output_zscore_normalization_filepath, index=True)
+    elif isinstance(rnaseq_matrix, sc.AnnData):
+        merged_zscores = ad.concat([m.z_score_matrix for m in metrics.values()], axis="obs")
+        merged_zscores.var.index.name = "entrez_gene_id"
+        merged_zscores.obs = merged_zscores.obs.reindex(columns=sorted(merged_zscores.obs.columns))
+        merged_zscores.write_h5ad(output_zscore_normalization_filepath.with_suffix(".h5ad"))
+    expressed_genes: list[str] = list(itertools.chain.from_iterable(m.entrez_gene_ids for m in metrics.values()))
+    top_genes: list[str] = list(
+        itertools.chain.from_iterable(m.high_confidence_entrez_gene_ids for m in metrics.values())
+    )
+
+    logger.success(f"Wrote z-score normalization matrix to {output_zscore_normalization_filepath}")
+
     expression_frequency = pd.Series(expressed_genes).value_counts()
-    expression_df = pd.DataFrame({"entrez_gene_id": expression_frequency.index, "frequency": expression_frequency.values})
+    expression_df = pd.DataFrame(
+        {"entrez_gene_id": expression_frequency.index, "frequency": expression_frequency.values}
+    )
     expression_df["prop"] = expression_df["frequency"] / len(metrics)
     expression_df = expression_df[expression_df["prop"] >= filtering_options.batch_ratio]
 
@@ -722,10 +732,10 @@ async def _process(
     top_df["prop"] = top_df["frequency"] / len(metrics)
     top_df = top_df[top_df["prop"] >= filtering_options.high_batch_ratio]
 
-    entrez_id_series = pd.Series(read_counts_results.entrez_gene_ids)
+    entrez_id_series = pd.Series(entrez_gene_ids)
     boolean_matrix = pd.DataFrame(
         data={
-            "entrez_gene_id": read_counts_results.entrez_gene_ids,
+            "entrez_gene_id": entrez_gene_ids,
             "expressed": entrez_id_series.isin(expression_df["entrez_gene_id"]).astype(int),
             "high": entrez_id_series.isin(top_df["entrez_gene_id"]).astype(int),
         }
@@ -736,8 +746,13 @@ async def _process(
 
     # TODO: 2025-OCT-31: commented out dropping entrez ids, should this be kept?
     # boolean_matrix.dropna(subset="entrez_gene_id", inplace=True)
+    boolean_matrix = boolean_matrix.groupby("entrez_gene_id", as_index=False).mean()
+    boolean_matrix["expressed"] = boolean_matrix["expressed"].copy().astype(int)
+    boolean_matrix["high"] = boolean_matrix["high"].copy().astype(int)
     boolean_matrix.to_csv(output_boolean_activity_filepath, index=False)
-    logger.info(f"{context_name} - Found {expressed_count} expressed genes, {high_confidence_count} of which are confidently expressed")
+    logger.info(
+        f"{context_name} - Found {expressed_count} expressed genes, {high_confidence_count} of which are confidently expressed"
+    )
     logger.success(f"Wrote boolean matrix to {output_boolean_activity_filepath}")
 
 
@@ -757,11 +772,13 @@ async def rnaseq_gen(  # noqa: C901
     technique: FilteringTechnique | str = FilteringTechnique.ZFPKM,
     zfpkm_min_peak_height: float = 0.02,
     zfpkm_min_peak_distance: int = 1,
+    input_fragment_lengths: Path | None = None,
     cutoff: int | float | None = None,
     force_zfpkm_plot: bool = False,
     log_level: LogLevel = LogLevel.INFO,
     log_location: str | TextIO = sys.stderr,
     output_zfpkm_plot_dirpath: Path | None = None,
+    force_negative_counts_to_zero: bool = False,
 ) -> None:
     """Generate a list of active and high-confidence genes from a gene count matrix.
 
@@ -777,6 +794,7 @@ async def rnaseq_gen(  # noqa: C901
     :param prep: The preparation method
     :param taxon_id: The NCBI Taxon ID
     :param input_metadata_filepath_or_df: The filepath or dataframe containing metadata information
+    :param input_fragment_lengths: The filepath to the fragment lengths file, if applicable.
     :param replicate_ratio: The percentage of replicates that a gene must
         appear in for a gene to be marked as "active" in a batch/study
     :param batch_ratio: The percentage of batches that a gene must appear in for a gene to be marked as 'active"
@@ -792,6 +810,9 @@ async def rnaseq_gen(  # noqa: C901
     :param log_level: The level of logging to output
     :param log_location: The location to write logs to
     :param output_zfpkm_plot_dirpath: Optional filepath to save zFPKM plots
+    :param force_negative_counts_to_zero: Should negative values be forcibly set to 0?
+        This could happen as a result of normalization producing negative near-zero values (e.g., -0.001)
+
     :return: None
     """
     _set_up_logging(level=log_level, location=log_location)
@@ -817,8 +838,10 @@ async def rnaseq_gen(  # noqa: C901
             elif cutoff:
                 cutoff = "default"
 
-        case FilteringTechnique.ZFPKM | FilteringTechnique.UMI:
+        case FilteringTechnique.ZFPKM:
             cutoff: int | float = cutoff or -3
+        case FilteringTechnique.UMI:
+            cutoff: int = cutoff or 1
         case _:
             _log_and_raise_error(
                 f"Technique must be one of {','.join(FilteringTechnique)}. Got: {technique.value}",
@@ -870,7 +893,8 @@ async def rnaseq_gen(  # noqa: C901
         context_name=context_name,
         rnaseq_matrix_filepath=input_rnaseq_filepath,
         metadata_df=metadata_df,
-        gene_info_df=await _read_file(input_gene_info_filepath),
+        gene_info_df=_read_file(input_gene_info_filepath),
+        fragment_df=_read_file(input_fragment_lengths),
         prep=prep,
         taxon=taxon_id,
         replicate_ratio=replicate_ratio,
@@ -885,4 +909,5 @@ async def rnaseq_gen(  # noqa: C901
         output_boolean_activity_filepath=output_boolean_activity_filepath,
         output_zscore_normalization_filepath=output_zscore_normalization_filepath,
         output_zfpkm_plot_dirpath=output_zfpkm_plot_dirpath,
+        force_negative_to_zero=force_negative_counts_to_zero,
     )
