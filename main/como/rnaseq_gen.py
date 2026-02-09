@@ -1,34 +1,33 @@
 from __future__ import annotations
 
 import itertools
-import multiprocessing
 import sys
-import time
 from collections import namedtuple
 from collections.abc import Callable
-from concurrent.futures import Future, ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import NamedTuple, TextIO, cast
 
-import matplotlib.pyplot as plt
+import anndata as ad
+import boolean
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-import seaborn as sns
+import scanpy as sc
 import sklearn
 import sklearn.neighbors
+from anndata.compat import XDataArray
+from anndata.experimental.backed import Dataset2D
 from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
-from pandas import DataFrame
+from scipy import sparse
+from zfpkm import zFPKM, zfpkm_plot
 
-from como.data_types import FilteringTechnique, LogLevel, PeakIdentificationParameters, RNAType
-from como.density import density
+from como.data_types import FilteringTechnique, LogLevel, RNAType
 from como.migrations import gene_info_migrations
-from como.peak_finder import find_peaks
 from como.project import Config
-from como.utils import _log_and_raise_error, _num_columns, _read_file, _set_up_logging
+from como.utils import _log_and_raise_error, _read_file, _set_up_logging
 
 
 class _FilteringOptions(NamedTuple):
