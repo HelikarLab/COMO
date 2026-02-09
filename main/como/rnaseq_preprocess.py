@@ -256,7 +256,9 @@ def _process_first_multirun_sample(strand_file: Path, all_quant_files: list[Path
     for info in quant_information:
         run_counts = info.count_matrix[["ensembl_gene_id", info.sample_name]]
         run_counts.columns = ["ensembl_gene_id", "counts"]
-        sample_count = run_counts if sample_count.empty else sample_count.merge(run_counts, on=["ensembl_gene_id", "counts"], how="outer")
+        sample_count = (
+            run_counts if sample_count.empty else sample_count.join(run_counts, on=["ensembl_gene_id"], how="outer")
+        )
 
     # Set na values to 0
     sample_count = sample_count.fillna(value="0")
@@ -336,14 +338,13 @@ async def _write_counts_matrix(
 ) -> pd.DataFrame:
     """Create a counts matrix file by reading gene counts table(s).
 
-    Args:
-        config_df: Configuration DataFrame containing sample information.
-        como_context_dir: Path to the COMO_input directory containing gene count files.
-        output_counts_matrix_filepath: Path where the output counts matrix CSV will be saved.
-        rna: RNAType enum indicating whether to process 'trna' or 'mrna' samples.
-
-    Returns:
-        A pandas DataFrame representing the final counts matrix.
+    :param config_df: Configuration DataFrame containing sample information.
+    :param fragment_lengths: DataFrame containing effective lengths for each gene and sample, used for zFPKM normalization.
+    :param como_context_dir: Path to the COMO_input directory containing gene count files.
+    :param output_counts_matrix_filepath: Path where the output counts matrix CSV will be saved.
+    :param output_fragment_lengths_filepath: Path where the output fragment lengths CSV will be saved.
+    :param rna: RNAType enum indicating whether to process 'trna' or 'mrna' samples.
+    :return: A pandas DataFrame representing the final counts matrix.
     """
     study_metrics = _organize_gene_counts_files(data_dir=como_context_dir)
     counts: list[pd.DataFrame] = [_create_sample_counts_matrix(metric) for metric in study_metrics]
@@ -363,6 +364,7 @@ async def _write_counts_matrix(
     fragment_lengths[rna_specific_sample_names].to_csv(output_fragment_lengths_filepath, index=True)
 
     logger.success(f"Wrote gene count matrix for '{rna.value}' RNA at '{output_counts_matrix_filepath}'")
+
     return final_matrix
 
 
@@ -675,9 +677,9 @@ async def _create_gene_info_file(
             return data["ensembl_gene_id"].tolist()
         try:
             conversion = await gene_symbol_to_ensembl_and_gene_id(symbols=data.var_names.tolist(), taxon=taxon)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             _log_and_raise_error(
-                f"Got a JSON decode error for file '{counts_matrix_filepaths}'",
+                f"Got a JSON decode error for file '{counts_matrix_filepaths}' ({e})",
                 error=ValueError,
                 level=LogLevel.CRITICAL,
             )
@@ -724,7 +726,7 @@ async def _create_gene_info_file(
     # we would set `entrez_gene_id` to int here as well, but not all ensembl ids are mapped to entrez ids,
     #   and as a result, there are still "-" values in the entrez id column that cannot be converted to an integer
 
-    gene_info: pd.DataFrame = cast(pd.DataFrame, gene_info.sort_values(by="ensembl_gene_id"))
+    gene_info = gene_info.sort_values(by="ensembl_gene_id")
     output_filepath.parent.mkdir(parents=True, exist_ok=True)
     gene_info.to_csv(output_filepath, index=False)
     logger.success(f"Gene Info file written at '{output_filepath}'")
@@ -733,7 +735,7 @@ async def _create_gene_info_file(
 async def _process_como_input(
     context_name: str,
     output_config_filepath: Path,
-    como_context_dir: PATH_TYPE,
+    como_context_dir: Path,
     output_counts_matrix_filepath: Path,
     output_fragment_lengths_filepath: Path,
     rna: RNAType,
@@ -845,7 +847,7 @@ async def rnaseq_preprocess(
     output_mrna_count_matrix_filepath: Path | None = None,
     cache: bool = True,
     log_level: LogLevel | str = LogLevel.INFO,
-    log_location: str | TextIOWrapper = sys.stderr,
+    log_location: str | io.TextIOWrapper = sys.stderr,
     *,
     create_gene_info_only: bool = False,
 ) -> None:
@@ -880,8 +882,12 @@ async def rnaseq_preprocess(
     input_matrix_filepath = [i.resolve() for i in _listify(input_matrix_filepath)] if input_matrix_filepath else None
     output_trna_metadata_filepath = output_trna_metadata_filepath.resolve() if output_trna_metadata_filepath else None
     output_mrna_metadata_filepath = output_mrna_metadata_filepath.resolve() if output_mrna_metadata_filepath else None
-    output_trna_count_matrix_filepath = output_trna_count_matrix_filepath.resolve() if output_trna_count_matrix_filepath else None
-    output_mrna_count_matrix_filepath = output_mrna_count_matrix_filepath.resolve() if output_mrna_count_matrix_filepath else None
+    output_trna_count_matrix_filepath = (
+        output_trna_count_matrix_filepath.resolve() if output_trna_count_matrix_filepath else None
+    )
+    output_mrna_count_matrix_filepath = (
+        output_mrna_count_matrix_filepath.resolve() if output_mrna_count_matrix_filepath else None
+    )
 
     await _process(
         context_name=context_name,
