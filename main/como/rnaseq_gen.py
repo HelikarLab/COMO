@@ -146,7 +146,11 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
             level=LogLevel.CRITICAL,
         )
 
-    return data.apply(filter_func, axis=1).values if isinstance(data, pd.DataFrame) else np.apply_along_axis(filter_func, axis=1, arr=data)
+    return (
+        data.apply(filter_func, axis=1).to_numpy()
+        if isinstance(data, pd.DataFrame)
+        else np.apply_along_axis(filter_func, axis=1, arr=data)
+    )
 
 
 async def _build_matrix_results(
@@ -159,15 +163,14 @@ async def _build_matrix_results(
 ) -> tuple[NamedMetrics, list[int]]:
     """Read the counts matrix and returns the results.
 
-    Arg:
-        matrix: The gene counts matrix to process
-        metadata_df: The configuration dataframe related to the current context
-        taxon: The NCBI Taxon ID
-
-    Returns:
-        A dataclass `ReadMatrixResults`
+    :param matrix: The gene counts matrix to process
+    :param metadata_df: The configuration dataframe related to the current context
+    :param taxon: The NCBI Taxon ID
+    :returns: A dataclass `ReadMatrixResults`
     """
-    conversion = await ensembl_to_gene_id_and_symbol(ids=matrix["ensembl_gene_id"].tolist(), taxon=taxon)
+    if isinstance(matrix, sc.AnnData):
+        if not isinstance(matrix.var, pd.DataFrame):
+            raise TypeError("AnnData.var is expected to be a pandas.DataFrame")
 
         matrix.var = matrix.var.reset_index(drop=False, names=["gene_symbol"])
         conversion = await gene_symbol_to_ensembl_and_gene_id(symbols=matrix.var["gene_symbol"].tolist(), taxon=taxon)
@@ -325,7 +328,7 @@ def calculate_tpm(metrics: NamedMetrics) -> NamedMetrics:
 
 
 def _calculate_fpkm(metrics: NamedMetrics, scale: float = 1e6) -> NamedMetrics:
-    """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each sample in the metrics dictionary.
+    """Calculate the Fragments Per Kilobase of transcript per Million mapped reads (FPKM) for each i in the metrics dictionary.
 
     Args:
         metrics: A dictionary of study metrics to calculate FPKM for.
