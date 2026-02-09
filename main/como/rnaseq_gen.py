@@ -338,53 +338,25 @@ def _calculate_fpkm(metrics: NamedMetrics, scale: float = 1e6) -> NamedMetrics:
         A dictionary of study metrics with FPKM calculated.
     """
     for study in metrics:
-        matrix_values = []
-
-        for sample in range(metrics[study].num_samples):
-            layout = metrics[study].layout[sample]
-            count_matrix: npt.NDArray[float] = metrics[study].count_matrix.iloc[:, sample].values
-            gene_lengths = (
-                metrics[study].fragment_lengths[sample].astype(float)
-                if layout == LayoutMethod.paired_end
-                else metrics[study].gene_sizes.astype(float)
+        matrix_values: dict[str, npt.NDArray[np.floating]] = {}
+        count_matrix = metrics[study].count_matrix
+        if not isinstance(count_matrix, pd.DataFrame):
+            _log_and_raise_error(
+                message="FPKM cannot be performed on scanpy.AnnData objects!",
+                error=TypeError,
+                level=LogLevel.CRITICAL,
             )
-            gene_lengths_kb = gene_lengths / 1000.0
 
-            match layout:
-                case LayoutMethod.paired_end:  # FPKM
-                    total_fragments = count_matrix.sum(axis=0)
-                    if total_fragments == 0:
-                        fragments_per_kilobase_million = np.nan
-                    else:
-                        counts_per_million = total_fragments / scale
-                        fragments_per_kilobase = count_matrix / gene_lengths_kb
-                        fragments_per_kilobase_million = fragments_per_kilobase / counts_per_million
-                    matrix_values.append(fragments_per_kilobase_million)
-                case LayoutMethod.single_end:  # RPKM
-                    reads_per_kilobase = count_matrix / gene_lengths_kb
-                    total_reads = count_matrix.sum(axis=0)
-                    counts_per_million = total_reads / scale
-                    reads_per_kilobase_million = reads_per_kilobase / counts_per_million
-                    matrix_values.append(reads_per_kilobase_million)
-                case _:
-                    _log_and_raise_error(
-                        (
-                            f"Invalid normalization method specified ''. "
-                            f"Must be one of '{LayoutMethod.paired_end.value}' or '{LayoutMethod.single_end.value}'."
-                        ),
-                        error=ValueError,
-                        level=LogLevel.ERROR,
-                    )
+        study_counts = count_matrix.to_numpy(dtype=int, copy=False)
+        for i in range(metrics[study].num_samples):
+            layout = metrics[study].layout[i]
+            sample_name = metrics[study].sample_names[i]
+            length = metrics[study].fragment_lengths if layout == LayoutMethod.paired_end else metrics[study].gene_sizes
+            counts = study_counts[:, i]
+            mapped_reads = counts.sum()
+            matrix_values[sample_name] = ((counts * 1e9) / (length * mapped_reads)).astype(int)
 
-        # Transpose is needed because values were appended as rows
-        fpkm_matrix = pd.DataFrame(matrix_values).T
-        fpkm_matrix.index = metrics[study].count_matrix.index
-        fpkm_matrix.columns = metrics[study].sample_names
-
-        fpkm_matrix = fpkm_matrix[~pd.isna(fpkm_matrix)]
-        metrics[study].normalization_matrix = fpkm_matrix
-        metrics[study].normalization_matrix.columns = metrics[study].count_matrix.columns
-
+        metrics[study].normalization_matrix = pd.DataFrame(matrix_values, index=metrics[study].entrez_gene_ids)
     return metrics
 
 
