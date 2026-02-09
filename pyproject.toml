@@ -61,3 +61,4 @@ pythonpath = ["main/src"]
 
 [tool.uv.sources]
 python-louvain = { git = "https://github.com/taynaud/python-louvain" }
+fast-bioservices = { path = "../fast_bioservices", editable = true }
