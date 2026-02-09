@@ -7,8 +7,8 @@ import pytest
 from como.rnaseq_preprocess import (
     _organize_gene_counts_files,
     _process_first_multirun_sample,
+    _QuantInformation,
     _sample_name_from_filepath,
-    _STARinformation,
     _StudyMetrics,
 )
 
@@ -22,26 +22,25 @@ from tests.fixtures.collect_files import (
 )
 
 
-class TestSTARInformation:
-    valid_data = Path("main/data/COMO_input/naiveB/geneCounts/S1/naiveB_S1R1.tab").resolve()
-    invalid_data = Path("main/data/COMO_input/naiveB/fragmentSizes/S1/naiveB_S1R1_fragment_size.txt").resolve()
+class TestQuantInformation:
+    valid_data = Path("main/data/COMO_input/naiveB/quantification/S1/naiveB_S1R1_quant.genes.sf").resolve()
+    invalid_data = Path("main/data/COMO_input/naiveB/strandedness/S1/naiveB_S1R1_strandedness.txt").resolve()
 
-    @pytest.mark.asyncio
-    async def test_build_from_tab_valid_file(self) -> None:
-        """Validate building STAR information object."""
-        star: _STARinformation = await _STARinformation.build_from_tab(TestSTARInformation.valid_data)
+    def test_build_from_sf_valid_file(self) -> None:
+        quant: _QuantInformation = _QuantInformation.build_from_sf(TestQuantInformation.valid_data)
+        assert len(quant.gene_names) == len(quant.count_matrix) == 78900
+        assert quant.sample_name == "naiveB_S1R1"
+        assert quant.filepath.as_posix().endswith(
+            "/COMO/main/data/COMO_input/naiveB/quantification/S1/naiveB_S1R1_quant.genes.sf"
+        )
 
-        assert len(star.gene_names) == len(star.count_matrix) == 61541
-        assert len(star.num_unmapped) == 3
-        assert len(star.num_multimapping) == 3
-        assert len(star.num_no_feature) == 3
-        assert len(star.num_ambiguous) == 3
+    def test_build_from_sf_invalid_file(self):
+        with pytest.raises(ValueError, match=r"Building quantification information requires a '.sf' file; received: "):
+            _QuantInformation.build_from_sf(TestQuantInformation.invalid_data)
 
-    @pytest.mark.asyncio
-    async def test_build_from_tab_invalid_file(self):
-        """Validate error on invalid file."""
-        with pytest.raises(ValueError, match=r"Building STAR information requires a '\.tab' file"):
-            await _STARinformation.build_from_tab(TestSTARInformation.invalid_data)
+    def test_build_from_missing_file(self):
+        with pytest.raises(FileNotFoundError, match=r"Unable to find the .sf file: "):
+            _QuantInformation.build_from_sf(Path("missing_file.txt"))
 
 
 def test_sample_name_from_filepath(any_como_input_filepath: Path):

@@ -46,7 +46,7 @@ class _QuantInformation:
                 level=LogLevel.ERROR,
             )
 
-        sample_name = filepath.stem.removesuffix("_quant.genes.sf")
+        sample_name = filepath.stem.removesuffix("_quant.genes")
         df = pd.read_csv(
             io.StringIO(filepath.read_text()),
             sep="\t",
