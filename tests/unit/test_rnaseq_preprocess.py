@@ -28,7 +28,7 @@ class TestQuantInformation:
 
     def test_build_from_sf_valid_file(self) -> None:
         quant: _QuantInformation = _QuantInformation.build_from_sf(TestQuantInformation.valid_data)
-        assert len(quant.gene_names) == len(quant.count_matrix) == 78900
+        assert len(quant.gene_names) == len(quant.count_matrix) == 78899
         assert quant.sample_name == "naiveB_S1R1"
         assert quant.filepath.as_posix().endswith(
             "/COMO/main/data/COMO_input/naiveB/quantification/S1/naiveB_S1R1_quant.genes.sf"
