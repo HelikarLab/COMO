@@ -27,6 +27,7 @@ from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
 
 from como.data_types import Algorithm, CobraCompartments, LogLevel, Solver, _BoundaryReactions, _BuildResults
 from como.utils import _log_and_raise_error, _read_file, _set_up_logging, split_gene_expression_data
+from como.utils import log_and_raise_error, set_up_logging, split_gene_expression_data
 
 
 def _correct_bracket(rule: str, name: str) -> str:
@@ -203,11 +204,28 @@ def _build_with_gimme(
     return model_reconstruction
 
 
-def _build_with_fastcore(cobra_model, s_matrix, lower_bounds, upper_bounds, exp_idx_list, solver):
+def _build_with_fastcore(
+    reference_model: cobra.Model,
+    lower_bounds: npt.NDArray[np.floating],
+    upper_bounds: npt.NDArray[np.floating],
+    exp_idx_list: Sequence[int],
+    solver: str,
+):
     # 'Vlassis, Pacheco, Sauter (2014). Fast reconstruction of compact
     # context-specific metabolic network models. PLoS Comput. Biol. 10,
     # e1003424.'
-    logger.warning("Fastcore requires a flux consistant model is used as refererence, to achieve this fastcc is required which is NOT reproducible.")
+    model = reference_model
+    logger.warning(
+        "Fastcore requires a flux consistant model is used as refererence. "
+        "To achieve this, fastcc is required, which is NOT reproducible."
+    )
+    s_matrix = cast(npt.NDArray[np.floating], cobra.util.create_stoichiometric_matrix(model=model))
+    if lower_bounds.shape[0] != upper_bounds.shape[0] != s_matrix.shape[1]:
+        log_and_raise_error(
+            message="Lower bounds, upper bounds, and stoichiometric matrix must have the same number of reactions.",
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
     logger.debug("Creating feasible model")
     _, cobra_model = _feasibility_test(cobra_model, "other")
     properties = FastcoreProperties(core=exp_idx_list, solver=solver)
@@ -269,6 +287,8 @@ def _build_with_tinit(
     solver,
     idx_force,
 ) -> Model:
+    log_and_raise_error("tINIT is not yet implemented.", error=NotImplementedError, level=LogLevel.CRITICAL)
+    model = reference_model
     properties = tINITProperties(
         reactions_scores=expr_vector,
         solver=solver,
@@ -284,10 +304,47 @@ def _build_with_tinit(
     algorithm.build_problem()
     _log_and_raise_error("tINIT is not yet implemented.", error=NotImplementedError, level=LogLevel.CRITICAL)
 
+def _build_with_corda(
+    reference_model: cobra.Model,
+    neg_expression_threshold: float,
+    high_expression_threshold: float,
+    lower_bounds: npt.NDArray[np.floating],
+    upper_bounds: npt.NDArray[np.floating],
+    expression_vector: Sequence[float] | npt.NDArray[np.floating],
+):
+    """Reconstruct a model using CORDA.
 
 async def _map_expression_to_reaction(
     reference_model,
     gene_expression_file,
+    :param neg_expression_threshold: Reactions expressed below this value will be placed in "negative" expression bin
+    :param high_expression_threshold: Reactions expressed above this value will be placed in the "high" expression bin
+    """
+    log_and_raise_error("CORDA is not yet implemented", error=NotImplementedError, level=LogLevel.CRITICAL)
+    model = reference_model
+    properties = CORDAProperties(
+        high_conf_rx=[],
+        medium_conf_rx=[],
+        neg_conf_rx=[],
+        pr_to_np=2,
+        constraint=1,
+        constrainby="val",
+        om=1e4,
+        ntimes=5,
+        nl=1e-2,
+        solver="GUROBI",
+        threads=5,
+    )
+    s_matrix: npt.NDArray[np.floating] = np.asarray(
+        cobra.util.array.create_stoichiometric_matrix(model=model), dtype=float
+    )
+    algorithm = CORDA(S=s_matrix, lb=np.asarray(lower_bounds), ub=np.asarray(upper_bounds), properties=properties)
+    active_rxn_indices: npt.NDArray[np.integer] = algorithm.run()
+
+
+def _map_expression_to_reaction(
+    reference_model: cobra.Model,
+    gene_expression_file: Path,
     recon_algorithm: Algorithm,
     low_thresh: float,
     high_thresh: float,
@@ -382,7 +439,7 @@ def _read_reference_model(filepath: Path) -> cobra.Model:
         case ".json":
             reference_model = cobra.io.load_json_model(filepath)
         case _:
-            _log_and_raise_error(
+            log_and_raise_error(
                 f"Reference model format must be .xml, .mat, or .json; found '{filepath.suffix}'",
                 error=ValueError,
                 level=LogLevel.ERROR,
@@ -449,12 +506,34 @@ async def _build_model(
     lower_bounds: list[int] = []
     upper_bounds: list[int] = []
     reaction_ids: list[str] = []
-    for i, reaction in enumerate(reference_model.reactions):
-        # if reaction.id in boundary_reactions:
-        #     lower_bounds.append()
-        lower_bounds.append(reaction.lower_bound)
-        upper_bounds.append(reaction.upper_bound)
-        reaction_ids.append(reaction.id)
+    for i, rxn in enumerate(reference_model.reactions):
+        rxn: cobra.Reaction
+        ref_lb[i] = float(rxn.lower_bound)
+        ref_ub[i] = float(rxn.upper_bound)
+        reaction_ids.append(rxn.id)
+    if ref_lb.shape[0] != ref_ub.shape[0] != len(reaction_ids):
+        log_and_raise_error(
+            message=(
+                "Lower bounds, upper bounds, and reaction IDs must have the same length.\n"
+                f"Number of reactions: {len(reaction_ids)}\n"
+                f"Number of upper bounds: {ref_ub.shape[0]}\n"
+                f"Number of lower bounds: {ref_lb.shape[0]}"
+            ),
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
+    if np.isnan(ref_lb).any():
+        log_and_raise_error(
+            message="Lower bounds contains unfilled values!",
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
+    if np.isnan(ref_ub).any():
+        log_and_raise_error(
+            message="Upper bounds contains unfilled values!",
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
 
     # get expressed reactions
     reaction_expression: collections.OrderedDict[str, int] = await _map_expression_to_reaction(
@@ -555,6 +634,60 @@ async def _build_model(
                 error=ValueError,
                 level=LogLevel.ERROR,
             )
+    if recon_algorithm == Algorithm.IMAT:
+        context_model_cobra: cobra.Model = _build_with_imat(
+            reference_model=reference_model,
+            lower_bounds=ref_lb,
+            upper_bounds=ref_ub,
+            expr_vector=expression_vector,
+            low_expression_threshold=updated_low_thresh,
+            high_expression_threshold=updated_high_thresh,
+            force_reaction_indices=force_reaction_indices,
+            solver=solver,
+            build_settings=build_settings,
+        )
+    elif recon_algorithm == Algorithm.GIMME:
+        expressed_rxn_ids: list[str] = list(reaction_expression.keys())
+        metabolite_ids: set[str] = set()
+        for rxn_id in expressed_rxn_ids:
+            cobra_rxn: cobra.Reaction = cast(cobra.Reaction, reference_model.reactions.get_by_id(rxn_id))
+            metabolite_ids.update([m.id for m in cobra_rxn.metabolites])
+
+        context_model_cobra: cobra.Model = _build_with_gimme(
+            reference_model=reference_model,
+            expression_vector=expression_vector,
+            idx_objective=objective_index,
+            lower_bounds=ref_lb,
+            upper_bounds=ref_ub,
+            solver=solver,
+        )
+    elif recon_algorithm == Algorithm.FASTCORE:
+        context_model_cobra: cobra.Model = _build_with_fastcore(
+            reference_model=reference_model,
+            lower_bounds=ref_lb,
+            upper_bounds=ref_ub,
+            exp_idx_list=expression_vector_indices,
+            solver=solver,
+        )
+    elif recon_algorithm == Algorithm.TINIT:
+        context_model_cobra: cobra.Model = _build_with_tinit(
+            reference_model=reference_model,
+            lower_bounds=ref_lb,
+            upper_bounds=ref_ub,
+            expr_vector=expression_vector,
+            solver=solver,
+            idx_force=force_reaction_indices,
+        )
+    else:
+        log_and_raise_error(
+            (
+                f"Reconstruction algorithm must be {Algorithm.GIMME.value}, "
+                f"{Algorithm.FASTCORE.value}, {Algorithm.IMAT.value}, or {Algorithm.TINIT.value}. "
+                f"Got: {recon_algorithm.value}"
+            ),
+            error=ValueError,
+            level=LogLevel.ERROR,
+        )
 
     inconsistent_and_infeasible_reactions: pd.DataFrame = pd.concat(
         [
@@ -601,7 +734,7 @@ async def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
             "minimum reaction rate",
             "maximum reaction rate",
         ]:
-            _log_and_raise_error(
+            log_and_raise_error(
                 (
                     f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', "
                     f"'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}"
@@ -618,7 +751,7 @@ async def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
     for i in range(len(boundary_type)):
         boundary: str = boundary_type[i].lower()
         if boundary not in boundary_map:
-            _log_and_raise_error(
+            log_and_raise_error(
                 f"Boundary reaction type must be 'Exchange', 'Demand', or 'Sink'. Found: {boundary}",
                 error=ValueError,
                 level=LogLevel.ERROR,
@@ -652,7 +785,7 @@ async def _write_model_to_disk(
         elif path.suffix in xml_suffix:
             tasks.add(asyncio.to_thread(cobra.io.write_sbml_model, model=model, filename=path))
         else:
-            _log_and_raise_error(
+            log_and_raise_error(
                 f"Invalid output model filetype. Should be one of .xml, .sbml, .mat, or .json. Got '{path.suffix}'",
                 error=ValueError,
                 level=LogLevel.ERROR,
@@ -709,44 +842,50 @@ async def create_context_specific_model(  # noqa: C901
     Raises:
         ImportError: If Gurobi solver is selected but gurobipy is not installed.
     """
-    _set_up_logging(level=log_level, location=log_location)
+    set_up_logging(level=log_level, location=log_location)
+    if low_percentile is None:
+        raise ValueError("low_percentile must be provided")
+    if high_percentile is None:
+        raise ValueError("high_percentile must be provided")
+    # TODO: set up zfpkm threshold defaults
+
     boundary_rxns_filepath: Path | None = Path(boundary_rxns_filepath) if boundary_rxns_filepath else None
     output_model_filepaths = [output_model_filepaths] if isinstance(output_model_filepaths, Path) else output_model_filepaths
 
     if not reference_model.exists():
-        _log_and_raise_error(
+        log_and_raise_error(
             f"Reference model not found at {reference_model}",
             error=FileNotFoundError,
             level=LogLevel.ERROR,
         )
     if not active_genes_filepath.exists():
-        _log_and_raise_error(
+        log_and_raise_error(
             f"Active genes file not found at {active_genes_filepath}",
             error=FileNotFoundError,
             level=LogLevel.ERROR,
         )
     if algorithm == Algorithm.FASTCORE and not output_fastcore_expression_index_filepath:
-        _log_and_raise_error(
+        log_and_raise_error(
             "The fastcore expression index output filepath must be provided",
             error=ValueError,
             level=LogLevel.ERROR,
         )
     if boundary_rxns_filepath and not boundary_rxns_filepath.exists():
-        _log_and_raise_error(
+        log_and_raise_error(
             f"Boundary reactions file not found at {boundary_rxns_filepath}",
             error=FileNotFoundError,
             level=LogLevel.ERROR,
         )
 
     if algorithm not in Algorithm:
-        _log_and_raise_error(
+        log_and_raise_error(
             f"Algorithm {algorithm} not supported. Use one of {', '.join(a.value for a in Algorithm)}",
             error=ValueError,
             level=LogLevel.ERROR,
         )
 
     if solver not in Solver:
-        _log_and_raise_error(
+        log_and_raise_error(
             f"Solver '{solver}' not supported. Use one of {', '.join(s.value for s in Solver)}",
             error=ValueError,
             level=LogLevel.ERROR,
@@ -756,6 +895,7 @@ async def create_context_specific_model(  # noqa: C901
     if any(path.suffix not in {*mat_suffix, *json_suffix, *xml_suffix} for path in output_model_filepaths):
         invalid_suffix = "\n".join(path for path in output_model_filepaths if path.suffix not in {*mat_suffix, *json_suffix, *xml_suffix})
         _log_and_raise_error(
+        log_and_raise_error(
             f"Invalid output filetype. Should be 'xml', 'sbml', 'mat', or 'json'. Got:\n{invalid_suffix}'",
             error=ValueError,
             level=LogLevel.ERROR,
@@ -770,7 +910,7 @@ async def create_context_specific_model(  # noqa: C901
         exclude_rxns_filepath: Path = Path(exclude_rxns_filepath)
         df = await _create_df(exclude_rxns_filepath)
         if "abbreviation" not in df.columns:
-            _log_and_raise_error(
+            log_and_raise_error(
                 "The exclude reactions file should have a single column with a header named Abbreviation",
                 error=ValueError,
                 level=LogLevel.ERROR,
@@ -782,7 +922,7 @@ async def create_context_specific_model(  # noqa: C901
         force_rxns_filepath: Path = Path(force_rxns_filepath)
         df = await _create_df(force_rxns_filepath, lowercase_col_names=True)
         if "abbreviation" not in df.columns:
-            _log_and_raise_error(
+            log_and_raise_error(
                 "The force reactions file should have a single column with a header named Abbreviation",
                 error=ValueError,
                 level=LogLevel.ERROR,
@@ -795,7 +935,7 @@ async def create_context_specific_model(  # noqa: C901
 
         gurobi_present = find_spec("gurobipy")
         if not gurobi_present:
-            _log_and_raise_error(
+            log_and_raise_error(
                 message=(
                     "The gurobi solver requires the gurobipy package to be installed. "
                     "Please install gurobipy and try again. "

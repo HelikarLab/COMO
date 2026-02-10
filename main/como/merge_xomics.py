@@ -24,7 +24,7 @@ from como.data_types import (
     _SourceWeights,
 )
 from como.project import Config
-from como.utils import _log_and_raise_error, _read_file, _set_up_logging, get_missing_gene_data, return_placeholder_data
+from como.utils import log_and_raise_error, read_file, set_up_logging, get_missing_gene_data, return_placeholder_data
 
 
 class _MergedHeaderNames:
@@ -72,7 +72,7 @@ def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tuple[st
 
     inquiry_full_path = Path(config.data_dir, "config_sheets", filename)
     if not inquiry_full_path.exists():
-        _log_and_raise_error(
+        log_and_raise_error(
             f"Config file not found at {inquiry_full_path}",
             error=FileNotFoundError,
             level=LogLevel.ERROR,
@@ -451,7 +451,7 @@ async def _process(
     elif adjust_method == AdjustmentMethod.FLAT:
         adjusted_expression_requirement = expression_requirement
     else:
-        _log_and_raise_error(
+        log_and_raise_error(
             message=f"Unknown `adjust_method`: {adjust_method}.",
             error=ValueError,
             level=LogLevel.ERROR,
@@ -516,7 +516,7 @@ def _build_batches(
         for study in sorted(metadata["study"].unique()):
             batch_search = re.search(r"\d+", study)
             if not batch_search:
-                _log_and_raise_error(
+                log_and_raise_error(
                     message=f"Unable to find batch number in study name. Expected a digit in the study value: {study}",
                     error=ValueError,
                     level=LogLevel.ERROR,
@@ -545,7 +545,7 @@ def _validate_source_arguments(
 
     """
     if any(i for i in args) and not all(i for i in args):
-        _log_and_raise_error(
+        log_and_raise_error(
             f"Must specify all or none of '{source.value}' arguments",
             error=ValueError,
             level=LogLevel.ERROR,
@@ -614,7 +614,7 @@ async def merge_xomics(  # noqa: C901
             proteomic_matrix_or_filepath,
         )
     ):
-        _log_and_raise_error("No data was passed!", error=ValueError, level=LogLevel.ERROR)
+        log_and_raise_error("No data was passed!", error=ValueError, level=LogLevel.ERROR)
 
     if expression_requirement and expression_requirement < 1:
         logger.warning(f"Expression requirement must be at least 1! Setting to the minimum of 1 now. Got: {expression_requirement}")

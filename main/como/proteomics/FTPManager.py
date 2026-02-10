@@ -17,7 +17,7 @@ import aioftp
 from loguru import logger
 
 from como.proteomics.FileInformation import FileInformation, clear_print
-from como.utils import _log_and_raise_error
+from como.utils import log_and_raise_error
 from como.data_types import LogLevel
 
 
@@ -43,7 +43,7 @@ async def aioftp_client(host: str, username: str = "anonymous", password: str = 
             attempt_num += 1
             time.sleep(5)
     if not connection_successful:
-        _log_and_raise_error(
+        log_and_raise_error(
             "Could not connect to FTP server",
             error=ConnectionResetError,
             level=LogLevel.ERROR,
@@ -97,7 +97,7 @@ class Reader:
         if url_parse.hostname is not None:
             host = url_parse.hostname
         else:
-            _log_and_raise_error(
+            log_and_raise_error(
                 f"Unable to identify hostname from url: {self._root_link}",
                 error=ValueError,
                 level=LogLevel.ERROR,
@@ -105,7 +105,7 @@ class Reader:
         if url_parse.path != "":
             folder = url_parse.path
         else:
-            _log_and_raise_error(
+            log_and_raise_error(
                 f"Unable to identify folder or path from url: {self._root_link}",
                 error=ValueError,
                 level=LogLevel.ERROR,
@@ -184,7 +184,7 @@ class Download:
         if url_parse.hostname is not None:
             host = url_parse.hostname
         else:
-            _log_and_raise_error(
+            log_and_raise_error(
                 f"Unable to identify hostname from url: {file_information.download_url}",
                 error=ValueError,
                 level=LogLevel.ERROR,
@@ -192,7 +192,7 @@ class Download:
         if url_parse.path != "":
             folder = url_parse.path
         else:
-            _log_and_raise_error(
+            log_and_raise_error(
                 f"Unable to identify folder or path from url: {file_information.download_url}",
                 error=ValueError,
                 level=LogLevel.ERROR,
