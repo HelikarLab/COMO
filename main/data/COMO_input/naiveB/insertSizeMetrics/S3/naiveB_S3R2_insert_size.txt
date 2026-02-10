@@ -1,1 +1,1 @@
-cannot collect metrics for single-end data
+NOTICE: Cannot collect metrics for single-end data.
