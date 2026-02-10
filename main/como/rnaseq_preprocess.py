@@ -15,11 +15,10 @@ from typing import Final, Literal, TextIO, cast
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from fast_bioservices.biothings.mygene import MyGene
-from fast_bioservices.pipeline import gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
 
 from como.data_types import LogLevel, RNAType
+from como.pipelines.identifier import convert
 from como.utils import log_and_raise_error, read_file, set_up_logging
 
 
@@ -183,6 +182,7 @@ class SampleConfiguration:
 
         return config, lengths
 
+
 def _sample_name_from_filepath(file: Path) -> str:
     group = re.search(r".+_S\d+R\d+(r\d+)?", file.stem)
     if not group:
@@ -196,8 +196,10 @@ def _sample_name_from_filepath(file: Path) -> str:
         )
     return group.group()
 
+
 def _sample_name_from_filepath(file: Path) -> str:
     return re.search(r".+_S\d+R\d+(r\d+)?", file.stem).group()
+
 
 def _require_one(
     paths: list[Path | None],
@@ -536,7 +538,7 @@ async def _create_gene_info_file(  # noqa: C901
         if isinstance(data_, pd.DataFrame):
             return data_["ensembl_gene_id"].tolist()
         try:
-            conversion = await gene_symbol_to_ensembl_and_gene_id(symbols=data_.var_names.tolist(), taxon=taxon)
+            conversion = convert(ids=data_.var_names.tolist(), taxon=taxon)
         except json.JSONDecodeError as e:
             log_and_raise_error(
                 f"Got a JSON decode error for file '{counts_matrix_filepaths}' ({e})",

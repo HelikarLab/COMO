@@ -71,15 +71,18 @@ async def load_gene_symbol_map(gene_symbols: list[str], entrez_map: Path | None 
         biodbnet.services.settings.TIMEOUT = 60
         for i in range(0, len(gene_symbols), step_size):
             # Operations: Goes from gene_symbols=["A", "B;C", "D"] -> gene.split=[["A"], ["B", "C"], ["D"]] -> chain.from_iterable["A", "B", "C", "D"]
-            chunk: list[str] = list(itertools.chain.from_iterable(gene.split(";") for gene in gene_symbols[i : i + step_size]))
-            dataframes.append(
-                biodbnet.db2db(
-                    input_values=chunk,
-                    input_db=Input.GENE_SYMBOL.value,
-                    output_db=[Output.GENE_ID.value, Output.ENSEMBL_GENE_ID.value],
-                    taxon=9606,
-                )
+            chunk: list[str] = list(
+                itertools.chain.from_iterable(gene.split(";") for gene in gene_symbols[i : i + step_size])
             )
+            result = biodbnet.db2db(
+                input_db="Gene Symbol",
+                output_db=["Gene ID", "Ensembl Gene ID"],
+                input_values=chunk,
+                taxon=9606,
+            )
+            if not isinstance(result, pd.DataFrame):
+                raise TypeError(f"Got {type(result)}, expected pd.DataFrame")
+            dataframes.append(result)
         df = pd.concat(dataframes, axis="columns")
         print(df)
         df.loc[df["gene_id"].isna(), ["gene_id"]] = np.nan
