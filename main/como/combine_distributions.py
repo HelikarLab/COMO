@@ -56,9 +56,6 @@ def _combine_z_distribution_for_batch(
         f"source: '{source.value}', "
         f"context: '{context_name}'"
     )
-    if _num_columns(matrix) < 2:
-        logger.trace(f"A single sample exists for batch '{batch.batch_num}'. Returning as-is because no additional combining can be done")
-        return matrix
     if num_columns(matrix) < 2:
         logger.trace(
             f"A single sample exists for batch '{batch.batch_num}'. Returning as-is because no additional combining can be done"
@@ -211,8 +208,6 @@ def _combine_z_distribution_for_context(
         z_matrices.append(matrix)
 
     z_matrix = pd.concat(z_matrices, axis="columns", join="outer", ignore_index=False)
-    if _num_columns(z_matrix) <= 1:
-        logger.trace(f"Only 1 source exists for '{context}', returning dataframe as-is becuase no data exists to combine")
     if num_columns(z_matrix) <= 1:
         logger.trace(
             f"Only 1 source exists for '{context}', returning dataframe as-is becuase no data exists to combine"
