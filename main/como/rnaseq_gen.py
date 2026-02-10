@@ -27,7 +27,7 @@ from zfpkm import zFPKM, zfpkm_plot
 from como.data_types import FilteringTechnique, LogLevel, RNAType
 from como.migrations import gene_info_migrations
 from como.project import Config
-from como.utils import _log_and_raise_error, _read_file, _set_up_logging
+from como.utils import log_and_raise_error, read_file, set_up_logging
 
 
 class _FilteringOptions(NamedTuple):
@@ -62,7 +62,7 @@ class _StudyMetrics:
     def __post_init__(self):
         for layout in self.layout:
             if layout not in LayoutMethod:
-                _log_and_raise_error(
+                log_and_raise_error(
                     f"Layout must be 'paired-end' or 'single-end'; got: {layout}",
                     error=ValueError,
                     level=LogLevel.ERROR,
@@ -140,7 +140,7 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
         A NumPy array of the filtered data.
     """
     if not isinstance(data, pd.DataFrame | np.ndarray):
-        _log_and_raise_error(
+        log_and_raise_error(
             f"Unsupported data type. Must be a Pandas DataFrame or a NumPy array, got '{type(data)}'",
             error=TypeError,
             level=LogLevel.CRITICAL,
@@ -176,7 +176,7 @@ async def _build_matrix_results(
         conversion = await gene_symbol_to_ensembl_and_gene_id(symbols=matrix.var["gene_symbol"].tolist(), taxon=taxon)
     else:
         if "ensembl_gene_id" not in matrix.columns:
-            _log_and_raise_error(
+            log_and_raise_error(
                 message="'ensembl_gene_id' column not found in the provided DataFrame.",
                 error=ValueError,
                 level=LogLevel.CRITICAL,
@@ -201,7 +201,7 @@ async def _build_matrix_results(
         set(matrix.columns if isinstance(matrix, pd.DataFrame) else matrix.var.columns) & set(conversion.columns)
     )
     if not conversion_merge_on:
-        _log_and_raise_error(
+        log_and_raise_error(
             (
                 "No columns to merge on, unable to find at least one of `ensembl_gene_id`, `entrez_gene_id`, or `gene_symbol`. "
                 "Please check your input files."
@@ -273,7 +273,7 @@ async def _build_matrix_results(
             entrez_gene_ids = subset.var["entrez_gene_id"].to_numpy(dtype=int)
             gene_sizes = subset.var["size"].to_numpy(dtype=int)
         else:
-            _log_and_raise_error(
+            log_and_raise_error(
                 message=f"Matrix must be a pandas DataFrame or scanpy AnnData object, got: '{type(matrix)}'.",
                 error=TypeError,
                 level=LogLevel.CRITICAL,
@@ -341,7 +341,7 @@ def _calculate_fpkm(metrics: NamedMetrics, scale: float = 1e6) -> NamedMetrics:
         matrix_values: dict[str, npt.NDArray[np.floating]] = {}
         count_matrix = metrics[study].count_matrix
         if not isinstance(count_matrix, pd.DataFrame):
-            _log_and_raise_error(
+            log_and_raise_error(
                 message="FPKM cannot be performed on scanpy.AnnData objects!",
                 error=TypeError,
                 level=LogLevel.CRITICAL,
@@ -715,7 +715,7 @@ def filter_counts(
                 perform_normalization=umi_perform_normalization,
             )
         case _:
-            _log_and_raise_error(
+            log_and_raise_error(
                 f"Technique must be one of {FilteringTechnique}, got '{technique.value}'",
                 error=ValueError,
                 level=LogLevel.ERROR,
@@ -749,7 +749,7 @@ async def _process(
     """Save the results of the RNA-Seq tests to a CSV file."""
     output_boolean_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
 
-    rnaseq_matrix: pd.DataFrame | sc.AnnData = _read_file(rnaseq_matrix_filepath, h5ad_as_df=False)
+    rnaseq_matrix: pd.DataFrame | sc.AnnData = read_file(rnaseq_matrix_filepath, h5ad_as_df=False)
     filtering_options = _FilteringOptions(
         replicate_ratio=replicate_ratio,
         batch_ratio=batch_ratio,
@@ -907,14 +907,14 @@ async def rnaseq_gen(  # noqa: C901
 
     :return: None
     """
-    _set_up_logging(level=log_level, location=log_location)
+    set_up_logging(level=log_level, location=log_location)
 
     technique = FilteringTechnique(technique) if isinstance(technique, str) else technique
     match technique:
         case FilteringTechnique.TPM:
             cutoff: int | float = cutoff or 25
             if cutoff < 1 or cutoff > 100:
-                _log_and_raise_error(
+                log_and_raise_error(
                     "Quantile must be between 1 - 100",
                     error=ValueError,
                     level=LogLevel.ERROR,
@@ -922,7 +922,7 @@ async def rnaseq_gen(  # noqa: C901
 
         case FilteringTechnique.CPM:
             if cutoff and cutoff < 0:
-                _log_and_raise_error(
+                log_and_raise_error(
                     "Cutoff must be greater than or equal to 0",
                     error=ValueError,
                     level=LogLevel.ERROR,
@@ -935,14 +935,14 @@ async def rnaseq_gen(  # noqa: C901
         case FilteringTechnique.UMI:
             cutoff: int = cutoff or 1
         case _:
-            _log_and_raise_error(
+            log_and_raise_error(
                 f"Technique must be one of {','.join(FilteringTechnique)}. Got: {technique.value}",
                 error=ValueError,
                 level=LogLevel.ERROR,
             )
 
     if not input_rnaseq_filepath.exists():
-        _log_and_raise_error(
+        log_and_raise_error(
             f"Input RNA-seq file not found! Searching for: '{input_rnaseq_filepath}'",
             error=FileNotFoundError,
             level=LogLevel.ERROR,
@@ -960,13 +960,13 @@ async def rnaseq_gen(  # noqa: C901
         metadata_df = input_metadata_filepath_or_df
     elif isinstance(input_metadata_filepath_or_df, Path):
         if input_metadata_filepath_or_df.suffix not in {".xlsx", ".xls"}:
-            _log_and_raise_error(
+            log_and_raise_error(
                 f"Expected an excel file with extension of '.xlsx' or '.xls', got '{input_metadata_filepath_or_df.suffix}'.",
                 error=ValueError,
                 level=LogLevel.ERROR,
             )
         if not input_metadata_filepath_or_df.exists():
-            _log_and_raise_error(
+            log_and_raise_error(
                 f"Input metadata file not found! Searching for: '{input_metadata_filepath_or_df}'",
                 error=FileNotFoundError,
                 level=LogLevel.ERROR,
@@ -974,7 +974,7 @@ async def rnaseq_gen(  # noqa: C901
 
         metadata_df = pd.read_excel(input_metadata_filepath_or_df)
     else:
-        _log_and_raise_error(
+        log_and_raise_error(
             f"Expected a pandas DataFrame or Path object as metadata, got '{type(input_metadata_filepath_or_df)}'",
             error=TypeError,
             level=LogLevel.ERROR,
@@ -985,8 +985,8 @@ async def rnaseq_gen(  # noqa: C901
         context_name=context_name,
         rnaseq_matrix_filepath=input_rnaseq_filepath,
         metadata_df=metadata_df,
-        gene_info_df=_read_file(input_gene_info_filepath),
-        fragment_df=_read_file(input_fragment_lengths),
+        gene_info_df=read_file(input_gene_info_filepath),
+        fragment_df=read_file(input_fragment_lengths),
         prep=prep,
         taxon=taxon_id,
         replicate_ratio=replicate_ratio,

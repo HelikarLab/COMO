@@ -14,7 +14,7 @@ from loguru import logger
 from como.data_types import LogLevel
 from como.project import Config
 from como.proteomics_preprocessing import protein_transform_main
-from como.utils import _log_and_raise_error, _set_up_logging, return_placeholder_data
+from como.utils import log_and_raise_error, set_up_logging, return_placeholder_data
 
 
 # Load Proteomics
@@ -31,13 +31,13 @@ def process_proteomics_data(path: Path) -> pd.DataFrame:
     matrix: pd.DataFrame = pd.read_csv(path)
     gene_symbol_colname = [col for col in matrix.columns if "symbol" in col]
     if len(gene_symbol_colname) == 0:
-        _log_and_raise_error(
+        log_and_raise_error(
             "No gene_symbol column found in proteomics data.",
             error=ValueError,
             level=LogLevel.ERROR,
         )
     if len(gene_symbol_colname) > 1:
-        _log_and_raise_error(
+        log_and_raise_error(
             "Multiple gene_symbol columns found in proteomics data.",
             error=ValueError,
             level=LogLevel.ERROR,
@@ -179,7 +179,7 @@ def load_proteomics_tests(filename, context_name) -> tuple[str, pd.DataFrame]:
 
     inquiry_full_path = config.data_dir / "config_sheets" / filename
     if not inquiry_full_path.exists():
-        _log_and_raise_error(f"Error: file not found {inquiry_full_path}", error=FileNotFoundError, level=LogLevel.ERROR)
+        log_and_raise_error(f"Error: file not found {inquiry_full_path}", error=FileNotFoundError, level=LogLevel.ERROR)
 
     filename = f"Proteomics_{context_name}.csv"
     full_save_filepath = config.result_dir / context_name / "proteomics" / filename
@@ -211,36 +211,36 @@ async def proteomics_gen(
     log_location: str | TextIO = sys.stderr,
 ):
     """Generate proteomics data."""
-    _set_up_logging(level=log_level, location=log_location)
+    set_up_logging(level=log_level, location=log_location)
 
     if not config_filepath.exists():
-        _log_and_raise_error(
+        log_and_raise_error(
             f"Config file not found at {config_filepath}",
             error=FileNotFoundError,
             level=LogLevel.ERROR,
         )
     if config_filepath.suffix not in (".xlsx", ".xls"):
-        _log_and_raise_error(
+        log_and_raise_error(
             f"Config file must be an xlsx or xls file at {config_filepath}",
             error=FileNotFoundError,
             level=LogLevel.ERROR,
         )
 
     if not matrix_filepath.exists():
-        _log_and_raise_error(
+        log_and_raise_error(
             f"Matrix file not found at {matrix_filepath}",
             error=FileNotFoundError,
             level=LogLevel.ERROR,
         )
     if matrix_filepath.suffix != ".csv":
-        _log_and_raise_error(
+        log_and_raise_error(
             f"Matrix file must be a csv file at {matrix_filepath}",
             error=FileNotFoundError,
             level=LogLevel.ERROR,
         )
 
     if quantile < 0 or quantile > 100:
-        _log_and_raise_error(
+        log_and_raise_error(
             "Quantile must be an integer from 0 to 100",
             error=ValueError,
             level=LogLevel.ERROR,
