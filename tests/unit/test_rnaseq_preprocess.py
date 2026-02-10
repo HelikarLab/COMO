@@ -7,8 +7,8 @@ import pytest
 from como.rnaseq_preprocess import (
     _organize_gene_counts_files,
     _process_first_multirun_sample,
+    _QuantInformation,
     _sample_name_from_filepath,
-    _STARinformation,
     _StudyMetrics,
 )
 
@@ -22,26 +22,25 @@ from tests.fixtures.collect_files import (
 )
 
 
-class TestSTARInformation:
-    valid_data = Path("main/data/COMO_input/naiveB/geneCounts/S1/naiveB_S1R1.tab").resolve()
-    invalid_data = Path("main/data/COMO_input/naiveB/fragmentSizes/S1/naiveB_S1R1_fragment_size.txt").resolve()
+class TestQuantInformation:
+    valid_data = Path("main/data/COMO_input/naiveB/quantification/S1/naiveB_S1R1_quant.genes.sf").resolve()
+    invalid_data = Path("main/data/COMO_input/naiveB/strandedness/S1/naiveB_S1R1_strandedness.txt").resolve()
 
-    @pytest.mark.asyncio
-    async def test_build_from_tab_valid_file(self) -> None:
-        """Validate building STAR information object."""
-        star: _STARinformation = await _STARinformation.build_from_tab(TestSTARInformation.valid_data)
+    def test_build_from_sf_valid_file(self) -> None:
+        quant: _QuantInformation = _QuantInformation.build_from_sf(TestQuantInformation.valid_data)
+        assert len(quant.gene_names) == len(quant.count_matrix) == 78899
+        assert quant.sample_name == "naiveB_S1R1"
+        assert quant.filepath.as_posix().endswith(
+            "/COMO/main/data/COMO_input/naiveB/quantification/S1/naiveB_S1R1_quant.genes.sf"
+        )
 
-        assert len(star.gene_names) == len(star.count_matrix) == 61541
-        assert len(star.num_unmapped) == 3
-        assert len(star.num_multimapping) == 3
-        assert len(star.num_no_feature) == 3
-        assert len(star.num_ambiguous) == 3
+    def test_build_from_sf_invalid_file(self):
+        with pytest.raises(ValueError, match=r"Building quantification information requires a '.sf' file; received: "):
+            _QuantInformation.build_from_sf(TestQuantInformation.invalid_data)
 
-    @pytest.mark.asyncio
-    async def test_build_from_tab_invalid_file(self):
-        """Validate error on invalid file."""
-        with pytest.raises(ValueError, match=r"Building STAR information requires a '\.tab' file"):
-            await _STARinformation.build_from_tab(TestSTARInformation.invalid_data)
+    def test_build_from_missing_file(self):
+        with pytest.raises(FileNotFoundError, match=r"Unable to find the .sf file"):
+            _QuantInformation.build_from_sf(Path("missing_file.sf"))
 
 
 def test_sample_name_from_filepath(any_como_input_filepath: Path):
@@ -52,12 +51,12 @@ def test_sample_name_from_filepath(any_como_input_filepath: Path):
 def test_organize_gene_counts_files(como_input_data_directory: Path):
     metric: _StudyMetrics
     for metric in _organize_gene_counts_files(como_input_data_directory):
-        assert len(metric.sample_names) == metric.num_samples == len(metric.count_files) == len(metric.strand_files)
+        assert len(metric.sample_names) == metric.num_samples == len(metric.quant_files) == len(metric.strand_files)
 
-        for file in metric.count_files:
+        for file in metric.quant_files:
             assert f"/{metric.study_name}/" in file.as_posix()
-            assert "geneCounts" in file.as_posix()
-            assert file.suffix == ".tab"
+            assert file.as_posix().endswith("_quant.genes.sf")
+            assert file.suffix == ".sf"
 
         for file in metric.strand_files:
             assert f"/{metric.study_name}/" in file.as_posix()
@@ -65,9 +64,8 @@ def test_organize_gene_counts_files(como_input_data_directory: Path):
             assert file.suffix == ".txt"
 
 
-@pytest.mark.asyncio
-async def test_process_first_multirun_sample(strand_filepath: Path, all_gene_count_filepaths: list[Path]):
-    result: pd.DataFrame = await _process_first_multirun_sample(strand_filepath, all_gene_count_filepaths)
+def test_process_first_multirun_sample(strand_filepath: Path, all_gene_count_filepaths: list[Path]):
+    result: pd.DataFrame = _process_first_multirun_sample(strand_filepath, all_gene_count_filepaths)
     assert result.columns[0] == "ensembl_gene_id"
     assert len(result.columns) == 2
     assert result.columns.tolist()[1] in strand_filepath.as_posix()
