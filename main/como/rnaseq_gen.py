@@ -565,8 +565,93 @@ def zfpkm_filter(
         # determine which genes are confidently expressed
         top_samples = round(high_confidence_sample_expression * len(zfpkm_df.columns))
         top_func = k_over_a(top_samples, cut_off)
-        top_genes: npt.NDArray[bool] = genefilter(zfpkm_df, top_func)
-        metric.high_confidence_entrez_gene_ids = [gene for gene, keep in zip(zfpkm_df.index, top_genes, strict=True) if keep]
+        top_genes: npt.NDArray[np.bool] = genefilter(zfpkm_df, top_func)
+        metric.high_confidence_entrez_gene_ids = [
+            gene for gene, keep in zip(zfpkm_df.index, top_genes, strict=True) if keep
+        ]
+
+    return metrics
+
+
+def umi_filter(
+    metrics: NamedMetrics,
+    filtering_options: _FilteringOptions,
+    target_sum: int = 10_000,
+    perform_normalization: bool = False,
+) -> NamedMetrics:
+    """Perform UMI-based filtering.
+
+    UMI filtering uses ScanPy's built-in `sc.pp.scale` (if `perform_normalization=True`)
+    Otherwise, this function assumes that data has been pre-normalized+scaled beforehand and will evaluate expressed & highly expressed genes directly
+
+    For each metric's matrix:
+        - The rows are genomic identifiers (gene symbol, entrez gene id, ensembl gene id, etc.)
+        - The columns are cell identifiers (e.g., barcodes)
+
+    Calculating counts per cell should, therefore, be a column-wise sum (axis=0)
+
+
+    :param metrics: The metrics to perform UMI filtering on
+    :param filtering_options: Options for filtering the count matrix.
+    :param target_sum: The target sum for UMI normalization.
+    :param perform_normalization: Whether to perform normalization before filtering.
+
+    :returns: The filtered metrics
+    """
+    min_sample_expression = filtering_options.replicate_ratio
+    high_confidence_sample_expression = filtering_options.high_replicate_ratio
+    cut_off = filtering_options.cut_off
+
+    if min_sample_expression > 0.20:
+        logger.warning(
+            "Setting a minimum sample expression greater than ~20% for UMI-based filtering will likely result in very few/no genes being marked as active. "  # noqa: E501
+            "Activity values ranging from 10-20% are recommended based on recent literature. "
+            f"Got: {min_sample_expression} for option 'replicate_ratio'"
+        )
+    if high_confidence_sample_expression > 0.40:
+        logger.warning(
+            f"Setting high-confidence expression greater than ~40% for UMI-based filtering will likely result in very few to no genes being marked as highly active. "  # noqa: E501
+            "Activity values ranging from 20-30% are recommended based on recent literature. "
+            f"Got: {high_confidence_sample_expression} for option 'high_replicate_ratio'."
+        )
+
+    for metric in metrics.values():
+        metric: _StudyMetrics
+        if not isinstance(metric.count_matrix, sc.AnnData):
+            raise TypeError(f"Expected a scanpy.AnnData for UMI filtering, got: '{type(metric.count_matrix)}'")
+        adata: sc.AnnData = metric.count_matrix
+
+        if perform_normalization:
+            if adata.raw is not None:
+                adata.X = adata.raw.X.copy()
+            sc.pp.filter_cells(adata, min_genes=20)
+            sc.pp.filter_genes(adata, min_cells=1)
+            sc.pp.normalize_total(adata, target_sum=target_sum)
+            sc.pp.log1p(adata)
+            # sc.pp.scale(adata, max_value=15)  # abs(values)>10 standard deviations away will be set to +/-10
+
+        metric.z_score_matrix = adata
+
+        adata_x = adata.X
+        n_cells, n_genes = adata.shape
+
+        min_samples: float = round(min_sample_expression * n_cells)
+        min_func = k_over_a(min_samples, cut_off)
+        min_genes_mask = np.zeros(n_genes, dtype=bool)
+        for j in range(n_genes):
+            col = adata_x.getcol(j).toarray().ravel() if sparse.issparse(adata_x) else adata_x[:, j]
+            min_genes_mask[j] = min_func(col)
+        metric.entrez_gene_ids = (
+            adata.var.loc[min_genes_mask, "entrez_gene_id"].dropna().tolist()
+        )  # at this point we do not need/want NA entrez IDs
+
+        top_samples = round(high_confidence_sample_expression * n_cells)
+        top_func = k_over_a(top_samples, cut_off)
+        top_genes_mask = np.zeros(n_genes, dtype=bool)
+        for j in range(n_genes):
+            col = adata_x.getcol(j).toarray().ravel() if sparse.issparse(adata_x) else adata_x[:, j]
+            top_genes_mask[j] = top_func(col)
+        metric.high_confidence_entrez_gene_ids = adata.var.loc[top_genes_mask, "entrez_gene_id"].dropna().tolist()
 
     return metrics
 
@@ -581,6 +666,8 @@ def filter_counts(
     force_zfpkm_plot: bool,
     zfpkm_min_peak_height: float,
     zfpkm_min_peak_distance: int,
+    umi_target_sum: int = 10_000,
+    umi_perform_normalization: bool = False,
     output_zfpkm_plot_dirpath: Path | None = None,
     force_negative_to_zero: bool = False,
 ) -> NamedMetrics:
@@ -600,12 +687,13 @@ def filter_counts(
     :param force_negative_to_zero: Should negative values be forcibly set to 0?
             This could happen as a result of normalization producing negative near-zero values (e.g., -0.001)
 
-    Returns:
-        A dictionary of filtered study metrics.
+    :returns: A dictionary of filtered study metrics.
     """
     match technique:
         case FilteringTechnique.CPM:
-            return cpm_filter(context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep)
+            return cpm_filter(
+                context_name=context_name, metrics=metrics, filtering_options=filtering_options, prep=prep
+            )
         case FilteringTechnique.TPM:
             return tpm_quantile_filter(metrics=metrics, filtering_options=filtering_options)
         case FilteringTechnique.ZFPKM:
@@ -620,15 +708,11 @@ def filter_counts(
                 force_negative_to_zero=force_negative_to_zero,
             )
         case FilteringTechnique.UMI:
-            # UMI filtering is the same as zFPKM filtering without calculating FPKM
-            return zfpkm_filter(
+            return umi_filter(
                 metrics=metrics,
                 filtering_options=filtering_options,
-                calculate_fpkm=False,
-                force_zfpkm_plot=force_zfpkm_plot,
-                min_peak_height=zfpkm_min_peak_height,
-                min_peak_distance=zfpkm_min_peak_distance,
-                output_png_dirpath=output_zfpkm_plot_dirpath,
+                target_sum=umi_target_sum,
+                perform_normalization=umi_perform_normalization,
             )
         case _:
             _log_and_raise_error(
@@ -655,6 +739,8 @@ async def _process(
     force_zfpkm_plot: bool,
     zfpkm_min_peak_height: float,
     zfpkm_min_peak_distance: int,
+    umi_target_sum: int,
+    umi_perform_normalization: bool,
     output_boolean_activity_filepath: Path,
     output_zscore_normalization_filepath: Path,
     output_zfpkm_plot_dirpath: Path | None,
@@ -688,6 +774,8 @@ async def _process(
         force_zfpkm_plot=force_zfpkm_plot,
         zfpkm_min_peak_height=zfpkm_min_peak_height,
         zfpkm_min_peak_distance=zfpkm_min_peak_distance,
+        umi_target_sum=umi_target_sum,
+        umi_perform_normalization=umi_perform_normalization,
         output_zfpkm_plot_dirpath=output_zfpkm_plot_dirpath,
         force_negative_to_zero=force_negative_to_zero,
     )
@@ -807,6 +895,8 @@ async def rnaseq_gen(  # noqa: C901
     :param technique: The filtering technique to use
     :param zfpkm_min_peak_height: The height of the zFPKM peak
     :param zfpkm_min_peak_distance: The distance of the zFPKM peak
+    :param umi_target_sum: The target sum for UMI normalization
+    :param umi_perform_normalization: Should UMI normalization be performed?
     :param cutoff: The cutoff value to use for the provided filtering technique
     :param force_zfpkm_plot: If too many samples exist, should plotting be done anyway?
     :param log_level: The level of logging to output
@@ -908,6 +998,8 @@ async def rnaseq_gen(  # noqa: C901
         force_zfpkm_plot=force_zfpkm_plot,
         zfpkm_min_peak_height=zfpkm_min_peak_height,
         zfpkm_min_peak_distance=zfpkm_min_peak_distance,
+        umi_target_sum=umi_target_sum,
+        umi_perform_normalization=umi_perform_normalization,
         output_boolean_activity_filepath=output_boolean_activity_filepath,
         output_zscore_normalization_filepath=output_zscore_normalization_filepath,
         output_zfpkm_plot_dirpath=output_zfpkm_plot_dirpath,
