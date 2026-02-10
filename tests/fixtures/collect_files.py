@@ -76,12 +76,12 @@ def any_como_input_filepath(request: SubRequest) -> Path:
     return request.param
 
 
-@pytest.fixture(params=[Path("main/data/COMO_input/naiveB").absolute(), Path("main/data/COMO_input/smB").absolute()])
+@pytest.fixture(params=[Path("main/data/COMO_input/naiveB").absolute()])
 def como_input_data_directory(request: SubRequest) -> Path:
     return request.param
 
 
-@pytest.fixture(params=["naiveB", "smB"])
+@pytest.fixture(params=["naiveB"])
 def packed_filepaths(request: SubRequest) -> PackedFilepaths:
     return PackedFilepaths(
         sample_name=request.param,

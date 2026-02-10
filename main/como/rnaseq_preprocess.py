@@ -47,10 +47,11 @@ class _QuantInformation:
             )
 
         sample_name = filepath.stem.removesuffix("_quant.genes")
-        df = pd.read_csv(
-            io.StringIO(filepath.read_text()),
+        df = _read_file(
+            filepath,
             sep="\t",
             names=["ensembl_gene_id", "length", "effective_length", "tpm", sample_name],
+            header=0,
         )
         return cls(
             gene_names=df["ensembl_gene_id"].to_list(),
@@ -248,21 +249,20 @@ def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
 
 
 def _process_first_multirun_sample(strand_file: Path, all_quant_files: list[Path]):
-    sample_count = pd.DataFrame()
     quant_information: list[_QuantInformation] = [_QuantInformation.build_from_sf(f) for f in all_quant_files]
 
+    counts: list[pd.DataFrame] = []
     for info in quant_information:
-        run_counts = info.count_matrix[["ensembl_gene_id", info.sample_name]]
-        run_counts.columns = ["ensembl_gene_id", "counts"]
-        sample_count = (
-            run_counts if sample_count.empty else sample_count.join(run_counts, on=["ensembl_gene_id"], how="outer")
-        )
+        count = info.count_matrix[["ensembl_gene_id", info.sample_name]]
+        count.columns = ["ensembl_gene_id", "counts"]
+        counts.append(count)
+    sample_counts = pd.concat(counts, axis=0, ignore_index=True)
 
     # Set na values to 0
-    sample_count = sample_count.fillna(value=0)
-    sample_count["counts"] = sample_count["counts"].astype(float)
+    sample_counts = sample_counts.fillna(value=0)
+    sample_counts["counts"] = sample_counts["counts"].astype(float)
 
-    count_avg = sample_count.groupby("ensembl_gene_id", as_index=False)["counts"].mean()
+    count_avg = sample_counts.groupby("ensembl_gene_id", as_index=False)["counts"].mean()
     count_avg["counts"] = np.ceil(count_avg["counts"].astype(int))
     count_avg.columns = ["ensembl_gene_id", _sample_name_from_filepath(strand_file)]
     return count_avg

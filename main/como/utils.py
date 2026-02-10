@@ -188,35 +188,39 @@ async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int 
 
 
 @overload
-async def _read_file(path: None, h5ad_as_df: Literal[True] | Literal[False], **kwargs) -> None: ...
+def _read_file(path: None, h5ad_as_df: bool = True, **kwargs: Any) -> None: ...
 
 
 @overload
-async def _read_file(path: pd.DataFrame, h5ad_as_df: Literal[True] | Literal[False], **kwargs) -> pd.DataFrame: ...
+def _read_file(path: pd.DataFrame, h5ad_as_df: bool = True, **kwargs: Any) -> pd.DataFrame: ...
 
 
 @overload
-async def _read_file(path: sc.AnnData, h5ad_as_df: Literal[False] = False, **kwargs) -> sc.AnnData: ...
+def _read_file(path: io.StringIO, h5ad_as_df: bool = True, **kwargs: Any) -> pd.DataFrame: ...
 
 
 @overload
-async def _read_file(path: sc.AnnData, h5ad_as_df: Literal[True] = True, **kwargs) -> pd.DataFrame: ...
+def _read_file(path: sc.AnnData, h5ad_as_df: Literal[False], **kwargs: Any) -> sc.AnnData: ...
 
 
 @overload
-async def _read_file(path: Path, h5ad_as_df: Literal[False] = False, **kwargs) -> pd.DataFrame | sc.AnnData: ...
+def _read_file(path: sc.AnnData, h5ad_as_df: Literal[True] = True, **kwargs: Any) -> pd.DataFrame: ...
 
 
 @overload
-async def _read_file(path: Path, h5ad_as_df: Literal[True] = True, **kwargs) -> pd.DataFrame: ...
+def _read_file(path: Path, h5ad_as_df: Literal[False], **kwargs: Any) -> pd.DataFrame | sc.AnnData: ...
 
 
-async def _read_file(
+@overload
+def _read_file(path: Path, h5ad_as_df: Literal[True] = True, **kwargs: Any) -> pd.DataFrame: ...
+
+
+def _read_file(
     path: Path | io.StringIO | pd.DataFrame | sc.AnnData | None,
     h5ad_as_df: bool = True,
-    **kwargs,
+    **kwargs: Any,
 ) -> pd.DataFrame | sc.AnnData | None:
-    """Asynchronously read a filepath and return a pandas DataFrame.
+    """Read a filepath and return pandas.DataFrame or scanpy.AnnData.
 
     If the provided path is None, None will also be returned.
     None may be provided to this function so that `asyncio.gather` can safely be used on all sources
@@ -244,18 +248,17 @@ async def _read_file(
         _log_and_raise_error(f"File {path} does not exist", error=FileNotFoundError, level=LogLevel.CRITICAL)
 
     match path.suffix:
-        case ".csv" | ".tsv" | ".txt" | ".tab":
+        case ".csv" | ".tsv" | ".txt" | ".tab" | ".sf":
             kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")  # set sep if not defined
-            async with aiofiles.open(path) as i_stream:
-                content = await i_stream.read()
-                return pd.read_csv(io.StringIO(content), **kwargs)
+            return pd.read_csv(path, **kwargs)
         case ".xlsx" | ".xls":
             return pd.read_excel(path, **kwargs)
         case ".h5ad":
             adata: sc.AnnData = sc.read_h5ad(path, **kwargs)
             if h5ad_as_df:
                 df = adata.to_df().T
-                df.index.name = "gene_symbol"
+                if not df.index.name:
+                    df.index.name = "gene_symbol"
                 df.reset_index(inplace=True)
                 return df
             return adata

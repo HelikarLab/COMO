@@ -28,7 +28,7 @@ class TestQuantInformation:
 
     def test_build_from_sf_valid_file(self) -> None:
         quant: _QuantInformation = _QuantInformation.build_from_sf(TestQuantInformation.valid_data)
-        assert len(quant.gene_names) == len(quant.count_matrix) == 78900
+        assert len(quant.gene_names) == len(quant.count_matrix) == 78899
         assert quant.sample_name == "naiveB_S1R1"
         assert quant.filepath.as_posix().endswith(
             "/COMO/main/data/COMO_input/naiveB/quantification/S1/naiveB_S1R1_quant.genes.sf"
@@ -39,8 +39,8 @@ class TestQuantInformation:
             _QuantInformation.build_from_sf(TestQuantInformation.invalid_data)
 
     def test_build_from_missing_file(self):
-        with pytest.raises(FileNotFoundError, match=r"Unable to find the .sf file: "):
-            _QuantInformation.build_from_sf(Path("missing_file.txt"))
+        with pytest.raises(FileNotFoundError, match=r"Unable to find the .sf file"):
+            _QuantInformation.build_from_sf(Path("missing_file.sf"))
 
 
 def test_sample_name_from_filepath(any_como_input_filepath: Path):
@@ -55,8 +55,8 @@ def test_organize_gene_counts_files(como_input_data_directory: Path):
 
         for file in metric.quant_files:
             assert f"/{metric.study_name}/" in file.as_posix()
-            assert "geneCounts" in file.as_posix()
-            assert file.suffix == ".tab"
+            assert file.as_posix().endswith("_quant.genes.sf")
+            assert file.suffix == ".sf"
 
         for file in metric.strand_files:
             assert f"/{metric.study_name}/" in file.as_posix()
