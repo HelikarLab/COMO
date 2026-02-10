@@ -39,8 +39,8 @@ class TestQuantInformation:
             _QuantInformation.build_from_sf(TestQuantInformation.invalid_data)
 
     def test_build_from_missing_file(self):
-        with pytest.raises(FileNotFoundError, match=r"Unable to find the .sf file: "):
-            _QuantInformation.build_from_sf(Path("missing_file.txt"))
+        with pytest.raises(FileNotFoundError, match=r"Unable to find the .sf file"):
+            _QuantInformation.build_from_sf(Path("missing_file.sf"))
 
 
 def test_sample_name_from_filepath(any_como_input_filepath: Path):
