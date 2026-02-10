@@ -25,9 +25,23 @@ from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.imat import IMAT, IMATProperties
 from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
 
-from como.data_types import Algorithm, CobraCompartments, LogLevel, Solver, _BoundaryReactions, _BuildResults
-from como.utils import _log_and_raise_error, _read_file, _set_up_logging, split_gene_expression_data
+from como.data_types import (
+    Algorithm,
+    BuildResults,
+    CobraCompartments,
+    LogLevel,
+    ModelBuildSettings,
+    Solver,
+    _BoundaryReactions,
+)
 from como.utils import log_and_raise_error, set_up_logging, split_gene_expression_data
+
+
+def _reaction_indices_to_ids(
+    ref_model: cobra.Model, reaction_indices: Sequence[int] | npt.NDArray[np.integer]
+) -> list[str]:
+    rxns = list(ref_model.reactions)
+    return [rxns[int(i)].id for i in reaction_indices]
 
 
 def _correct_bracket(rule: str, name: str) -> str:
@@ -314,9 +328,6 @@ def _build_with_corda(
 ):
     """Reconstruct a model using CORDA.
 
-async def _map_expression_to_reaction(
-    reference_model,
-    gene_expression_file,
     :param neg_expression_threshold: Reactions expressed below this value will be placed in "negative" expression bin
     :param high_expression_threshold: Reactions expressed above this value will be placed in the "high" expression bin
     """
@@ -579,61 +590,6 @@ async def _build_model(
     expression_vector_indices = [i for (i, val) in enumerate(expression_vector) if val > 0]
     expression_threshold = (low_thresh, high_thresh)
 
-    match recon_algorithm:
-        case Algorithm.IMAT:
-            context_model_cobra: cobra.Model = _build_with_imat(
-                reference_model=reference_model,
-                lower_bounds=lower_bounds,
-                upper_bounds=upper_bounds,
-                expr_vector=expression_vector,
-                expr_thresh=expression_threshold,
-                force_reaction_indices=force_reaction_indices,
-                solver=solver,
-            )
-        case Algorithm.GIMME:
-            context_model_cobra: cobra.Model = _build_with_gimme(
-                reference_model=reference_model,
-                lower_bounds=lower_bounds,
-                upper_bounds=upper_bounds,
-                idx_objective=objective_index,
-                expr_vector=expression_vector,
-            )
-        case Algorithm.FASTCORE:
-            context_model_cobra: cobra.Model = _build_with_fastcore(
-                cobra_model=reference_model,
-                s_matrix=s_matrix,
-                lower_bounds=lower_bounds,
-                upper_bounds=upper_bounds,
-                exp_idx_list=expression_vector_indices,
-                solver=solver,
-            )
-            context_model_cobra.objective = objective
-            flux_sol: cobra.Solution = context_model_cobra.optimize()
-            fluxes: pd.Series = flux_sol.fluxes
-            model_reactions: list[str] = [reaction.id for reaction in context_model_cobra.reactions]
-            reaction_intersections: set[str] = set(fluxes.index).intersection(model_reactions)
-            flux_df: pd.DataFrame = cast(pd.DataFrame, fluxes[~fluxes.index.isin(reaction_intersections)])
-            flux_df.dropna(inplace=True)
-            flux_df.to_csv(output_flux_result_filepath)
-        case Algorithm.TINIT:
-            context_model_cobra: cobra.Model = _build_with_tinit(
-                reference_model=reference_model,
-                lower_bounds=lower_bounds,
-                upper_bounds=upper_bounds,
-                expr_vector=expression_vector,
-                solver=solver,
-                idx_force=force_reaction_indices,
-            )
-        case _:
-            _log_and_raise_error(
-                (
-                    f"Reconstruction algorithm must be {Algorithm.GIMME.value}, "
-                    f"{Algorithm.FASTCORE.value}, {Algorithm.IMAT.value}, or {Algorithm.TINIT.value}. "
-                    f"Got: {recon_algorithm.value}"
-                ),
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
     if recon_algorithm == Algorithm.IMAT:
         context_model_cobra: cobra.Model = _build_with_imat(
             reference_model=reference_model,
@@ -893,8 +849,11 @@ async def create_context_specific_model(  # noqa: C901
 
     mat_suffix, json_suffix, xml_suffix = {".mat"}, {".json"}, {".sbml", ".xml"}
     if any(path.suffix not in {*mat_suffix, *json_suffix, *xml_suffix} for path in output_model_filepaths):
-        invalid_suffix = "\n".join(path for path in output_model_filepaths if path.suffix not in {*mat_suffix, *json_suffix, *xml_suffix})
-        _log_and_raise_error(
+        invalid_suffix: str = "\n".join(
+            path.as_posix()
+            for path in output_model_filepaths
+            if path.suffix not in {*mat_suffix, *json_suffix, *xml_suffix}
+        )
         log_and_raise_error(
             f"Invalid output filetype. Should be 'xml', 'sbml', 'mat', or 'json'. Got:\n{invalid_suffix}'",
             error=ValueError,

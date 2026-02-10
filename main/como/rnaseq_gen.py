@@ -749,7 +749,7 @@ async def _process(
     """Save the results of the RNA-Seq tests to a CSV file."""
     output_boolean_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
 
-    rnaseq_matrix: pd.DataFrame | sc.AnnData = _read_file(rnaseq_matrix_filepath, h5ad_as_df=False)
+    rnaseq_matrix: pd.DataFrame | sc.AnnData = read_file(rnaseq_matrix_filepath, h5ad_as_df=False)
     filtering_options = _FilteringOptions(
         replicate_ratio=replicate_ratio,
         batch_ratio=batch_ratio,
@@ -985,8 +985,8 @@ async def rnaseq_gen(  # noqa: C901
         context_name=context_name,
         rnaseq_matrix_filepath=input_rnaseq_filepath,
         metadata_df=metadata_df,
-        gene_info_df=_read_file(input_gene_info_filepath),
-        fragment_df=_read_file(input_fragment_lengths),
+        gene_info_df=read_file(input_gene_info_filepath),
+        fragment_df=read_file(input_fragment_lengths),
         prep=prep,
         taxon=taxon_id,
         replicate_ratio=replicate_ratio,

@@ -651,52 +651,24 @@ async def merge_xomics(  # noqa: C901
 
     # Build trna items
     # `cast` helps type checkers know what types we are dealing with - costs no runtime performance
-    (trna_matrix, trna_boolean_matrix, trna_metadata) = cast(
-        typ=tuple[pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None],
-        val=await asyncio.gather(
-            *[
-                _read_file(trna_matrix_or_filepath, h5ad_as_df=True),
-                _read_file(trna_boolean_matrix_or_filepath, h5ad_as_df=True),
-                _read_file(trna_metadata_filepath_or_df, h5ad_as_df=True),
-            ]
-        ),
-    )
+    trna_matrix = read_file(trna_matrix_or_filepath, h5ad_as_df=True)
+    trna_boolean_matrix = read_file(trna_boolean_matrix_or_filepath, h5ad_as_df=True)
+    trna_metadata = read_file(trna_metadata_filepath_or_df, h5ad_as_df=True)
 
     # Build mrna items
-    (mrna_matrix, mrna_boolean_matrix, mrna_metadata) = cast(
-        typ=tuple[pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None],
-        val=await asyncio.gather(
-            *[
-                _read_file(mrna_matrix_or_filepath),
-                _read_file(mrna_boolean_matrix_or_filepath),
-                _read_file(mrna_metadata_filepath_or_df),
-            ]
-        ),
-    )
+    mrna_matrix = read_file(mrna_matrix_or_filepath, h5ad_as_df=True)
+    mrna_boolean_matrix = read_file(mrna_boolean_matrix_or_filepath, h5ad_as_df=True)
+    mrna_metadata = read_file(mrna_metadata_filepath_or_df, h5ad_as_df=True)
 
     # build scrna items
-    (scrna_matrix, scrna_boolean_matrix, scrna_metadata) = cast(
-        typ=tuple[pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None],
-        val=await asyncio.gather(
-            *[
-                _read_file(scrna_matrix_or_filepath),
-                _read_file(scrna_boolean_matrix_or_filepath),
-                _read_file(scrna_metadata_filepath_or_df),
-            ]
-        ),
-    )
+    scrna_matrix = read_file(scrna_matrix_or_filepath, h5ad_as_df=True)
+    scrna_boolean_matrix = read_file(scrna_boolean_matrix_or_filepath, h5ad_as_df=True)
+    scrna_metadata = read_file(scrna_metadata_filepath_or_df, h5ad_as_df=True)
 
     # build proteomic items
-    (proteomic_matrix, proteomic_boolean_matrix, proteomic_metadata) = cast(
-        typ=tuple[pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None],
-        val=await asyncio.gather(
-            *[
-                _read_file(proteomic_matrix_or_filepath),
-                _read_file(proteomic_boolean_matrix_or_filepath),
-                _read_file(proteomic_metadata_filepath_or_df),
-            ]
-        ),
-    )
+    proteomic_matrix = read_file(proteomic_matrix_or_filepath, h5ad_as_df=True)
+    proteomic_boolean_matrix = read_file(proteomic_boolean_matrix_or_filepath, h5ad_as_df=True)
+    proteomic_metadata = read_file(proteomic_metadata_filepath_or_df, h5ad_as_df=True)
 
     source_weights = _SourceWeights(trna=trna_weight, mrna=mrna_weight, scrna=scrna_weight, proteomics=proteomic_weight)
     input_matrices = _InputMatrices(trna=trna_matrix, mrna=mrna_matrix, scrna=scrna_matrix, proteomics=proteomic_matrix)
