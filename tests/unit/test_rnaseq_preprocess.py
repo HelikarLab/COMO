@@ -55,8 +55,8 @@ def test_organize_gene_counts_files(como_input_data_directory: Path):
 
         for file in metric.quant_files:
             assert f"/{metric.study_name}/" in file.as_posix()
-            assert "geneCounts" in file.as_posix()
-            assert file.suffix == ".tab"
+            assert file.as_posix().endswith("_quant.genes.sf")
+            assert file.suffix == ".sf"
 
         for file in metric.strand_files:
             assert f"/{metric.study_name}/" in file.as_posix()
