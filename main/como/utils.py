@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import contextlib
 import io
-import itertools
 import sys
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Literal, NoReturn, TextIO, TypeVar, cast, overload
+from typing import Any, Literal, NoReturn, TextIO, TypeVar, overload
 
-import aiofiles
 import numpy.typing as npt
 import pandas as pd
 import scanpy as sc
@@ -24,7 +22,14 @@ from loguru import logger
 from como.data_types import LOG_FORMAT, Algorithm, LogLevel
 
 T = TypeVar("T")
-__all__ = ["split_gene_expression_data", "stringlist_to_list", "suppress_stdout"]
+__all__ = [
+    "log_and_raise_error",
+    "read_file",
+    "set_up_logging",
+    "split_gene_expression_data",
+    "stringlist_to_list",
+    "suppress_stdout",
+]
 
 
 def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
@@ -188,34 +193,34 @@ async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int 
 
 
 @overload
-def _read_file(path: None, h5ad_as_df: bool = True, **kwargs: Any) -> None: ...
+def read_file(path: None, h5ad_as_df: bool = True, **kwargs: Any) -> None: ...
 
 
 @overload
-def _read_file(path: pd.DataFrame, h5ad_as_df: bool = True, **kwargs: Any) -> pd.DataFrame: ...
+def read_file(path: pd.DataFrame, h5ad_as_df: bool = True, **kwargs: Any) -> pd.DataFrame: ...
 
 
 @overload
-def _read_file(path: io.StringIO, h5ad_as_df: bool = True, **kwargs: Any) -> pd.DataFrame: ...
+def read_file(path: io.StringIO, h5ad_as_df: bool = True, **kwargs: Any) -> pd.DataFrame: ...
 
 
 @overload
-def _read_file(path: sc.AnnData, h5ad_as_df: Literal[False], **kwargs: Any) -> sc.AnnData: ...
+def read_file(path: sc.AnnData, h5ad_as_df: Literal[False], **kwargs: Any) -> sc.AnnData: ...
 
 
 @overload
-def _read_file(path: sc.AnnData, h5ad_as_df: Literal[True] = True, **kwargs: Any) -> pd.DataFrame: ...
+def read_file(path: sc.AnnData, h5ad_as_df: Literal[True] = True, **kwargs: Any) -> pd.DataFrame: ...
 
 
 @overload
-def _read_file(path: Path, h5ad_as_df: Literal[False], **kwargs: Any) -> pd.DataFrame | sc.AnnData: ...
+def read_file(path: Path, h5ad_as_df: Literal[False], **kwargs: Any) -> pd.DataFrame | sc.AnnData: ...
 
 
 @overload
-def _read_file(path: Path, h5ad_as_df: Literal[True] = True, **kwargs: Any) -> pd.DataFrame: ...
+def read_file(path: Path, h5ad_as_df: Literal[True] = True, **kwargs: Any) -> pd.DataFrame: ...
 
 
-def _read_file(
+def read_file(
     path: Path | io.StringIO | pd.DataFrame | sc.AnnData | None,
     h5ad_as_df: bool = True,
     **kwargs: Any,
@@ -305,7 +310,7 @@ def return_placeholder_data() -> pd.DataFrame:
     return pd.DataFrame(data=0, index=pd.Index(data=[0], name="entrez_gene_id"), columns=["expressed", "top"])
 
 
-def _set_up_logging(
+def set_up_logging(
     level: LogLevel | str,
     location: str | TextIO,
     formatting: str = LOG_FORMAT,
@@ -317,19 +322,18 @@ def _set_up_logging(
         logger.add(sink=location, level=level.value, format=formatting)
 
 
-def _log_and_raise_error(
+def log_and_raise_error(
     message: str,
     *,
     error: type[BaseException],
     level: LogLevel,
 ) -> NoReturn:
     caller = logger.opt(depth=1)
-    match level:
-        case LogLevel.ERROR:
-            caller.error(message)
-            raise error(message)
-        case LogLevel.CRITICAL:
-            caller.critical(message)
-            raise error(message)
-        case _:
-            raise ValueError(f"When raising an error, LogLevel.ERROR or LogLevel.CRITICAL must be used. Got: {level}")
+    if level == LogLevel.ERROR:
+        caller.error(message)
+        raise error(message)
+    if level == LogLevel.CRITICAL:
+        caller.critical(message)
+        raise error(message)
+
+    raise ValueError(f"When raising an error, LogLevel.ERROR or LogLevel.CRITICAL must be used. Got: {level}")
