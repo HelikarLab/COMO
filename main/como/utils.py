@@ -3,27 +3,24 @@ from __future__ import annotations
 import contextlib
 import io
 import sys
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any, Literal, NoReturn, TextIO, TypeVar, overload
 
 import numpy.typing as npt
 import pandas as pd
 import scanpy as sc
-from fast_bioservices import BioDBNet, Output, Taxon
-from fast_bioservices.pipeline import (
-    determine_gene_type,
-    ensembl_to_gene_id_and_symbol,
-    gene_id_to_ensembl_and_gene_symbol,
-    gene_symbol_to_ensembl_and_gene_id,
-)
 from loguru import logger
 
 from como.data_types import LOG_FORMAT, Algorithm, LogLevel
+from como.pipelines.identifier import convert
 
 T = TypeVar("T")
 __all__ = [
+    "get_missing_gene_data",
     "log_and_raise_error",
+    "num_columns",
+    "num_rows",
     "read_file",
     "set_up_logging",
     "split_gene_expression_data",
@@ -124,48 +121,21 @@ def suppress_stdout() -> Iterator[None]:
             sys.stdout = sys.__stdout__
 
 
-async def _format_determination(
-    biodbnet: BioDBNet, *, requested_output: Output | list[Output], input_values: list[str], taxon: Taxon
-) -> pd.DataFrame:
-    """Determine the data type of the given input values (i.e., Entrez Gene ID, Gene Symbol, etc.).
+def get_missing_gene_data(values: Sequence[str] | pd.DataFrame | sc.AnnData, taxon_id: int | str) -> pd.DataFrame:
+    """Get missing gene data from a given set of values.
 
-    Args:
-        biodbnet: The BioDBNet to use for determination
-        requested_output: The data type to generate (of type `Output`)
-        input_values: The input values to determine
-        taxon: The Taxon ID
+    This function will attempt to find gene identifiers in the provided values and convert them to a DataFrame
+    containing "entrez_gene_id", "ensembl_gene_id", and "gene_symbol"
 
-    Returns:
-        A pandas DataFrame
-
+    :param values: The values to extract gene identifiers from.
+        This can be a list of strings, a pandas DataFrame, or a scanpy AnnData object.
+    :param taxon_id: The taxonomic identifier to use for gene consversion
+    :return: A DataFrame containing "entrez_gene_id", "ensembl_gene_id", and "gene_symbol" for the provided values
     """
-    requested_output = [requested_output] if isinstance(requested_output, Output) else requested_output
-    coercion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(
-        columns=["Input Type"]
-    )
-    coercion.columns = pd.Index(["input_value", *[o.value.replace(" ", "_").lower() for o in requested_output]])
-    return coercion
-
-
-async def get_missing_gene_data(  # noqa: C901
-    values: list[str] | pd.DataFrame | sc.AnnData, taxon_id: int | str | Taxon
-) -> pd.DataFrame:
-    if isinstance(values, list) and not isinstance(
-        values, pd.DataFrame
-    ):  # second isinstance required for static type check to be happy
-        gene_type = await determine_gene_type(values)
-        if all(v == "gene_symbol" for v in gene_type.values()):
-            return await gene_symbol_to_ensembl_and_gene_id(values, taxon=taxon_id)
-        elif all(v == "ensembl_gene_id" for v in gene_type.values()):
-            return await ensembl_to_gene_id_and_symbol(ids=values, taxon=taxon_id)
-        elif all(v == "entrez_gene_id" for v in gene_type.values()):
-            return await gene_id_to_ensembl_and_gene_symbol(ids=values, taxon=taxon_id)
-        else:
-            log_and_raise_error(
-                message="Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)",
-                error=ValueError,
-                level=LogLevel.CRITICAL,
-            )
+    # second isinstance required for static type check to be happy
+    # if isinstance(values, list) and not isinstance(values, pd.DataFrame):
+    if isinstance(values, list):
+        return convert(ids=values, taxon=taxon_id)
     elif isinstance(values, pd.DataFrame):
         # raise error if duplicate column names exist
         if any(values.columns.duplicated(keep=False)):
@@ -183,17 +153,17 @@ async def get_missing_gene_data(  # noqa: C901
         if values.index.name is not None:
             names.append(str(values.index.name))
         if "gene_symbol" in names:
-            return await get_missing_gene_data(
+            return get_missing_gene_data(
                 values["gene_symbol"].tolist() if "gene_symbol" in values.columns else values.index.tolist(),
                 taxon_id=taxon_id,
             )
         elif "entrez_gene_id" in names:
-            return await get_missing_gene_data(
+            return get_missing_gene_data(
                 values["entrez_gene_id"].tolist() if "entrez_gene_id" in values.columns else values.index.tolist(),
                 taxon_id=taxon_id,
             )
         elif "ensembl_gene_id" in names:
-            return await get_missing_gene_data(
+            return get_missing_gene_data(
                 values["ensembl_gene_id"].tolist() if "ensembl_gene_id" in values.columns else values.index.tolist(),
                 taxon_id=taxon_id,
             )
@@ -315,11 +285,21 @@ def _listify(value: T | list[T]) -> list[T]:
     return value if isinstance(value, list) else [value]
 
 
-def _num_rows(item: pd.DataFrame | npt.NDArray) -> int:
+def num_rows(item: pd.DataFrame | npt.NDArray) -> int:
+    """Return the number of rows in an object.
+
+    :param item: The object to check the number of rows of
+    :return: The number of rows in the provided object
+    """
     return item.shape[0]
 
 
-def _num_columns(item: pd.DataFrame | npt.NDArray) -> int:
+def num_columns(item: pd.DataFrame | npt.NDArray) -> int:
+    """Return the number of columns in an object.
+
+    :param item: The object to check the number of columns of
+    :return: The number of columns in the provided object
+    """
     return item.shape[1]
 
 

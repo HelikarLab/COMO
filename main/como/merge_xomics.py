@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 import re
 import sys
 from pathlib import Path
-from typing import TextIO, cast
+from typing import TextIO
 
 import numpy as np
 import pandas as pd
-from fast_bioservices.biothings.mygene import MyGene
 from loguru import logger
 
 from como.combine_distributions import _begin_combining_distributions
@@ -24,7 +22,7 @@ from como.data_types import (
     _SourceWeights,
 )
 from como.project import Config
-from como.utils import log_and_raise_error, read_file, set_up_logging, get_missing_gene_data, return_placeholder_data
+from como.utils import get_missing_gene_data, log_and_raise_error, read_file, return_placeholder_data, set_up_logging
 
 
 class _MergedHeaderNames:
@@ -348,17 +346,16 @@ async def _update_missing_data(input_matrices: _InputMatrices, taxon_id: int) ->
         "proteomics": [input_matrices.proteomics],
     }
     logger.trace(f"Gathering missing data for data sources: {','.join(key for key in matrix_keys if key is not None)}")
+    # ruff: disable[E501]
     # fmt: off
-    results = await asyncio.gather(
-        *[
-            # Using 'is not None' is required because the truth value of a Dataframe is ambiguous
-            get_missing_gene_data(values=input_matrices.trna, taxon_id=taxon_id) if input_matrices.trna is not None else asyncio.sleep(0),
-            get_missing_gene_data(values=input_matrices.mrna, taxon_id=taxon_id) if input_matrices.mrna is not None else asyncio.sleep(0),
-            get_missing_gene_data(values=input_matrices.scrna, taxon_id=taxon_id) if input_matrices.scrna is not None else asyncio.sleep(0),
-            get_missing_gene_data(values=input_matrices.proteomics, taxon_id=taxon_id) if input_matrices.proteomics is not None else asyncio.sleep(0),
-        ]
+    results: tuple[pd.DataFrame | None, ...] = (
+        get_missing_gene_data(values=input_matrices.trna, taxon_id=taxon_id) if input_matrices.trna is not None else None,
+        get_missing_gene_data(values=input_matrices.mrna, taxon_id=taxon_id) if input_matrices.mrna is not None else None,
+        get_missing_gene_data(values=input_matrices.scrna, taxon_id=taxon_id) if input_matrices.scrna is not None else None,
+        get_missing_gene_data(values=input_matrices.proteomics, taxon_id=taxon_id) if input_matrices.proteomics is not None else None,
     )
     # fmt: on
+    # ruff: enable[E501]
     for i, key in enumerate(matrix_keys):
         matrix_keys[key].append(results[i])
 
@@ -591,7 +588,7 @@ async def merge_xomics(  # noqa: C901
     log_location: str | TextIO = sys.stderr,
 ):
     """Merge expression tables of multiple sources (RNA-seq, proteomics) into one."""
-    _set_up_logging(level=log_level, location=log_location)
+    set_up_logging(level=log_level, location=log_location)
     logger.info(f"Starting to merge all omics data for context: '{context_name}'")
 
     # fmt: off
