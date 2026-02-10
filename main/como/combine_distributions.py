@@ -18,7 +18,7 @@ from como.data_types import (
     _OutputCombinedSourceFilepath,
     _SourceWeights,
 )
-from como.utils import LogLevel, _log_and_raise_error, _num_columns
+from como.utils import LogLevel, log_and_raise_error, _num_columns, get_missing_gene_data
 
 
 def _combine_z_distribution_for_batch(
@@ -186,7 +186,7 @@ def _combine_z_distribution_for_context(
     for res in zscore_results:
         matrix = res.z_score_matrix.copy()
         if len(matrix.columns) > 1:
-            _log_and_raise_error(
+            log_and_raise_error(
                 f"Expected a single column for combined z-score dataframe for data '{res.type.value.lower()}'. Got '{len(matrix.columns)}' columns",
                 error=ValueError,
                 level=LogLevel.ERROR,
@@ -302,7 +302,7 @@ async def _begin_combining_distributions(
             else ""
         )
         if not index_name:
-            _log_and_raise_error(
+            log_and_raise_error(
                 f"Unable to find common gene identifier across batches for source '{source.value}' in context '{context_name}'",
                 error=ValueError,
                 level=LogLevel.ERROR,

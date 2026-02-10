@@ -24,7 +24,7 @@ from como.data_types import (
     _SourceWeights,
 )
 from como.project import Config
-from como.utils import _log_and_raise_error, _read_file, _set_up_logging, get_missing_gene_data, return_placeholder_data
+from como.utils import log_and_raise_error, read_file, set_up_logging, get_missing_gene_data, return_placeholder_data
 
 
 class _MergedHeaderNames:
@@ -72,7 +72,7 @@ def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tuple[st
 
     inquiry_full_path = Path(config.data_dir, "config_sheets", filename)
     if not inquiry_full_path.exists():
-        _log_and_raise_error(
+        log_and_raise_error(
             f"Config file not found at {inquiry_full_path}",
             error=FileNotFoundError,
             level=LogLevel.ERROR,
@@ -451,7 +451,7 @@ async def _process(
     elif adjust_method == AdjustmentMethod.FLAT:
         adjusted_expression_requirement = expression_requirement
     else:
-        _log_and_raise_error(
+        log_and_raise_error(
             message=f"Unknown `adjust_method`: {adjust_method}.",
             error=ValueError,
             level=LogLevel.ERROR,
@@ -516,7 +516,7 @@ def _build_batches(
         for study in sorted(metadata["study"].unique()):
             batch_search = re.search(r"\d+", study)
             if not batch_search:
-                _log_and_raise_error(
+                log_and_raise_error(
                     message=f"Unable to find batch number in study name. Expected a digit in the study value: {study}",
                     error=ValueError,
                     level=LogLevel.ERROR,
@@ -545,7 +545,7 @@ def _validate_source_arguments(
 
     """
     if any(i for i in args) and not all(i for i in args):
-        _log_and_raise_error(
+        log_and_raise_error(
             f"Must specify all or none of '{source.value}' arguments",
             error=ValueError,
             level=LogLevel.ERROR,
@@ -614,7 +614,7 @@ async def merge_xomics(  # noqa: C901
             proteomic_matrix_or_filepath,
         )
     ):
-        _log_and_raise_error("No data was passed!", error=ValueError, level=LogLevel.ERROR)
+        log_and_raise_error("No data was passed!", error=ValueError, level=LogLevel.ERROR)
 
     if expression_requirement and expression_requirement < 1:
         logger.warning(f"Expression requirement must be at least 1! Setting to the minimum of 1 now. Got: {expression_requirement}")
@@ -651,52 +651,24 @@ async def merge_xomics(  # noqa: C901
 
     # Build trna items
     # `cast` helps type checkers know what types we are dealing with - costs no runtime performance
-    (trna_matrix, trna_boolean_matrix, trna_metadata) = cast(
-        typ=tuple[pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None],
-        val=await asyncio.gather(
-            *[
-                _read_file(trna_matrix_or_filepath, h5ad_as_df=True),
-                _read_file(trna_boolean_matrix_or_filepath, h5ad_as_df=True),
-                _read_file(trna_metadata_filepath_or_df, h5ad_as_df=True),
-            ]
-        ),
-    )
+    trna_matrix = read_file(trna_matrix_or_filepath, h5ad_as_df=True)
+    trna_boolean_matrix = read_file(trna_boolean_matrix_or_filepath, h5ad_as_df=True)
+    trna_metadata = read_file(trna_metadata_filepath_or_df, h5ad_as_df=True)
 
     # Build mrna items
-    (mrna_matrix, mrna_boolean_matrix, mrna_metadata) = cast(
-        typ=tuple[pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None],
-        val=await asyncio.gather(
-            *[
-                _read_file(mrna_matrix_or_filepath),
-                _read_file(mrna_boolean_matrix_or_filepath),
-                _read_file(mrna_metadata_filepath_or_df),
-            ]
-        ),
-    )
+    mrna_matrix = read_file(mrna_matrix_or_filepath, h5ad_as_df=True)
+    mrna_boolean_matrix = read_file(mrna_boolean_matrix_or_filepath, h5ad_as_df=True)
+    mrna_metadata = read_file(mrna_metadata_filepath_or_df, h5ad_as_df=True)
 
     # build scrna items
-    (scrna_matrix, scrna_boolean_matrix, scrna_metadata) = cast(
-        typ=tuple[pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None],
-        val=await asyncio.gather(
-            *[
-                _read_file(scrna_matrix_or_filepath),
-                _read_file(scrna_boolean_matrix_or_filepath),
-                _read_file(scrna_metadata_filepath_or_df),
-            ]
-        ),
-    )
+    scrna_matrix = read_file(scrna_matrix_or_filepath, h5ad_as_df=True)
+    scrna_boolean_matrix = read_file(scrna_boolean_matrix_or_filepath, h5ad_as_df=True)
+    scrna_metadata = read_file(scrna_metadata_filepath_or_df, h5ad_as_df=True)
 
     # build proteomic items
-    (proteomic_matrix, proteomic_boolean_matrix, proteomic_metadata) = cast(
-        typ=tuple[pd.DataFrame | None, pd.DataFrame | None, pd.DataFrame | None],
-        val=await asyncio.gather(
-            *[
-                _read_file(proteomic_matrix_or_filepath),
-                _read_file(proteomic_boolean_matrix_or_filepath),
-                _read_file(proteomic_metadata_filepath_or_df),
-            ]
-        ),
-    )
+    proteomic_matrix = read_file(proteomic_matrix_or_filepath, h5ad_as_df=True)
+    proteomic_boolean_matrix = read_file(proteomic_boolean_matrix_or_filepath, h5ad_as_df=True)
+    proteomic_metadata = read_file(proteomic_metadata_filepath_or_df, h5ad_as_df=True)
 
     source_weights = _SourceWeights(trna=trna_weight, mrna=mrna_weight, scrna=scrna_weight, proteomics=proteomic_weight)
     input_matrices = _InputMatrices(trna=trna_matrix, mrna=mrna_matrix, scrna=scrna_matrix, proteomics=proteomic_matrix)

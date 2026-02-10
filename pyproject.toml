@@ -39,13 +39,6 @@ interactive = [
     "ipython>=8.0.0",
     "jupyterlab>=4.3.2"
 ]
-dev = [
-    "como",
-    "hatchling>=1.27.0",
-    "pytest-asyncio>=1.1.0",
-    "pytest-cov>=6.2.1",
-    "pytest>=8.4.1",
-]
 
 [tool.hatch.version]
 path = "main/como/__init__.py"
@@ -61,3 +54,13 @@ pythonpath = ["main/src"]
 
 [tool.uv.sources]
 python-louvain = { git = "https://github.com/taynaud/python-louvain" }
+
+[dependency-groups]
+dev = [
+    "hatchling>=1.27.0",
+    "pandas-stubs>=3.0.0.260204",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "pytest-cov>=7.0.0",
+    "pytest-xdist>=3.8.0",
+]
