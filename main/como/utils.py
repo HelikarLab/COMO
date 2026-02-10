@@ -57,14 +57,20 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
     new_list: list[str] = stringlist.strip("[]").replace("'", "").replace(" ", "").split(",")
 
     # Show a warning if more than one item is present in the list (this means we are using the old method)
-    logger.critical("DeprecationWarning: Please use the new method of providing context names, i.e. --output-filetypes 'type1 type2 type3'.")
+    logger.critical(
+        "DeprecationWarning: Please use the new method of providing context names, "
+        "i.e. --output-filetypes 'type1 type2 type3'."
+    )
     logger.critical(
         "If you are using COMO, this can be done by setting the 'context_names' variable to a "
         "simple string separated by spaces. Here are a few examples!"
     )
     logger.critical("context_names = 'cellType1 cellType2 cellType3'")
     logger.critical("output_filetypes = 'output1 output2 output3'")
-    logger.critical("\nYour current method of passing context names will be removed in the future. Update your variables above accordingly!\n\n")
+    logger.critical(
+        "\nYour current method of passing context names will be removed in the future. "
+        "Update your variables above accordingly!\n\n"
+    )
 
     return new_list
 
@@ -75,7 +81,7 @@ def split_gene_expression_data(
     recon_algorithm: Algorithm | None = None,
     *,
     ensembl_as_index: bool = True,
-):
+) -> pd.DataFrame:
     """Split the gene expression data into single-gene and multiple-gene names.
 
     Arg:
@@ -88,15 +94,15 @@ def split_gene_expression_data(
         A pandas DataFrame with the split gene expression data
     """
     expression_data.columns = [c.lower() for c in expression_data.columns]
-    if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT}:
+    if "combine_z" in expression_data.columns:
         expression_data.rename(columns={"combine_z": "active"}, inplace=True)
 
-    expression_data = cast(typ=pd.DataFrame, val=expression_data[[identifier_column, "active"]])
+    expression_data = expression_data[[identifier_column, "active"]]
     single_gene_names = expression_data[~expression_data[identifier_column].astype(str).str.contains("//")]
     multiple_gene_names = expression_data[expression_data[identifier_column].astype(str).str.contains("//")]
-    split_gene_names = multiple_gene_names.assign(ensembl_gene_id=multiple_gene_names[identifier_column].astype(str).str.split("///")).explode(
-        identifier_column
-    )
+    split_gene_names = multiple_gene_names.assign(
+        ensembl_gene_id=multiple_gene_names[identifier_column].astype(str).str.split("///")
+    ).explode(identifier_column)
 
     gene_expressions = pd.concat([single_gene_names, split_gene_names], axis=0, ignore_index=True)
     if ensembl_as_index:
@@ -134,13 +140,19 @@ async def _format_determination(
 
     """
     requested_output = [requested_output] if isinstance(requested_output, Output) else requested_output
-    coercion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(columns=["Input Type"])
+    coercion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(
+        columns=["Input Type"]
+    )
     coercion.columns = pd.Index(["input_value", *[o.value.replace(" ", "_").lower() for o in requested_output]])
     return coercion
 
 
-async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int | str | Taxon) -> pd.DataFrame:
-    if isinstance(values, list) and not isinstance(values, pd.DataFrame):  # second isinstance required for static type check to be happy
+async def get_missing_gene_data(  # noqa: C901
+    values: list[str] | pd.DataFrame | sc.AnnData, taxon_id: int | str | Taxon
+) -> pd.DataFrame:
+    if isinstance(values, list) and not isinstance(
+        values, pd.DataFrame
+    ):  # second isinstance required for static type check to be happy
         gene_type = await determine_gene_type(values)
         if all(v == "gene_symbol" for v in gene_type.values()):
             return await gene_symbol_to_ensembl_and_gene_id(values, taxon=taxon_id)
@@ -149,7 +161,7 @@ async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int 
         elif all(v == "entrez_gene_id" for v in gene_type.values()):
             return await gene_id_to_ensembl_and_gene_symbol(ids=values, taxon=taxon_id)
         else:
-            _log_and_raise_error(
+            log_and_raise_error(
                 message="Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)",
                 error=ValueError,
                 level=LogLevel.CRITICAL,
@@ -158,34 +170,41 @@ async def get_missing_gene_data(values: list[str] | pd.DataFrame, taxon_id: int 
         # raise error if duplicate column names exist
         if any(values.columns.duplicated(keep=False)):
             duplicate_cols = values.columns[values.columns.duplicated(keep=False)].unique().tolist()
-            _log_and_raise_error(
-                message=f"Duplicate column names exist! This will result in an error processing data. Duplicates: {','.join(duplicate_cols)}",
+            log_and_raise_error(
+                message=(
+                    f"Duplicate column names exist! This will result in an error processing data. "
+                    f"Duplicates: {','.join(duplicate_cols)}"
+                ),
                 error=ValueError,
                 level=LogLevel.CRITICAL,
             )
-        if "gene_symbol" in itertools.chain(values.columns, [values.index.name]):
+
+        names: list[str] = values.columns.tolist()
+        if values.index.name is not None:
+            names.append(str(values.index.name))
+        if "gene_symbol" in names:
             return await get_missing_gene_data(
                 values["gene_symbol"].tolist() if "gene_symbol" in values.columns else values.index.tolist(),
                 taxon_id=taxon_id,
             )
-        elif "entrez_gene_id" in itertools.chain(values.columns, [values.index.name]):
+        elif "entrez_gene_id" in names:
             return await get_missing_gene_data(
                 values["entrez_gene_id"].tolist() if "entrez_gene_id" in values.columns else values.index.tolist(),
                 taxon_id=taxon_id,
             )
-        elif "ensembl_gene_id" in itertools.chain(values.columns, [values.index.name]):
+        elif "ensembl_gene_id" in names:
             return await get_missing_gene_data(
                 values["ensembl_gene_id"].tolist() if "ensembl_gene_id" in values.columns else values.index.tolist(),
                 taxon_id=taxon_id,
             )
         else:
-            _log_and_raise_error(
+            log_and_raise_error(
                 message="Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.",
                 error=ValueError,
                 level=LogLevel.CRITICAL,
             )
     else:
-        _log_and_raise_error(
+        log_and_raise_error(
             message=f"Values must be a list of strings or a pandas DataFrame, got: {type(values)}",
             error=TypeError,
             level=LogLevel.CRITICAL,
@@ -220,7 +239,7 @@ def read_file(path: Path, h5ad_as_df: Literal[False], **kwargs: Any) -> pd.DataF
 def read_file(path: Path, h5ad_as_df: Literal[True] = True, **kwargs: Any) -> pd.DataFrame: ...
 
 
-def read_file(
+def read_file(  # noqa: C901
     path: Path | io.StringIO | pd.DataFrame | sc.AnnData | None,
     h5ad_as_df: bool = True,
     **kwargs: Any,
@@ -233,8 +252,8 @@ def read_file(
 
     Args:
         path: The path to read from
-        h5ad_as_df: If True and the file is an h5ad, return a pandas DataFrame of the .X matrix instead of an AnnData object
-        kwargs: Additional arguments to pass to pandas.read_csv, pandas.read_excel, or scanpy.read_h5ad, depending on the filepath provided
+        h5ad_as_df: If True and the file is an h5ad, return a pandas DataFrame of the .X matrix
+        kwargs: Additional arguments to pass to pandas.read_csv, pandas.read_excel, or scanpy.read_h5ad
 
     Returns:
         None, or a pandas DataFrame or AnnData
@@ -250,7 +269,7 @@ def read_file(
         return None
 
     if isinstance(path, Path) and not path.exists():
-        _log_and_raise_error(f"File {path} does not exist", error=FileNotFoundError, level=LogLevel.CRITICAL)
+        log_and_raise_error(f"File {path} does not exist", error=FileNotFoundError, level=LogLevel.CRITICAL)
 
     match path.suffix:
         case ".csv" | ".tsv" | ".txt" | ".tab" | ".sf":
@@ -268,8 +287,9 @@ def read_file(
                 return df
             return adata
         case _:
-            _log_and_raise_error(
-                f"Unknown file extension '{path.suffix}'. Valid options are '.tsv', '.csv', '.xlsx', '.xls', or '.h5ad'",
+            log_and_raise_error(
+                f"Unknown file extension '{path.suffix}'. "
+                "Valid options are '.tsv', '.csv', '.xlsx', '.xls', or '.h5ad'",
                 error=ValueError,
                 level=LogLevel.CRITICAL,
             )
@@ -291,11 +311,8 @@ def _listify(value: T | list[T]) -> list[T]:
 
     Returns:
         A list of the provided value
-
     """
-    if isinstance(value, list):
-        return cast(list[T], value)  # does not actually do anything; signifies to type checker that return value is of type list[T]
-    return [value]
+    return value if isinstance(value, list) else [value]
 
 
 def _num_rows(item: pd.DataFrame | npt.NDArray) -> int:
@@ -315,6 +332,12 @@ def set_up_logging(
     location: str | TextIO,
     formatting: str = LOG_FORMAT,
 ):
+    """Set up logging for the application.
+
+    :param level: The default logging level to use (e.g., LogLevel.INFO, LogLevel.DEBUG, etc.)
+    :param location: The location to log to (e.g., a file path or sys.stdout)
+    :param formatting: The log message format to use (default is LOG_FORMAT)
+    """
     if isinstance(level, str):
         level = LogLevel[level.upper()]
     with contextlib.suppress(ValueError):
@@ -328,6 +351,12 @@ def log_and_raise_error(
     error: type[BaseException],
     level: LogLevel,
 ) -> NoReturn:
+    """Log an error message and raise an exception.
+
+    :param message: The error message to log and include in the raised exception
+    :param error: The type of exception to raise (e.g., ValueError, File NotFoundError, etc.)
+    :param level: The LogLevel at which to log the error message (e.g., LogLevel.ERROR, LogLevel.CRITICAL)
+    """
     caller = logger.opt(depth=1)
     if level == LogLevel.ERROR:
         caller.error(message)
