@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import NamedTuple, TextIO, cast
 
 import anndata as ad
-import boolean
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
@@ -19,13 +18,13 @@ import sklearn
 import sklearn.neighbors
 from anndata.compat import XDataArray
 from anndata.experimental.backed import Dataset2D
-from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol, gene_symbol_to_ensembl_and_gene_id
 from loguru import logger
 from scipy import sparse
 from zfpkm import zFPKM, zfpkm_plot
 
 from como.data_types import FilteringTechnique, LogLevel, RNAType
 from como.migrations import gene_info_migrations
+from como.pipelines.identifier import convert
 from como.project import Config
 from como.utils import log_and_raise_error, read_file, set_up_logging
 
@@ -173,7 +172,7 @@ async def _build_matrix_results(
             raise TypeError("AnnData.var is expected to be a pandas.DataFrame")
 
         matrix.var = matrix.var.reset_index(drop=False, names=["gene_symbol"])
-        conversion = await gene_symbol_to_ensembl_and_gene_id(symbols=matrix.var["gene_symbol"].tolist(), taxon=taxon)
+        conversion = convert(ids=matrix.var["gene_symbol"].tolist(), taxon=taxon)
     else:
         if "ensembl_gene_id" not in matrix.columns:
             log_and_raise_error(
@@ -181,9 +180,7 @@ async def _build_matrix_results(
                 error=ValueError,
                 level=LogLevel.CRITICAL,
             )
-        conversion: pd.DataFrame = await ensembl_to_gene_id_and_symbol(
-            ids=matrix["ensembl_gene_id"].tolist(), taxon=taxon
-        )
+        conversion: pd.DataFrame = convert(ids=matrix["ensembl_gene_id"].tolist(), taxon=taxon)
     # If the entrez gene id column is empty, it is indicative that the incorrect taxon id was provided
     if conversion["entrez_gene_id"].eq("-").all():
         logger.critical(

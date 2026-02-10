@@ -18,7 +18,8 @@ from como.data_types import (
     _OutputCombinedSourceFilepath,
     _SourceWeights,
 )
-from como.utils import LogLevel, log_and_raise_error, _num_columns, get_missing_gene_data
+from como.pipelines.identifier import convert
+from como.utils import LogLevel, get_missing_gene_data, log_and_raise_error, num_columns
 
 
 def _combine_z_distribution_for_batch(
@@ -55,9 +56,13 @@ def _combine_z_distribution_for_batch(
         f"source: '{source.value}', "
         f"context: '{context_name}'"
     )
-    if _num_columns(matrix) < 2:
-        logger.trace(f"A single sample exists for batch '{batch.batch_num}'. Returning as-is because no additional combining can be done")
-        return matrix
+    if num_columns(matrix) < 2:
+        logger.trace(
+            f"A single sample exists for batch '{batch.batch_num}'. Returning as-is because no additional combining can be done"
+        )
+        with_batch_num = matrix.copy()
+        with_batch_num.columns = [batch.batch_num]
+        return with_batch_num
 
     values = matrix.values
     weighted_matrix = np.clip(
@@ -116,7 +121,7 @@ def _combine_z_distribution_for_source(
           A pandas dataframe of the weighted z-distributions
     """
     # If only one batch column exists, return as-is (rename like R path-through).
-    if _num_columns(merged_source_data) <= 1:
+    if num_columns(merged_source_data) <= 1:
         logger.warning("A single batch exists for this source; returning matrix as-is.")
         out_df = merged_source_data.copy()
         out_df.columns = ["combine_z"]
@@ -203,8 +208,10 @@ def _combine_z_distribution_for_context(
         z_matrices.append(matrix)
 
     z_matrix = pd.concat(z_matrices, axis="columns", join="outer", ignore_index=False)
-    if _num_columns(z_matrix) <= 1:
-        logger.trace(f"Only 1 source exists for '{context}', returning dataframe as-is becuase no data exists to combine")
+    if num_columns(z_matrix) <= 1:
+        logger.trace(
+            f"Only 1 source exists for '{context}', returning dataframe as-is becuase no data exists to combine"
+        )
         z_matrix.columns = ["combine_z"]
         return z_matrix
 
@@ -275,8 +282,26 @@ async def _begin_combining_distributions(
         batch_results: list[pd.DataFrame] = []
         for batch in batch_names[source.value]:
             batch: _BatchEntry
-            matrix_subset = cast(pd.DataFrame, matrix[[GeneIdentifier.ensembl_gene_id.value, *batch.sample_names]])
-            matrix_subset = matrix_subset.set_index(keys=[GeneIdentifier.ensembl_gene_id.value], drop=True)
+            if isinstance(matrix, pd.DataFrame):
+                matrix_subset = matrix[[GeneIdentifier.entrez_gene_id.value, *batch.sample_names]]
+                matrix_subset = matrix_subset.set_index(keys=[GeneIdentifier.entrez_gene_id.value], drop=True)
+                matrix_subset = matrix_subset.drop(columns=["gene_symbol", "ensembl_gene_id"], errors="ignore")
+            elif isinstance(matrix, sc.AnnData):
+                conversion = convert(ids=matrix.var_names.tolist(), taxon=taxon)
+                conversion.reset_index(drop=False, inplace=True)
+                matrix: pd.DataFrame = matrix.to_df().T
+                matrix.reset_index(inplace=True, drop=False, names=["gene_symbol"])
+                matrix: pd.DataFrame = matrix.merge(
+                    conversion, left_on="gene_symbol", right_on="gene_symbol", how="left"
+                )
+                matrix_subset: pd.DataFrame = matrix[[GeneIdentifier.entrez_gene_id.value, *batch.sample_names]]
+                matrix_subset: pd.DataFrame = matrix_subset.set_index(
+                    keys=[GeneIdentifier.entrez_gene_id.value], drop=True
+                )
+            else:
+                raise TypeError(
+                    f"Unexpected matrix type for source '{source.value}'; expected 'pandas.DataFrame' or 'scanpy.AnnData': {type(matrix)}"
+                )
 
             output_fp = output_filepaths[source.value].parent / f"{source.value}_batch{batch.batch_num}_combined_z_distrobution_{context_name}.csv"
             batch_results.append(
