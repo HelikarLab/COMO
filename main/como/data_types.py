@@ -226,10 +226,7 @@ class _BaseDataType:
 
     def _validate_attribute(self, key):
         if key not in {i.value for i in SourceTypes._member_map_.values()}:
-            # Unable to use como.utils._log_and_raise_error because it results in a circular import
-            message = f"{key} is not a valid attribute of {SourceTypes.__name__}; got '{key}'"
-            logger.warning(message)
-            raise ValueError(message)
+            raise ValueError(f"{key} is not a valid attribute of {SourceTypes.__name__}; got '{key}'")
 
     def __iter__(self) -> Iterator[tuple[SourceTypes, pd.DataFrame | None]]:
         """Iterate over matrix fields and their names.

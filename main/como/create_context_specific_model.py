@@ -34,7 +34,7 @@ from como.data_types import (
     Solver,
     _BoundaryReactions,
 )
-from como.utils import log_and_raise_error, set_up_logging, split_gene_expression_data
+from como.utils import set_up_logging, split_gene_expression_data
 
 
 def _reaction_indices_to_ids(
@@ -235,10 +235,8 @@ def _build_with_fastcore(
     )
     s_matrix = cast(npt.NDArray[np.floating], cobra.util.create_stoichiometric_matrix(model=model))
     if lower_bounds.shape[0] != upper_bounds.shape[0] != s_matrix.shape[1]:
-        log_and_raise_error(
-            message="Lower bounds, upper bounds, and stoichiometric matrix must have the same number of reactions.",
-            error=ValueError,
-            level=LogLevel.ERROR,
+        raise ValueError(
+            "Lower bounds, upper bounds, and stoichiometric matrix must have the same number of reactions."
         )
     logger.debug("Creating feasible model")
     _, cobra_model = _feasibility_test(cobra_model, "other")
@@ -301,7 +299,7 @@ def _build_with_tinit(
     solver,
     idx_force,
 ) -> Model:
-    log_and_raise_error("tINIT is not yet implemented.", error=NotImplementedError, level=LogLevel.CRITICAL)
+    raise NotImplementedError("tINIT is not yet implemented.")
     model = reference_model
     properties = tINITProperties(
         reactions_scores=expr_vector,
@@ -331,7 +329,7 @@ def _build_with_corda(
     :param neg_expression_threshold: Reactions expressed below this value will be placed in "negative" expression bin
     :param high_expression_threshold: Reactions expressed above this value will be placed in the "high" expression bin
     """
-    log_and_raise_error("CORDA is not yet implemented", error=NotImplementedError, level=LogLevel.CRITICAL)
+    raise NotImplementedError("CORDA is not yet implemented")
     model = reference_model
     properties = CORDAProperties(
         high_conf_rx=[],
@@ -450,12 +448,7 @@ def _read_reference_model(filepath: Path) -> cobra.Model:
         case ".json":
             reference_model = cobra.io.load_json_model(filepath)
         case _:
-            log_and_raise_error(
-                f"Reference model format must be .xml, .mat, or .json; found '{filepath.suffix}'",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
-    return reference_model
+            raise ValueError(f"Reference model format must be .xml, .mat, or .json; found '{filepath.suffix}'")
 
 
 async def _build_model(
@@ -523,28 +516,16 @@ async def _build_model(
         ref_ub[i] = float(rxn.upper_bound)
         reaction_ids.append(rxn.id)
     if ref_lb.shape[0] != ref_ub.shape[0] != len(reaction_ids):
-        log_and_raise_error(
-            message=(
-                "Lower bounds, upper bounds, and reaction IDs must have the same length.\n"
-                f"Number of reactions: {len(reaction_ids)}\n"
-                f"Number of upper bounds: {ref_ub.shape[0]}\n"
-                f"Number of lower bounds: {ref_lb.shape[0]}"
-            ),
-            error=ValueError,
-            level=LogLevel.ERROR,
+        raise ValueError(
+            "Lower bounds, upper bounds, and reaction IDs must have the same length.\n"
+            f"Number of reactions: {len(reaction_ids)}\n"
+            f"Number of upper bounds: {ref_ub.shape[0]}\n"
+            f"Number of lower bounds: {ref_lb.shape[0]}"
         )
     if np.isnan(ref_lb).any():
-        log_and_raise_error(
-            message="Lower bounds contains unfilled values!",
-            error=ValueError,
-            level=LogLevel.ERROR,
-        )
+        raise ValueError("Lower bounds contains unfilled values!")
     if np.isnan(ref_ub).any():
-        log_and_raise_error(
-            message="Upper bounds contains unfilled values!",
-            error=ValueError,
-            level=LogLevel.ERROR,
-        )
+        raise ValueError("Upper bounds contains unfilled values!")
 
     # get expressed reactions
     reaction_expression: collections.OrderedDict[str, int] = await _map_expression_to_reaction(
@@ -635,14 +616,10 @@ async def _build_model(
             idx_force=force_reaction_indices,
         )
     else:
-        log_and_raise_error(
-            (
-                f"Reconstruction algorithm must be {Algorithm.GIMME.value}, "
-                f"{Algorithm.FASTCORE.value}, {Algorithm.IMAT.value}, or {Algorithm.TINIT.value}. "
-                f"Got: {recon_algorithm.value}"
-            ),
-            error=ValueError,
-            level=LogLevel.ERROR,
+        raise ValueError(
+            f"Reconstruction algorithm must be {Algorithm.GIMME.value}, "
+            f"{Algorithm.FASTCORE.value}, {Algorithm.IMAT.value}, or {Algorithm.TINIT.value}. "
+            f"Got: {recon_algorithm.value}"
         )
 
     inconsistent_and_infeasible_reactions: pd.DataFrame = pd.concat(
@@ -690,13 +667,9 @@ async def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
             "minimum reaction rate",
             "maximum reaction rate",
         ]:
-            log_and_raise_error(
-                (
-                    f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', "
-                    f"'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}"
-                ),
-                error=ValueError,
-                level=LogLevel.ERROR,
+            raise ValueError(
+                f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', "
+                f"'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}"
             )
 
     reactions: list[str] = [""] * len(df)
@@ -707,11 +680,7 @@ async def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
     for i in range(len(boundary_type)):
         boundary: str = boundary_type[i].lower()
         if boundary not in boundary_map:
-            log_and_raise_error(
-                f"Boundary reaction type must be 'Exchange', 'Demand', or 'Sink'. Found: {boundary}",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError(f"Boundary reaction type must be 'Exchange', 'Demand', or 'Sink'. Found: {boundary}")
 
         shorthand_compartment = CobraCompartments.get_shorthand(reaction_compartment[i])
         reactions[i] = f"{boundary_map.get(boundary)}_{reaction_abbreviation[i]}[{shorthand_compartment}]"
@@ -741,10 +710,8 @@ async def _write_model_to_disk(
         elif path.suffix in xml_suffix:
             tasks.add(asyncio.to_thread(cobra.io.write_sbml_model, model=model, filename=path))
         else:
-            log_and_raise_error(
-                f"Invalid output model filetype. Should be one of .xml, .sbml, .mat, or .json. Got '{path.suffix}'",
-                error=ValueError,
-                level=LogLevel.ERROR,
+            raise ValueError(
+                f"Invalid output model filetype. Should be one of .xml, .sbml, .mat, or .json. Got '{path.suffix}'"
             )
         logger.success(f"Will save metabolic model for context '{context_name}' to: '{path}'")
     await asyncio.gather(*tasks)
@@ -809,43 +776,19 @@ async def create_context_specific_model(  # noqa: C901
     output_model_filepaths = [output_model_filepaths] if isinstance(output_model_filepaths, Path) else output_model_filepaths
 
     if not reference_model.exists():
-        log_and_raise_error(
-            f"Reference model not found at {reference_model}",
-            error=FileNotFoundError,
-            level=LogLevel.ERROR,
-        )
+        raise FileNotFoundError(f"Reference model not found at {reference_model}")
     if not active_genes_filepath.exists():
-        log_and_raise_error(
-            f"Active genes file not found at {active_genes_filepath}",
-            error=FileNotFoundError,
-            level=LogLevel.ERROR,
-        )
+        raise FileNotFoundError(f"Active genes file not found at {active_genes_filepath}")
     if algorithm == Algorithm.FASTCORE and not output_fastcore_expression_index_filepath:
-        log_and_raise_error(
-            "The fastcore expression index output filepath must be provided",
-            error=ValueError,
-            level=LogLevel.ERROR,
-        )
+        raise ValueError("The fastcore expression index output filepath must be provided")
     if boundary_rxns_filepath and not boundary_rxns_filepath.exists():
-        log_and_raise_error(
-            f"Boundary reactions file not found at {boundary_rxns_filepath}",
-            error=FileNotFoundError,
-            level=LogLevel.ERROR,
-        )
+        raise FileNotFoundError(f"Boundary reactions file not found at {boundary_rxns_filepath}")
 
     if algorithm not in Algorithm:
-        log_and_raise_error(
-            f"Algorithm {algorithm} not supported. Use one of {', '.join(a.value for a in Algorithm)}",
-            error=ValueError,
-            level=LogLevel.ERROR,
-        )
+        raise ValueError(f"Algorithm {algorithm} not supported. Use one of {', '.join(a.value for a in Algorithm)}")
 
     if solver not in Solver:
-        log_and_raise_error(
-            f"Solver '{solver}' not supported. Use one of {', '.join(s.value for s in Solver)}",
-            error=ValueError,
-            level=LogLevel.ERROR,
-        )
+        raise ValueError(f"Solver '{solver}' not supported. Use one of {', '.join(s.value for s in Solver)}")
 
     mat_suffix, json_suffix, xml_suffix = {".mat"}, {".json"}, {".sbml", ".xml"}
     if any(path.suffix not in {*mat_suffix, *json_suffix, *xml_suffix} for path in output_model_filepaths):
@@ -858,6 +801,7 @@ async def create_context_specific_model(  # noqa: C901
             f"Invalid output filetype. Should be 'xml', 'sbml', 'mat', or 'json'. Got:\n{invalid_suffix}'",
             error=ValueError,
             level=LogLevel.ERROR,
+        raise ValueError(f"Invalid output filetype. Should be 'xml', 'sbml', 'mat', or 'json'. Got:\n{invalid_suffix}'")
         )
 
     boundary_reactions = None
@@ -869,11 +813,7 @@ async def create_context_specific_model(  # noqa: C901
         exclude_rxns_filepath: Path = Path(exclude_rxns_filepath)
         df = await _create_df(exclude_rxns_filepath)
         if "abbreviation" not in df.columns:
-            log_and_raise_error(
-                "The exclude reactions file should have a single column with a header named Abbreviation",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError("The exclude reactions file should have a single column with a header named Abbreviation")
         exclude_rxns = df["abbreviation"].tolist()
 
     force_rxns: list[str] = []
@@ -881,11 +821,7 @@ async def create_context_specific_model(  # noqa: C901
         force_rxns_filepath: Path = Path(force_rxns_filepath)
         df = await _create_df(force_rxns_filepath, lowercase_col_names=True)
         if "abbreviation" not in df.columns:
-            log_and_raise_error(
-                "The force reactions file should have a single column with a header named Abbreviation",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError("The force reactions file should have a single column with a header named Abbreviation")
         force_rxns = df["abbreviation"].tolist()
 
     # Test that gurobi is using a valid license file
@@ -894,14 +830,10 @@ async def create_context_specific_model(  # noqa: C901
 
         gurobi_present = find_spec("gurobipy")
         if not gurobi_present:
-            log_and_raise_error(
-                message=(
-                    "The gurobi solver requires the gurobipy package to be installed. "
-                    "Please install gurobipy and try again. "
-                    "This can be done by installing the 'gurobi' optional dependency."
-                ),
-                error=ImportError,
-                level=LogLevel.ERROR,
+            raise ImportError(
+                "The gurobi solver requires the gurobipy package to be installed. "
+                "Please install gurobipy and try again. "
+                "This can be done by installing the 'gurobi' optional dependency."
             )
 
         if not Path(f"{os.environ['HOME']}/gurobi.lic").exists():

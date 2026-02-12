@@ -17,7 +17,6 @@ import aioftp
 from loguru import logger
 
 from como.proteomics.FileInformation import FileInformation, clear_print
-from como.utils import log_and_raise_error
 from como.data_types import LogLevel
 
 
@@ -43,11 +42,7 @@ async def aioftp_client(host: str, username: str = "anonymous", password: str = 
             attempt_num += 1
             time.sleep(5)
     if not connection_successful:
-        log_and_raise_error(
-            "Could not connect to FTP server",
-            error=ConnectionResetError,
-            level=LogLevel.ERROR,
-        )
+        raise ConnectionResetError("Could not connect to FTP server")
 
     return client
 
@@ -97,19 +92,11 @@ class Reader:
         if url_parse.hostname is not None:
             host = url_parse.hostname
         else:
-            log_and_raise_error(
-                f"Unable to identify hostname from url: {self._root_link}",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError(f"Unable to identify hostname from url: {self._root_link}")
         if url_parse.path != "":
             folder = url_parse.path
         else:
-            log_and_raise_error(
-                f"Unable to identify folder or path from url: {self._root_link}",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError(f"Unable to identify folder or path from url: {self._root_link}")
 
         client = await aioftp_client(host=host)
         for path, info in await client.list(folder, recursive=True):
@@ -184,19 +171,11 @@ class Download:
         if url_parse.hostname is not None:
             host = url_parse.hostname
         else:
-            log_and_raise_error(
-                f"Unable to identify hostname from url: {file_information.download_url}",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError(f"Unable to identify hostname from url: {file_information.download_url}")
         if url_parse.path != "":
             folder = url_parse.path
         else:
-            log_and_raise_error(
-                f"Unable to identify folder or path from url: {file_information.download_url}",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError(f"Unable to identify folder or path from url: {file_information.download_url}")
 
         # Convert file size from byte to MB
         size_mb: int = round(file_information.file_size / (1024**2))

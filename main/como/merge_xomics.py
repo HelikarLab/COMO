@@ -70,11 +70,7 @@ def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tuple[st
 
     inquiry_full_path = Path(config.data_dir, "config_sheets", filename)
     if not inquiry_full_path.exists():
-        log_and_raise_error(
-            f"Config file not found at {inquiry_full_path}",
-            error=FileNotFoundError,
-            level=LogLevel.ERROR,
-        )
+        raise FileNotFoundError(f"Config file not found at {inquiry_full_path}")
 
     filename: str = f"{prep_method.value}_{context_name}.csv"
     save_filepath = config.result_dir / context_name / prep_method.value / filename
@@ -448,11 +444,7 @@ async def _process(
     elif adjust_method == AdjustmentMethod.FLAT:
         adjusted_expression_requirement = expression_requirement
     else:
-        log_and_raise_error(
-            message=f"Unknown `adjust_method`: {adjust_method}.",
-            error=ValueError,
-            level=LogLevel.ERROR,
-        )
+        raise ValueError(f"Unknown `adjust_method`: {adjust_method}.")
     logger.debug(f"Adjusted expression requirement: {adjusted_expression_requirement}")
 
     if adjusted_expression_requirement != expression_requirement:
@@ -513,10 +505,8 @@ def _build_batches(
         for study in sorted(metadata["study"].unique()):
             batch_search = re.search(r"\d+", study)
             if not batch_search:
-                log_and_raise_error(
-                    message=f"Unable to find batch number in study name. Expected a digit in the study value: {study}",
-                    error=ValueError,
-                    level=LogLevel.ERROR,
+                raise ValueError(
+                    f"Unable to find batch number in study name. Expected a digit in the study value: {study}"
                 )
 
             batch_num = int(batch_search.group(0))  # ty: ignore[possibly-missing-attribute]
@@ -542,11 +532,7 @@ def _validate_source_arguments(
 
     """
     if any(i for i in args) and not all(i for i in args):
-        log_and_raise_error(
-            f"Must specify all or none of '{source.value}' arguments",
-            error=ValueError,
-            level=LogLevel.ERROR,
-        )
+        raise ValueError(f"Must specify all or none of '{source.value}' arguments")
 
 
 async def merge_xomics(  # noqa: C901
@@ -611,7 +597,7 @@ async def merge_xomics(  # noqa: C901
             proteomic_matrix_or_filepath,
         )
     ):
-        log_and_raise_error("No data was passed!", error=ValueError, level=LogLevel.ERROR)
+        raise ValueError("No data was passed!")
 
     if expression_requirement and expression_requirement < 1:
         logger.warning(f"Expression requirement must be at least 1! Setting to the minimum of 1 now. Got: {expression_requirement}")
