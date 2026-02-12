@@ -19,7 +19,6 @@ from loguru import logger
 
 from como.data_types import LogLevel, RNAType
 from como.pipelines.identifier import convert
-from como.utils import log_and_raise_error, read_file, set_up_logging
 from como.utils import read_file, set_up_logging
 
 
