@@ -19,7 +19,7 @@ from loguru import logger
 
 from como.data_types import LogLevel, RNAType
 from como.pipelines.identifier import convert
-from como.utils import log_and_raise_error, read_file, set_up_logging
+from como.utils import read_file, set_up_logging
 
 
 @dataclass
@@ -32,17 +32,9 @@ class _QuantInformation:
     @classmethod
     def build_from_sf(cls, filepath: Path) -> _QuantInformation:
         if filepath.suffix != ".sf":
-            log_and_raise_error(
-                f"Building quantification information requires a '.sf' file; received: '{filepath}'",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError(f"Building quantification information requires a '.sf' file; received: '{filepath}'")
         if not filepath.exists():
-            log_and_raise_error(
-                f"Unable to find the .sf file: {filepath}",
-                error=FileNotFoundError,
-                level=LogLevel.ERROR,
-            )
+            raise FileNotFoundError(f"Unable to find the .sf file: {filepath}")
 
         sample_name = filepath.stem.removesuffix("_quant.genes")
         df = read_file(
@@ -80,41 +72,25 @@ class _StudyMetrics:
         self.__sample_names = [f.stem for f in self.quant_files]
 
         if len(self.quant_files) != len(self.strand_files):
-            log_and_raise_error(
-                (
-                    f"Unequal number of count files and strand files for study '{self.study_name}'. "
-                    f"Found {len(self.quant_files)} count files and {len(self.strand_files)} strand files."
-                ),
-                error=ValueError,
-                level=LogLevel.ERROR,
+            raise ValueError(
+                f"Unequal number of count files and strand files for study '{self.study_name}'. "
+                f"Found {len(self.quant_files)} count files and {len(self.strand_files)} strand files."
             )
 
         if self.num_samples != len(self.quant_files):
-            log_and_raise_error(
-                (
-                    f"Unequal number of samples and count files for study '{self.study_name}'. "
-                    f"Found {self.num_samples} samples and {len(self.quant_files)} count files."
-                ),
-                error=ValueError,
-                level=LogLevel.ERROR,
+            raise ValueError(
+                f"Unequal number of samples and count files for study '{self.study_name}'. "
+                f"Found {self.num_samples} samples and {len(self.quant_files)} count files."
             )
 
         if self.num_samples != len(self.strand_files):
-            log_and_raise_error(
-                (
-                    f"Unequal number of samples and strand files for study '{self.study_name}'. "
-                    f"Found {self.num_samples} samples and {len(self.strand_files)} strand files."
-                ),
-                error=ValueError,
-                level=LogLevel.ERROR,
+            raise ValueError(
+                f"Unequal number of samples and strand files for study '{self.study_name}'. "
+                f"Found {self.num_samples} samples and {len(self.strand_files)} strand files."
             )
 
         if self.__num_samples == 1:
-            log_and_raise_error(
-                f"Only one sample exists for study {self.study_name}. Provide at least two samples",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError(f"Only one sample exists for study {self.study_name}. Provide at least two samples")
 
         self.quant_files.sort()
         self.strand_files.sort()
@@ -134,26 +110,16 @@ class SampleConfiguration:
     def __post_init__(self):
         """Validate the effective lengths dataframe to ensure it has the expected structure and content."""
         if len(self.effective_lengths.columns) > 2:
-            log_and_raise_error(
-                message=(
-                    f"Effective lengths dataframe for sample '{self.sample_name}' has more than 2 columns, "
-                    f"expected 'name' and 'effective_length'"
-                ),
-                error=ValueError,
-                level=LogLevel.ERROR,
+            raise ValueError(
+                f"Effective lengths dataframe for sample '{self.sample_name}' has more than 2 columns, "
+                f"expected 'name' and 'effective_length'"
             )
+
         if "name" not in self.effective_lengths.columns:
-            log_and_raise_error(
-                message=f"Effective lengths dataframe for sample '{self.sample_name}' is missing 'name' column",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError(f"Effective lengths dataframe for sample '{self.sample_name}' is missing 'name' column")
+
         if "effective_length" not in self.effective_lengths.columns:
-            log_and_raise_error(
-                message=f"Sample '{self.sample_name}' is missing 'effective_length' column",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError(f"Sample '{self.sample_name}' is missing 'effective_length' column")
 
     @classmethod
     def to_dataframe(cls, samples: list[SampleConfiguration]) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -186,19 +152,11 @@ class SampleConfiguration:
 def _sample_name_from_filepath(file: Path) -> str:
     group = re.search(r".+_S\d+R\d+(r\d+)?", file.stem)
     if not group:
-        log_and_raise_error(
-            message=(
-                "Filename does not match expected pattern 'contextName_SXRYrZ' where "
-                "X is the study number, Y is the replicate number, and Z is the optional run number"
-            ),
-            error=ValueError,
-            level=LogLevel.ERROR,
+        raise ValueError(
+            "Filename does not match expected pattern 'contextName_SXRYrZ' where "
+            "X is the study number, Y is the replicate number, and Z is the optional run number"
         )
     return group.group()
-
-
-def _sample_name_from_filepath(file: Path) -> str:
-    return re.search(r".+_S\d+R\d+(r\d+)?", file.stem).group()
 
 
 def _require_one(
@@ -218,7 +176,7 @@ def _require_one(
     else:
         message = f"No {kind} file found for {label}, make sure there is one copy for each replicate in COMO_input"
 
-    log_and_raise_error(message=message, error=ValueError, level=LogLevel.ERROR)
+    raise ValueError(message)
 
 
 def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
@@ -235,15 +193,11 @@ def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
     strandedness_directories: list[Path] = sorted([p for p in strand_dir.glob("*") if not p.name.startswith(".")])
 
     if len(quantification_directories) != len(strandedness_directories):
-        log_and_raise_error(
-            (
-                f"Unequal number of quantification directories and strandedness directories. "
-                f"Found {len(quantification_directories)} quantification directories and "
-                f"{len(strandedness_directories)} strandedness directories."
-                f"\nQuantification directory: {quant_dir}\nStrandedness directory: {strand_dir}"
-            ),
-            error=ValueError,
-            level=LogLevel.ERROR,
+        raise ValueError(
+            f"Unequal number of quantification directories and strandedness directories. "
+            f"Found {len(quantification_directories)} quantification directories and "
+            f"{len(strandedness_directories)} strandedness directories."
+            f"\nQuantification directory: {quant_dir}\nStrandedness directory: {strand_dir}"
         )
 
     # For each study, collect gene count files, fragment files, insert size files, layouts, and strandedness information
@@ -252,13 +206,9 @@ def _organize_gene_counts_files(data_dir: Path) -> list[_StudyMetrics]:
         quant_files = list(quant.glob("*_quant.genes.sf"))
         strand_files = list(strand_dir.glob("*.txt"))
         if len(quant_files) == 0:
-            log_and_raise_error(f"No quant found for study '{quant.stem}'.", error=ValueError, level=LogLevel.ERROR)
+            raise ValueError(f"No quant found for study '{quant.stem}'.")
         if len(strand_files) == 0:
-            log_and_raise_error(
-                f"No strandedness files found for study '{quant.stem}'.",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError(f"No strandedness files found for study '{quant.stem}'.")
 
         study_metrics.append(
             _StudyMetrics(
@@ -425,11 +375,7 @@ def _create_config_df(  # noqa: C901
     quant_files: list[Path] = list((como_context_dir / quantification_dir).rglob("*.genes.sf"))
     # gene_counts: list[Path] = list((como_context_dir / gene_count_dirname).rglob("*.tab"))
     if not quant_files:
-        log_and_raise_error(
-            f"No gene count files found in '{gene_count_dirname}'",
-            error=FileNotFoundError,
-            level=LogLevel.ERROR,
-        )
+        raise FileNotFoundError(f"No gene count files found in '{gene_count_dirname}'")
 
     auxillary_directories = {
         "layout": como_context_dir / layout_dirname,
@@ -453,11 +399,8 @@ def _create_config_df(  # noqa: C901
     for quant_file in sorted(quant_files):
         m = label_regex.search(quant_file.as_posix())
         if m is None:
-            log_and_raise_error(
-                f"Filename '{quant_file.name}' does not match contextName_SXRYrZ.tab pattern",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError(f"Filename '{quant_file.name}' does not match contextName_SXRYrZ.tab pattern")
+
         label = m.group()
         study_number = m["study"]
         rep_number = m["rep"]
@@ -471,17 +414,9 @@ def _create_config_df(  # noqa: C901
         strand = strand_path.read_text().rstrip()
         prep = prep_path.read_text().rstrip()
         if prep not in {"total", "mrna"}:
-            log_and_raise_error(
-                f"Prep method must be 'total' or 'mrna' (got '{prep}') for {label}",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError(f"Prep method must be 'total' or 'mrna' (got '{prep}') for {label}")
         if layout == "":
-            log_and_raise_error(
-                message=f"No layout file found for '{label}'.",
-                error=FileNotFoundError,
-                level=LogLevel.WARNING,
-            )
+            raise FileNotFoundError(message=f"No layout file found for '{label}'.")
 
         quant_paths = [p for p in aux_lookup["quantification"].values() if p.name == f"{sample_id}_quant.genes.sf"]
         if (
@@ -540,11 +475,7 @@ async def _create_gene_info_file(  # noqa: C901
         try:
             conversion = convert(ids=data_.var_names.tolist(), taxon=taxon)
         except json.JSONDecodeError as e:
-            log_and_raise_error(
-                f"Got a JSON decode error for file '{counts_matrix_filepaths}' ({e})",
-                error=ValueError,
-                level=LogLevel.CRITICAL,
-            )
+            raise ValueError(f"Got a JSON decode error for file '{counts_matrix_filepaths}' ({e})")
 
         # Remove NA values from entrez_gene_id dataframe column
         conversion = conversion[~conversion["ensembl_gene_id"].isna()]
@@ -706,17 +637,9 @@ async def _process(
     # if provided, iterate through como-input specific directories
     if not create_gene_info_only:
         if como_context_dir is None:
-            log_and_raise_error(
-                message="como_context_dir must be provided if create_gene_info_only is False",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError("como_context_dir must be provided if create_gene_info_only is False")
         if output_trna_fragment_lengths_filepath is None:
-            log_and_raise_error(
-                message="output_fragment_lengths_filepath must be provided if create_gene_info_only is False",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError("output_fragment_lengths_filepath must be provided if create_gene_info_only is False")
 
         for rna, out_config, out_matrix, out_frag_len in rna_types:
             _process_como_input(
@@ -789,11 +712,7 @@ async def rnaseq_preprocess(  # noqa: C901
 
     # ruff: disable[ASYNC240]
     if not output_gene_info_filepath:
-        log_and_raise_error(
-            message="output_gene_info_filepath must be provided",
-            error=ValueError,
-            level=LogLevel.ERROR,
-        )
+        raise ValueError("output_gene_info_filepath must be provided")
 
     output_gene_info_filepath = Path(output_gene_info_filepath).resolve()
 

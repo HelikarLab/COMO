@@ -140,13 +140,9 @@ def get_missing_gene_data(values: Sequence[str] | pd.DataFrame | sc.AnnData, tax
         # raise error if duplicate column names exist
         if any(values.columns.duplicated(keep=False)):
             duplicate_cols = values.columns[values.columns.duplicated(keep=False)].unique().tolist()
-            log_and_raise_error(
-                message=(
-                    f"Duplicate column names exist! This will result in an error processing data. "
-                    f"Duplicates: {','.join(duplicate_cols)}"
-                ),
-                error=ValueError,
-                level=LogLevel.CRITICAL,
+            raise ValueError(
+                f"Duplicate column names exist! This will result in an error processing data. "
+                f"Duplicates: {','.join(duplicate_cols)}"
             )
 
         names: list[str] = values.columns.tolist()
@@ -168,17 +164,11 @@ def get_missing_gene_data(values: Sequence[str] | pd.DataFrame | sc.AnnData, tax
                 taxon_id=taxon_id,
             )
         else:
-            log_and_raise_error(
-                message="Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix.",
-                error=ValueError,
-                level=LogLevel.CRITICAL,
+            raise ValueError(
+                "Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix."
             )
     else:
-        log_and_raise_error(
-            message=f"Values must be a list of strings or a pandas DataFrame, got: {type(values)}",
-            error=TypeError,
-            level=LogLevel.CRITICAL,
-        )
+        raise ValueError(f"Values must be a list of strings or a pandas DataFrame, got: {type(values)}")
 
 
 @overload
@@ -239,7 +229,7 @@ def read_file(  # noqa: C901
         return None
 
     if isinstance(path, Path) and not path.exists():
-        log_and_raise_error(f"File {path} does not exist", error=FileNotFoundError, level=LogLevel.CRITICAL)
+        raise FileNotFoundError(f"File not found: '{path}'")
 
     match path.suffix:
         case ".csv" | ".tsv" | ".txt" | ".tab" | ".sf":
@@ -257,11 +247,8 @@ def read_file(  # noqa: C901
                 return df
             return adata
         case _:
-            log_and_raise_error(
-                f"Unknown file extension '{path.suffix}'. "
-                "Valid options are '.tsv', '.csv', '.xlsx', '.xls', or '.h5ad'",
-                error=ValueError,
-                level=LogLevel.CRITICAL,
+            raise ValueError(
+                f"Unknown file extension '{path.suffix}'. Valid options are '.tsv', '.csv', '.xlsx', '.xls', or '.h5ad'"
             )
 
 
@@ -323,26 +310,3 @@ def set_up_logging(
     with contextlib.suppress(ValueError):
         logger.remove(0)
         logger.add(sink=location, level=level.value, format=formatting)
-
-
-def log_and_raise_error(
-    message: str,
-    *,
-    error: type[BaseException],
-    level: LogLevel,
-) -> NoReturn:
-    """Log an error message and raise an exception.
-
-    :param message: The error message to log and include in the raised exception
-    :param error: The type of exception to raise (e.g., ValueError, File NotFoundError, etc.)
-    :param level: The LogLevel at which to log the error message (e.g., LogLevel.ERROR, LogLevel.CRITICAL)
-    """
-    caller = logger.opt(depth=1)
-    if level == LogLevel.ERROR:
-        caller.error(message)
-        raise error(message)
-    if level == LogLevel.CRITICAL:
-        caller.critical(message)
-        raise error(message)
-
-    raise ValueError(f"When raising an error, LogLevel.ERROR or LogLevel.CRITICAL must be used. Got: {level}")

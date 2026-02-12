@@ -26,7 +26,7 @@ from como.data_types import FilteringTechnique, LogLevel, RNAType
 from como.migrations import gene_info_migrations
 from como.pipelines.identifier import convert
 from como.project import Config
-from como.utils import log_and_raise_error, read_file, set_up_logging
+from como.utils import read_file, set_up_logging
 
 
 class _FilteringOptions(NamedTuple):
@@ -61,11 +61,7 @@ class _StudyMetrics:
     def __post_init__(self):
         for layout in self.layout:
             if layout not in LayoutMethod:
-                log_and_raise_error(
-                    f"Layout must be 'paired-end' or 'single-end'; got: {layout}",
-                    error=ValueError,
-                    level=LogLevel.ERROR,
-                )
+                raise ValueError(f"Layout must be 'paired-end' or 'single-end'; got: {layout}")
 
     @property
     def normalization_matrix(self) -> pd.DataFrame:
@@ -139,11 +135,7 @@ def genefilter(data: pd.DataFrame | npt.NDArray, filter_func: Callable[[npt.NDAr
         A NumPy array of the filtered data.
     """
     if not isinstance(data, pd.DataFrame | np.ndarray):
-        log_and_raise_error(
-            f"Unsupported data type. Must be a Pandas DataFrame or a NumPy array, got '{type(data)}'",
-            error=TypeError,
-            level=LogLevel.CRITICAL,
-        )
+        raise TypeError(f"Unsupported data type. Must be a Pandas DataFrame or a NumPy array, got '{type(data)}'")
 
     return (
         data.apply(filter_func, axis=1).to_numpy()
@@ -270,11 +262,7 @@ async def _build_matrix_results(
             entrez_gene_ids = subset.var["entrez_gene_id"].to_numpy(dtype=int)
             gene_sizes = subset.var["size"].to_numpy(dtype=int)
         else:
-            log_and_raise_error(
-                message=f"Matrix must be a pandas DataFrame or scanpy AnnData object, got: '{type(matrix)}'.",
-                error=TypeError,
-                level=LogLevel.CRITICAL,
-            )
+            raise TypeError(f"Matrix must be a pandas DataFrame or scanpy AnnData object, got: '{type(matrix)}'.")
 
         frag_lengths = None
         if fragment_df is not None:
@@ -338,11 +326,7 @@ def _calculate_fpkm(metrics: NamedMetrics, scale: float = 1e6) -> NamedMetrics:
         matrix_values: dict[str, npt.NDArray[np.floating]] = {}
         count_matrix = metrics[study].count_matrix
         if not isinstance(count_matrix, pd.DataFrame):
-            log_and_raise_error(
-                message="FPKM cannot be performed on scanpy.AnnData objects!",
-                error=TypeError,
-                level=LogLevel.CRITICAL,
-            )
+            raise TypeError("FPKM cannot be performed on scanpy.AnnData objects!")
 
         study_counts = count_matrix.to_numpy(dtype=int, copy=False)
         for i in range(metrics[study].num_samples):
@@ -712,11 +696,7 @@ def filter_counts(
                 perform_normalization=umi_perform_normalization,
             )
         case _:
-            log_and_raise_error(
-                f"Technique must be one of {FilteringTechnique}, got '{technique.value}'",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError(f"Technique must be one of {FilteringTechnique}, got '{technique.value}'")
 
 
 async def _process(
@@ -911,19 +891,11 @@ async def rnaseq_gen(  # noqa: C901
         case FilteringTechnique.TPM:
             cutoff: int | float = cutoff or 25
             if cutoff < 1 or cutoff > 100:
-                log_and_raise_error(
-                    "Quantile must be between 1 - 100",
-                    error=ValueError,
-                    level=LogLevel.ERROR,
-                )
+                raise ValueError("Quantile must be between 1 - 100")
 
         case FilteringTechnique.CPM:
             if cutoff and cutoff < 0:
-                log_and_raise_error(
-                    "Cutoff must be greater than or equal to 0",
-                    error=ValueError,
-                    level=LogLevel.ERROR,
-                )
+                raise ValueError("Cutoff must be greater than or equal to 0")
             elif cutoff:
                 cutoff = "default"
 
@@ -932,18 +904,10 @@ async def rnaseq_gen(  # noqa: C901
         case FilteringTechnique.UMI:
             cutoff: int = cutoff or 1
         case _:
-            log_and_raise_error(
-                f"Technique must be one of {','.join(FilteringTechnique)}. Got: {technique.value}",
-                error=ValueError,
-                level=LogLevel.ERROR,
-            )
+            raise ValueError(f"Technique must be one of {','.join(FilteringTechnique)}. Got: {technique.value}")
 
     if not input_rnaseq_filepath.exists():
-        log_and_raise_error(
-            f"Input RNA-seq file not found! Searching for: '{input_rnaseq_filepath}'",
-            error=FileNotFoundError,
-            level=LogLevel.ERROR,
-        )
+        raise FileNotFoundError(f"Input RNA-seq file not found! Searching for: '{input_rnaseq_filepath}'")
 
     if prep == RNAType.SCRNA and technique.value.lower() != FilteringTechnique.UMI.value.lower():
         logger.warning(
@@ -957,24 +921,17 @@ async def rnaseq_gen(  # noqa: C901
         metadata_df = input_metadata_filepath_or_df
     elif isinstance(input_metadata_filepath_or_df, Path):
         if input_metadata_filepath_or_df.suffix not in {".xlsx", ".xls"}:
-            log_and_raise_error(
-                f"Expected an excel file with extension of '.xlsx' or '.xls', got '{input_metadata_filepath_or_df.suffix}'.",
-                error=ValueError,
-                level=LogLevel.ERROR,
+            raise ValueError(
+                f"Expected an excel file with extension of '.xlsx' or '.xls', "
+                f"got '{input_metadata_filepath_or_df.suffix}'"
             )
         if not input_metadata_filepath_or_df.exists():
-            log_and_raise_error(
-                f"Input metadata file not found! Searching for: '{input_metadata_filepath_or_df}'",
-                error=FileNotFoundError,
-                level=LogLevel.ERROR,
-            )
+            raise FileNotFoundError(f"Input metadata file not found! Searching for: '{input_metadata_filepath_or_df}'")
 
         metadata_df = pd.read_excel(input_metadata_filepath_or_df)
     else:
-        log_and_raise_error(
-            f"Expected a pandas DataFrame or Path object as metadata, got '{type(input_metadata_filepath_or_df)}'",
-            error=TypeError,
-            level=LogLevel.ERROR,
+        raise TypeError(
+            f"Expected a pandas DataFrame or Path object as metadata, got '{type(input_metadata_filepath_or_df)}'"
         )
 
     logger.debug(f"Starting '{context_name}'")
