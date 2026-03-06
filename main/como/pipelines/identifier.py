@@ -1,37 +1,56 @@
-from collections.abc import Sequence
-from typing import Literal
+from collections.abc import Iterable, Iterator, Sequence
+from typing import Any, Literal, overload
 
 import pandas as pd
 from bioservices.mygeneinfo import MyGeneInfo
+from tqdm import tqdm
 
 __all__ = [
-    "convert",
+    "build_gene_info",
+    "contains_identical_gene_types",
     "determine_gene_type",
+    "get_remaining_identifiers",
 ]
 
+T_IDS = int | str | Iterable[int] | Iterable[str] | Iterable[int | str]
 T_MG_SCOPE = Literal["entrezgene", "ensembl.gene", "symbol"]
 T_MG_TRANSLATE = Literal["entrez_gene_id", "ensembl_gene_id", "gene_symbol"]
 T_MG_RETURN = list[dict[T_MG_TRANSLATE, str]]
 
 
-def _get_conversion(info: MyGeneInfo, values: list[str], scope: T_MG_SCOPE, fields: str, taxon: str) -> T_MG_RETURN:
-    value_str = ",".join(map(str, values))
-    results = info.get_queries(query=value_str, dotfield=True, scopes=scope, fields=fields, species=taxon)
-    if not isinstance(results, list):
-        raise TypeError(f"Expected results to be a list, but got {type(results)}")
-    if not isinstance(results[0], dict):
-        raise TypeError(f"Expected each result to be a dict, but got {type(results[0])}")
+def _get_conversion(info: MyGeneInfo, values: T_IDS, taxon: str | int) -> list[dict[str, Any]]:
+    value_list = sorted(map(str, [values] if isinstance(values, (int, str)) else values))
+    data_type = determine_gene_type(value_list)
+    if not all(v == data_type[value_list[0]] for v in data_type.values()):
+        raise ValueError("All items in ids must be of the same type (Entrez, Ensembl, or symbols).")
 
-    data: T_MG_RETURN = []
-    for result in results:
-        ensembl = result.get("query" if scope == "ensembl.gene" else "ensembl.gene")
-        entrez = result.get("query" if scope == "entrezgene" else "entrezgene")
-        symbol = result.get("query" if scope == "symbol" else "symbol")
-        data.append({"ensembl_gene_id": ensembl, "entrez_gene_id": entrez, "gene_symbol": symbol})
+    chunk_size = 1000
+    taxon_str = str(taxon)
+    scope: T_MG_SCOPE = next(iter(data_type.values()))
+    data = []
+    chunks = range(0, len(value_list), chunk_size)
+
+    for i in tqdm(chunks, desc=f"Getting info for '{scope}'"):
+        result = info.get_queries(
+            query=",".join(map(str, value_list[i : i + chunk_size])),
+            dotfield=True,
+            scopes=scope,
+            fields="ensembl.gene,entrezgene,symbol,genomic_pos.start,genomic_pos.end,taxid,notfound",
+            species=taxon_str,
+        )
+        if isinstance(result, int) and result == 414:
+            raise ValueError(
+                f"Query too long. Reduce the number of IDs in each query chunk (current chunk size: {chunk_size})."
+            )
+        if not isinstance(result, list):
+            raise TypeError(f"Expected results to be a list, but got {type(result)}")
+        if not isinstance(result[0], dict):
+            raise TypeError(f"Expected each result to be a dict, but got {type(result[0])}")
+        data.extend(result)
     return data
 
 
-def convert(ids: int | str | Sequence[int] | Sequence[str] | Sequence[int | str], taxon: int | str, cache: bool = True):
+def get_remaining_identifiers(ids: T_IDS, taxon: int | str, cache: bool = True):
     """Convert between genomic identifiers.
 
     This function will convert between the following components:
@@ -46,33 +65,111 @@ def convert(ids: int | str | Sequence[int] | Sequence[str] | Sequence[int | str]
     :return: DataFrame with columns "entrez_gene_id", "ensembl_gene_id", and "gene_symbol"
     """
     my_geneinfo = MyGeneInfo(cache=cache)
-    chunk_size = 1000
-    id_list = list(map(str, [ids] if isinstance(ids, (int, str)) else ids))
-    chunks = list(range(0, len(id_list), chunk_size))
+    gene_data = _get_conversion(info=my_geneinfo, values=ids, taxon=taxon)
+    df = (
+        pd.json_normalize(gene_data)
+        .rename(
+            columns={
+                "ensembl.gene": "ensembl_gene_id",
+                "entrezgene": "entrez_gene_id",
+                "symbol": "gene_symbol",
+                "taxid": "taxon_id",
+            }
+        )
+        .drop(
+            columns=["query", "_id", "_score", "genomic_pos.end", "genomic_pos.start"],
+            errors="ignore",
+        )
+    )
+    df = df[df["taxon_id"] == taxon]
+    df["taxon_id"] = df["taxon_id"].astype(int, copy=True)
 
-    data_type = determine_gene_type(id_list)
-    if not all(v == data_type[id_list[0]] for v in data_type.values()):
-        raise ValueError("All items in ids must be of the same type (Entrez, Ensembl, or symbols).")
+    # BUG: For an unknown reason, some Ensembl IDs are actually Entrez IDs
+    #   To filter these, two approaches can be done:
+    #   1) Remove rows where Ensembl IDs are integers
+    #   2) Remove rows where Ensembl IDs equal Entrez IDs
+    # We are selecting option 1 because it goes for the root cause: Ensembl IDs are not pure integers
+    mask = df["ensembl_gene_id"].astype(str).str.fullmatch(r"\d+").fillna(False)
+    df = df[
+        (df["ensembl_gene_id"].astype("string").notna())  # remove NA values
+        & (~df["ensembl_gene_id"].astype("string").str.fullmatch(r"\d+"))  # remove Entrez IDs
+    ]
+    return df
 
-    scope = next(iter(data_type.values()))
-    fields = ",".join({"ensembl.gene", "entrezgene", "symbol"} - {scope})
-    taxon_str = str(taxon)
-    return pd.DataFrame(
-        [
-            row
-            for i in chunks
-            for row in _get_conversion(
-                info=my_geneinfo,
-                values=id_list[i : i + chunk_size],
-                scope=scope,
-                fields=fields,
-                taxon=taxon_str,
-            )
-        ]
+
+def _to_scalar(val) -> int:
+    """Calculate the distance between end (e) and start (s)."""
+    if isinstance(val, list):
+        return int(sum(val) / len(val)) if val else 0  # `if val` checks that the list contains items
+    if pd.isna(val):
+        return 0
+    return int(val)
+
+
+def build_gene_info(ids: T_IDS, taxon: int | str, cache: bool = True):
+    """Get genomic information from a given set of IDs.
+
+    The input should be of the same type, otherwise this function will fail.
+    Expected types are:
+        - Ensembl Gene ID
+        - Entrez Gene ID
+        - Gene Symbol
+
+    The returned data frame will have the following columns:
+        - ensembl_gene_id
+        - entrez_gene_id
+        - gene_symbol
+        - size (distance between genomic end and start)
+
+    :param ids: IDs to be converted
+    :param taxon: Taxonomic identifier
+    :param cache: Should local caching be used for queries
+    :return: pandas.DataFrame
+    """
+    my_geneinfo = MyGeneInfo(cache=cache)
+    gene_data = _get_conversion(info=my_geneinfo, values=ids, taxon=taxon)
+    df = pd.json_normalize(gene_data).rename(columns={"taxid": "taxon_id"})
+    df = df[df["taxon_id"] == taxon]
+    df["taxon_id"] = df["taxon_id"].astype(int, copy=True)
+
+    df["size"] = df["genomic_pos.end"].fillna(0).map(_to_scalar) - df["genomic_pos.start"].fillna(0).map(_to_scalar)
+    df = (
+        df[~(df["size"] == 0)]
+        .drop(
+            columns=[
+                "query",
+                "_id",
+                "_score",
+                "genomic_pos.start",
+                "genomic_pos.end",
+                "notfound",
+            ],
+            inplace=False,
+            errors="ignore",
+        )
+        .rename(
+            columns={
+                "ensembl.gene": "ensembl_gene_id",
+                "entrezgene": "entrez_gene_id",
+                "symbol": "gene_symbol",
+            }
+        )
+        .explode(column=["ensembl_gene_id"])
+        .sort_values(by="ensembl_gene_id", inplace=False)
     )
 
+    return df
 
-def determine_gene_type(items: str | list[str], /) -> dict[str, T_MG_SCOPE]:
+
+@overload
+def determine_gene_type(items: str, /) -> T_MG_SCOPE: ...
+
+
+@overload
+def determine_gene_type(items: Sequence[str], /) -> dict[str, T_MG_SCOPE]: ...
+
+
+def determine_gene_type(items: str | Sequence[str], /) -> str | dict[str, T_MG_SCOPE]:
     """Determine the genomic data type.
 
     :param items: A string or list of strings representing gene identifiers.
@@ -85,16 +182,29 @@ def determine_gene_type(items: str | list[str], /) -> dict[str, T_MG_SCOPE]:
             followed by a specific format (length greater than 11 and the last 11 characters are digits).
         - "gene_symbol": If the item does not match the above criteria, it is assumed to be a gene symbol.
     """
-    items = [items] if isinstance(items, str) else items
+    values = (items,) if isinstance(items, str) else items
+    result: dict[str, Literal["entrezgene", "ensembl.gene", "symbol"]] = {}
 
-    determine: dict[str, Literal["entrezgene", "ensembl.gene", "symbol"]] = {}
-    for i in items:
-        i_str = str(i).split(".")[0] if isinstance(i, float) else str(i)
-        if i_str.isdigit():
-            determine[i_str] = "entrezgene"
-        elif i_str.startswith("ENS") and (len(i_str) > 11 and all(i.isdigit() for i in i_str[-11:])):
-            determine[i_str] = "ensembl.gene"
+    for i in values:
+        s = str(i).partition(".")[0]  # remove any transcripts that may exist
+
+        if s.startswith("ENS") and len(s) > 11 and s[-11:].isdigit():
+            result[s] = "ensembl.gene"
+        elif s.isdigit():
+            result[s] = "entrezgene"
         else:
-            determine[i_str] = "symbol"
+            result[s] = "symbol"
 
-    return determine
+    if isinstance(items, str):
+        return result[items]
+    return result
+
+
+def contains_identical_gene_types(values: dict[str, T_MG_SCOPE] | Sequence[T_MG_SCOPE]) -> bool:
+    """Check if all values in the input are identical.
+
+    :param values: A dictionary mapping gene identifiers to their types or a sequence of gene types.
+    :return: True if all values are identical, False otherwise.
+    """
+    data = values if not isinstance(values, dict) else list(values.values())
+    return all(v == data[0] for v in data)

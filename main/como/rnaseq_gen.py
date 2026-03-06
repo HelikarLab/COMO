@@ -24,7 +24,7 @@ from zfpkm import zFPKM, zfpkm_plot
 
 from como.data_types import FilteringTechnique, LogLevel, RNAType
 from como.migrations import gene_info_migrations
-from como.pipelines.identifier import convert
+from como.pipelines.identifier import contains_identical_gene_types, determine_gene_type
 from como.project import Config
 from como.utils import read_file, set_up_logging
 
