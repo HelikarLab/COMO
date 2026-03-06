@@ -701,23 +701,22 @@ def _build_model(
             f"Got: {recon_algorithm.value}"
         )
 
-    inconsistent_and_infeasible_reactions: pd.DataFrame = pd.concat(
-        [
-            pd.DataFrame({"infeasible_reactions": inconsistent_reactions}),
-            pd.DataFrame({"expressed_infeasible_reactions": infeasible_expression_reactions}),
-            pd.DataFrame({"infeasible_force_reactions": infeasible_force_reactions}),
-            pd.DataFrame({"infeasible_context_reactions": []}),  # Included to maintain legacy support
-        ],
-        ignore_index=True,
-        axis=0,
-    )
+    # Set each reaction subsystem based on the reference model
+    for rxn in context_model_cobra.reactions:
+        cast(cobra.Reaction, context_model_cobra.reactions.get_by_id(rxn.id)).subsystem = cast(
+            cobra.Reaction, reference_model.reactions.get_by_id(rxn.id)
+        ).subsystem
 
-    return _BuildResults(
-        model=context_model_cobra,
-        expression_index_list=expression_vector_indices,
-        infeasible_reactions=inconsistent_and_infeasible_reactions,
-    )
+    context_model_cobra.objective = objective
+    flux_sol: cobra.Solution = context_model_cobra.optimize()
+    fluxes = flux_sol.fluxes
+    model_reactions: list[str] = [reaction.id for reaction in context_model_cobra.reactions]
+    reaction_intersections: set[str] = set(fluxes.index).intersection(model_reactions)
+    flux_df = fluxes[~fluxes.index.isin(reaction_intersections)]
+    flux_df.dropna(inplace=True)
+    flux_df.to_csv(output_flux_result_filepath)
 
+    return context_model_cobra
 
 
 def _create_df(path: Path, *, lowercase_col_names: bool = False) -> pd.DataFrame:
