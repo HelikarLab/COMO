@@ -18,7 +18,7 @@ import pandas as pd
 from loguru import logger
 
 from como.data_types import LogLevel, RNAType
-from como.pipelines.identifier import convert
+from como.pipelines.identifier import build_gene_info, get_remaining_identifiers
 from como.utils import read_file, set_up_logging
 
 
@@ -473,7 +473,7 @@ async def _create_gene_info_file(  # noqa: C901
         if isinstance(data_, pd.DataFrame):
             return data_["ensembl_gene_id"].tolist()
         try:
-            conversion = convert(ids=data_.var_names.tolist(), taxon=taxon)
+            conversion = get_remaining_identifiers(ids=data_.var_names.tolist(), taxon=taxon)
         except json.JSONDecodeError as e:
             raise ValueError(f"Got a JSON decode error for file '{counts_matrix_filepaths}' ({e})")
 
