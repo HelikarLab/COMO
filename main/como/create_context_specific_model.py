@@ -524,15 +524,13 @@ def _map_expression_to_reaction(
 
 
 def _read_reference_model(filepath: Path) -> cobra.Model:
-    match filepath.suffix:
-        case ".mat":
-            reference_model = cobra.io.load_matlab_model(filepath)
-        case ".xml" | ".sbml":
-            reference_model = cobra.io.read_sbml_model(filepath)
-        case ".json":
-            reference_model = cobra.io.load_json_model(filepath)
-        case _:
-            raise ValueError(f"Reference model format must be .xml, .mat, or .json; found '{filepath.suffix}'")
+    if filepath.suffix == ".json":
+        return cobra.io.load_json_model(filepath)
+    if filepath.suffix == ".mat":
+        return cobra.io.load_matlab_model(filepath)
+    if filepath.suffix in {".xml", ".sbml"}:
+        return cobra.io.read_sbml_model(filepath)
+    raise ValueError(f"Reference model format must be .xml, .mat, or .json; found '{filepath.suffix}'")
 
 
 def _build_model(
