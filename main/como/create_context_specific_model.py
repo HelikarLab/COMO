@@ -345,18 +345,18 @@ def _build_with_imat(
 
 def _build_with_tinit(
     reference_model: cobra.Model,
-    lower_bounds,
-    upper_bounds,
-    expr_vector,
-    solver,
-    idx_force,
-) -> Model:
+    lower_bounds: npt.NDArray[np.floating],
+    upper_bounds: npt.NDArray[np.floating],
+    expr_vector: npt.NDArray[np.floating],
+    solver: str,
+    idx_force: npt.NDArray[np.integer],
+) -> None:
     raise NotImplementedError("tINIT is not yet implemented.")
     model = reference_model
     properties = tINITProperties(
-        reactions_scores=expr_vector,
+        reactions_scores=list(expr_vector),
         solver=solver,
-        essential_reactions=idx_force,
+        essential_reactions=list(idx_force),
         production_weight=0.0,
         allow_excretion=False,
         no_reverse_loops=True,
