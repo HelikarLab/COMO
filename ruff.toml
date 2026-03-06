@@ -1,3 +1,4 @@
+src = ["main/como"]
 line-length = 120
 extend-include = ["docs/**/*.py", "tests/**/*.py", "**/*.ipynb"]
 
@@ -6,7 +7,11 @@ quote-style = "double"
 docstring-code-format = true
 
 [lint]
-extend-fixable = ["I001"]
+extend-fixable = [
+    "I001",
+    "RUF022",
+    "W293",
+]
 # Linting rules: https://docs.astral.sh/ruff/rules/
 unfixable = [
     "F401", # warn about, but do not remove, unused imports
@@ -44,6 +49,9 @@ ignore = [
     "D213", # first docstring line should be on the second line
     "TRY003", # allow exception messages outside the `Exception` class
 ]
+
+[lint.isort]
+known-first-party = ["como"]
 
 [lint.pydocstyle]
 convention = "google"
