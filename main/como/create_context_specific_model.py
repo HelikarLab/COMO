@@ -152,10 +152,12 @@ def _feasibility_test(model_cobra: cobra.Model, step: str):
 
 def _build_with_gimme(
     reference_model: cobra.Model,
-    lower_bounds: Sequence[float] | npt.NDArray[float],
-    upper_bounds: Sequence[float] | npt.NDArray[float],
+    expression_vector: Sequence[float] | npt.NDArray[np.floating],
     idx_objective: int,
-    expr_vector: npt.NDArray[float],
+    lower_bounds: npt.NDArray[np.floating],
+    upper_bounds: npt.NDArray[np.floating],
+    solver: str,
+    threshold_percentile: int = 30,
 ):
     model_reconstruction = reference_model.copy()
     s_matrix: list[float] = list(cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction))
@@ -218,12 +220,14 @@ def _build_with_fastcore(
 
 def _build_with_imat(
     reference_model: cobra.Model,
-    lower_bounds: Sequence[float] | npt.NDArray[float],
-    upper_bounds: Sequence[float] | npt.NDArray[float],
+    lower_bounds: npt.NDArray[np.floating],
+    upper_bounds: npt.NDArray[np.floating],
     expr_vector: npt.NDArray,
-    expr_thresh: tuple[float, float],
-    force_reaction_indices: Sequence[int],
+    low_expression_threshold: float,
+    high_expression_threshold: float,
+    force_reaction_indices: npt.NDArray[np.integer],
     solver: str,
+    build_settings: ModelBuildSettings,
 ) -> cobra.Model:
     properties: IMATProperties = IMATProperties(
         exp_vector=expr_vector,
@@ -459,13 +463,15 @@ def _build_model(
     lower_bounds: list[float],
     upper_bounds: list[float],
     solver: str,
-    low_thresh: float,
-    high_thresh: float,
+    low_percentile: int,
+    high_percentile: int,
     output_flux_result_filepath: Path,
-    taxon: int | str | Taxon,
+    taxon: int | str,
+    objective_direction: Literal["min", "max"],
+    build_settings: ModelBuildSettings,
     *,
     force_boundary_rxn_inclusion: bool,
-) -> _BuildResults:
+) -> cobra.Model:
     """Seed a context specific reference_model.
 
     Core reactions are determined from GPR associations with gene expression logicals.
@@ -474,7 +480,7 @@ def _build_model(
     force excluded even if they meet GPR association requirements using the force exclude file.
 
     Args:
-        general_model_file: Path to a COBRA model file (.xml, .mat, or .json)
+        reference_model: The reference model used in reconstruction
         gene_expression_file: Path to a gene expression file (.csv, .tsv, .xlsx, or .xls)
         recon_algorithm: Algorithm to use for reconstruction (GIMME, FASTCORE, iMAT, or tINIT)
         objective: Objective reaction ID in the general model
@@ -484,14 +490,15 @@ def _build_model(
         lower_bounds: List of lower bounds corresponding to boundary reactions
         upper_bounds: List of upper bounds corresponding to boundary reactions
         solver: Solver to use (e.g., 'glpk', 'cplex', 'gurobi')
-        low_thresh: Low expression threshold for algorithms that require it (iMAT, tINIT)
-        high_thresh: High expression threshold for algorithms that require it (iMAT, tINIT)
         output_flux_result_filepath: Path to save flux results (for iMAT only)
         taxon: Taxon ID or Taxon object for gene ID conversion.
         force_boundary_rxn_inclusion: If True, ensure that all boundary reactions are included in the final model.
 
     Returns:
-        A _BuildResults object containing the context-specific model, list of expression indices used, and a DataFrame of infeasible reactions.
+        A _BuildResults object containing:
+         the context-specific model
+         list of expression indices used
+        A DataFrame of infeasible reactions.
     """
     reference_model: cobra.Model = _read_reference_model(general_model_file)
 
