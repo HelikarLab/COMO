@@ -172,7 +172,7 @@ def test_get_conversion_scope_specific_mapping(mod, scope, results, expected):
 def test_convert_rejects_mixed_id_types(mod):
     # Mixed: Entrez-like ("1017") + symbol ("TP53") => ValueError
     with pytest.raises(ValueError, match="All items in ids must be of the same type"):
-        mod.convert(ids=["1017", "TP53"], taxon=9606)
+        mod.get_remaining_identifiers(ids=["1017", "TP53"], taxon=9606)
 
 
 def test_convert_single_id_passes_expected_scope_fields_taxon_and_cache(monkeypatch, mod):
@@ -190,7 +190,7 @@ def test_convert_single_id_passes_expected_scope_fields_taxon_and_cache(monkeypa
     monkeypatch.setattr(mod, "MyGeneInfo", CapturingMyGeneInfo)
     monkeypatch.setattr(mod, "_get_conversion", fake_get_conversion)
 
-    df = mod.convert(ids=1017, taxon=9606, cache=False)
+    df = mod.get_remaining_identifiers(ids=1017, taxon=9606, cache=False)
 
     assert isinstance(df, pd.DataFrame)
     assert set(df.columns) == {"ensembl_gene_id", "entrez_gene_id", "gene_symbol"}
@@ -228,7 +228,7 @@ def test_convert_chunks_inputs_over_1000(monkeypatch, mod):
     monkeypatch.setattr(mod, "_get_conversion", fake_get_conversion)
 
     ids = list(range(1, 1002))  # 1001 ids => should create 2 chunks: 1000 and 1
-    df = mod.convert(ids=ids, taxon="9606")
+    df = mod.get_remaining_identifiers(ids=ids, taxon="9606")
 
     assert len(df) == 1001
     assert set(df.columns) == {"ensembl_gene_id", "entrez_gene_id", "gene_symbol"}
@@ -262,7 +262,7 @@ def test_convert_symbol_scope_fields_exclude_symbol(monkeypatch, mod):
     monkeypatch.setattr(mod, "MyGeneInfo", CapturingMyGeneInfo)
     monkeypatch.setattr(mod, "_get_conversion", fake_get_conversion)
 
-    df = mod.convert(ids=["TP53", "BRCA1"], taxon=9606)
+    df = mod.get_remaining_identifiers(ids=["TP53", "BRCA1"], taxon=9606)
 
     assert len(df) == 2
     assert set(df.columns) == {"ensembl_gene_id", "entrez_gene_id", "gene_symbol"}
