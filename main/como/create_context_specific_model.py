@@ -628,23 +628,15 @@ def _build_model(
                 f"Check BiGG, or the relevant database for your reference model, for synonyms."
             )
 
-    # collect list of reactions that are infeasible but active in expression data or user defined
-    infeasible_expression_reactions = []
-    infeasible_force_reactions = []
-
-    for i, rxn in enumerate(reaction_expression):
-        # log reactions in expressed and force lists that are infeasible that the user may wish to review
-        if rxn in inconsistent_reactions and expression_vector[i] == 1:
-            infeasible_expression_reactions.append(rxn)
-        if rxn in inconsistent_reactions and rxn in force_reactions:
-            infeasible_force_reactions.append(rxn)
-
-        if rxn in force_reactions:
-            expression_vector[i] = high_thresh + 0.1 if recon_algorithm in {Algorithm.TINIT, Algorithm.IMAT} else 1
-        if rxn in inconsistent_reactions or rxn in exclude_reactions:
-            expression_vector[i] = low_thresh - 0.1 if recon_algorithm in {Algorithm.TINIT, Algorithm.IMAT} else 0
-
-    objective_index = reaction_ids.index(objective)
+    # Set force-include reactions to have an expression higher than the upper threshold
+    # Set force-exclude reactions to have an expression lower than the lower threshold
+    rxn_ids = list(reaction_expression.keys())
+    force_mask = np.isin(rxn_ids, force_reactions)
+    exclude_mask = np.isin(rxn_ids, exclude_reactions)
+    expression_vector[force_mask] = high_expr + 1 if recon_algorithm in {Algorithm.TINIT, Algorithm.IMAT} else 1
+    expression_vector[exclude_mask] = (
+        max(0.0, low_expr - 1) if recon_algorithm in {Algorithm.TINIT, Algorithm.IMAT} else 0
+    )
 
     if force_boundary_rxn_inclusion:
         all_forced: set[str] = {*force_reactions, *boundary_reactions}
