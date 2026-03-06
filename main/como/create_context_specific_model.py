@@ -849,8 +849,9 @@ def create_context_specific_model(  # noqa: C901
     log_level: LogLevel = LogLevel.INFO,
     log_location: str | TextIO | TextIOWrapper = sys.stderr,
     *,
-    force_boundary_rxn_inclusion: bool = True,
-):
+    force_boundary_rxn_inclusion: bool = False,
+    close_unlisted_exchanges: bool = False,
+) -> cobra.Model:
     """Create a context-specific model using the provided data.
 
     Args:
@@ -909,11 +910,14 @@ def create_context_specific_model(  # noqa: C901
             for path in output_model_filepaths
             if path.suffix not in {*mat_suffix, *json_suffix, *xml_suffix}
         )
-        log_and_raise_error(
-            f"Invalid output filetype. Should be 'xml', 'sbml', 'mat', or 'json'. Got:\n{invalid_suffix}'",
-            error=ValueError,
-            level=LogLevel.ERROR,
         raise ValueError(f"Invalid output filetype. Should be 'xml', 'sbml', 'mat', or 'json'. Got:\n{invalid_suffix}'")
+
+    reference_model = _read_reference_model(reference_model_filepath)
+    boundary_reactions = (
+        _collect_boundary_reactions(
+            boundary_rxns_filepath,
+            reference_model=reference_model,
+            close_unlisted_exchanges=close_unlisted_exchanges,
         )
 
     boundary_reactions = None
