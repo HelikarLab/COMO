@@ -1,4 +1,4 @@
-# ruff: noqa: T201
+# ruff: noqa: D103 T201
 """COMO integration tests.
 
 The aim of these tests are to validate COMO's behavior on file changes.
@@ -8,17 +8,24 @@ Seven behaviors exist in this file:
 1. Validate that glucose restriction has no impact on B cell function.
 2. Glucose distributes through G6P, F16BP, G3P, and 3PG. Check if the reactions exist in the model.
 3. Naive B cells produce lactate.
-4. In naive B cells, citrate, glutamate, glutamine, å-ketoglutarate, succinate, fumarate, malate are active.
+4. In naive B cells, citrate, glutamate, glutamine, alpha-ketoglutarate, succinate, fumarate, malate are active.
 5. Naive B cells showed no significant increase in the ECAR in response to the glucose addition.
 6. B cell survival requires proper maintenance of glycolytic and oxidative glucose pathways.
 7. Naive B cells seem to rely on FA as their main fuel.
 """
 
-import csv
+from collections import defaultdict
+from contextlib import redirect_stderr, redirect_stdout, suppress
 from pathlib import Path
+from typing import cast
 
 import cobra
-from cobra.flux_analysis import moma, single_reaction_deletion
+import numpy as np
+import pandas as pd
+from cobra import Metabolite, Model, Reaction
+from cobra.flux_analysis import single_reaction_deletion
+
+from como.sanity_checks.naiveB_requirement import GLYCOLYSIS_REACTIONS, add_exchanges, add_glycolysis_reactions
 
 # The aim of this unit test is to check if the current COMO version (after transition from R to Python)
 # There are seven cell behaviors in total in the unit test
