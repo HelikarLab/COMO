@@ -13,7 +13,7 @@ import scanpy as sc
 from loguru import logger
 
 from como.data_types import LOG_FORMAT, Algorithm, LogLevel
-from como.pipelines.identifier import convert
+from como.pipelines.identifier import get_remaining_identifiers
 
 T = TypeVar("T")
 __all__ = [
@@ -134,7 +134,7 @@ def get_missing_gene_data(values: Sequence[str] | pd.DataFrame | sc.AnnData, tax
     # second isinstance required for static type check to be happy
     # if isinstance(values, list) and not isinstance(values, pd.DataFrame):
     if isinstance(values, list):
-        return convert(ids=values, taxon=taxon_id)
+        return get_remaining_identifiers(ids=values, taxon=taxon_id)
     elif isinstance(values, pd.DataFrame):
         # raise error if duplicate column names exist
         if any(values.columns.duplicated(keep=False)):
