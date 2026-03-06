@@ -973,22 +973,24 @@ def create_context_specific_model(  # noqa: C901
         )
 
     logger.info(f"context='{context_name}', reconstruction method='{algorithm.value}', solver='{solver.value}'")
-    build_results: _BuildResults = await _build_model(
-        general_model_file=reference_model,
+    context_model: cobra.Model = _build_model(
+        reference_model=reference_model,
         gene_expression_file=active_genes_filepath,
         recon_algorithm=algorithm,
         objective=objective,
-        boundary_reactions=boundary_reactions.reactions if boundary_reactions else [],
+        objective_direction=objective_direction,
+        boundary_reactions=boundary_reactions.reactions,
         exclude_reactions=exclude_rxns,
         force_reactions=force_rxns,
-        lower_bounds=boundary_reactions.lower_bounds if boundary_reactions else [],
-        upper_bounds=boundary_reactions.upper_bounds if boundary_reactions else [],
+        lower_bounds=boundary_reactions.lower_bounds,
+        upper_bounds=boundary_reactions.upper_bounds,
         solver=solver.value.lower(),
-        low_thresh=low_threshold,
-        high_thresh=high_threshold,
+        low_percentile=low_percentile,
+        high_percentile=high_percentile,
         output_flux_result_filepath=output_flux_result_filepath,
         force_boundary_rxn_inclusion=force_boundary_rxn_inclusion,
-        taxon=taxon,
+        taxon=taxon_id,
+        build_settings=build_settings or ModelBuildSettings(),
     )
 
     build_results.infeasible_reactions.dropna(inplace=True)
