@@ -834,53 +834,58 @@ def _write_model_to_disk(
 
 def create_context_specific_model(  # noqa: C901
     context_name: str,
-    taxon: int | str | Taxon,
-    reference_model: Path,
+    taxon_id: int | str,
+    reference_model_filepath: Path,
     active_genes_filepath: Path,
     output_infeasible_reactions_filepath: Path,
     output_flux_result_filepath: Path,
     output_model_filepaths: Path | list[Path],
     output_fastcore_expression_index_filepath: Path | None = None,
     objective: str = "biomass_reaction",
+    objective_direction: Literal["min", "max"] = "max",
+    contextualized_model_id: str | None = None,
     boundary_rxns_filepath: str | Path | None = None,
     exclude_rxns_filepath: str | Path | None = None,
     force_rxns_filepath: str | Path | None = None,
     algorithm: Algorithm = Algorithm.GIMME,
-    low_threshold: float = -5,
-    high_threshold: float = -3,
+    low_percentile: int | None = None,
+    high_percentile: int | None = None,
     solver: Solver = Solver.GLPK,
     log_level: LogLevel = LogLevel.INFO,
     log_location: str | TextIO | TextIOWrapper = sys.stderr,
+    build_settings: ModelBuildSettings | None = None,
     *,
     force_boundary_rxn_inclusion: bool = False,
     close_unlisted_exchanges: bool = False,
 ) -> cobra.Model:
     """Create a context-specific model using the provided data.
 
-    Args:
-        context_name: Name of the context-specific model.
-        taxon: NCBI taxonomy ID or name for the organism of interest.
-        reference_model: Path to the general genome-scale metabolic model file (.xml, .mat, or .json).
-        active_genes_filepath: Path to the gene expression data file (csv, tsv, or Excel).
-        output_infeasible_reactions_filepath: Path to save infeasible reactions (csv).
-        output_flux_result_filepath: Path to save flux results (csv).
-        output_model_filepaths: Path or list of paths to save the context-specific model (.xml, .mat, or .json).
-        output_fastcore_expression_index_filepath: Path to save Fastcore expression indices (txt). Required if using Fastcore.
-        objective: Objective function reaction ID.
-        boundary_rxns_filepath: Optional path to boundary reactions file (csv, tsv, or Excel).
-        exclude_rxns_filepath: Optional path to reactions to exclude file (csv, tsv, or Excel).
-        force_rxns_filepath: Optional path to reactions to force include file (csv, tsv, or Excel).
-        algorithm: Algorithm to use for reconstruction. One of Algorithm.GIMME, Algorithm.FASTCORE, Algorithm.IMAT, Algorithm.TINIT.
-        low_threshold: Low expression threshold for algorithms that require it.
-        high_threshold: High expression threshold for algorithms that require it.
-        solver: Solver to use. One of Solver.GLPK, Solver.CPLEX, Solver.GUROBI
-        log_level: Logging level. One of LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARNING, LogLevel.ERROR, LogLevel.CRITICAL
-        log_location: Location for log output. Can be a file path or sys.stderr/sys.stdout.
-        force_boundary_rxn_inclusion: If True, ensure that all provided boundary reactions are included in the final model.
+    :param context_name: Name of the context-specific model.
+    :param taxon_id: NCBI taxonomy ID or name for the organism of interest.
+    :param reference_model_filepath: Path to the general genome-scale metabolic model file (.xml, .mat, or .json).
+    :param active_genes_filepath: Path to the gene expression data file (csv, tsv, or Excel).
+    :param output_infeasible_reactions_filepath: Path to save infeasible reactions (csv).
+    :param output_flux_result_filepath: Path to save flux results (csv).
+    :param output_model_filepaths: Path or list of paths to save the context-specific model (.xml, .mat, or .json).
+    :param output_fastcore_expression_index_filepath: Path to save Fastcore expression indices (txt).
+    :param objective: Objective function reaction ID.
+    :param objective_direction: Direction of the objective function, either 'min' or 'max'.
+    :param contextualized_model_id: A custom name to save under `model.id`, otherwise the `context_name` value will be used.
+    :param boundary_rxns_filepath: Optional path to boundary reactions file (csv, tsv, or Excel).
+    :param exclude_rxns_filepath: Optional path to reactions to exclude file (csv, tsv, or Excel).
+    :param force_rxns_filepath: Optional path to reactions to force include file (csv, tsv, or Excel).
+    :param algorithm: Algorithm to use for reconstruction.
+    :param low_percentile: Low percentile for gene expression threshold calculation.
+    :param high_percentile: High percentile for gene expression threshold calculation.
+    :param solver: Solver to use. One of Solver.GLPK, Solver.CPLEX, Solver.GUROBI
+    :param log_level: Logging level
+    :param log_location: Location for log output. Can be a file path or sys.stderr/sys.stdout.
+    :param force_boundary_rxn_inclusion: If True, ensure that all provided boundary reactions are included in the final model.
+    :param build_settings: Optional ModelBuildSettings object to customize model building parameters.
+    :param close_unlisted_exchanges: If True, all exchanges not listed in the boundary reactions input will be closed
 
-    Raises:
-        ImportError: If Gurobi solver is selected but gurobipy is not installed.
-    """
+    :raises ImportError: If Gurobi solver is selected but gurobipy is not installed.
+    """  # noqa: E501
     set_up_logging(level=log_level, location=log_location)
     if low_percentile is None:
         raise ValueError("low_percentile must be provided")
