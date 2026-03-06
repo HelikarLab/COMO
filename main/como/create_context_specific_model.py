@@ -891,13 +891,14 @@ def create_context_specific_model(  # noqa: C901
         raise ValueError("low_percentile must be provided")
     if high_percentile is None:
         raise ValueError("high_percentile must be provided")
-    # TODO: set up zfpkm threshold defaults
 
-    boundary_rxns_filepath: Path | None = Path(boundary_rxns_filepath) if boundary_rxns_filepath else None
-    output_model_filepaths = [output_model_filepaths] if isinstance(output_model_filepaths, Path) else output_model_filepaths
+    boundary_rxns_filepath = Path(boundary_rxns_filepath) if boundary_rxns_filepath else None
+    output_model_filepaths = (
+        [output_model_filepaths] if isinstance(output_model_filepaths, Path) else output_model_filepaths
+    )
 
-    if not reference_model.exists():
-        raise FileNotFoundError(f"Reference model not found at {reference_model}")
+    if not reference_model_filepath.exists():
+        raise FileNotFoundError(f"Reference model not found at {reference_model_filepath}")
     if not active_genes_filepath.exists():
         raise FileNotFoundError(f"Active genes file not found at {active_genes_filepath}")
     if algorithm == Algorithm.FASTCORE and not output_fastcore_expression_index_filepath:
@@ -927,23 +928,22 @@ def create_context_specific_model(  # noqa: C901
             reference_model=reference_model,
             close_unlisted_exchanges=close_unlisted_exchanges,
         )
-
-    boundary_reactions = None
-    if boundary_rxns_filepath:
-        boundary_reactions = await _collect_boundary_reactions(boundary_rxns_filepath)
+        if boundary_rxns_filepath
+        else _BoundaryReactions(reactions=[], lower_bounds=[], upper_bounds=[])
+    )
 
     exclude_rxns: list[str] = []
     if exclude_rxns_filepath:
-        exclude_rxns_filepath: Path = Path(exclude_rxns_filepath)
-        df = await _create_df(exclude_rxns_filepath)
+        exclude_rxns_filepath = Path(exclude_rxns_filepath)
+        df = _create_df(exclude_rxns_filepath)
         if "abbreviation" not in df.columns:
             raise ValueError("The exclude reactions file should have a single column with a header named Abbreviation")
         exclude_rxns = df["abbreviation"].tolist()
 
     force_rxns: list[str] = []
     if force_rxns_filepath:
-        force_rxns_filepath: Path = Path(force_rxns_filepath)
-        df = await _create_df(force_rxns_filepath, lowercase_col_names=True)
+        force_rxns_filepath = Path(force_rxns_filepath)
+        df = _create_df(force_rxns_filepath, lowercase_col_names=True)
         if "abbreviation" not in df.columns:
             raise ValueError("The force reactions file should have a single column with a header named Abbreviation")
         force_rxns = df["abbreviation"].tolist()
@@ -965,6 +965,12 @@ def create_context_specific_model(  # noqa: C901
                 "Gurobi solver requested, but license information cannot be found. "
                 "COMO will continue, but it is HIGHLY unlikely the resulting model will be valid."
             )
+
+    overlapping_rxns = set(force_rxns) & set(exclude_rxns)
+    if overlapping_rxns:
+        raise ValueError(
+            f"Reactions found in force-include and force-exclude sets: {','.join(sorted(overlapping_rxns))}"
+        )
 
     logger.info(f"context='{context_name}', reconstruction method='{algorithm.value}', solver='{solver.value}'")
     build_results: _BuildResults = await _build_model(
