@@ -97,5 +97,5 @@ class FisherExactTest:
                 else:
                     d += 1
 
-        result = scipy.stats.fisher_exact(np.array([[a, b], [c, d]]), alternative=alternative)
+        result = scipy.stats.fisher_exact(np.asarray([[a, b], [c, d]]), alternative=alternative)
         return cls(statistic=result.statistic, pvalue=result.pvalue, pathway=pathway, a=a, b=b, c=c, d=d)
