@@ -22,7 +22,7 @@ from como.data_types import (
     _SourceWeights,
 )
 from como.project import Config
-from como.utils import get_missing_gene_data, log_and_raise_error, read_file, return_placeholder_data, set_up_logging
+from como.utils import get_missing_gene_data, read_file, return_placeholder_data, set_up_logging
 
 
 class _MergedHeaderNames:
