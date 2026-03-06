@@ -3,106 +3,29 @@ from __future__ import annotations
 import contextlib
 import io
 import sys
-from collections.abc import Iterator
-from enum import Enum
+from collections.abc import Iterator, Sequence
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, Literal, NoReturn, TextIO, TypeVar, overload
 
-import aiofiles
+import numpy.typing as npt
 import pandas as pd
-from fast_bioservices import BioDBNet, Output, Taxon
-from fast_bioservices.pipeline import (
-    determine_gene_type,
-    ensembl_to_gene_id_and_symbol,
-    gene_id_to_ensembl_and_gene_symbol,
-    gene_symbol_to_ensembl_and_gene_id,
-)
+import scanpy as sc
 from loguru import logger
 
-__all__ = ["Compartments", "split_gene_expression_data", "stringlist_to_list", "suppress_stdout"]
+from como.data_types import LOG_FORMAT, Algorithm, LogLevel
+from como.pipelines.identifier import get_remaining_identifiers
 
-
-class Algorithm(Enum):
-    GIMME = "GIMME"
-    FASTCORE = "FASTCORE"
-    IMAT = "IMAT"
-    TINIT = "TINIT"
-
-    @staticmethod
-    def from_string(value: str) -> Algorithm:
-        match value.lower():
-            case "gimme":
-                return Algorithm.GIMME
-            case "fastcore":
-                return Algorithm.FASTCORE
-            case "imat":
-                return Algorithm.IMAT
-            case "tinit":
-                return Algorithm.TINIT
-            case _:
-                raise ValueError(f"Unknown solver: {value}")
-
-
-class Compartments:
-    """Convert from compartment "long-hand" to "short-hand".
-
-    Shorthand from: https://cobrapy.readthedocs.io/en/latest/_modules/cobra/medium/annotations.html
-
-    "Extracellular" -> "e"
-    "golgi" -> "g"
-    """
-
-    SHORTHAND: ClassVar[dict[str, list[str]]] = {
-        "ce": ["cell envelope"],
-        "c": [
-            "cytoplasm",
-            "cytosol",
-            "default",
-            "in",
-            "intra cellular",
-            "intracellular",
-            "intracellular region",
-            "intracellular space",
-        ],
-        "er": ["endoplasmic reticulum"],
-        "erm": ["endoplasmic reticulum membrane"],
-        "e": [
-            "extracellular",
-            "extraorganism",
-            "out",
-            "extracellular space",
-            "extra organism",
-            "extra cellular",
-            "extra-organism",
-            "external",
-            "external medium",
-        ],
-        "f": ["flagellum", "bacterial-type flagellum"],
-        "g": ["golgi", "golgi apparatus"],
-        "gm": ["golgi membrane"],
-        "h": ["chloroplast"],
-        "l": ["lysosome"],
-        "im": ["mitochondrial intermembrane space"],
-        "mm": ["mitochondrial membrane"],
-        "m": ["mitochondrion", "mitochondria"],
-        "n": ["nucleus"],
-        "p": ["periplasm", "periplasmic space"],
-        "x": ["peroxisome", "glyoxysome"],
-        "u": ["thylakoid"],
-        "vm": ["vacuolar membrane"],
-        "v": ["vacuole"],
-        "w": ["cell wall"],
-        "s": ["eyespot", "eyespot apparatus", "stigma"],
-    }
-
-    _REVERSE_LOOKUP: ClassVar[dict[str, list[str]]] = {
-        value.lower(): key for key, values in SHORTHAND.items() for value in values
-    }
-
-    @classmethod
-    def get(cls, longhand: str) -> str | None:
-        """Get the short-hand compartment name from the long-hand name."""
-        return cls._REVERSE_LOOKUP.get(longhand.lower(), None)
+T = TypeVar("T")
+__all__ = [
+    "get_missing_gene_data",
+    "num_columns",
+    "num_rows",
+    "read_file",
+    "set_up_logging",
+    "split_gene_expression_data",
+    "stringlist_to_list",
+    "suppress_stdout",
+]
 
 
 def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
@@ -113,57 +36,73 @@ def stringlist_to_list(stringlist: str | list[str]) -> list[str]:
     If '[' and ']' are present in the first and last items of the list,
         assume we are using the "old" method of providing context names
 
-    :param stringlist: The "string list" gathered from the command line. Example input: "['mat', 'xml', 'json']"
+    Args:
+        stringlist: The "string list" gathered from the command line. Example input: "['mat', 'xml', 'json']"
+
+    Returns:
+        A list of strings. Example output: ['mat', 'xml', 'json']
+
     """
-    if isinstance(stringlist, str):
-        if stringlist.startswith("[") and stringlist.endswith("]"):
-            # Remove any brackets from the first and last items; replace quotation marks and commas with nothing
-            new_list: list[str] = stringlist.strip("[]").replace("'", "").replace(" ", "").split(",")
+    if isinstance(stringlist, list):
+        return stringlist
 
-            # Show a warning if more than one item is present in the list (this means we are using the old method)
-            logger.critical(
-                "DeprecationWarning: Please use the new method of providing context names, "
-                "i.e. --output-filetypes 'type1 type2 type3'."
-            )
-            logger.critical(
-                "If you are using COMO, this can be done by setting the 'context_names' variable to a "
-                "simple string separated by spaces. Here are a few examples!"
-            )
-            logger.critical("context_names = 'cellType1 cellType2 cellType3'")
-            logger.critical("output_filetypes = 'output1 output2 output3'")
-            logger.critical(
-                "\nYour current method of passing context names will be removed in the future. "
-                "Update your variables above accordingly!\n\n"
-            )
+    if not (stringlist.startswith("[") and stringlist.endswith("]")):
+        return stringlist.split(" ")
 
-        else:
-            new_list: list[str] = stringlist.split(" ")
+    # Remove any brackets from the first and last items; replace quotation marks and commas with nothing
+    new_list: list[str] = stringlist.strip("[]").replace("'", "").replace(" ", "").split(",")
 
-        return new_list
-    return stringlist
+    # Show a warning if more than one item is present in the list (this means we are using the old method)
+    logger.critical(
+        "DeprecationWarning: Please use the new method of providing context names, "
+        "i.e. --output-filetypes 'type1 type2 type3'."
+    )
+    logger.critical(
+        "If you are using COMO, this can be done by setting the 'context_names' variable to a "
+        "simple string separated by spaces. Here are a few examples!"
+    )
+    logger.critical("context_names = 'cellType1 cellType2 cellType3'")
+    logger.critical("output_filetypes = 'output1 output2 output3'")
+    logger.critical(
+        "\nYour current method of passing context names will be removed in the future. "
+        "Update your variables above accordingly!\n\n"
+    )
+
+    return new_list
 
 
-def split_gene_expression_data(expression_data: pd.DataFrame, recon_algorithm: Algorithm | None = None):
+def split_gene_expression_data(
+    expression_data: pd.DataFrame,
+    identifier_column: Literal["ensembl_gene_id", "entrez_gene_id"],
+    recon_algorithm: Algorithm | None = None,
+    *,
+    ensembl_as_index: bool = True,
+) -> pd.DataFrame:
     """Split the gene expression data into single-gene and multiple-gene names.
 
-    :param expression_data: The gene expression data to map
-    :param recon_algorithm: The recon algorithm used to generate the gene expression data
-    :return:
+    Arg:
+        expression_data: The gene expression data to map
+        identifier_column: The column containing the gene identifiers, either 'ensembl_gene_id'
+        recon_algorithm: The recon algorithm used to generate the gene expression data
+        ensembl_as_index: Should the 'ensembl_gene_id' column be set as
+
+    Returns:
+        A pandas DataFrame with the split gene expression data
     """
     expression_data.columns = [c.lower() for c in expression_data.columns]
-    if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT}:
+    if "combine_z" in expression_data.columns:
         expression_data.rename(columns={"combine_z": "active"}, inplace=True)
 
-    expression_data = expression_data[["entrez_gene_id", "active"]]
-    expression_data.loc[:, "entrez_gene_id"] = expression_data["entrez_gene_id"].astype(str)
-    single_gene_names = expression_data[~expression_data["entrez_gene_id"].str.contains("//")]
-    multiple_gene_names = expression_data[expression_data["entrez_gene_id"].str.contains("//")]
+    expression_data = expression_data[[identifier_column, "active"]]
+    single_gene_names = expression_data[~expression_data[identifier_column].astype(str).str.contains("//")]
+    multiple_gene_names = expression_data[expression_data[identifier_column].astype(str).str.contains("//")]
     split_gene_names = multiple_gene_names.assign(
-        entrez_gene_id=multiple_gene_names["entrez_gene_id"].str.split("///")
-    ).explode("entrez_gene_id")
+        ensembl_gene_id=multiple_gene_names[identifier_column].astype(str).str.split("///")
+    ).explode(identifier_column)
 
     gene_expressions = pd.concat([single_gene_names, split_gene_names], axis=0, ignore_index=True)
-    gene_expressions.set_index("entrez_gene_id", inplace=True)
+    if ensembl_as_index:
+        gene_expressions.set_index(identifier_column, inplace=True)
     return gene_expressions
 
 
@@ -181,80 +120,192 @@ def suppress_stdout() -> Iterator[None]:
             sys.stdout = sys.__stdout__
 
 
-async def _format_determination(
-    biodbnet: BioDBNet, *, requested_output: Output | list[Output], input_values: list[str], taxon: Taxon
-) -> pd.DataFrame:
-    """Determine the data type of the given input values (i.e., Entrez Gene ID, Gene Symbol, etc.).
+def get_missing_gene_data(values: Sequence[str] | pd.DataFrame | sc.AnnData, taxon_id: int | str) -> pd.DataFrame:
+    """Get missing gene data from a given set of values.
 
-    :param biodbnet: The BioDBNet to use for deter
-    :param requested_output: The data type to generate (of type `Output`)
-    :param input_values: The input values to determine
-    :param taxon: The Taxon ID
-    :return: A pandas DataFrame
+    This function will attempt to find gene identifiers in the provided values and convert them to a DataFrame
+    containing "entrez_gene_id", "ensembl_gene_id", and "gene_symbol"
+
+    :param values: The values to extract gene identifiers from.
+        This can be a list of strings, a pandas DataFrame, or a scanpy AnnData object.
+    :param taxon_id: The taxonomic identifier to use for gene consversion
+    :return: A DataFrame containing "entrez_gene_id", "ensembl_gene_id", and "gene_symbol" for the provided values
     """
-    requested_output = [requested_output] if isinstance(requested_output, Output) else requested_output
-    cohersion = (await biodbnet.db_find(values=input_values, output_db=requested_output, taxon=taxon)).drop(
-        columns=["Input Type"]
-    )
-    cohersion.columns = pd.Index(["input_value", *[o.value.replace(" ", "_").lower() for o in requested_output]])
-    return cohersion
+    # second isinstance required for static type check to be happy
+    # if isinstance(values, list) and not isinstance(values, pd.DataFrame):
+    if isinstance(values, list):
+        return get_remaining_identifiers(ids=values, taxon=taxon_id)
+    elif isinstance(values, pd.DataFrame):
+        # raise error if duplicate column names exist
+        if any(values.columns.duplicated(keep=False)):
+            duplicate_cols = values.columns[values.columns.duplicated(keep=False)].unique().tolist()
+            raise ValueError(
+                f"Duplicate column names exist! This will result in an error processing data. "
+                f"Duplicates: {','.join(duplicate_cols)}"
+            )
 
-
-async def _async_read_csv(path: Path, **kwargs) -> pd.DataFrame:
-    """Asynchronously reads a CSV file and returns a pandas DataFrame.
-
-    :param path: The path to read from
-    :param kwargs: Additional arguments to pass to pandas.read_csv
-    :return: A pandas DataFrame
-    """
-    if not path.exists():
-        raise FileNotFoundError(f"File {path} does not exist")
-    if path.suffix not in {".csv", ".tsv"}:
-        raise ValueError(f"File {path} is not a CSV file")
-
-    kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")
-    async with aiofiles.open(path) as f:
-        content = await f.read()
-        return pd.read_csv(io.StringIO(content), **kwargs)
-
-
-async def _async_read_excel(path: Path, **kwargs) -> pd.DataFrame:
-    """Asynchronously reads an Excel file and returns a pandas DataFrame.
-
-    :param path: The path to read from
-    :param kwargs: Additional arguments to pass to pandas.read_excel
-    :return: A pandas DataFrame
-    """
-    if not path.exists():
-        raise FileNotFoundError(f"File {path} does not exist")
-    if path.suffix not in {".xls", ".xlsx"}:
-        raise ValueError(f"File {path} is not an Excel file")
-
-    async with aiofiles.open(path, "rb") as f:
-        content = await f.read()
-        return pd.read_excel(io.StringIO(content.decode()), **kwargs)
-
-
-def is_notebook() -> bool:
-    """Check if the current environment is a Jupyter Notebook.
-
-    :returns: True if the current environment is a Jupyter Notebook, False otherwise.
-    """
-    try:
-        from IPython import get_ipython
-
-        return get_ipython() is not None
-    except ModuleNotFoundError:
-        return False
-
-
-async def convert_gene_data(values: list[str], taxon_id: int | str | Taxon) -> pd.DataFrame:
-    gene_type = await determine_gene_type(values)
-    if all(v == "gene_symbol" for v in gene_type.values()):
-        return await gene_symbol_to_ensembl_and_gene_id(values, taxon=taxon_id)
-    elif all(v == "ensembl_gene_id" for v in gene_type.values()):
-        return await ensembl_to_gene_id_and_symbol(ids=values, taxon=taxon_id)
-    elif all(v == "entrez_gene_id" for v in gene_type.values()):
-        return await gene_id_to_ensembl_and_gene_symbol(ids=values, taxon=taxon_id)
+        names: list[str] = values.columns.tolist()
+        if values.index.name is not None:
+            names.append(str(values.index.name))
+        if "gene_symbol" in names:
+            return get_missing_gene_data(
+                values["gene_symbol"].tolist() if "gene_symbol" in values.columns else values.index.tolist(),
+                taxon_id=taxon_id,
+            )
+        elif "entrez_gene_id" in names:
+            return get_missing_gene_data(
+                values["entrez_gene_id"].tolist() if "entrez_gene_id" in values.columns else values.index.tolist(),
+                taxon_id=taxon_id,
+            )
+        elif "ensembl_gene_id" in names:
+            return get_missing_gene_data(
+                values["ensembl_gene_id"].tolist() if "ensembl_gene_id" in values.columns else values.index.tolist(),
+                taxon_id=taxon_id,
+            )
+        else:
+            raise ValueError(
+                "Unable to find 'gene_symbol', 'entrez_gene_id', or 'ensembl_gene_id' in the input matrix."
+            )
     else:
-        raise ValueError("Gene data must be of the same type (i.e., all Ensembl, Entrez, or Gene Symbols)")
+        raise ValueError(f"Values must be a list of strings or a pandas DataFrame, got: {type(values)}")
+
+
+@overload
+def read_file(path: None, h5ad_as_df: bool = True, **kwargs: Any) -> None: ...
+
+
+@overload
+def read_file(path: pd.DataFrame, h5ad_as_df: bool = True, **kwargs: Any) -> pd.DataFrame: ...
+
+
+@overload
+def read_file(path: io.StringIO, h5ad_as_df: bool = True, **kwargs: Any) -> pd.DataFrame: ...
+
+
+@overload
+def read_file(path: sc.AnnData, h5ad_as_df: Literal[False], **kwargs: Any) -> sc.AnnData: ...
+
+
+@overload
+def read_file(path: sc.AnnData, h5ad_as_df: Literal[True] = True, **kwargs: Any) -> pd.DataFrame: ...
+
+
+@overload
+def read_file(path: Path, h5ad_as_df: Literal[False], **kwargs: Any) -> pd.DataFrame | sc.AnnData: ...
+
+
+@overload
+def read_file(path: Path, h5ad_as_df: Literal[True] = True, **kwargs: Any) -> pd.DataFrame: ...
+
+
+def read_file(  # noqa: C901
+    path: Path | io.StringIO | pd.DataFrame | sc.AnnData | None,
+    h5ad_as_df: bool = True,
+    **kwargs: Any,
+) -> pd.DataFrame | sc.AnnData | None:
+    """Read a filepath and return pandas.DataFrame or scanpy.AnnData.
+
+    If the provided path is None, None will also be returned.
+    None may be provided to this function so that `asyncio.gather` can safely be used on all sources
+        (trna, mrna, scrna, proteomics) without needing to check if the user has provided those sources
+
+    Args:
+        path: The path to read from
+        h5ad_as_df: If True and the file is an h5ad, return a pandas DataFrame of the .X matrix
+        kwargs: Additional arguments to pass to pandas.read_csv, pandas.read_excel, or scanpy.read_h5ad
+
+    Returns:
+        None, or a pandas DataFrame or AnnData
+
+    """
+    if isinstance(path, pd.DataFrame):
+        return path
+    elif isinstance(path, sc.AnnData):
+        return path.to_df().T if h5ad_as_df else path
+    elif isinstance(path, io.StringIO):
+        return pd.read_csv(path, **kwargs)
+    elif not path:
+        return None
+
+    if isinstance(path, Path) and not path.exists():
+        raise FileNotFoundError(f"File not found: '{path}'")
+
+    match path.suffix:
+        case ".csv" | ".tsv" | ".txt" | ".tab" | ".sf":
+            kwargs.setdefault("sep", "," if path.suffix == ".csv" else "\t")  # set sep if not defined
+            return pd.read_csv(path, **kwargs)
+        case ".xlsx" | ".xls":
+            return pd.read_excel(path, **kwargs)
+        case ".h5ad":
+            adata: sc.AnnData = sc.read_h5ad(path, **kwargs)
+            if h5ad_as_df:
+                df = adata.to_df().T
+                if not df.index.name:
+                    df.index.name = "gene_symbol"
+                df.reset_index(inplace=True)
+                return df
+            return adata
+        case _:
+            raise ValueError(
+                f"Unknown file extension '{path.suffix}'. Valid options are '.tsv', '.csv', '.xlsx', '.xls', or '.h5ad'"
+            )
+
+
+@overload
+def _listify(value: list[T]) -> list[T]: ...
+
+
+@overload
+def _listify(value: T) -> list[T]: ...
+
+
+def _listify(value: T | list[T]) -> list[T]:
+    """Convert items into a list.
+
+    Args:
+        value: The value to convert to a list (if it isn't already)
+
+    Returns:
+        A list of the provided value
+    """
+    return value if isinstance(value, list) else [value]
+
+
+def num_rows(item: pd.DataFrame | npt.NDArray) -> int:
+    """Return the number of rows in an object.
+
+    :param item: The object to check the number of rows of
+    :return: The number of rows in the provided object
+    """
+    return item.shape[0]
+
+
+def num_columns(item: pd.DataFrame | npt.NDArray) -> int:
+    """Return the number of columns in an object.
+
+    :param item: The object to check the number of columns of
+    :return: The number of columns in the provided object
+    """
+    return item.shape[1]
+
+
+def return_placeholder_data() -> pd.DataFrame:
+    return pd.DataFrame(data=0, index=pd.Index(data=[0], name="entrez_gene_id"), columns=["expressed", "top"])
+
+
+def set_up_logging(
+    level: LogLevel | str,
+    location: str | TextIO,
+    formatting: str = LOG_FORMAT,
+):
+    """Set up logging for the application.
+
+    :param level: The default logging level to use (e.g., LogLevel.INFO, LogLevel.DEBUG, etc.)
+    :param location: The location to log to (e.g., a file path or sys.stdout)
+    :param formatting: The log message format to use (default is LOG_FORMAT)
+    """
+    if isinstance(level, str):
+        level = LogLevel[level.upper()]
+    with contextlib.suppress(ValueError):
+        logger.remove(0)
+        logger.add(sink=location, level=level.value, format=formatting)

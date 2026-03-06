@@ -14,12 +14,18 @@ from multiprocessing.sharedctypes import Synchronized
 from urllib.parse import urlparse
 
 import aioftp
+from loguru import logger
 
-from .FileInformation import FileInformation, clear_print
+from como.proteomics.FileInformation import FileInformation, clear_print
+from como.data_types import LogLevel
 
 
 async def aioftp_client(
-    host: str, username: str = "anonymous", password: str = "guest", port: int = 21, max_attempts: int = 3
+    host: str,
+    username: str = "anonymous",
+    password: str = "guest",
+    port: int = 21,
+    max_attempts: int = 3,
 ) -> aioftp.Client:
     """This class is responsible for creating a "client" connection"""
     connection_successful: bool = False
@@ -42,7 +48,6 @@ async def aioftp_client(
             attempt_num += 1
             time.sleep(5)
     if not connection_successful:
-        print()
         raise ConnectionResetError("Could not connect to FTP server")
 
     return client

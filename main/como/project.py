@@ -9,8 +9,16 @@ from loguru import logger
 class SingletonMeta(type):
     _instances: ClassVar[dict] = {}
 
-    def __call__(cls, *args, **kwargs):
-        """Validate that changes to the `__init__` argument do not affect the returned instance."""
+    def __call__(cls, *args, **kwargs) -> SingletonMeta:
+        """Validate that changes to the `__init__` argument do not affect the returned instance.
+
+        Args:
+            args: Positional arguments for the class constructor
+            kwargs: Keyword arguments for the class constructor
+
+        Returns:
+            The singleton instance of the class
+        """
         if cls not in cls._instances:
             instance = super().__call__(*args, **kwargs)
             cls._instances[cls] = instance
@@ -56,7 +64,11 @@ class Config(metaclass=SingletonMeta):
         self.figures_dir.mkdir(parents=True, exist_ok=True)
 
     def update(self, **kwargs):
-        """Update a key in the config object."""
+        """Update a key in the config object.
+
+        Args:
+            kwargs: keyword argumentsto set for the singleton
+        """
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, Path(value) if value else getattr(self, key))
@@ -64,18 +76,41 @@ class Config(metaclass=SingletonMeta):
                 logger.warning(f"{key} is not a valid attribute of Config")
 
     def get_context_path(self, context_name: str, create: bool = True) -> Path:
-        """Get path for a specific context, optionally creating it."""
+        """Get path for a specific context, optionally creating it.
+
+        Args:
+            context_name: Name of the context (subdirectory).
+            create: Whether to create the directory if it doesn't exist.
+
+        Returns:
+            Full path to the context directory.
+        """
         path = self.result_dir / context_name
         if create:
             path.mkdir(parents=True, exist_ok=True)
         return path
 
     def get_r_path(self, path: Path) -> str:
-        """Convert a Path object to an R-compatible path string."""
+        """Convert a Path object to an R-compatible path string.
+
+        Args:
+            path: Path object to convert.
+
+        Returns:
+            R-compatible path string.
+        """
         return path.as_posix()
 
     def get_matrix_path(self, context_name: str, filename: str) -> Path:
-        """Get path for a matrix file in a specific context."""
+        """Get path for a matrix file in a specific context.
+
+        Arg:
+            context_name: Name of the context (subdirectory).
+            filename: Name of the matrix file.
+
+        Returns:
+            Full path to the matrix file.
+        """
         path = self.matrix_dir / context_name
         path.mkdir(parents=True, exist_ok=True)
         return path / filename

@@ -1,7 +1,7 @@
-Boundary,Abbreviation,Compartment,Minimum Reaction Rate,Maximum Reaction Rate
+Reaction,Abbreviation,Compartment,Lower Bound,Upper Bound
 Exchange,glc_D,Extracellular,-100,1000
 Exchange,fe2,Extracellular,-1000,1000
-Exchange,gal,Extracellular,0,1000
+Exchange,gal,Extracellular,-0,1000
 Exchange,zn2,Extracellular,-1000,1000
 Exchange,ca2,Extracellular,-1000,1000
 Exchange,na1,Extracellular,-1000,1000
@@ -44,18 +44,18 @@ Exchange,lnlnca,Extracellular,-1,1000
 Exchange,lnlncg,Extracellular,-1,1000
 Exchange,ocdca,Extracellular,-1,1000
 Exchange,ocdcea,Extracellular,-1,1000
-Exchange,thmmp,Extracellular,0,1000
-Exchange,thmtp,Extracellular,0,1000
-Exchange,ncam,Extracellular,0,1000
-Exchange,pnto_R,Extracellular,0,1000
-Exchange,pydxn,Extracellular,0,1000
-Exchange,pydx,Extracellular,0,1000
-Exchange,pydam,Extracellular,0,1000
-Exchange,btn,Extracellular,0,1000
+Exchange,thmmp,Extracellular,-0,1000
+Exchange,thmtp,Extracellular,-0,1000
+Exchange,ncam,Extracellular,-0,1000
+Exchange,pnto_R,Extracellular,-0,1000
+Exchange,pydxn,Extracellular,-0,1000
+Exchange,pydx,Extracellular,-0,1000
+Exchange,pydam,Extracellular,-0,1000
+Exchange,btn,Extracellular,-0,1000
 Exchange,fol,Extracellular,-10,1000
-Exchange,aqcobal,Extracellular,0,1000
+Exchange,aqcobal,Extracellular,-0,1000
 Exchange,vitd3,Extracellular,-1,1000
-Exchange,ascb_L,Extracellular,0,1000
+Exchange,ascb_L,Extracellular,-0,1000
 Exchange,retinol,Extracellular,-10,1000
 Exchange,retinal,Extracellular,-10,1000
 Exchange,ala_B,Extracellular,-1,1000

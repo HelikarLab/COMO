@@ -1,0 +1,3 @@
+from cobra import Model as Model
+
+def normalize_cutoff(model: Model, zero_cutoff: float | None = None) -> float: ...

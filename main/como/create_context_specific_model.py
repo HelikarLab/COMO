@@ -1,121 +1,57 @@
 from __future__ import annotations
 
-import argparse
-import ast
 import collections
+import os
 import re
+import sys
 from collections.abc import Sequence
-from dataclasses import dataclass
-from enum import Enum
+from io import TextIOWrapper
+from math import isfinite
+from multiprocessing import Value
 from pathlib import Path
-from typing import NamedTuple
+from typing import Literal, Never, TextIO, cast, reveal_type
 
+import cobamp.core.optimization
 import cobra
+import cobra.util.array
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from cobra import Model
-from cobra.flux_analysis import pfba
 from loguru import logger
+from troppo.methods.reconstruction.corda import CORDA, CORDAProperties
 from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
 from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.imat import IMAT, IMATProperties
 from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
 
-from como.project import Config
-from como.utils import Algorithm, Compartments, split_gene_expression_data, stringlist_to_list
+from como.data_types import (
+    Algorithm,
+    CobraCompartments,
+    LogLevel,
+    ModelBuildSettings,
+    Solver,
+    _BoundaryReactions,
+)
+from como.utils import set_up_logging, split_gene_expression_data
 
 
-class Solver(Enum):
-    """Solver used to seed context specific model."""
-
-    GLPK = "GLPK"
-    GUROBI = "GUROBI"
-    SCIPY = "SCIPY"
-    GLPK_EXACT = "GLPK_EXACT"
-
-    @staticmethod
-    def from_string(value: str) -> Solver:
-        """Convert string to Solver enum."""
-        match value.lower():
-            case "glpk":
-                return Solver.GLPK
-            case "gurobi":
-                return Solver.GUROBI
-            case "scipy":
-                return Solver.SCIPY
-            case "glpk_exact":
-                return Solver.GLPK_EXACT
-            case _:
-                raise ValueError(f"Unknown solver: {value}")
-
-
-class _BoundaryReactions(NamedTuple):
-    """Boundary reactions to be used in the context specific model."""
-
-    reactions: list[str]
-    lower_bounds: list[float]
-    upper_bounds: list[float]
-
-
-class _BuildResults(NamedTuple):
-    """Results of building a context specific model."""
-
-    model: cobra.Model
-    expression_index_list: list[int]
-    infeasible_reactions: pd.DataFrame
-
-
-@dataclass
-class _Arguments:
-    """Arguments for creating a context specific model."""
-
-    context_name: str
-    reference_model: Path
-    active_genes_filepath: Path
-    objective: str
-    boundary_reactions_filepath: Path
-    exclude_reactions_filepath: Path
-    force_reactions_filepath: Path
-    recon_algorithm: Algorithm
-    solver: Solver
-    low_threshold: int
-    high_threshold: int
-    output_filetypes: list[str]
-
-    def __post_init__(self):
-        self.reference_model = Path(self.reference_model)
-        self.active_genes_filepath = Path(self.active_genes_filepath)
-        self.boundary_reactions_filepath = (
-            Path(self.boundary_reactions_filepath) if self.boundary_reactions_filepath is not None else None
-        )
-        self.exclude_reactions_filepath = (
-            Path(self.exclude_reactions_filepath) if self.exclude_reactions_filepath is not None else None
-        )
-        self.force_reactions_filepath = (
-            Path(self.force_reactions_filepath) if self.force_reactions_filepath is not None else None
-        )
-
-        if not self.reference_model.exists():
-            raise FileNotFoundError(f"Reference model not found at {self.reference_model}")
-        if not self.active_genes_filepath.exists():
-            raise FileNotFoundError(f"Active genes file not found at {self.active_genes_filepath}")
-        if self.boundary_reactions_filepath and not self.boundary_reactions_filepath.exists():
-            raise FileNotFoundError(f"Boundary reactions file not found at {self.boundary_reactions_filepath}")
-        if self.exclude_reactions_filepath and not self.exclude_reactions_filepath.exists():
-            raise FileNotFoundError(f"Exclude reactions file not found at {self.exclude_reactions_filepath}")
-        if self.force_reactions_filepath and not self.force_reactions_filepath.exists():
-            raise FileNotFoundError(f"Force reactions file not found at {self.force_reactions_filepath}")
-
-        if self.high_threshold < self.low_threshold:
-            raise ValueError(
-                f"Low threshold must be less than high threshold. "
-                f"Received low threshold: {self.low_threshold}, high threshold: {self.high_threshold}"
-            )
+def _reaction_indices_to_ids(
+    ref_model: cobra.Model, reaction_indices: Sequence[int] | npt.NDArray[np.integer]
+) -> list[str]:
+    rxns = list(ref_model.reactions)
+    return [rxns[int(i)].id for i in reaction_indices]
 
 
 def _correct_bracket(rule: str, name: str) -> str:
-    """Correct GPR rules to format readable by."""
+    """Correct GPR rules to format readable by.
+
+    Args:
+        rule: GPR rule string from a COBRA model
+        name: Gene name string from a COBRA model
+
+    Returns:
+        A corrected GPR rule string
+    """
     rule_match = re.search(r"or|and", rule)
     name_match = re.search(r"or|and", name)
     if rule_match is None or name_match is None:
@@ -131,28 +67,36 @@ def _correct_bracket(rule: str, name: str) -> str:
         right_name = name[name_match.span()[1] :]
         operator = rule_match.group()
 
-    new_right_rule = []
+    new_right_rule: list[str] = []
     for char in list(left_rule):
         if char.isspace() or char.isdigit():
             new_right_rule.append(char)
         elif len(left_name) > 0 and char == left_name[0]:
             new_right_rule.append(char)
             left_name = left_name[1:]
-    new_left_rule = "".join(new_right_rule)
+    new_left_rule = "".join(new_right_rule).strip()
     final_right_rule = "" if rule_match is None else _correct_bracket(right_rule, right_name)
-    return " ".join([new_left_rule, operator, final_right_rule])
+    return " ".join([new_left_rule, operator, final_right_rule]).strip()
 
 
 def _gene_rule_logical(gpr_expression: str, level: int = 0) -> str:
-    """Create an expression from GPR rule which can be evaluated as true or false."""
+    """Create an expression from GPR rule which can be evaluated as true or false.
+
+    Args:
+        gpr_expression: GPR rule string from a COBRA model
+        level: Current recursion level (used for debugging)
+
+    Returns:
+        An evaluable string where "and" is replaced with "min" and "or" is replaced with "max"
+    """
     try:
         loc_r = gpr_expression.index(")")
     except ValueError:
         if "and" in gpr_expression:
-            gpr_expression = gpr_expression.replace("and", ",")
+            gpr_expression = gpr_expression.replace(" and ", ", ")
             return "min{" + gpr_expression + "}"
         elif "or" in gpr_expression:
-            gpr_expression = gpr_expression.replace("or", ",")
+            gpr_expression = gpr_expression.replace(" or ", ", ")
             return "max{" + gpr_expression + "}"
         else:
             gpr_expression = gpr_expression.replace("[", "")
@@ -172,57 +116,10 @@ def _gene_rule_logical(gpr_expression: str, level: int = 0) -> str:
         inner_string = inner_string.replace("[", "")
         inner_string = inner_string.replace("]", "")
 
-    expression_out = f"{gpr_expression[:loc_l]}{inner_string}{gpr_expression[loc_r + 1:]}"
+    expression_out = f"{gpr_expression[:loc_l]}{inner_string}{gpr_expression[loc_r + 1 :]}"
     expression_out = _gene_rule_logical(expression_out, level + 1)
 
     return expression_out
-
-
-def _gene_rule_evaluable(expression_in: str) -> str:
-    """Make expression rule evaluable."""
-    gene_reaction_by_rule = _gene_rule_logical(expression_in)
-    gene_reaction_by_rule = gene_reaction_by_rule.replace("{", "(")
-    gene_reaction_by_rule = gene_reaction_by_rule.replace("}", ")")
-
-    return gene_reaction_by_rule
-
-
-def _set_boundaries(model: cobra.Model, bound_rxns: list, bound_lb, bound_ub) -> tuple[cobra.Model, list]:
-    all_rxns = model.reactions  # get all reactions
-    bound_rm_rxns = []
-
-    # get boundary reactions
-    exchange_rxns = [rxn.id for rxn in all_rxns if re.search("EX_", rxn.id)]
-    sink_rxns = [rxn.id for rxn in all_rxns if re.search("sink_", rxn.id)]
-    demand_rxns = [rxn.id for rxn in all_rxns if re.search("DM_", rxn.id)]
-
-    # Allows all boundary reactions to be used if none are given
-    allow_all_boundary_rxns = not bound_rxns
-
-    # close sinks and demands not in boundary reactions unless no boundary reactions were given
-    if not allow_all_boundary_rxns:
-        for i, rxn in enumerate(sink_rxns):  # set sinks to 0
-            if rxn not in bound_rxns:  # only allow sink accumulation
-                getattr(model.reactions, rxn).lower_bounds = 0
-                getattr(model.reactions, rxn).upper_bounds = 1000
-            else:  # set from file
-                getattr(model.reactions, rxn).lower_bounds = bound_lb[i]
-                getattr(model.reactions, rxn).upper_bounds = bound_ub[i]
-
-        for i, rxn in enumerate(demand_rxns):
-            getattr(model.reactions, rxn).lower_bounds = 0
-            getattr(model.reactions, rxn).upper_bounds = bound_ub[i] if rxn in bound_rxns else 0
-
-    # Reaction media
-    medium = model.medium  # get reaction media to modify
-    for rxn in exchange_rxns:  # open exchanges from exchange file, close unspecified exchanges
-        if rxn not in bound_rxns:
-            medium[rxn] = 0.0
-        else:
-            medium[rxn] = -float(bound_lb[bound_rxns.index(rxn)])
-    model.medium = medium  # set new media
-
-    return model, bound_rm_rxns
 
 
 def _feasibility_test(model_cobra: cobra.Model, step: str):
@@ -253,390 +150,761 @@ def _feasibility_test(model_cobra: cobra.Model, step: str):
     return incon_rxns, model_cobra_rm
 
 
-def _build_with_gimme(cobra_model, s_matrix, lb, ub, idx_objective, expr_vector):
+def _build_with_gimme(
+    reference_model: cobra.Model,
+    expression_vector: Sequence[float] | npt.NDArray[np.floating],
+    idx_objective: int,
+    lower_bounds: npt.NDArray[np.floating],
+    upper_bounds: npt.NDArray[np.floating],
+    solver: str,
+    threshold_percentile: int = 30,
+):
+    model = reference_model
+    if threshold_percentile < 1:
+        logger.critical(
+            f"GIMME quantile calculation is less than 1 ({threshold_percentile}), but expected an integer of ~25! "
+            f"This will likely result in a model with many more reactions than expected."
+        )
+
+    expression: npt.NDArray[np.floating] = np.asarray(expression_vector, dtype=float)
+    nonzero = expression[expression > 0]
+    min_expr_percentile = np.percentile(nonzero, threshold_percentile).astype(float)
+    logger.debug(f"GIMME: minimum expression is {expression.min():.4f}")
+    logger.debug(f"GIMME: minimum non-zero expression is {nonzero.min():.4f}")
+    logger.debug(f"GIMME: maximum expression is {expression.max():.4f}")
+
+    expression[(expression < min_expr_percentile) & (expression > 0)] = 0
+    expression[expression >= min_expr_percentile] = 1
+
+    suffix: str = {1: "st", 2: "nd", 3: "rd"}.get(threshold_percentile, "th")
+    logger.debug(f"GIMME: {threshold_percentile}{suffix} percentile is {min_expr_percentile:.4f}")
+
+    s_matrix: list[float] = list(np.asarray(cobra.util.array.create_stoichiometric_matrix(model=model), dtype=float))
+    reaction_ids: list[str] = [r.id for r in model.reactions]
+    metabolite_ids: list[str] = [m.id for m in model.metabolites]
+
     # `Becker and Palsson (2008). Context-specific metabolic networks are
     # consistent with experiments. PLoS Comput. Biol. 4, e1000082.`
     properties = GIMMEProperties(
-        exp_vector=expr_vector,  # np.array(gimme_data['0']),
-        obj_frac=0.9,
+        exp_vector=list(expression),
         objectives=[{idx_objective: 1}],
         preprocess=True,
-        flux_threshold=0.9,
+        reaction_ids=reaction_ids,
+        metabolite_ids=metabolite_ids,
+        solver=solver.upper(),
     )
-    algorithm = GIMME(s_matrix, lb, ub, properties)
-    gene_activity = algorithm.run()
-    context_cobra_model = cobra_model.copy()
-    r_ids = [r.id for r in context_cobra_model.reactions]
-    to_remove_ids = [r_ids[r] for r in np.where(gene_activity == 0)[0]]
+    algorithm = GIMME(s_matrix, list(lower_bounds), list(upper_bounds), properties)
+    active_rxn_indices: list[int] = algorithm.run()
+    to_remove_ids: list[str | cobra.Reaction] = [
+        reaction_ids[i] for i in range(len(model.reactions)) if i not in active_rxn_indices
+    ]
+    model.remove_reactions(to_remove_ids, True)
 
-    context_cobra_model.remove_reactions(to_remove_ids, True)
-    r_ids = [r.id for r in context_cobra_model.reactions]
-    psol = pfba(context_cobra_model)  # noqa: F841
+    # psol = pfba(model)
+    # reaction_ids = [r.id for r in context_cobra_model.reactions]
     # psol = context_cobra_model.optimize()
-    # to_remove_ids = [r_ids[r] for r in np.where(abs(psol.fluxes) < 1e-8)[0]]
+    # to_remove_ids = [reaction_ids[r] for r in np.where(abs(psol.fluxes) < 1e-8)[0]]
     # context_cobra_model.remove_reactions(to_remove_ids, True)
 
-    return context_cobra_model
+    return model
 
 
-def _build_with_fastcore(cobra_model, s_matrix, lb, ub, exp_idx_list, solver):
+def _build_with_fastcore(
+    reference_model: cobra.Model,
+    lower_bounds: npt.NDArray[np.floating],
+    upper_bounds: npt.NDArray[np.floating],
+    exp_idx_list: Sequence[int],
+    solver: str,
+):
     # 'Vlassis, Pacheco, Sauter (2014). Fast reconstruction of compact
     # context-specific metabolic network models. PLoS Comput. Biol. 10,
     # e1003424.'
+    model = reference_model
     logger.warning(
-        "Fastcore requires a flux consistant model is used as refererence, "
-        "to achieve this fastcc is required which is NOT reproducible."
+        "Fastcore requires a flux consistant model is used as refererence. "
+        "To achieve this, fastcc is required, which is NOT reproducible."
     )
+    s_matrix = cast(npt.NDArray[np.floating], cobra.util.create_stoichiometric_matrix(model=model))
+    if lower_bounds.shape[0] != upper_bounds.shape[0] != s_matrix.shape[1]:
+        raise ValueError(
+            "Lower bounds, upper bounds, and stoichiometric matrix must have the same number of reactions."
+        )
     logger.debug("Creating feasible model")
-    incon_rxns, cobra_model = _feasibility_test(cobra_model, "other")
-    properties = FastcoreProperties(core=exp_idx_list, solver=solver)
-    algorithm = FASTcore(s_matrix, lb, ub, properties)
+    _, reference_model = _feasibility_test(reference_model, "other")
+    properties = FastcoreProperties(core=list(exp_idx_list), solver=solver)
+    algorithm = FASTcore(s_matrix, np.asarray(lower_bounds), np.asarray(upper_bounds), properties)
     context_rxns = algorithm.fastcore()
-    context_cobra_model = cobra_model.copy()
-    r_ids = [r.id for r in context_cobra_model.reactions]
+    r_ids = [r.id for r in model.reactions]
     remove_rxns = [r_ids[int(i)] for i in range(s_matrix.shape[1]) if i not in context_rxns]
-    context_cobra_model.remove_reactions(remove_rxns, True)
+    model.remove_reactions(remove_rxns, True)
 
-    return context_cobra_model
+    return model
 
 
 def _build_with_imat(
-    cobra_model: cobra.Model,
-    s_matrix: npt.NDArray,
-    lb: Sequence[float],
-    ub: Sequence[float],
+    reference_model: cobra.Model,
+    lower_bounds: npt.NDArray[np.floating],
+    upper_bounds: npt.NDArray[np.floating],
     expr_vector: npt.NDArray,
-    expr_thesh: tuple[float, float],
-    force_gene_ids: Sequence[int],
+    low_expression_threshold: float,
+    high_expression_threshold: float,
+    force_reaction_indices: npt.NDArray[np.integer],
     solver: str,
-) -> (cobra.Model, pd.DataFrame):
-    expr_vector = np.array(expr_vector)
-    properties = IMATProperties(
+    build_settings: ModelBuildSettings,
+) -> cobra.Model:
+    model = reference_model.copy()
+
+    # `list()` is required because imat uses `if core:`; this returns an error on numpy arrays
+    force_rxn_list = list(np.asarray(force_reaction_indices, dtype=int))
+    properties: IMATProperties = IMATProperties(
         exp_vector=expr_vector,
-        exp_thresholds=expr_thesh,
-        core=force_gene_ids,
-        epsilon=0.01,
-        solver=solver.upper(),
+        exp_thresholds=(
+            low_expression_threshold,
+            high_expression_threshold,
+        ),
+        tolerance=build_settings.min_reaction_flux,
+        core=force_rxn_list,
+        epsilon=build_settings.troppo_epsilon,
+        solver=solver,
     )
-    algorithm = IMAT(s_matrix, np.array(lb), np.array(ub), properties)
-    context_rxns: npt.NDArray = algorithm.run()
-    fluxes: pd.Series = algorithm.sol.to_series()
-    context_cobra_model = cobra_model.copy()
-    reaction_ids = [r.id for r in context_cobra_model.reactions]
 
-    remove_rxns = [reaction_ids[i] for i in range(s_matrix.shape[1]) if i not in context_rxns]
-    flux_df = pd.DataFrame(columns=["rxn", "flux"])
-    for idx, (_, val) in enumerate(fluxes.items()):
-        if idx <= len(cobra_model.reactions) - 1:
-            r_id = str(context_cobra_model.reactions.get_by_id(reaction_ids[idx])).split(":")[0]
-            getattr(context_cobra_model.reactions, r_id).fluxes = val
-            flux_df.loc[len(flux_df.index)] = [r_id, val]
+    # Using cobra to create the stoichiometry matrix means we have less work to do
+    s_matrix: npt.NDArray[np.floating] = cast(
+        npt.NDArray[np.floating], cobra.util.array.create_stoichiometric_matrix(model=model)
+    )
+    algorithm: IMAT = IMAT(S=s_matrix, lb=lower_bounds, ub=upper_bounds, properties=properties)
 
-    context_cobra_model.remove_reactions(remove_rxns, True)
+    # Match Troppo's iMAT high/low bin calculations
+    high_index = np.where(expr_vector >= high_expression_threshold)[0].astype(int)
+    low_index = np.where((expr_vector >= 0) & (expr_vector < low_expression_threshold))[0].astype(int)
+    if force_reaction_indices.size > 0:
+        high_index = np.union1d(high_index, force_reaction_indices)
+    lso, lsystem = algorithm.generate_imat_problem(
+        S=algorithm.S,
+        lb=algorithm.lb,
+        ub=algorithm.ub,
+        high_idx=high_index,
+        low_idx=low_index,
+        epsilon=build_settings.troppo_epsilon,
+    )
+    # reset default Troppo/Cobamp thresholds
+    cfg = lsystem.get_configuration()
+    cfg.verbosity = build_settings.solver_verbosity
+    cfg.timeout = build_settings.solver_timeout
+    cfg.tolerances.feasibility = build_settings.solver_feasibility
+    cfg.tolerances.optimality = build_settings.solver_optimality
+    cfg.tolerances.integrality = build_settings.solver_integrality
+    grb_model = getattr(getattr(cfg, "problem", None), "problem", None)  # `getattr` to handle non-gurobi solvers
+    if grb_model is not None:
+        grb_model.Params.MIPGap = build_settings.gurobi_mipgap
+        grb_model.Params.IntegralityFocus = build_settings.gurobi_integrality_focus
+        grb_model.Params.NumericFocus = build_settings.gurobi_numeric_focus
 
-    return context_cobra_model, flux_df
+    # Keep reactions from imat + force-included reactions
+    solution: cobamp.core.optimization.Solution = lso.optimize()
+    x_sol: npt.NDArray[np.floating] = solution.x().astype(float)
+
+    # partition the solution into the following components:
+    #   1) High-bin, forward-direction reactions
+    #   2) High-bin, reverse-direction reactions
+    #   3) Activated low-bin reactions
+    n_rxns = len(reference_model.reactions)
+    expected_len = n_rxns + (2 * high_index.size) + low_index.size
+    if expected_len != x_sol.size:
+        raise ValueError(
+            f"Unexpected solution length: got {x_sol.size}, expected {expected_len}"
+            f"(n_rxns={n_rxns}, n_high_index={high_index.size}, n_low_index={low_index.size}"
+        )
+
+    part: int = 0
+    flux_vector: npt.NDArray[np.floating] = x_sol[part : part + n_rxns]
+    part += n_rxns
+    high_forward: npt.NDArray[np.floating] = x_sol[part : part + high_index.size]
+    part += high_index.size
+    high_reverse: npt.NDArray[np.floating] = x_sol[part : part + high_index.size]
+    part += high_index.size + low_index.size
+
+    # iMAT binarizes at ~0 and ~1 for off/on reactions,
+    #   so we can use 0.5 as the midpoint for defining inclusion/exclusion
+    high_forward_rxns: npt.NDArray[np.integer] = high_index[high_forward > 0.5]
+    high_reverse_rxns: npt.NDArray[np.integer] = high_index[high_reverse > 0.5]
+    high_on_rxns = np.unique(np.concatenate([high_forward_rxns, high_reverse_rxns])).astype(int)
+
+    # Low bin reactions may be included if it has a flux greater than `min_reaction_flux`
+    flux_keep = np.where(np.abs(solution.x())[:n_rxns] >= build_settings.min_reaction_flux)[0].astype(int)
+    to_keep = np.unique(np.concatenate([flux_keep, high_on_rxns, force_reaction_indices]))
+
+    # Collect all reaction IDs and their associated index (e.g., HEX1 is at index 123)
+    all_rxn_ids: npt.NDArray[np.str_] = np.asarray([r.id for r in model.reactions], dtype=str)
+    to_remove = np.ones(shape=len(model.reactions), dtype=bool)
+    to_remove[to_keep] = False
+    remove_rxn_ids: list[str | cobra.Reaction] = list(all_rxn_ids[to_remove])
+    model.remove_reactions(reactions=remove_rxn_ids, remove_orphans=True)
+    return model
 
 
-def _build_with_tinit(cobra_model: cobra.Model, s_matrix, lb, ub, expr_vector, solver, idx_force) -> Model:
+def _build_with_tinit(
+    reference_model: cobra.Model,
+    lower_bounds: npt.NDArray[np.floating],
+    upper_bounds: npt.NDArray[np.floating],
+    expr_vector: npt.NDArray[np.floating],
+    solver: str,
+    idx_force: npt.NDArray[np.integer],
+) -> None:
+    raise NotImplementedError("tINIT is not yet implemented.")
+    model = reference_model
     properties = tINITProperties(
-        reactions_scores=expr_vector,
-        essential_reactions=idx_force,
+        reactions_scores=list(expr_vector),
+        solver=solver,
+        essential_reactions=list(idx_force),
         production_weight=0.0,
         allow_excretion=False,
         no_reverse_loops=True,
-        solver=solver,
     )
-    algorithm = tINIT(s_matrix, lb, ub, properties)
-    algorithm.preprocessing()
-    algorithm.build_problem()
-    raise NotImplementedError("tINIT is not yet implemented")
+    s_matrix: npt.NDArray[np.floating] = np.asarray(
+        cobra.util.array.create_stoichiometric_matrix(model=model), dtype=float
+    )
+    algorithm = tINIT(s_matrix, np.asarray(lower_bounds), np.asarray(upper_bounds), properties)
+    active_rxn_indices: npt.NDArray[np.integer] = algorithm.run()
+
+
+def _build_with_corda(
+    reference_model: cobra.Model,
+    neg_expression_threshold: float,
+    high_expression_threshold: float,
+    lower_bounds: npt.NDArray[np.floating],
+    upper_bounds: npt.NDArray[np.floating],
+    expression_vector: Sequence[float] | npt.NDArray[np.floating],
+):
+    """Reconstruct a model using CORDA.
+
+    :param neg_expression_threshold: Reactions expressed below this value will be placed in "negative" expression bin
+    :param high_expression_threshold: Reactions expressed above this value will be placed in the "high" expression bin
+    """
+    raise NotImplementedError("CORDA is not yet implemented")
+    model = reference_model
+    properties = CORDAProperties(
+        high_conf_rx=[],
+        medium_conf_rx=[],
+        neg_conf_rx=[],
+        pr_to_np=2,
+        constraint=1,
+        constrainby="val",
+        om=1e4,
+        ntimes=5,
+        nl=1e-2,
+        solver="GUROBI",
+        threads=5,
+    )
+    s_matrix: npt.NDArray[np.floating] = np.asarray(
+        cobra.util.array.create_stoichiometric_matrix(model=model), dtype=float
+    )
+    algorithm = CORDA(S=s_matrix, lb=np.asarray(lower_bounds), ub=np.asarray(upper_bounds), properties=properties)
+    active_rxn_indices: npt.NDArray[np.integer] = algorithm.run()
 
 
 def _map_expression_to_reaction(
-    model_cobra,
-    gene_expression_file,
+    reference_model: cobra.Model,
+    gene_expression_file: Path,
     recon_algorithm: Algorithm,
-    low_thresh=None,
-    high_thresh=None,
-):
+    taxon: int | str,
+    low_percentile: int,
+    high_percentile: int,
+) -> tuple[collections.OrderedDict[str, float], float, float, float]:
     """Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules.
 
     These rules should be defined in the general genome-scale metabolic model
+
+    Args:
+        reference_model: A COBRA model object representing the general genome-scale metabolic model.
+        gene_expression_file: Path to a gene expression file (.csv, .tsv, .xlsx, or .xls)
+        recon_algorithm: Algorithm to use for reconstruction (GIMME, FASTCORE, iMAT, or tINIT)
+        taxon: Taxon ID or Taxon object for gene ID conversion.
+        low_percentile: Low percentile for threshold calculation
+        high_percentile: High percentile for threshold calculation
+
+    Returns:
+        [0]: An ordered dictionary mapping reaction IDs to their corresponding expression values.
+        [1]: The abs(minimum value) from the expression vector
+        [2]: The adjusted `low_expr` value
+        [3]: The adjusted `high_expr` value
+
+    Raises:
+        ValueError: If neither 'entrez_gene_id' nor 'ensembl_gene_id' columns are found in the gene expression file.
     """
     expression_data = pd.read_csv(gene_expression_file)
-    gene_expressions = split_gene_expression_data(expression_data, recon_algorithm=recon_algorithm)
-    expression_rxns = collections.OrderedDict()
+    gene_activity = split_gene_expression_data(
+        expression_data, identifier_column="entrez_gene_id", recon_algorithm=recon_algorithm
+    )
 
-    unknown_val = 1
-    if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT}:
-        unknown_val = np.mean([low_thresh, high_thresh])  # put unknowns in mid bin
-    elif recon_algorithm == Algorithm.GIMME:
-        unknown_val = -1
-    elif recon_algorithm == Algorithm.FASTCORE:
-        unknown_val = 0
+    # adjust expression to have a minimum value of 0; if the minimum value is already 0, this does nothing
+    gene_arr = gene_activity["active"].to_numpy(dtype=float, copy=False)
+    min_val = float(gene_arr[np.isfinite(gene_arr)].min())
+    if min_val < 0:
+        gene_arr[np.isfinite(gene_arr)] += abs(min_val)
 
+    # We are computing percentiles on non-zero data because we need to make sure that
+    #   zero values are definitely placed in the low bin
+    low_expr, high_expr = np.nanpercentile(gene_arr[gene_arr > 0], [low_percentile, high_percentile])
+    gene_activity["active"] = gene_arr
+    gene_activity.index = gene_activity.index.astype(str)  # maintain strings for reference model gene_ids
+
+    # fmt: off
+    # Define a default expression values for the following conditions:
+    # 1. `no_expression`: If a reaction has a gene reaction rule but is not found in the data, then
+    #       we can be positive that the reaction should be marked as inactive
+    #   For all algorithms, placing no-expression data at an expression value of 0.0 will
+    #       mark it as inactive, because we have adjusted the data to be >= 0 above
+    no_expression = 0
+    # 2. `missing_gpr`: If a reaction has no gene reaction rule, we don't know if it should be marked as (in)active
+    #   Thus, place it in a no-cost location where possible, otherwise mark it as inactive
+    #   IMAT/TINIT/GIMME: Place in mid-bin, which is a "no-cost weight" value
+    #   FASTCORE: Mark as inactive, which is the best we can do with FASTCORE
+    missing_gpr = (
+        # -1 if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT, Algorithm.GIMME}
+        (low_expr + high_expr) / 2 if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT, Algorithm.GIMME}
+        else 0 if recon_algorithm == Algorithm.FASTCORE
+        else 1
+    )
+    # fmt: on
+
+    reaction_expression: collections.OrderedDict[str, float] = collections.OrderedDict()
+    activity_map = cast(dict[str, float], gene_activity.loc[:, "active"].to_dict())
     error_count = 0
-    for rxn in model_cobra.reactions:
-        gene_reaction_rule = _correct_bracket(rxn.gene_reaction_rule, rxn.gene_name_reaction_rule)
-        gene_ids = re.findall(r"\d+", gene_reaction_rule)
-        expression_rxns[rxn.id] = unknown_val
-        if gene_reaction_rule.strip() == "":
+    _base_warn = "could not generate evaluable gene rule."
+    for rxn in reference_model.reactions:
+        rxn: cobra.Reaction
+        gene_reaction_rule = rxn.gene_reaction_rule
+
+        if not gene_reaction_rule:
+            reaction_expression[rxn.id] = missing_gpr
             continue
-        for gid in gene_ids:
-            if gid in gene_expressions.index:
-                rep_val = f' {gene_expressions.at[gid, "active"]} '
-            else:
-                rep_val = f" {unknown_val!s} "
-            gene_reaction_rule = f" {gene_reaction_rule} "  # pad white space to prevent gene matches inside floats
-            gene_reaction_rule = gene_reaction_rule.replace(f" {gid} ", rep_val, 1)
+
+        gene_ids: set[str] = set(re.findall(r"\d+", gene_reaction_rule))
+        for gene_id in gene_ids:
+            activity = activity_map.get(gene_id, no_expression)
+            if np.isposinf(activity):  # For positive infinity values, place in high bin
+                activity = high_expr + 1
+            elif not isfinite(activity):  # For non-finite values, place in low/non-active bin
+                activity = no_expression
+
+            # Matches the standalone gene ID only when it's not part of a larger number.
+            # It ensures the ID is not immediately preceded by a digit or decimal point and not immediately followed by
+            #   a digit, so if the gene id is '48', decimals like 1.48 or numbers like 1648 are left unchanged.
+            gene_reaction_rule = re.sub(
+                pattern=rf"(?<![\d.]){gene_id}(?!\d)",
+                repl=str(activity),
+                string=str(gene_reaction_rule),
+            )
+
+        evaluable_gene_rule = None
         try:
-            gene_reaction_by_rule = _gene_rule_evaluable(gene_reaction_rule)
-            gene_reaction_by_rule = gene_reaction_by_rule.strip()
-            expression_rxns[rxn.id] = ast.literal_eval(gene_reaction_by_rule)
+            # We are using eval here because ast.literal_eval is unable to process an evaluable such as `max(-4, 0, 1)`
+            # This isn't ideal, but ultimately the only other option is writing and maintaining a custom parsing engine
+            #   but this is too much work
+            evaluable_gene_rule = _gene_rule_logical(gene_reaction_rule).replace("{", "(").replace("}", ")")
+            reaction_expression[rxn.id] = eval(evaluable_gene_rule)  # noqa: S307
 
-        except BaseException:
+        except ValueError:
+            logger.warning(f"ValueError for Reaction '{rxn.id}': {evaluable_gene_rule or _base_warn}")
             error_count += 1
+        except NameError:
+            logger.warning(f"NameError for Reaction '{rxn.id}': {evaluable_gene_rule or _base_warn}")
+            error_count += 1
+        except SyntaxError as e:
+            raise SyntaxError(f"SyntaxError on Reaction '{rxn.id}': {evaluable_gene_rule or _base_warn}") from e
+        except Exception as e:
+            error_type = type(e).__name__
+            raise RuntimeError(
+                f"Unexpected error {error_type} on Reaction '{rxn.id}': {evaluable_gene_rule or _base_warn}"
+            ) from e
 
-    logger.info(f"Mapped gene expression to reactions, found {error_count} error(s).")
-    expr_vector = np.array(list(expression_rxns.values()), dtype=float)
-
-    return expression_rxns, expr_vector
+    logger.debug(f"Mapped gene expression to reactions, found {error_count} error(s).")
+    return reaction_expression, float(min_val), float(low_expr), float(high_expr)
 
 
-def _build_model(  # noqa: C901
-    context_name: str,
-    general_model_file: Path,
+def _read_reference_model(filepath: Path) -> cobra.Model:
+    if filepath.suffix == ".json":
+        return cobra.io.load_json_model(filepath)
+    if filepath.suffix == ".mat":
+        return cobra.io.load_matlab_model(filepath)
+    if filepath.suffix in {".xml", ".sbml"}:
+        return cobra.io.read_sbml_model(filepath)
+    raise ValueError(f"Reference model format must be .xml, .mat, or .json; found '{filepath.suffix}'")
+
+
+def _build_model(
+    reference_model: cobra.Model,
     gene_expression_file: Path,
     recon_algorithm: Algorithm,
     objective: str,
-    bound_rxns: list[str],
-    exclude_rxns: list[str],
-    force_rxns: list[str],
-    bound_lb: list[float],
-    bound_ub: list[float],
+    boundary_reactions: list[str],
+    exclude_reactions: list[str],
+    force_reactions: list[str],
+    lower_bounds: list[float],
+    upper_bounds: list[float],
     solver: str,
-    low_thresh: float,
-    high_thresh: float,
-) -> _BuildResults:
+    low_percentile: int,
+    high_percentile: int,
+    output_flux_result_filepath: Path,
+    taxon: int | str,
+    objective_direction: Literal["min", "max"],
+    build_settings: ModelBuildSettings,
+    *,
+    force_boundary_rxn_inclusion: bool,
+) -> cobra.Model:
     """Seed a context specific reference_model.
 
     Core reactions are determined from GPR associations with gene expression logicals.
     Core reactions that do not necessarily meet GPR association requirements can be forced if in the force reaction
     file. Metabolite exchange (media), sinks, and demands are determined from exchanges file. Reactions can also be
     force excluded even if they meet GPR association requirements using the force exclude file.
+
+    Args:
+        reference_model: The reference model used in reconstruction
+        gene_expression_file: Path to a gene expression file (.csv, .tsv, .xlsx, or .xls)
+        recon_algorithm: Algorithm to use for reconstruction (GIMME, FASTCORE, iMAT, or tINIT)
+        objective: Objective reaction ID in the general model
+        boundary_reactions: List of boundary reactions to set in the model
+        exclude_reactions: List of reactions to exclude from the model
+        force_reactions: List of reactions to force include in the model
+        lower_bounds: List of lower bounds corresponding to boundary reactions
+        upper_bounds: List of upper bounds corresponding to boundary reactions
+        solver: Solver to use (e.g., 'glpk', 'cplex', 'gurobi')
+        output_flux_result_filepath: Path to save flux results (for iMAT only)
+        taxon: Taxon ID or Taxon object for gene ID conversion.
+        force_boundary_rxn_inclusion: If True, ensure that all boundary reactions are included in the final model.
+
+    Returns:
+        A _BuildResults object containing:
+         the context-specific model
+         list of expression indices used
+        A DataFrame of infeasible reactions.
     """
-    config = Config()
-    reference_model: cobra.Model
-    match general_model_file.suffix:
-        case ".mat":
-            reference_model = cobra.io.load_matlab_model(general_model_file)
-        case ".xml":
-            reference_model = cobra.io.read_sbml_model(general_model_file)
-        case ".json":
-            reference_model = cobra.io.load_json_model(general_model_file)
-        case _:
-            raise NameError(
-                f"Reference reference_model format must be .xml, .mat, or .json, found '{general_model_file.suffix}'"
-            )
+    if objective not in force_reactions:
+        force_reactions.append(objective)  # forcibly include the objective in the reconstructed model
 
-    reference_model.objective = {getattr(reference_model.reactions, objective): 1}  # set objective
+    # Set reference model boundaries
+    for rxn, lb, ub in zip(boundary_reactions, lower_bounds, upper_bounds, strict=True):
+        cast(cobra.Reaction, reference_model.reactions.get_by_id(rxn)).lower_bound = lb  # type: ignore[bad-argument-count]
+        cast(cobra.Reaction, reference_model.reactions.get_by_id(rxn)).upper_bound = ub  # type: ignore[bad-argument-count]
+    reference_model.solver = solver.lower()  # type: ignore[bad-argument-count]
+    reference_model.objective_direction = objective_direction  # type: ignore[bad-argument-count]
 
-    if objective not in force_rxns:
-        force_rxns.append(objective)
+    # Collect the lower/upper bounds for reactions in the reference model to provide it to reconstruction methods
+    ref_lb: npt.NDArray[np.floating] = np.full(shape=(len(reference_model.reactions)), fill_value=np.nan, dtype=float)
+    ref_ub: npt.NDArray[np.floating] = np.full(shape=(len(reference_model.reactions)), fill_value=np.nan, dtype=float)
+    reaction_ids: list[str] = []
+    for i, rxn in enumerate(reference_model.reactions):
+        rxn: cobra.Reaction
+        ref_lb[i] = float(rxn.lower_bound)
+        ref_ub[i] = float(rxn.upper_bound)
+        reaction_ids.append(rxn.id)
+    if ref_lb.shape[0] != ref_ub.shape[0] != len(reaction_ids):
+        raise ValueError(
+            "Lower bounds, upper bounds, and reaction IDs must have the same length.\n"
+            f"Number of reactions: {len(reaction_ids)}\n"
+            f"Number of upper bounds: {ref_ub.shape[0]}\n"
+            f"Number of lower bounds: {ref_lb.shape[0]}"
+        )
+    if np.isnan(ref_lb).any():
+        raise ValueError("Lower bounds contains unfilled values!")
+    if np.isnan(ref_ub).any():
+        raise ValueError("Upper bounds contains unfilled values!")
 
-    # set boundaries
-    reference_model, bound_rm_rxns = _set_boundaries(reference_model, bound_rxns, bound_lb, bound_ub)
-
-    # set solver
-    reference_model.solver = solver.lower()
-
-    # check number of unsolvable reactions for reference model under media assumptions
-    # incon_rxns, cobra_model = _feasibility_test(cobra_model, "before_seeding")
-    incon_rxns = []
-
-    s_matrix = cobra.util.array.create_stoichiometric_matrix(reference_model, array_type="dense")
-    lb = []
-    ub = []
-    rx_names = []
-    for reaction in reference_model.reactions:
-        lb.append(reaction.lower_bound)
-        ub.append(reaction.upper_bound)
-        rx_names.append(reaction.id)
-
-    # get expressed reactions
-    expression_rxns, expr_vector = _map_expression_to_reaction(
+    reaction_expression, min_expr_val, low_expr, high_expr = _map_expression_to_reaction(
         reference_model,
         gene_expression_file,
         recon_algorithm,
-        high_thresh=high_thresh,
-        low_thresh=low_thresh,
+        taxon=taxon,
+        low_percentile=low_percentile,
+        high_percentile=high_percentile,
     )
-
-    for rxn in force_rxns:
-        if rxn not in rx_names:
+    expression_vector: npt.NDArray[np.floating] = np.asarray(list(reaction_expression.values()), dtype=float)
+    for rxn_id in force_reactions:
+        if rxn_id not in reaction_ids:
             logger.warning(
-                f"The force reaction '{rxn}' was not found in the general reference_model. "
-                f"Check BiGG, or the relevant database for your general reference_model, for synonyms."
+                f"The force reaction '{rxn_id}' was not found in the reference model. "
+                f"Check BiGG, or the relevant database for your reference model, for synonyms."
             )
 
-    # collect list of reactions that are infeasible but active in expression data or user defined
-    infeas_exp_rxns = []
-    infeas_force_rxns = []
-    infeas_exp_cnt = 0
-    infeas_force_cnt = 0
-
-    for idx, rxn in enumerate(expression_rxns):
-        # log reactions in expressed and force lists that are infeasible that the user may wish to review
-        if rxn in incon_rxns and expr_vector[idx] == 1:
-            infeas_exp_cnt += 1
-            infeas_exp_rxns.append(rxn)
-        if rxn in incon_rxns and rxn in force_rxns:
-            infeas_force_cnt += 1
-            infeas_force_rxns.append(rxn)
-
-        # make changes to expressed reactions base on user defined force/exclude reactions
-        # TODO: if not using bound reactions file, add two sets of exchange reactions to be put in either low or mid bin
-
-        if rxn in force_rxns:
-            expr_vector[idx] = high_thresh + 0.1 if recon_algorithm.value in {"TINIT", "IMAT"} else 1
-        if rxn in incon_rxns or rxn in exclude_rxns:
-            expr_vector[idx] = low_thresh - 0.1 if recon_algorithm.value in {"TINIT", "IMAT"} else 0
-
-    idx_obj = rx_names.index(objective)
-    idx_force = [rx_names.index(rxn) for rxn in force_rxns if rxn in rx_names]
-    exp_idx_list = [i for (i, val) in enumerate(expr_vector) if val > 0]  # type: ignore
-    exp_thresh = (low_thresh, high_thresh)
-
-    if recon_algorithm == Algorithm.GIMME:
-        context_model_cobra = _build_with_gimme(reference_model, s_matrix, lb, ub, idx_obj, expr_vector)
-    elif recon_algorithm == Algorithm.FASTCORE:
-        context_model_cobra = _build_with_fastcore(reference_model, s_matrix, lb, ub, exp_idx_list, solver)
-    elif recon_algorithm == Algorithm.IMAT:
-        context_model_cobra: cobra.Model
-        context_model_cobra, flux_df = _build_with_imat(
-            reference_model,
-            s_matrix,
-            lb,
-            ub,
-            expr_vector,
-            exp_thresh,
-            idx_force,
-            solver=solver,
-        )
-        imat_reactions = flux_df.rxn
-        model_reactions = [reaction.id for reaction in context_model_cobra.reactions]
-        reaction_intersections = set(imat_reactions).intersection(model_reactions)
-        flux_df = flux_df[~flux_df["rxn"].isin(reaction_intersections)]
-        flux_df.to_csv(config.data_dir / "results" / context_name / f"{recon_algorithm.value}_flux.csv")
-    elif recon_algorithm == Algorithm.TINIT:
-        context_model_cobra = _build_with_tinit(reference_model, s_matrix, lb, ub, expr_vector, solver, idx_force)
-
-    incon_rxns_cs = []
-    incon_df = pd.DataFrame({"general_infeasible_rxns": list(incon_rxns)})
-    infeas_exp_df = pd.DataFrame({"expressed_infeasible_rxns": infeas_exp_rxns})
-    infeas_force_df = pd.DataFrame({"infeasible_rxns_in_force_list": infeas_exp_rxns})
-    incon_df_cs = pd.DataFrame({"infeasible_rxns_from_seeding": list(incon_rxns_cs)})
-    infeasible_df = pd.concat([incon_df, infeas_exp_df, infeas_force_df, incon_df_cs], ignore_index=True, axis=1)
-    infeasible_df.columns = ["InfeasRxns", "ExpressedInfeasRxns", "ForceInfeasRxns", "ContextInfeasRxns"]
-
-    return _BuildResults(
-        model=context_model_cobra,
-        expression_index_list=exp_idx_list,
-        infeasible_reactions=infeasible_df,
+    # Set force-include reactions to have an expression higher than the upper threshold
+    # Set force-exclude reactions to have an expression lower than the lower threshold
+    rxn_ids = list(reaction_expression.keys())
+    force_mask = np.isin(rxn_ids, force_reactions)
+    exclude_mask = np.isin(rxn_ids, exclude_reactions)
+    expression_vector[force_mask] = high_expr + 1 if recon_algorithm in {Algorithm.TINIT, Algorithm.IMAT} else 1
+    expression_vector[exclude_mask] = (
+        max(0.0, low_expr - 1) if recon_algorithm in {Algorithm.TINIT, Algorithm.IMAT} else 0
     )
 
+    if force_boundary_rxn_inclusion:
+        all_forced: set[str] = {*force_reactions, *boundary_reactions}
+        force_reaction_indices: npt.NDArray[np.integer] = np.asarray(
+            [reaction_ids.index(rxn_id) for rxn_id in all_forced if rxn_id in reaction_ids], dtype=int
+        )
+    else:
+        force_reaction_indices: npt.NDArray[np.integer] = np.asarray(
+            [reaction_ids.index(rxn_id) for rxn_id in force_reactions if rxn_id in reaction_ids], dtype=int
+        )
 
-def _create_df(path: Path) -> pd.DataFrame:
-    match path.suffix:
-        case ".csv":
-            df = pd.read_csv(path, header=0, sep=",")
-        case ".tsv":
-            df = pd.read_csv(path, header=0, sep="\t")
-        case ".xlsx" | ".xls":
-            df = pd.read_excel(path, header=0)
-        case _:
-            raise FileNotFoundError(f"File not found! Must be a csv, tsv, or Excel file. Searching for: {path}")
-    df.columns = [c.lower() for c in df.columns]
+    expression_vector_indices: list[int] = list(range(len(expression_vector)))
+
+    if recon_algorithm == Algorithm.IMAT:
+        context_model_cobra: cobra.Model = _build_with_imat(
+            reference_model=reference_model,
+            lower_bounds=ref_lb,
+            upper_bounds=ref_ub,
+            expr_vector=expression_vector,
+            low_expression_threshold=low_expr,
+            high_expression_threshold=high_expr,
+            force_reaction_indices=force_reaction_indices,
+            solver=solver,
+            build_settings=build_settings,
+        )
+    elif recon_algorithm == Algorithm.GIMME:
+        expressed_rxn_ids: list[str] = list(reaction_expression.keys())
+        metabolite_ids: set[str] = set()
+        for rxn_id in expressed_rxn_ids:
+            cobra_rxn: cobra.Reaction = cast(cobra.Reaction, reference_model.reactions.get_by_id(rxn_id))
+            metabolite_ids.update([m.id for m in cobra_rxn.metabolites])
+
+        context_model_cobra: cobra.Model = _build_with_gimme(
+            reference_model=reference_model,
+            expression_vector=expression_vector,
+            idx_objective=reaction_ids.index(objective),
+            lower_bounds=ref_lb,
+            upper_bounds=ref_ub,
+            solver=solver,
+        )
+    elif recon_algorithm == Algorithm.FASTCORE:
+        context_model_cobra: cobra.Model = _build_with_fastcore(
+            reference_model=reference_model,
+            lower_bounds=ref_lb,
+            upper_bounds=ref_ub,
+            exp_idx_list=expression_vector_indices,
+            solver=solver,
+        )
+    elif recon_algorithm == Algorithm.TINIT:
+        context_model_cobra: cobra.Model = _build_with_tinit(
+            reference_model=reference_model,
+            lower_bounds=ref_lb,
+            upper_bounds=ref_ub,
+            expr_vector=expression_vector,
+            solver=solver,
+            idx_force=force_reaction_indices,
+        )
+    else:
+        raise ValueError(
+            f"Reconstruction algorithm must be {Algorithm.GIMME.value}, "
+            f"{Algorithm.FASTCORE.value}, {Algorithm.IMAT.value}, or {Algorithm.TINIT.value}. "
+            f"Got: {recon_algorithm.value}"
+        )
+
+    # Set each reaction subsystem based on the reference model
+    for rxn in context_model_cobra.reactions:
+        cast(cobra.Reaction, context_model_cobra.reactions.get_by_id(rxn.id)).subsystem = cast(
+            cobra.Reaction, reference_model.reactions.get_by_id(rxn.id)
+        ).subsystem
+
+    context_model_cobra.objective = objective
+    flux_sol: cobra.Solution = context_model_cobra.optimize()
+    fluxes = flux_sol.fluxes
+    model_reactions: list[str] = [reaction.id for reaction in context_model_cobra.reactions]
+    reaction_intersections: set[str] = set(fluxes.index).intersection(model_reactions)
+    flux_df = fluxes[~fluxes.index.isin(reaction_intersections)]
+    flux_df.dropna(inplace=True)
+    flux_df.to_csv(output_flux_result_filepath)
+
+    return context_model_cobra
+
+
+def _create_df(path: Path, *, lowercase_col_names: bool = False) -> pd.DataFrame:
+    if path.suffix not in {".csv", ".tsv"}:
+        raise ValueError(f"File must be a .csv or .tsv file, got '{path.suffix}'")
+
+    df = pd.read_csv(path, header=0, sep="," if path.suffix == ".csv" else "\t")
+    if lowercase_col_names:
+        df.columns = [c.lower() for c in df.columns]
     return df
 
 
-def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
-    df = _create_df(path)
+def _collect_boundary_reactions(
+    path: Path,
+    reference_model: cobra.Model,
+    *,
+    close_unlisted_exchanges: bool,
+) -> _BoundaryReactions:
+    df: pd.DataFrame = _create_df(path, lowercase_col_names=True)
+
     for column in df.columns:
         if column not in [
-            "boundary",
+            "reaction",
             "abbreviation",
             "compartment",
-            "minimum reaction rate",
-            "maximum reaction rate",
+            "lower bound",
+            "upper bound",
         ]:
             raise ValueError(
-                f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', "
-                f"'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}"
+                f"Boundary reactions file must have columns named 'reaction', 'abbreviation', 'compartment', "
+                f"'lower bound', and 'upper bound'. Found: '{column}'"
             )
 
-    reactions: list[str] = [""] * len(df)
-    boundary_type: list[str] = df["boundary"].tolist()
-    reaction_abbreviation: list[str] = df["abbreviation"].tolist()
-    reaction_compartment: list[str] = df["compartment"].tolist()
-    lower_bound = df["minimum reaction rate"].tolist()
-    upper_bound = df["maximum reaction rate"].tolist()
-    boundary_map = {"exchange": "EX", "demand": "DM", "sink": "SK"}
-    for i in range(len(boundary_type)):
-        boundary: str = boundary_type[i].lower()
-        if boundary not in boundary_map:
-            raise ValueError(f"Boundary reaction type must be 'Exchange', 'Demand', or 'Sink'. Found: {boundary[i]}")
+    for compartment in df["compartment"].unique():
+        as_shorthand = CobraCompartments.get_shorthand(compartment) if len(compartment) > 2 else compartment
+        if as_shorthand not in reference_model.compartments:
+            raise ValueError(f"Unknown compartment: '{compartment}'")
 
-        shorthand_compartment = Compartments.get(reaction_compartment[i])
-        reactions[i] = f"{boundary_map.get(boundary)}_{reaction_abbreviation[i]}[{shorthand_compartment}]"
+    boundary_map = {"exchange": "EX", "demand": "DM", "sink": "SK"}
+    for exchange in df["reaction"].str.lower().unique():
+        if boundary_map.get(exchange) is None:
+            raise ValueError(
+                f"Unable to determine reaction type for: '{exchange}'\n"
+                f"Validate the boundary reactions file has a 'Reaction' value of: 'Exchange', 'Demand', or 'Sink'."
+            )
+
+    reactions: list[str] = []
+    lower_bounds: list[float] = []
+    upper_bounds: list[float] = []
+    for ref_rxn in reference_model.boundary:
+        ref_rxn: cobra.Reaction
+
+        # Remove prefixes from reactions: EX_glc_D[e] -> glc_D[e]; DM_h2o[c] -> h2o[c]; sink_o2[m] -> o2[m]
+        # Then remove suffixes from reactions: glc_D[e] -> glc_D; h2o[c] -> h2o; o2[m] -> o2
+        base_rxn_id: str = ref_rxn.id.split("_", maxsplit=1)[1]
+        base_rxn_id = base_rxn_id.split("[", maxsplit=1)[0]
+
+        # If we are excluding unlisted exchange reactions from the model,
+        #   then we need to set their lower/upper bounds to 0
+        # Otherwise, keep the unlisted exchanges as their default
+        if base_rxn_id not in df["abbreviation"].values:
+            reactions.append(ref_rxn.id)
+            lower_bounds.append(0 if close_unlisted_exchanges else ref_rxn.lower_bound)
+            upper_bounds.append(0 if close_unlisted_exchanges else ref_rxn.upper_bound)
+            continue
+
+        rxn_index = df[df["abbreviation"] == base_rxn_id].index.item()
+        shorthand_compartment = CobraCompartments.get_shorthand(str(df.at[rxn_index, "compartment"]))
+        exch_type: str | None = boundary_map.get(str(df.at[rxn_index, "reaction"]).lower())
+        lower_bound, upper_bound = df.loc[rxn_index, ["lower bound", "upper bound"]].astype(float).values.ravel()
+
+        # The boundary reactions are built on the base reaction id;
+        #   if the reference model boundary has a matching base ID, but a non-matching
+        #   boundary type (exchange, sink, demand), this will check to make sure we are not
+        #   mistakingly setting boundaries that should not exist
+        formatted_boundary_reaction = f"{exch_type}_{base_rxn_id}[{shorthand_compartment}]"
+        if ref_rxn.id == formatted_boundary_reaction:
+            reactions.append(formatted_boundary_reaction)
+            lower_bounds.append(lower_bound)
+            upper_bounds.append(upper_bound)
+        else:
+            reactions.append(ref_rxn.id)
+            lower_bounds.append(0 if close_unlisted_exchanges else ref_rxn.lower_bound)
+            upper_bounds.append(0 if close_unlisted_exchanges else ref_rxn.upper_bound)
 
     return _BoundaryReactions(
         reactions=reactions,
-        lower_bounds=lower_bound,
-        upper_bounds=upper_bound,
+        lower_bounds=lower_bounds,
+        upper_bounds=upper_bounds,
     )
 
 
 def _write_model_to_disk(
-    model: cobra.Model,
-    output_directory: Path,
     context_name: str,
-    output_filetypes: list[str],
-    algorithm: Algorithm,
+    model: cobra.Model,
+    output_filepaths: list[Path],
+    mat_suffix: set[str],
+    json_suffix: set[str],
+    xml_suffix: set[str],
 ) -> None:
-    if "mat" in output_filetypes:
-        cobra.io.save_matlab_model(model, output_directory / f"{context_name}_SpecificModel_{algorithm.value}.mat")
-    if "xml" in output_filetypes:
-        cobra.io.write_sbml_model(model, output_directory / f"{context_name}_SpecificModel_{algorithm.value}.xml")
-    if "json" in output_filetypes:
-        cobra.io.save_json_model(model, output_directory / f"{context_name}_SpecificModel_{algorithm.value}.json")
+    for path in output_filepaths:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.suffix in mat_suffix:
+            cobra.io.save_matlab_model(model=model, file_name=path)
+        elif path.suffix in json_suffix:
+            cobra.io.save_json_model(model=model, filename=path, pretty=True)
+        elif path.suffix in xml_suffix:
+            cobra.io.write_sbml_model(cobra_model=model, filename=path)
+        else:
+            raise ValueError(
+                f"Invalid output model filetype. Should be one of .xml, .sbml, .mat, or .json. Got '{path.suffix}'"
+            )
+        logger.success(f"Model for context '{context_name}' saved to to: '{path}'")
 
 
 def create_context_specific_model(  # noqa: C901
     context_name: str,
-    reference_model: Path,
-    genes_file: Path,
+    taxon_id: int | str,
+    reference_model_filepath: Path,
+    active_genes_filepath: Path,
+    output_infeasible_reactions_filepath: Path,
+    output_flux_result_filepath: Path,
+    output_model_filepaths: Path | list[Path],
+    output_fastcore_expression_index_filepath: Path | None = None,
     objective: str = "biomass_reaction",
+    objective_direction: Literal["min", "max"] = "max",
+    contextualized_model_id: str | None = None,
     boundary_rxns_filepath: str | Path | None = None,
     exclude_rxns_filepath: str | Path | None = None,
     force_rxns_filepath: str | Path | None = None,
     algorithm: Algorithm = Algorithm.GIMME,
-    low_threshold: float = -5,
-    high_threshold: float = -3,
+    low_percentile: int | None = None,
+    high_percentile: int | None = None,
     solver: Solver = Solver.GLPK,
-    output_filetypes: list[str] | None = None,
-):
-    """Create a context-specific model using the provided data."""
-    if not reference_model.exists():
-        raise FileNotFoundError(f"Reference model not found at {reference_model}")
-    if not genes_file.exists():
-        raise FileNotFoundError(f"Active genes file not found at {genes_file}")
-    if output_filetypes is None:
-        output_filetypes = ["mat"]
+    log_level: LogLevel = LogLevel.INFO,
+    log_location: str | TextIO | TextIOWrapper = sys.stderr,
+    build_settings: ModelBuildSettings | None = None,
+    *,
+    force_boundary_rxn_inclusion: bool = False,
+    close_unlisted_exchanges: bool = False,
+) -> cobra.Model:
+    """Create a context-specific model using the provided data.
 
-    for output_type in output_filetypes:
-        if output_type not in {"xml", "mat", "json"}:
-            raise ValueError(f"Output file type {output_type} not recognized. Must be one of: 'xml', 'mat', 'json'")
+    :param context_name: Name of the context-specific model.
+    :param taxon_id: NCBI taxonomy ID or name for the organism of interest.
+    :param reference_model_filepath: Path to the general genome-scale metabolic model file (.xml, .mat, or .json).
+    :param active_genes_filepath: Path to the gene expression data file (csv, tsv, or Excel).
+    :param output_infeasible_reactions_filepath: Path to save infeasible reactions (csv).
+    :param output_flux_result_filepath: Path to save flux results (csv).
+    :param output_model_filepaths: Path or list of paths to save the context-specific model (.xml, .mat, or .json).
+    :param output_fastcore_expression_index_filepath: Path to save Fastcore expression indices (txt).
+    :param objective: Objective function reaction ID.
+    :param objective_direction: Direction of the objective function, either 'min' or 'max'.
+    :param contextualized_model_id: A custom name to save under `model.id`, otherwise the `context_name` value will be used.
+    :param boundary_rxns_filepath: Optional path to boundary reactions file (csv, tsv, or Excel).
+    :param exclude_rxns_filepath: Optional path to reactions to exclude file (csv, tsv, or Excel).
+    :param force_rxns_filepath: Optional path to reactions to force include file (csv, tsv, or Excel).
+    :param algorithm: Algorithm to use for reconstruction.
+    :param low_percentile: Low percentile for gene expression threshold calculation.
+    :param high_percentile: High percentile for gene expression threshold calculation.
+    :param solver: Solver to use. One of Solver.GLPK, Solver.CPLEX, Solver.GUROBI
+    :param log_level: Logging level
+    :param log_location: Location for log output. Can be a file path or sys.stderr/sys.stdout.
+    :param force_boundary_rxn_inclusion: If True, ensure that all provided boundary reactions are included in the final model.
+    :param build_settings: Optional ModelBuildSettings object to customize model building parameters.
+    :param close_unlisted_exchanges: If True, all exchanges not listed in the boundary reactions input will be closed
+
+    :raises ImportError: If Gurobi solver is selected but gurobipy is not installed.
+    """  # noqa: E501
+    set_up_logging(level=log_level, location=log_location)
+    if low_percentile is None:
+        raise ValueError("low_percentile must be provided")
+    if high_percentile is None:
+        raise ValueError("high_percentile must be provided")
+
+    boundary_rxns_filepath = Path(boundary_rxns_filepath) if boundary_rxns_filepath else None
+    output_model_filepaths = (
+        [output_model_filepaths] if isinstance(output_model_filepaths, Path) else output_model_filepaths
+    )
+
+    if not reference_model_filepath.exists():
+        raise FileNotFoundError(f"Reference model not found at {reference_model_filepath}")
+    if not active_genes_filepath.exists():
+        raise FileNotFoundError(f"Active genes file not found at {active_genes_filepath}")
+    if algorithm == Algorithm.FASTCORE and not output_fastcore_expression_index_filepath:
+        raise ValueError("The fastcore expression index output filepath must be provided")
+    if boundary_rxns_filepath and not boundary_rxns_filepath.exists():
+        raise FileNotFoundError(f"Boundary reactions file not found at {boundary_rxns_filepath}")
 
     if algorithm not in Algorithm:
         raise ValueError(f"Algorithm {algorithm} not supported. Use one of {', '.join(a.value for a in Algorithm)}")
@@ -644,12 +912,29 @@ def create_context_specific_model(  # noqa: C901
     if solver not in Solver:
         raise ValueError(f"Solver '{solver}' not supported. Use one of {', '.join(s.value for s in Solver)}")
 
-    if boundary_rxns_filepath:
-        boundary_reactions = _collect_boundary_reactions(boundary_rxns_filepath)
+    mat_suffix, json_suffix, xml_suffix = {".mat"}, {".json"}, {".sbml", ".xml"}
+    if any(path.suffix not in {*mat_suffix, *json_suffix, *xml_suffix} for path in output_model_filepaths):
+        invalid_suffix: str = "\n".join(
+            path.as_posix()
+            for path in output_model_filepaths
+            if path.suffix not in {*mat_suffix, *json_suffix, *xml_suffix}
+        )
+        raise ValueError(f"Invalid output filetype. Should be 'xml', 'sbml', 'mat', or 'json'. Got:\n{invalid_suffix}'")
+
+    reference_model = _read_reference_model(reference_model_filepath)
+    boundary_reactions = (
+        _collect_boundary_reactions(
+            boundary_rxns_filepath,
+            reference_model=reference_model,
+            close_unlisted_exchanges=close_unlisted_exchanges,
+        )
+        if boundary_rxns_filepath
+        else _BoundaryReactions(reactions=[], lower_bounds=[], upper_bounds=[])
+    )
 
     exclude_rxns: list[str] = []
     if exclude_rxns_filepath:
-        exclude_rxns_filepath: Path = Path(exclude_rxns_filepath)
+        exclude_rxns_filepath = Path(exclude_rxns_filepath)
         df = _create_df(exclude_rxns_filepath)
         if "abbreviation" not in df.columns:
             raise ValueError("The exclude reactions file should have a single column with a header named Abbreviation")
@@ -657,200 +942,75 @@ def create_context_specific_model(  # noqa: C901
 
     force_rxns: list[str] = []
     if force_rxns_filepath:
-        force_rxns_filepath: Path = Path(force_rxns_filepath)
-        df = _create_df(force_rxns_filepath)
+        force_rxns_filepath = Path(force_rxns_filepath)
+        df = _create_df(force_rxns_filepath, lowercase_col_names=True)
         if "abbreviation" not in df.columns:
             raise ValueError("The force reactions file should have a single column with a header named Abbreviation")
         force_rxns = df["abbreviation"].tolist()
 
-    logger.info(f"Creating '{context_name}' model using '{algorithm.value}' reconstruction and '{solver.value}' solver")
-    build_results: _BuildResults = _build_model(
-        context_name=context_name,
-        general_model_file=reference_model,
-        gene_expression_file=genes_file,
-        recon_algorithm=algorithm,
-        objective=objective,
-        bound_rxns=boundary_reactions.reactions,
-        bound_lb=boundary_reactions.lower_bounds,
-        bound_ub=boundary_reactions.upper_bounds,
-        exclude_rxns=exclude_rxns,
-        force_rxns=force_rxns,
-        solver=solver.value.lower(),
-        low_thresh=low_threshold,
-        high_thresh=high_threshold,
-    )
+    # Test that gurobi is using a valid license file
+    if solver == Solver.GUROBI:
+        from importlib.util import find_spec
 
-    config = Config()
-    build_results.infeasible_reactions.to_csv(
-        config.result_dir / context_name / f"{context_name}_infeasible_rxns.csv", index=False
-    )
+        gurobi_present = find_spec("gurobipy")
+        if not gurobi_present:
+            raise ImportError(
+                "The gurobi solver requires the gurobipy package to be installed. "
+                "Please install gurobipy and try again. "
+                "This can be done by installing the 'gurobi' optional dependency."
+            )
 
-    if algorithm == Algorithm.FASTCORE:
-        pd.DataFrame(build_results.expression_index_list).to_csv(
-            config.result_dir / context_name / f"{context_name}_core_rxns.csv", index=False
+        if not Path(f"{os.environ['HOME']}/gurobi.lic").exists():
+            logger.critical(
+                "Gurobi solver requested, but license information cannot be found. "
+                "COMO will continue, but it is HIGHLY unlikely the resulting model will be valid."
+            )
+
+    overlapping_rxns = set(force_rxns) & set(exclude_rxns)
+    if overlapping_rxns:
+        raise ValueError(
+            f"Reactions found in force-include and force-exclude sets: {','.join(sorted(overlapping_rxns))}"
         )
 
-    output_directory = config.result_dir / context_name
+    logger.info(f"context='{context_name}', reconstruction method='{algorithm.value}', solver='{solver.value}'")
+    context_model: cobra.Model = _build_model(
+        reference_model=reference_model,
+        gene_expression_file=active_genes_filepath,
+        recon_algorithm=algorithm,
+        objective=objective,
+        objective_direction=objective_direction,
+        boundary_reactions=boundary_reactions.reactions,
+        exclude_reactions=exclude_rxns,
+        force_reactions=force_rxns,
+        lower_bounds=boundary_reactions.lower_bounds,
+        upper_bounds=boundary_reactions.upper_bounds,
+        solver=solver.value.lower(),
+        low_percentile=low_percentile,
+        high_percentile=high_percentile,
+        output_flux_result_filepath=output_flux_result_filepath,
+        force_boundary_rxn_inclusion=force_boundary_rxn_inclusion,
+        taxon=taxon_id,
+        build_settings=build_settings or ModelBuildSettings(),
+    )
+    context_model.id = contextualized_model_id or context_name
+
+    if algorithm == Algorithm.FASTCORE:
+        fastcore_df = pd.DataFrame([r.id for r in context_model.reactions])
+        fastcore_df.dropna(inplace=True)
+        fastcore_df.to_csv(output_fastcore_expression_index_filepath, index=False)
+
     _write_model_to_disk(
-        model=build_results.model,
-        output_directory=output_directory,
         context_name=context_name,
-        output_filetypes=output_filetypes,
-        algorithm=algorithm,
+        model=context_model,
+        output_filepaths=output_model_filepaths,
+        mat_suffix=mat_suffix,
+        json_suffix=json_suffix,
+        xml_suffix=xml_suffix,
     )
-
-    logger.success(f"Saved output file to {output_directory}")
-    logger.info(f"Number of Genes: {len(build_results.model.genes):,}")
-    logger.info(f"Number of Metabolites: {len(build_results.model.metabolites):,}")
-    logger.info(f"Number of Reactions: {len(build_results.model.reactions):,}")
-
-
-def _parse_args():
-    parser = argparse.ArgumentParser(
-        prog="create_context_specific_model.py",
-        description="Seed a context-specific model from a list of expressed genes, a reference",
-        epilog="For additional help, please post questions/issues in the MADRID GitHub repo at "
-        "https://github.com/HelikarLab/MADRID or email babessell@gmail.com",
+    logger.info(
+        f"context={context_name}, "
+        f"reactions={len(context_model.reactions)}, "
+        f"genes={len(context_model.genes)}, "
+        f"metabolites={len(context_model.metabolites)}"
     )
-    parser.add_argument(
-        "-n",
-        "--context-name",
-        type=str,
-        required=True,
-        dest="context_name",
-        help="Name of context or context used consistent with outputs of merge_xomics.py.",
-    )
-    parser.add_argument(
-        "-m",
-        "--reference-model-filepath",
-        type=str,
-        required=True,
-        dest="reference_model",
-        help="Name of Genome-scale metabolic model to seed the context model to. For example, the "
-        "GeneralModelUpdatedV2.mat, is a modified Recon3D model. We also provide iMM_madrid for mouse."
-        "OT can be .mat, .xml, or .json.",
-    )
-    parser.add_argument(
-        "-g",
-        "--active-genes-filepath",
-        type=str,
-        required=True,
-        dest="active_genes_filepath",
-        help="Path to logical table of active genes output from merge_xomics.py called "
-        "ActiveGenes_contextName_Merged.csv. Should be in the corresponding context/context folder "
-        "inside /main/data/results/contextName/. The json file output from the function using "
-        "the context of interest as the key can be used here.",
-    )
-    parser.add_argument(
-        "-o",
-        "--objective",
-        type=str,
-        default="biomass_reaction",
-        dest="objective",
-        help="Reaction ID of the objective function in the model. Generally a biomass function.",
-    )
-    parser.add_argument(
-        "-b",
-        "--boundary-reactions-filepath",
-        type=str,
-        default=None,
-        dest="boundary_reactions_filepath",
-        help="Path to file contains the exchange (media), sink, and demand reactions which "
-        "the model should use to fulfill the reactions governed by transcriptomic and proteomics "
-        "data inputs. It must be a csv or xlsx with three columns: Rxn, Lowerbound, Upperbound. If not "
-        "specified, MADRID will allow ALL BOUNDARY REACTIONS THAT ARE OPEN IN THE REFERENCE MODEL "
-        "TO BE USED!",
-    )
-    parser.add_argument(
-        "-x",
-        "--exclude-reactions-filepath",
-        type=str,
-        default=None,
-        dest="exclude_reactions_filepath",
-        help="Filepath to file that contains reactions which will be removed from active reactions "
-        "the model to use when seeding, even if considered active from transcriptomic and "
-        "proteomics data inputs. It must be a csv or xlsx with one column of reaction IDs consistent with "
-        "the reference model",
-    )
-    parser.add_argument(
-        "-f",
-        "--force-reactions-filepath",
-        type=str,
-        default=None,
-        dest="force_reactions_filepath",
-        help="Filepath to file that contains reactions which will be added to active reactions for "
-        "the model to use when seeding (unless it causes the model to be unsolvable), regardless "
-        "of results of transcriptomic and proteomics data inputs. It must be a csv or xlsx with one "
-        "column of reaction IDs consistent with the reference model",
-    )
-    parser.add_argument(
-        "-a",
-        "--algorithm",
-        type=str,
-        default="GIMME",
-        dest="recon_algorithm",
-        help="Algorithm used to seed context specific model to the Genome-scale model. "
-        "Can be either GIMME, FASTCORE, iMAT, or tINIT.",
-    )
-    parser.add_argument(
-        "-lt",
-        "--low-threshold",
-        type=float,
-        default=-5,
-        dest="low_threshold",
-        help="Low to mid bin cutoff for iMAT solution",
-    )
-    parser.add_argument(
-        "-ht",
-        "--high-threshold",
-        type=float,
-        default=-3,
-        dest="high_threshold",
-        help="Mid to high bin cutoff for iMAT solution",
-    )
-    parser.add_argument(
-        "-s",
-        "--solver",
-        type=str,
-        default="glpk",
-        dest="solver",
-        help="Solver used to seed model and attempt to solve objective. Default is GLPK, also takes "
-        "GUROBI but you must mount a container license to the Docker to use. An academic license "
-        "can be obtained for free. See the README on the Github or Dockerhub for information on "
-        "mounting this license.",
-    )
-    parser.add_argument(
-        "-t",
-        "--output-filetypes",
-        type=str,
-        nargs="+",
-        default="mat",
-        dest="output_filetypes",
-        help="Filetypes to save seeded model type. Can be either a string with one filetype such as "
-        "'xml' or multiple in the format \"['extension1', 'extension2', ... etc]\". If you want "
-        "to output in all 3 accepted formats,  would be: \"['mat', 'xml', 'json']\" "
-        "Note the outer quotes required to be interpreted by cmd. This a string, not a python list",
-    )
-    args = parser.parse_args()
-    args.output_filetypes = stringlist_to_list(args.output_filetypes)
-    args.solver = Solver.from_string(args.solver)  # type: ignore
-    args.recon_algorithm = Algorithm.from_string(args.recon_algorithm)  # type: ignore
-    return _Arguments(**vars(args))
-
-
-if __name__ == "__main__":
-    args = _parse_args()
-    create_context_specific_model(
-        context_name=args.context_name,
-        reference_model=args.reference_model,
-        genes_file=args.active_genes_filepath,
-        objective=args.objective,
-        boundary_rxns_filepath=args.boundary_reactions_filepath,
-        exclude_rxns_filepath=args.exclude_reactions_filepath,
-        force_rxns_filepath=args.force_reactions_filepath,
-        algorithm=args.recon_algorithm,
-        low_threshold=args.low_threshold,
-        high_threshold=args.high_threshold,
-        solver=args.solver,
-        output_filetypes=args.output_filetypes,
-    )
+    return context_model

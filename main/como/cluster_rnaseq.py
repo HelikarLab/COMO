@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 
+from como.data_types import LogLevel
 from como.utils import stringlist_to_list
 
 
@@ -34,10 +35,10 @@ class _Arguments:
             self.seed = np.random.randint(0, 100_000)
 
         if (isdigit(self.min_active_count) and int(self.min_active_count) < 0) or self.min_active_count != "default":
-            raise ValueError("--min-count must be either 'default' or an integer > 0")
+            raise ValueError("min_active_count must be either 'default' or an integer > 0")
 
         if (isdigit(self.quantile) and 0 > int(self.quantile) > 100) or self.quantile != "default":
-            raise ValueError("--quantile must be either 'default' or an integer between 0 and 100")
+            raise ValueError("quantile must be either 'default' or an integer between 0 and 100")
 
         if (isdigit(self.replicate_ratio) and 0 > self.replicate_ratio > 1.0) or self.replicate_ratio != "default":
             raise ValueError("--rep-ratio must be either 'default' or a float between 0 and 1")

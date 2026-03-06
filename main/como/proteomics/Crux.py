@@ -1,5 +1,6 @@
 # ruff: noqa
 
+from typing import Type
 import asyncio
 import multiprocessing
 import os
@@ -8,10 +9,11 @@ import subprocess
 from multiprocessing.sharedctypes import Synchronized
 from pathlib import Path
 
+from bioservices.biodbnet import BioDBNet
 import numpy as np
 import pandas as pd
 import tqdm
-from fast_bioservices import BioDBNet
+
 
 from como.proteomics.FileInformation import FileInformation, clear_print
 
@@ -277,13 +279,11 @@ class SQTtoCSV:
             loop = asyncio.get_event_loop()
             # async with self._semaphore:
             #     gene_symbols: pd.DataFrame = await loop.run_in_executor(None, self._biodbnet.db2db, "UniProt Accession", "Gene Symbol", input_values)
-            gene_symbols: pd.DataFrame = await loop.run_in_executor(
-                None,
-                self._biodbnet.db2db,
-                input_values,
-                "UniProt Accession",
-                "Gene Symbol",
+            gene_symbols = self._biodbnet.db2db(
+                input_db="UniProt Accession", output_db="Gene Symbol", input_values=input_values
             )
+            if not isinstance(gene_symbols, pd.DataFrame):
+                raise TypeError(f"Expected gene_symbols to be a DataFrame, but got {type(gene_symbols)}")
 
             # The index is UniProt IDs. Create a new column of these values
             gene_symbols["uniprot"] = gene_symbols.index
