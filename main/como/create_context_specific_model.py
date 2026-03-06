@@ -159,30 +159,54 @@ def _build_with_gimme(
     solver: str,
     threshold_percentile: int = 30,
 ):
-    model_reconstruction = reference_model.copy()
-    s_matrix: list[float] = list(cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction))
+    model = reference_model
+    if threshold_percentile < 1:
+        logger.critical(
+            f"GIMME quantile calculation is less than 1 ({threshold_percentile}), but expected an integer of ~25! "
+            f"This will likely result in a model with many more reactions than expected."
+        )
+
+    expression: npt.NDArray[np.floating] = np.asarray(expression_vector, dtype=float)
+    nonzero = expression[expression > 0]
+    min_expr_percentile = np.percentile(nonzero, threshold_percentile).astype(float)
+    logger.debug(f"GIMME: minimum expression is {expression.min():.4f}")
+    logger.debug(f"GIMME: minimum non-zero expression is {nonzero.min():.4f}")
+    logger.debug(f"GIMME: maximum expression is {expression.max():.4f}")
+
+    expression[(expression < min_expr_percentile) & (expression > 0)] = 0
+    expression[expression >= min_expr_percentile] = 1
+
+    suffix: str = {1: "st", 2: "nd", 3: "rd"}.get(threshold_percentile, "th")
+    logger.debug(f"GIMME: {threshold_percentile}{suffix} percentile is {min_expr_percentile:.4f}")
+
+    s_matrix: list[float] = list(np.asarray(cobra.util.array.create_stoichiometric_matrix(model=model), dtype=float))
+    reaction_ids: list[str] = [r.id for r in model.reactions]
+    metabolite_ids: list[str] = [m.id for m in model.metabolites]
+
     # `Becker and Palsson (2008). Context-specific metabolic networks are
     # consistent with experiments. PLoS Comput. Biol. 4, e1000082.`
     properties = GIMMEProperties(
-        exp_vector=expr_vector,  # np.array(gimme_data['0']),
-        obj_frac=0.9,
+        exp_vector=list(expression),
         objectives=[{idx_objective: 1}],
         preprocess=True,
-        flux_threshold=0.9,
+        reaction_ids=reaction_ids,
+        metabolite_ids=metabolite_ids,
+        solver=solver.upper(),
     )
     algorithm = GIMME(s_matrix, list(lower_bounds), list(upper_bounds), properties)
-    gene_activity = algorithm.run()
-    reaction_ids = [r.id for r in model_reconstruction.reactions]
-    to_remove_ids = [reaction_ids[r] for r in np.where(gene_activity == 0)[0]]
+    active_rxn_indices: list[int] = algorithm.run()
+    to_remove_ids: list[str | cobra.Reaction] = [
+        reaction_ids[i] for i in range(len(model.reactions)) if i not in active_rxn_indices
+    ]
+    model.remove_reactions(to_remove_ids, True)
 
-    model_reconstruction.remove_reactions(to_remove_ids, True)
-    psol = pfba(model_reconstruction)  # noqa: F841
+    # psol = pfba(model)
     # reaction_ids = [r.id for r in context_cobra_model.reactions]
     # psol = context_cobra_model.optimize()
     # to_remove_ids = [reaction_ids[r] for r in np.where(abs(psol.fluxes) < 1e-8)[0]]
     # context_cobra_model.remove_reactions(to_remove_ids, True)
 
-    return model_reconstruction
+    return model
 
 
 def _build_with_fastcore(
@@ -338,12 +362,12 @@ def _build_with_tinit(
         allow_excretion=False,
         no_reverse_loops=True,
     )
-    model_reconstruction = reference_model.copy()
-    s_matrix: npt.NDArray[float] = np.asarray(cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction), dtype=float)
-    algorithm = tINIT(s_matrix, lower_bounds, upper_bounds, properties)
-    algorithm.preprocessing()
-    algorithm.build_problem()
-    _log_and_raise_error("tINIT is not yet implemented.", error=NotImplementedError, level=LogLevel.CRITICAL)
+    s_matrix: npt.NDArray[np.floating] = np.asarray(
+        cobra.util.array.create_stoichiometric_matrix(model=model), dtype=float
+    )
+    algorithm = tINIT(s_matrix, np.asarray(lower_bounds), np.asarray(upper_bounds), properties)
+    active_rxn_indices: npt.NDArray[np.integer] = algorithm.run()
+
 
 def _build_with_corda(
     reference_model: cobra.Model,
