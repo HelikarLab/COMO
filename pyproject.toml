@@ -28,7 +28,7 @@ dependencies = [
     "statsmodels>=0.13.0; python_version < '3.12'",
     "statsmodels>=0.14.0; python_version >= '3.12'",
     "troppo@git+https://github.com/JoshLoecker/troppo@master",
-    "zfpkm>=1.0.3",
+    "zfpkm>=1.1.0",
 ]
 
 [project.optional-dependencies]

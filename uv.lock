@@ -526,7 +526,7 @@ requires-dist = [
     { name = "statsmodels", marker = "python_full_version < '3.12'", specifier = ">=0.13.0" },
     { name = "statsmodels", marker = "python_full_version >= '3.12'", specifier = ">=0.14.0" },
     { name = "troppo", git = "https://github.com/JoshLoecker/troppo?rev=master" },
-    { name = "zfpkm", specifier = ">=1.0.3" },
+    { name = "zfpkm", specifier = ">=1.1.0" },
 ]
 provides-extras = ["gurobi", "interactive"]
 
@@ -3697,7 +3697,7 @@ wheels = [
 
 [[package]]
 name = "zfpkm"
-version = "1.0.3"
+version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "loguru" },
@@ -3705,9 +3705,9 @@ dependencies = [
     { name = "numpy" },
     { name = "pandas" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e3/7f/ff714f85601cd66439f2beed0d740772509b32b8be5a8b01a53652248714/zfpkm-1.0.3.tar.gz", hash = "sha256:58830ea61e6adc0c75f28d5304885bd03a33a6e9e56aa693856cbb37e30a5046", size = 15410, upload-time = "2025-11-10T16:47:45.614Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0d/bf/43471c26e47fc38b5f748723e3bfa104f77ee0352f5b6a242f8b01786ae4/zfpkm-1.1.0.tar.gz", hash = "sha256:c159f78703d9d853c5f8cbbc590fb9381f097329487947d4eaf95c72ab309870", size = 15623, upload-time = "2026-03-06T16:22:29.929Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/11/f8/ef2baeaf2d15682d5d663c3f5165b63abad114fc0c4cd90b67b1ed0a6456/zfpkm-1.0.3-py3-none-any.whl", hash = "sha256:085007f97e75e50d686677ee28e3fceba5fc19958b35e9fbad3756ca2302a219", size = 17841, upload-time = "2025-11-10T16:47:44.805Z" },
+    { url = "https://files.pythonhosted.org/packages/85/a1/10cf3c5268131d37a4a968a1f5f935a07e81cb78dbb83e8bedc4a835c048/zfpkm-1.1.0-py3-none-any.whl", hash = "sha256:765d1785a22729adeb89732da01ba47abcbc9597c17c587e42176398a758b7a3", size = 18103, upload-time = "2026-03-06T16:22:29.104Z" },
 ]
 
 [[package]]
