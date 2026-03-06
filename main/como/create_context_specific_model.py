@@ -229,35 +229,95 @@ def _build_with_imat(
     solver: str,
     build_settings: ModelBuildSettings,
 ) -> cobra.Model:
+    model = reference_model.copy()
+
+    # `list()` is required because imat uses `if core:`; this returns an error on numpy arrays
+    force_rxn_list = list(np.asarray(force_reaction_indices, dtype=int))
     properties: IMATProperties = IMATProperties(
         exp_vector=expr_vector,
-        exp_thresholds=expr_thresh,
-        # core=np.array(force_gene_indices).tolist(),
-        core=list(force_reaction_indices),  # `list()` is required because imat uses `if core:`; this returns an error on numpy arrays
-        epsilon=0.01,
-        solver=solver.upper(),
+        exp_thresholds=(
+            low_expression_threshold,
+            high_expression_threshold,
+        ),
+        tolerance=build_settings.min_reaction_flux,
+        core=force_rxn_list,
+        epsilon=build_settings.troppo_epsilon,
+        solver=solver,
     )
 
-    # Creating a copy of the model ensures we don't make any in-place modifications by accident
     # Using cobra to create the stoichiometry matrix means we have less work to do
-    force_reaction_indices = np.array(force_reaction_indices, dtype=np.uint16)
-    model_reconstruction: cobra.Model = reference_model.copy()
-    s_matrix: npt.NDArray[float] = cobra.util.array.create_stoichiometric_matrix(model=model_reconstruction)
-    algorithm: IMAT = IMAT(S=s_matrix, lb=np.array(lower_bounds), ub=np.array(upper_bounds), properties=properties)
-    rxns_from_imat: npt.NDArray[np.uint16] = algorithm.run().astype(np.uint16)
+    s_matrix: npt.NDArray[np.floating] = cast(
+        npt.NDArray[np.floating], cobra.util.array.create_stoichiometric_matrix(model=model)
+    )
+    algorithm: IMAT = IMAT(S=s_matrix, lb=lower_bounds, ub=upper_bounds, properties=properties)
+
+    # Match Troppo's iMAT high/low bin calculations
+    high_index = np.where(expr_vector >= high_expression_threshold)[0].astype(int)
+    low_index = np.where((expr_vector >= 0) & (expr_vector < low_expression_threshold))[0].astype(int)
+    if force_reaction_indices.size > 0:
+        high_index = np.union1d(high_index, force_reaction_indices)
+    lso, lsystem = algorithm.generate_imat_problem(
+        S=algorithm.S,
+        lb=algorithm.lb,
+        ub=algorithm.ub,
+        high_idx=high_index,
+        low_idx=low_index,
+        epsilon=build_settings.troppo_epsilon,
+    )
+    # reset default Troppo/Cobamp thresholds
+    cfg = lsystem.get_configuration()
+    cfg.verbosity = build_settings.solver_verbosity
+    cfg.timeout = build_settings.solver_timeout
+    cfg.tolerances.feasibility = build_settings.solver_feasibility
+    cfg.tolerances.optimality = build_settings.solver_optimality
+    cfg.tolerances.integrality = build_settings.solver_integrality
+    grb_model = getattr(getattr(cfg, "problem", None), "problem", None)  # `getattr` to handle non-gurobi solvers
+    if grb_model is not None:
+        grb_model.Params.MIPGap = build_settings.gurobi_mipgap
+        grb_model.Params.IntegralityFocus = build_settings.gurobi_integrality_focus
+        grb_model.Params.NumericFocus = build_settings.gurobi_numeric_focus
+
+    # Keep reactions from imat + force-included reactions
+    solution: cobamp.core.optimization.Solution = lso.optimize()
+    x_sol: npt.NDArray[np.floating] = solution.x().astype(float)
+
+    # partition the solution into the following components:
+    #   1) High-bin, forward-direction reactions
+    #   2) High-bin, reverse-direction reactions
+    #   3) Activated low-bin reactions
+    n_rxns = len(reference_model.reactions)
+    expected_len = n_rxns + (2 * high_index.size) + low_index.size
+    if expected_len != x_sol.size:
+        raise ValueError(
+            f"Unexpected solution length: got {x_sol.size}, expected {expected_len}"
+            f"(n_rxns={n_rxns}, n_high_index={high_index.size}, n_low_index={low_index.size}"
+        )
+
+    part: int = 0
+    flux_vector: npt.NDArray[np.floating] = x_sol[part : part + n_rxns]
+    part += n_rxns
+    high_forward: npt.NDArray[np.floating] = x_sol[part : part + high_index.size]
+    part += high_index.size
+    high_reverse: npt.NDArray[np.floating] = x_sol[part : part + high_index.size]
+    part += high_index.size + low_index.size
+
+    # iMAT binarizes at ~0 and ~1 for off/on reactions,
+    #   so we can use 0.5 as the midpoint for defining inclusion/exclusion
+    high_forward_rxns: npt.NDArray[np.integer] = high_index[high_forward > 0.5]
+    high_reverse_rxns: npt.NDArray[np.integer] = high_index[high_reverse > 0.5]
+    high_on_rxns = np.unique(np.concatenate([high_forward_rxns, high_reverse_rxns])).astype(int)
+
+    # Low bin reactions may be included if it has a flux greater than `min_reaction_flux`
+    flux_keep = np.where(np.abs(solution.x())[:n_rxns] >= build_settings.min_reaction_flux)[0].astype(int)
+    to_keep = np.unique(np.concatenate([flux_keep, high_on_rxns, force_reaction_indices]))
 
     # Collect all reaction IDs and their associated index (e.g., HEX1 is at index 123)
-    all_rxn_ids: npt.NDArray[str] = np.array([r.id for r in model_reconstruction.reactions], dtype=object)
-    all_rxn_indices: npt.NDArray[np.uint16] = np.array(range(len(model_reconstruction.reactions)), dtype=np.uint16)
-
-    rxn_indices_to_keep: npt.NDArray[int] = np.unique(np.concatenate([rxns_from_imat, force_reaction_indices], dtype=int))
-
-    # Reaction indices to exclude from the model are thus reactions that are not marked to be included in the model
-    # Assume unique is false because every value that is in `rxn_indices_to_keep` is included in `all_rxn_indices`
-    rxn_indices_to_remove: npt.NDArray[np.uint16] = np.setdiff1d(all_rxn_indices, rxn_indices_to_keep, assume_unique=False)
-    model_reconstruction.remove_reactions(reactions=all_rxn_ids[rxn_indices_to_remove].tolist(), remove_orphans=True)
-
-    return model_reconstruction
+    all_rxn_ids: npt.NDArray[np.str_] = np.asarray([r.id for r in model.reactions], dtype=str)
+    to_remove = np.ones(shape=len(model.reactions), dtype=bool)
+    to_remove[to_keep] = False
+    remove_rxn_ids: list[str | cobra.Reaction] = list(all_rxn_ids[to_remove])
+    model.remove_reactions(reactions=remove_rxn_ids, remove_orphans=True)
+    return model
 
 
 def _build_with_tinit(
