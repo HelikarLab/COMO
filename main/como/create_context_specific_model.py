@@ -67,7 +67,7 @@ def _correct_bracket(rule: str, name: str) -> str:
         right_name = name[name_match.span()[1] :]
         operator = rule_match.group()
 
-    new_right_rule = []
+    new_right_rule: list[str] = []
     for char in list(left_rule):
         if char.isspace() or char.isdigit():
             new_right_rule.append(char)
@@ -320,10 +320,10 @@ def _map_expression_to_reaction(
     reference_model: cobra.Model,
     gene_expression_file: Path,
     recon_algorithm: Algorithm,
-    low_thresh: float,
-    high_thresh: float,
-    taxon: int | str | Taxon,
-) -> collections.OrderedDict[str, int]:
+    taxon: int | str,
+    low_percentile: int,
+    high_percentile: int,
+) -> tuple[collections.OrderedDict[str, float], float, float, float]:
     """Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules.
 
     These rules should be defined in the general genome-scale metabolic model
@@ -332,76 +332,108 @@ def _map_expression_to_reaction(
         reference_model: A COBRA model object representing the general genome-scale metabolic model.
         gene_expression_file: Path to a gene expression file (.csv, .tsv, .xlsx, or .xls)
         recon_algorithm: Algorithm to use for reconstruction (GIMME, FASTCORE, iMAT, or tINIT)
-        low_thresh: Low expression threshold for algorithms that require it (iMAT, tINIT)
-        high_thresh: High expression threshold for algorithms that require it (iMAT, tINIT)
         taxon: Taxon ID or Taxon object for gene ID conversion.
+        low_percentile: Low percentile for threshold calculation
+        high_percentile: High percentile for threshold calculation
 
     Returns:
-        An ordered dictionary mapping reaction IDs to their corresponding expression values.
+        [0]: An ordered dictionary mapping reaction IDs to their corresponding expression values.
+        [1]: The abs(minimum value) from the expression vector
+        [2]: The adjusted `low_expr` value
+        [3]: The adjusted `high_expr` value
 
     Raises:
         ValueError: If neither 'entrez_gene_id' nor 'ensembl_gene_id' columns are found in the gene expression file.
     """
-    expression_data = await _read_file(gene_expression_file)
-    identifier_column = next((col for col in ("entrez_gene_id", "ensembl_gene_id") if col in expression_data.columns), "")
-
-    if not identifier_column:
-        raise ValueError(
-            f"At least one column of 'entrez_gene_id' or 'ensembl_gene_id' could not be found in the gene expression file '{gene_expression_file}'"
-        )
+    expression_data = pd.read_csv(gene_expression_file)
     gene_activity = split_gene_expression_data(
-        expression_data,
-        identifier_column=cast(Literal["ensembl_gene_id", "entrez_gene_id"], identifier_column),
-        recon_algorithm=recon_algorithm,
+        expression_data, identifier_column="entrez_gene_id", recon_algorithm=recon_algorithm
     )
 
-    # convert ensembl IDs to entrez ids to map expression data to reactions in the reference model
-    if identifier_column == "ensembl_gene_id":
-        conversion = await ensembl_to_gene_id_and_symbol(ids=gene_activity.index.tolist(), taxon=taxon)
-        gene_activity = gene_activity.merge(conversion, how="left", left_index=True, right_on="ensembl_gene_id")
-        gene_activity = gene_activity.set_index(keys=["entrez_gene_id"])
-        gene_activity = gene_activity.drop(columns=["ensembl_gene_id", "gene_symbol"])
+    # adjust expression to have a minimum value of 0; if the minimum value is already 0, this does nothing
+    gene_arr = gene_activity["active"].to_numpy(dtype=float, copy=False)
+    min_val = float(gene_arr[np.isfinite(gene_arr)].min())
+    if min_val < 0:
+        gene_arr[np.isfinite(gene_arr)] += abs(min_val)
 
-    reaction_expression = collections.OrderedDict()
+    # We are computing percentiles on non-zero data because we need to make sure that
+    #   zero values are definitely placed in the low bin
+    low_expr, high_expr = np.nanpercentile(gene_arr[gene_arr > 0], [low_percentile, high_percentile])
+    gene_activity["active"] = gene_arr
+    gene_activity.index = gene_activity.index.astype(str)  # maintain strings for reference model gene_ids
 
     # fmt: off
-    # Define a default expression value if a gene ID is not found
-    default_expression = (
-        np.mean([low_thresh, high_thresh]) if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT}
-        else -1 if recon_algorithm == Algorithm.GIMME
+    # Define a default expression values for the following conditions:
+    # 1. `no_expression`: If a reaction has a gene reaction rule but is not found in the data, then
+    #       we can be positive that the reaction should be marked as inactive
+    #   For all algorithms, placing no-expression data at an expression value of 0.0 will
+    #       mark it as inactive, because we have adjusted the data to be >= 0 above
+    no_expression = 0
+    # 2. `missing_gpr`: If a reaction has no gene reaction rule, we don't know if it should be marked as (in)active
+    #   Thus, place it in a no-cost location where possible, otherwise mark it as inactive
+    #   IMAT/TINIT/GIMME: Place in mid-bin, which is a "no-cost weight" value
+    #   FASTCORE: Mark as inactive, which is the best we can do with FASTCORE
+    missing_gpr = (
+        # -1 if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT, Algorithm.GIMME}
+        (low_expr + high_expr) / 2 if recon_algorithm in {Algorithm.IMAT, Algorithm.TINIT, Algorithm.GIMME}
         else 0 if recon_algorithm == Algorithm.FASTCORE
         else 1
     )
     # fmt: on
 
+    reaction_expression: collections.OrderedDict[str, float] = collections.OrderedDict()
+    activity_map = cast(dict[str, float], gene_activity.loc[:, "active"].to_dict())
     error_count = 0
+    _base_warn = "could not generate evaluable gene rule."
     for rxn in reference_model.reactions:
         rxn: cobra.Reaction
-
         gene_reaction_rule = rxn.gene_reaction_rule
+
         if not gene_reaction_rule:
+            reaction_expression[rxn.id] = missing_gpr
             continue
 
-        gene_ids = set(re.findall(r"\d+", gene_reaction_rule))
-        reaction_expression[rxn.id] = default_expression
+        gene_ids: set[str] = set(re.findall(r"\d+", gene_reaction_rule))
         for gene_id in gene_ids:
-            activity = gene_activity.at[gene_id, "active"] if gene_id in gene_activity.index else f"{default_expression!s}"
-            # replace gene_id with activity, using optional whitespace before and after the gene id
-            # Do not replace the whitespace (if it exists) before and after the gene ID
-            gene_reaction_rule = re.sub(pattern=rf"\b{gene_id}\b", repl=str(activity), string=str(gene_reaction_rule))
+            activity = activity_map.get(gene_id, no_expression)
+            if np.isposinf(activity):  # For positive infinity values, place in high bin
+                activity = high_expr + 1
+            elif not isfinite(activity):  # For non-finite values, place in low/non-active bin
+                activity = no_expression
 
+            # Matches the standalone gene ID only when it's not part of a larger number.
+            # It ensures the ID is not immediately preceded by a digit or decimal point and not immediately followed by
+            #   a digit, so if the gene id is '48', decimals like 1.48 or numbers like 1648 are left unchanged.
+            gene_reaction_rule = re.sub(
+                pattern=rf"(?<![\d.]){gene_id}(?!\d)",
+                repl=str(activity),
+                string=str(gene_reaction_rule),
+            )
+
+        evaluable_gene_rule = None
         try:
             # We are using eval here because ast.literal_eval is unable to process an evaluable such as `max(-4, 0, 1)`
-            # This isn't ideal, but ultimately the only other option is writing and maintaining a custom parsing engine, which is too much work
+            # This isn't ideal, but ultimately the only other option is writing and maintaining a custom parsing engine
+            #   but this is too much work
             evaluable_gene_rule = _gene_rule_logical(gene_reaction_rule).replace("{", "(").replace("}", ")")
             reaction_expression[rxn.id] = eval(evaluable_gene_rule)  # noqa: S307
+
         except ValueError:
+            logger.warning(f"ValueError for Reaction '{rxn.id}': {evaluable_gene_rule or _base_warn}")
             error_count += 1
+        except NameError:
+            logger.warning(f"NameError for Reaction '{rxn.id}': {evaluable_gene_rule or _base_warn}")
+            error_count += 1
+        except SyntaxError as e:
+            raise SyntaxError(f"SyntaxError on Reaction '{rxn.id}': {evaluable_gene_rule or _base_warn}") from e
+        except Exception as e:
+            error_type = type(e).__name__
+            raise RuntimeError(
+                f"Unexpected error {error_type} on Reaction '{rxn.id}': {evaluable_gene_rule or _base_warn}"
+            ) from e
 
     logger.debug(f"Mapped gene expression to reactions, found {error_count} error(s).")
-    # expr_vector = np.array(list(reaction_expression.values()), dtype=float)
-
-    return reaction_expression
+    return reaction_expression, float(min_val), float(low_expr), float(high_expr)
 
 
 def _read_reference_model(filepath: Path) -> cobra.Model:
