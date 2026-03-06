@@ -992,23 +992,25 @@ def create_context_specific_model(  # noqa: C901
         taxon=taxon_id,
         build_settings=build_settings or ModelBuildSettings(),
     )
-
-    build_results.infeasible_reactions.dropna(inplace=True)
-    build_results.infeasible_reactions.to_csv(output_infeasible_reactions_filepath, index=False)
+    context_model.id = contextualized_model_id or context_name
 
     if algorithm == Algorithm.FASTCORE:
-        fastcore_df = pd.DataFrame(build_results.expression_index_list)
+        fastcore_df = pd.DataFrame([r.id for r in context_model.reactions])
         fastcore_df.dropna(inplace=True)
         fastcore_df.to_csv(output_fastcore_expression_index_filepath, index=False)
 
-    await _write_model_to_disk(
+    _write_model_to_disk(
         context_name=context_name,
-        model=build_results.model,
+        model=context_model,
         output_filepaths=output_model_filepaths,
         mat_suffix=mat_suffix,
         json_suffix=json_suffix,
         xml_suffix=xml_suffix,
     )
     logger.info(
-        f"context={context_name}, reactions={len(build_results.model.reactions)}, genes={len(build_results.model.genes)}, metabolites={len(build_results.model.metabolites)}"
+        f"context={context_name}, "
+        f"reactions={len(context_model.reactions)}, "
+        f"genes={len(context_model.genes)}, "
+        f"metabolites={len(context_model.metabolites)}"
     )
+    return context_model
