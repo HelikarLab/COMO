@@ -581,12 +581,8 @@ def _build_model(
          list of expression indices used
         A DataFrame of infeasible reactions.
     """
-    reference_model: cobra.Model = _read_reference_model(general_model_file)
-
     if objective not in force_reactions:
-        force_reactions.append(objective)
-    reference_model = _set_boundaries(reference_model, boundary_reactions, lower_bounds, upper_bounds)
-    reference_model.solver = solver.lower()
+        force_reactions.append(objective)  # forcibly include the objective in the reconstructed model
 
     # Set reference model boundaries
     for rxn, lb, ub in zip(boundary_reactions, lower_bounds, upper_bounds, strict=True):
