@@ -181,7 +181,7 @@ wheels = [
 
 [[package]]
 name = "bioservices"
-version = "1.12.1"
+version = "1.13.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "appdirs" },
@@ -201,9 +201,9 @@ dependencies = [
     { name = "wrapt" },
     { name = "xmltodict" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5e/51/1a8dc87ffc6c27e0a896b982da3ff1b483f5ef85a47ae1ffafbc6a479bb4/bioservices-1.12.1.tar.gz", hash = "sha256:0f31782ae50930d4ab82b43f98d1ca2cc9befaa699f3a7a6cba512a8f9e2cab0", size = 218752, upload-time = "2025-02-27T22:38:58.628Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/99/8c/b9a20b6656446daaea5f3085d5465aad8f536c95fd14ffd6fcdcdf410031/bioservices-1.13.0.tar.gz", hash = "sha256:24d30be650d37c1377b4fd452abead9ec5ee891dbdaa96a21543ab508d401386", size = 220384, upload-time = "2026-03-02T14:49:11.002Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/c9/656854139abbdc0a09d544bacc6fa3132245ebf9847dd45da9a8e416c5a5/bioservices-1.12.1-py3-none-any.whl", hash = "sha256:898033fe0158a0e31ea5ad93ff02f5000aa67ff9d06e9dc6477583d3f60ace80", size = 258032, upload-time = "2025-02-27T22:38:56.406Z" },
+    { url = "https://files.pythonhosted.org/packages/27/49/93a413b3b70a96e525f11212d0ca7992c4c7b35c47da78bf227a52282e85/bioservices-1.13.0-py3-none-any.whl", hash = "sha256:aaafb5ee246bccd9323a21de12ea6a35163e01c1ed4777e45acbda565804fc32", size = 259727, upload-time = "2026-03-02T14:49:09.879Z" },
 ]
 
 [[package]]
@@ -504,7 +504,7 @@ dev = [
 requires-dist = [
     { name = "aioftp", specifier = ">=0.23.1" },
     { name = "anndata", specifier = ">=0.12.0" },
-    { name = "bioservices", specifier = ">=1.12.1" },
+    { name = "bioservices", specifier = ">=1.13.0" },
     { name = "cobamp", git = "https://github.com/JoshLoecker/cobamp?rev=master" },
     { name = "cobra", specifier = ">=0.28.0" },
     { name = "gurobipy", marker = "extra == 'gurobi'", specifier = "<14" },
