@@ -739,31 +739,70 @@ def _collect_boundary_reactions(
             "reaction",
             "abbreviation",
             "compartment",
-            "minimum reaction rate",
-            "maximum reaction rate",
+            "lower bound",
+            "upper bound",
         ]:
             raise ValueError(
-                f"Boundary reactions file must have columns named 'Reaction', 'Abbreviation', 'Compartment', "
-                f"'Minimum Reaction Rate', and 'Maximum Reaction Rate'. Found: {column}"
+                f"Boundary reactions file must have columns named 'reaction', 'abbreviation', 'compartment', "
+                f"'lower bound', and 'upper bound'. Found: '{column}'"
             )
 
-    reactions: list[str] = [""] * len(df)
-    boundary_type: list[str] = df["reaction"].tolist()
-    reaction_abbreviation: list[str] = list(df["abbreviation"].astype(str))
-    reaction_compartment: list[str] = list(df["compartment"].astype(str))
-    boundary_map = {"exchange": "EX", "demand": "DM", "sink": "SK"}
-    for i in range(len(boundary_type)):
-        boundary: str = boundary_type[i].lower()
-        if boundary not in boundary_map:
-            raise ValueError(f"Boundary reaction type must be 'Exchange', 'Demand', or 'Sink'. Found: {boundary}")
+    for compartment in df["compartment"].unique():
+        as_shorthand = CobraCompartments.get_shorthand(compartment) if len(compartment) > 2 else compartment
+        if as_shorthand not in reference_model.compartments:
+            raise ValueError(f"Unknown compartment: '{compartment}'")
 
-        shorthand_compartment = CobraCompartments.get_shorthand(reaction_compartment[i])
-        reactions[i] = f"{boundary_map.get(boundary)}_{reaction_abbreviation[i]}[{shorthand_compartment}]"
+    boundary_map = {"exchange": "EX", "demand": "DM", "sink": "SK"}
+    for exchange in df["reaction"].str.lower().unique():
+        if boundary_map.get(exchange) is None:
+            raise ValueError(
+                f"Unable to determine reaction type for: '{exchange}'\n"
+                f"Validate the boundary reactions file has a 'Reaction' value of: 'Exchange', 'Demand', or 'Sink'."
+            )
+
+    reactions: list[str] = []
+    lower_bounds: list[float] = []
+    upper_bounds: list[float] = []
+    for ref_rxn in reference_model.boundary:
+        ref_rxn: cobra.Reaction
+
+        # Remove prefixes from reactions: EX_glc_D[e] -> glc_D[e]; DM_h2o[c] -> h2o[c]; sink_o2[m] -> o2[m]
+        # Then remove suffixes from reactions: glc_D[e] -> glc_D; h2o[c] -> h2o; o2[m] -> o2
+        base_rxn_id: str = ref_rxn.id.split("_", maxsplit=1)[1]
+        base_rxn_id = base_rxn_id.split("[", maxsplit=1)[0]
+
+        # If we are excluding unlisted exchange reactions from the model,
+        #   then we need to set their lower/upper bounds to 0
+        # Otherwise, keep the unlisted exchanges as their default
+        if base_rxn_id not in df["abbreviation"].values:
+            reactions.append(ref_rxn.id)
+            lower_bounds.append(0 if close_unlisted_exchanges else ref_rxn.lower_bound)
+            upper_bounds.append(0 if close_unlisted_exchanges else ref_rxn.upper_bound)
+            continue
+
+        rxn_index = df[df["abbreviation"] == base_rxn_id].index.item()
+        shorthand_compartment = CobraCompartments.get_shorthand(str(df.at[rxn_index, "compartment"]))
+        exch_type: str | None = boundary_map.get(str(df.at[rxn_index, "reaction"]).lower())
+        lower_bound, upper_bound = df.loc[rxn_index, ["lower bound", "upper bound"]].astype(float).values.ravel()
+
+        # The boundary reactions are built on the base reaction id;
+        #   if the reference model boundary has a matching base ID, but a non-matching
+        #   boundary type (exchange, sink, demand), this will check to make sure we are not
+        #   mistakingly setting boundaries that should not exist
+        formatted_boundary_reaction = f"{exch_type}_{base_rxn_id}[{shorthand_compartment}]"
+        if ref_rxn.id == formatted_boundary_reaction:
+            reactions.append(formatted_boundary_reaction)
+            lower_bounds.append(lower_bound)
+            upper_bounds.append(upper_bound)
+        else:
+            reactions.append(ref_rxn.id)
+            lower_bounds.append(0 if close_unlisted_exchanges else ref_rxn.lower_bound)
+            upper_bounds.append(0 if close_unlisted_exchanges else ref_rxn.upper_bound)
 
     return _BoundaryReactions(
         reactions=reactions,
-        lower_bounds=df["minimum reaction rate"].tolist(),
-        upper_bounds=df["maximum reaction rate"].tolist(),
+        lower_bounds=lower_bounds,
+        upper_bounds=upper_bounds,
     )
 
 
