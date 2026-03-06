@@ -722,15 +722,8 @@ def _build_model(
 def _create_df(path: Path, *, lowercase_col_names: bool = False) -> pd.DataFrame:
     if path.suffix not in {".csv", ".tsv"}:
         raise ValueError(f"File must be a .csv or .tsv file, got '{path.suffix}'")
-    df: pd.DataFrame = await _read_file(path=path, header=0, sep="," if path.suffix == ".csv" else "\t", h5ad_as_df=True)
 
-    if not isinstance(df, pd.DataFrame):
-        _log_and_raise_error(
-            f"Expected a pandas.DataFrame, got {type(df)}",
-            error=TypeError,
-            level=LogLevel.ERROR,
-        )
-
+    df = pd.read_csv(path, header=0, sep="," if path.suffix == ".csv" else "\t")
     if lowercase_col_names:
         df.columns = [c.lower() for c in df.columns]
     return df
