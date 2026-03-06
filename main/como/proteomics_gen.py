@@ -8,7 +8,6 @@ from typing import TextIO, cast
 import numpy as np
 import pandas as pd
 from bioservices import BioDBNet
-from fast_bioservices.biodbnet import Input, Output  # BioDBNet
 from loguru import logger
 
 from como.data_types import LogLevel
@@ -184,7 +183,9 @@ def load_proteomics_tests(filename, context_name) -> tuple[str, pd.DataFrame]:
         return context_name, data
 
     else:
-        logger.warning(f"Proteomics gene expression file for {context_name} was not found at {full_save_filepath}. Is this intentional?")
+        logger.warning(
+            f"Proteomics gene expression file for {context_name} was not found at {full_save_filepath}. Is this intentional?"
+        )
         return load_empty_dict()
 
 
