@@ -18,8 +18,7 @@ from como.data_types import (
     _OutputCombinedSourceFilepath,
     _SourceWeights,
 )
-from como.pipelines.identifier import convert
-from como.utils import LogLevel, get_missing_gene_data, log_and_raise_error, num_columns
+from como.pipelines.identifier import get_remaining_identifiers
 from como.utils import num_columns
 
 
@@ -287,7 +286,7 @@ async def _begin_combining_distributions(
                 matrix_subset = matrix_subset.set_index(keys=[GeneIdentifier.entrez_gene_id.value], drop=True)
                 matrix_subset = matrix_subset.drop(columns=["gene_symbol", "ensembl_gene_id"], errors="ignore")
             elif isinstance(matrix, sc.AnnData):
-                conversion = convert(ids=matrix.var_names.tolist(), taxon=taxon)
+                conversion = get_remaining_identifiers(ids=matrix.var_names.tolist(), taxon=taxon)
                 conversion.reset_index(drop=False, inplace=True)
                 matrix: pd.DataFrame = matrix.to_df().T
                 matrix.reset_index(inplace=True, drop=False, names=["gene_symbol"])
