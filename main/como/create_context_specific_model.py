@@ -1,25 +1,24 @@
 from __future__ import annotations
 
-import asyncio
 import collections
 import os
 import re
 import sys
-from collections.abc import Coroutine, Sequence
+from collections.abc import Sequence
 from io import TextIOWrapper
+from math import isfinite
+from multiprocessing import Value
 from pathlib import Path
-from typing import Any, Literal, TextIO, cast
+from typing import Literal, Never, TextIO, cast, reveal_type
 
+import cobamp.core.optimization
 import cobra
 import cobra.util.array
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from cobra import Model
-from cobra.flux_analysis import pfba
-from fast_bioservices.common import Taxon
-from fast_bioservices.pipeline import ensembl_to_gene_id_and_symbol
 from loguru import logger
+from troppo.methods.reconstruction.corda import CORDA, CORDAProperties
 from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
 from troppo.methods.reconstruction.gimme import GIMME, GIMMEProperties
 from troppo.methods.reconstruction.imat import IMAT, IMATProperties
@@ -27,7 +26,6 @@ from troppo.methods.reconstruction.tINIT import tINIT, tINITProperties
 
 from como.data_types import (
     Algorithm,
-    BuildResults,
     CobraCompartments,
     LogLevel,
     ModelBuildSettings,
@@ -453,6 +451,7 @@ def _read_reference_model(filepath: Path) -> cobra.Model:
 
 async def _build_model(
     general_model_file: Path,
+def _build_model(
     gene_expression_file: Path,
     recon_algorithm: Algorithm,
     objective: str,
@@ -640,7 +639,8 @@ async def _build_model(
     )
 
 
-async def _create_df(path: Path, *, lowercase_col_names: bool = False) -> pd.DataFrame:
+
+def _create_df(path: Path, *, lowercase_col_names: bool = False) -> pd.DataFrame:
     if path.suffix not in {".csv", ".tsv"}:
         raise ValueError(f"File must be a .csv or .tsv file, got '{path.suffix}'")
     df: pd.DataFrame = await _read_file(path=path, header=0, sep="," if path.suffix == ".csv" else "\t", h5ad_as_df=True)
@@ -657,8 +657,14 @@ async def _create_df(path: Path, *, lowercase_col_names: bool = False) -> pd.Dat
     return df
 
 
-async def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
-    df: pd.DataFrame = await _create_df(path, lowercase_col_names=True)
+def _collect_boundary_reactions(
+    path: Path,
+    reference_model: cobra.Model,
+    *,
+    close_unlisted_exchanges: bool,
+) -> _BoundaryReactions:
+    df: pd.DataFrame = _create_df(path, lowercase_col_names=True)
+
     for column in df.columns:
         if column not in [
             "reaction",
@@ -692,7 +698,7 @@ async def _collect_boundary_reactions(path: Path) -> _BoundaryReactions:
     )
 
 
-async def _write_model_to_disk(
+def _write_model_to_disk(
     context_name: str,
     model: cobra.Model,
     output_filepaths: list[Path],
@@ -700,24 +706,22 @@ async def _write_model_to_disk(
     json_suffix: set[str],
     xml_suffix: set[str],
 ) -> None:
-    tasks: set[Coroutine[Any, Any, None]] = set()
     for path in output_filepaths:
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.suffix in mat_suffix:
-            tasks.add(asyncio.to_thread(cobra.io.save_matlab_model, model=model, file_name=path))
+            cobra.io.save_matlab_model(model=model, file_name=path)
         elif path.suffix in json_suffix:
-            tasks.add(asyncio.to_thread(cobra.io.save_json_model, model=model, filename=path, pretty=True))
+            cobra.io.save_json_model(model=model, filename=path, pretty=True)
         elif path.suffix in xml_suffix:
-            tasks.add(asyncio.to_thread(cobra.io.write_sbml_model, model=model, filename=path))
+            cobra.io.write_sbml_model(cobra_model=model, filename=path)
         else:
             raise ValueError(
                 f"Invalid output model filetype. Should be one of .xml, .sbml, .mat, or .json. Got '{path.suffix}'"
             )
-        logger.success(f"Will save metabolic model for context '{context_name}' to: '{path}'")
-    await asyncio.gather(*tasks)
+        logger.success(f"Model for context '{context_name}' saved to to: '{path}'")
 
 
-async def create_context_specific_model(  # noqa: C901
+def create_context_specific_model(  # noqa: C901
     context_name: str,
     taxon: int | str | Taxon,
     reference_model: Path,
