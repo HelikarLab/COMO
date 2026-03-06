@@ -188,7 +188,7 @@ def load_proteomics_tests(filename, context_name) -> tuple[str, pd.DataFrame]:
         )
         return load_empty_dict()
 
-
+# TODO: Convert to synchronous function
 async def proteomics_gen(
     context_name: str,
     config_filepath: Path,
