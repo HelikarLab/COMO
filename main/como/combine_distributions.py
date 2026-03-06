@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import cast
 
 import numpy as np
 import pandas as pd
+import scanpy as sc
 from loguru import logger
 
 from como.data_types import (
@@ -18,8 +18,7 @@ from como.data_types import (
     _OutputCombinedSourceFilepath,
     _SourceWeights,
 )
-from como.pipelines.identifier import convert
-from como.utils import LogLevel, get_missing_gene_data, log_and_raise_error, num_columns
+from como.pipelines.identifier import get_remaining_identifiers
 from como.utils import num_columns
 
 
@@ -30,23 +29,17 @@ def _combine_z_distribution_for_batch(
     source: SourceTypes,
     output_combined_matrix_filepath: Path,
     output_figure_dirpath: Path,
-    weighted_z_floor: int,
-    weighted_z_ceiling: int,
 ) -> pd.DataFrame:
     """Combine z-score distributions across samples for a single batch.
 
-    Args:
-        context_name: Name of the context (e.g., tissue or condition).
-        batch: Batch entry containing batch number and sample names.
-        matrix: DataFrame with 'ensembl_gene_id' and sample columns.
-        source: Source type (e.g., trna, mrna, scrna, proteomics).
-        output_combined_matrix_filepath: Path to save the combined z-score matrix.
-        output_figure_dirpath: Path to save the z-score distribution figure.
-        weighted_z_floor: Minimum z-score value after combining.
-        weighted_z_ceiling: Maximum z-score value after combining.
+    :param context_name: Name of the context (e.g., tissue or condition).
+    :param batch: Batch entry containing batch number and sample names.
+    :param matrix: DataFrame with 'ensembl_gene_id' and sample columns.
+    :param source: Source type (e.g., trna, mrna, scrna, proteomics).
+    :param output_combined_matrix_filepath: Path to save the combined z-score matrix.
+    :param output_figure_dirpath: Path to save the z-score distribution figure.
 
-    Returns:
-            A pandas dataframe of the weighted z-distributions
+    :returns: A pandas dataframe of the weighted z-distributions
     """
     output_combined_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
     output_figure_dirpath.mkdir(parents=True, exist_ok=True)
@@ -59,20 +52,30 @@ def _combine_z_distribution_for_batch(
     )
     if num_columns(matrix) < 2:
         logger.trace(
-            f"A single sample exists for batch '{batch.batch_num}'. Returning as-is because no additional combining can be done"
+            f"A single sample exists for batch '{batch.batch_num}'. "
+            f"Returning as-is because no additional combining can be done"
         )
         with_batch_num = matrix.copy()
         with_batch_num.columns = [batch.batch_num]
         return with_batch_num
 
-    values = matrix.values
-    weighted_matrix = np.clip(
-        a=np.sum(values, axis=1) / np.sqrt(values.shape[1]),  # calculate a weighted matrix
-        a_min=weighted_z_floor,
-        a_max=weighted_z_ceiling,
-    ).astype(float)
+    values = matrix.copy().replace([np.inf, -np.inf], np.nan)
+    values_array = values.to_numpy(dtype=float)
+    mask = ~np.isnan(values_array)
+    weights = np.ones(values.shape[1], dtype=float)
+    masked_values = np.where(mask, values_array * weights, 0.0)
+    weighted_sum = masked_values.sum(axis=1)
 
-    weighted_matrix = pd.DataFrame({"combine_z": weighted_matrix}, index=matrix.index)
+    weights_squared = weights**2
+    sum_weights_squared = (mask * weights_squared).sum(axis=1)
+    denominator = np.sqrt(sum_weights_squared)
+    combined_z = np.divide(
+        weighted_sum,
+        denominator,
+        out=np.full_like(weighted_sum, np.nan, dtype=float),
+        where=denominator != 0.0,
+    )
+    df = pd.DataFrame({"combine_z": combined_z}, index=values.index)
 
     # merge_df = pd.concat([matrix, pd.Series(weighted_matrix, name="combined")], axis=1)
     # stack_df = pd.melt(
@@ -92,9 +95,11 @@ def _combine_z_distribution_for_batch(
     #     / f"{context_name}_{source.value}_batch{batch.batch_num}_combined_zscore_distribution.pdf",
     # )
 
-    weighted_matrix.columns = [batch.batch_num]
-    weighted_matrix.to_csv(output_combined_matrix_filepath, index=True)
-    return weighted_matrix
+    df.columns = [batch.batch_num]
+    df.index = df.index.astype(int)
+    df = df.sort_index()
+    df.to_csv(output_combined_matrix_filepath, index=True)
+    return df
 
 
 def _combine_z_distribution_for_source(
@@ -109,7 +114,8 @@ def _combine_z_distribution_for_source(
     """Combine z-score distributions across batches for a single source.
 
     Args:
-        merged_source_data : DataFrame with columns: ["ensembl_gene_id", <batch1>, <batch2>, ...]. Each batch column contains the within-batch combined z for that gene.
+        merged_source_data : DataFrame with columns: ["ensembl_gene_id", <batch1>, <batch2>, ...].
+            Each batch column contains the within-batch combined z for that gene.
         context_name: tissue or condition name
         replicates_per_batch: vector of replicate counts per batch, aligned exactly to the order of
             batch columns in `merged_source_data.iloc[:, 1:]`.
@@ -142,19 +148,20 @@ def _combine_z_distribution_for_source(
         )
 
     logger.trace(
-        f"[{context_name}] Combining {expected_num_batches} batches with replicate counts: {dict(zip(batch_column_names, replicates_per_batch))}"
+        f"[{context_name}] Combining {expected_num_batches} batches with"
+        f" replicate counts: {dict(zip(batch_column_names, replicates_per_batch, strict=True))}"
     )
 
     # extract values and build masks (shape is in gene x batch)
     gene_by_batch_values: np.ndarray = merged_source_data.to_numpy(dtype=float)
     present_mask: np.ndarray = ~np.isnan(gene_by_batch_values)
 
-    # per-batch weights from replicate counts, normalized over all batches
+    # per-batch weights: use equal weights (Stouffer's Z method)
+    # Replicate counts are not statistically valid weights for z-scores because
+    #   z-scores are already standardized (mean=0, std=1 under null hypothesis)
+    #   Weighting by sample size assumes information about precision that was lost during standardization
     replicates_per_batch_array: np.ndarray = np.asarray(replicates_per_batch, dtype=float)
-    total_replicates: float = replicates_per_batch_array.sum()
-    if total_replicates <= 0.0:
-        raise ValueError(f"[{context_name}] Sum of replicates_per_batch must be > 0; got {total_replicates}.")
-    base_weights_per_batch: np.ndarray = replicates_per_batch_array / total_replicates  # shape: (B,)
+    base_weights_per_batch = np.ones_like(replicates_per_batch_array, dtype=float)  # shape: (B,)
 
     # drop NA columns per gene by zeroing their weights
     masked_weights_per_batch: np.ndarray = np.where(present_mask, base_weights_per_batch, 0.0)  # (G,B)
@@ -174,16 +181,17 @@ def _combine_z_distribution_for_source(
 
     logger.trace(f"[{context_name}] Finished combining batch z-distributions for source.")
 
-    return pd.DataFrame({"combine_z": combined_z_per_gene}, index=merged_source_data.index)
+    df = pd.DataFrame({"combine_z": combined_z_per_gene}, index=merged_source_data.index)
+    df.index = df.index.astype(int)
+    df = df.sort_index()
+    return df
 
 
 def _combine_z_distribution_for_context(
     context: str,
     zscore_results: list[_CombineOmicsInput],
     output_graph_filepath: Path,
-    weighted_z_floor: int = -6,
-    weighted_z_ceiling: int = 6,
-):
+) -> pd.DataFrame:
     if not zscore_results:
         logger.warning("No zscore results exist, returning empty dataframe")
         return pd.DataFrame({"ensembl_gene_id": [], "combine_z": []})
@@ -198,13 +206,12 @@ def _combine_z_distribution_for_context(
             )
 
         matrix.columns = [res.type.value.lower()]
-        matrix = cast(pd.DataFrame, matrix.loc[matrix.index != "-"])
+        matrix = matrix.loc[matrix.index != "-"]
 
         # if the matrix has duplicate ids (i.e., multiple entrez ids map to a single ensembl id, etc.)
-        #   take the mean value of them to remove the duplicates
+        #   take the max value of them to remove the duplicates
         if not matrix.index.is_unique:
-            # matrix = cast(pd.DataFrame, matrix.groupby(level=0).mean())
-            matrix = cast(pd.DataFrame, matrix.groupby(level=0).max())
+            matrix = matrix.groupby(level=0).max()
         z_matrices.append(matrix)
 
     z_matrix = pd.concat(z_matrices, axis="columns", join="outer", ignore_index=False)
@@ -215,20 +222,23 @@ def _combine_z_distribution_for_context(
         z_matrix.columns = ["combine_z"]
         return z_matrix
 
-    values = z_matrix.iloc[:, 1:].values
+    values = z_matrix.values
     weights = np.array([r.weight for r in zscore_results])
     mask = ~np.isnan(values)
     masked_values = np.where(mask, values, 0)
     masked_weights = np.where(mask, weights, 0)
 
-    normalized_weights = masked_weights / np.sum(masked_weights, axis=1, keepdims=True)
-    numerator = np.sum(normalized_weights * masked_values, axis=1)
-    denominator = np.sqrt(np.sum(normalized_weights**2, axis=1))
-    combined_z_matrix = numerator / denominator
-    combined_z_matrix = np.clip(combined_z_matrix, weighted_z_floor, weighted_z_ceiling, dtype=float)
+    numerator = np.sum(masked_weights * masked_values, axis=1)
+    denominator = np.sqrt(np.sum(masked_weights**2, axis=1))
+    combined_z_matrix = np.divide(
+        numerator,
+        denominator,
+        out=np.full_like(numerator, np.nan, dtype=float),
+        where=denominator != 0.0,
+    )
     combined_z_matrix_df = pd.DataFrame(
         {
-            "ensembl_gene_id": z_matrix.index,
+            "entrez_gene_id": z_matrix.index,
             "combine_z": combined_z_matrix,
         }
     )
@@ -253,11 +263,14 @@ def _combine_z_distribution_for_context(
     #     title=f"Combined Z-score Distribution for {context}",
     #     output_filepath=output_graph_filepath,
     # )
+    combined_z_matrix_df["entrez_gene_id"] = combined_z_matrix_df["entrez_gene_id"].astype(int)
+    combined_z_matrix_df = combined_z_matrix_df.sort_values(by="entrez_gene_id")
     return combined_z_matrix_df
 
 
-async def _begin_combining_distributions(
+def _begin_combining_distributions(
     context_name: str,
+    taxon: int,
     input_matrices: _InputMatrices,
     batch_names: _BatchNames,
     source_weights: _SourceWeights,
@@ -271,6 +284,8 @@ async def _begin_combining_distributions(
     output_figure_dirpath.mkdir(parents=True, exist_ok=True)
 
     z_score_results: list[_CombineOmicsInput] = []
+
+    matrix: pd.DataFrame | None
     for source, matrix in input_matrices:
         if matrix is None:
             logger.trace(f"Source '{source.value}' is None, skipping")
@@ -287,23 +302,25 @@ async def _begin_combining_distributions(
                 matrix_subset = matrix_subset.set_index(keys=[GeneIdentifier.entrez_gene_id.value], drop=True)
                 matrix_subset = matrix_subset.drop(columns=["gene_symbol", "ensembl_gene_id"], errors="ignore")
             elif isinstance(matrix, sc.AnnData):
-                conversion = convert(ids=matrix.var_names.tolist(), taxon=taxon)
+                conversion = get_remaining_identifiers(ids=matrix.var_names.tolist(), taxon=taxon)
                 conversion.reset_index(drop=False, inplace=True)
-                matrix: pd.DataFrame = matrix.to_df().T
+                matrix = matrix.to_df().T
                 matrix.reset_index(inplace=True, drop=False, names=["gene_symbol"])
-                matrix: pd.DataFrame = matrix.merge(
-                    conversion, left_on="gene_symbol", right_on="gene_symbol", how="left"
-                )
+                matrix = matrix.merge(conversion, left_on="gene_symbol", right_on="gene_symbol", how="left")
                 matrix_subset: pd.DataFrame = matrix[[GeneIdentifier.entrez_gene_id.value, *batch.sample_names]]
                 matrix_subset: pd.DataFrame = matrix_subset.set_index(
                     keys=[GeneIdentifier.entrez_gene_id.value], drop=True
                 )
             else:
                 raise TypeError(
-                    f"Unexpected matrix type for source '{source.value}'; expected 'pandas.DataFrame' or 'scanpy.AnnData': {type(matrix)}"
+                    f"Unexpected matrix type for source '{source.value}'; "
+                    f"expected 'pandas.DataFrame' or 'scanpy.AnnData': {type(matrix)}"
                 )
 
-            output_fp = output_filepaths[source.value].parent / f"{source.value}_batch{batch.batch_num}_combined_z_distrobution_{context_name}.csv"
+            output_fp = (
+                output_filepaths[source.value].parent
+                / f"{source.value}_batch{batch.batch_num}_combined_z_distrobution_{context_name}.csv"
+            )
             batch_results.append(
                 _combine_z_distribution_for_batch(
                     context_name=context_name,
@@ -312,8 +329,6 @@ async def _begin_combining_distributions(
                     source=source,
                     output_combined_matrix_filepath=output_fp,
                     output_figure_dirpath=output_figure_dirpath,
-                    weighted_z_floor=weighted_z_floor,
-                    weighted_z_ceiling=weighted_z_ceiling,
                 )
             )
 
@@ -334,14 +349,17 @@ async def _begin_combining_distributions(
         merged_batch_results = pd.concat(batch_results, axis="columns")
         merged_batch_results.index.name = index_name
 
-        replicates_by_batch_num_map: dict[str, int] = {str(batch.batch_num): batch.num_samples for batch in batch_names[source.value]}
+        replicates_by_batch_num_map: dict[str, int] = {
+            str(batch.batch_num): batch.num_samples for batch in batch_names[source.value]
+        }
         batch_column_names: list[str] = list(merged_batch_results.columns)
         replicates_per_batch: list[int] = []
         for col in batch_column_names:
             key = str(col)
             if key not in replicates_by_batch_num_map:
                 raise KeyError(
-                    f"Missing replicate count for batch column '{col}' in source '{source.value}'. Known: {list(replicates_by_batch_num_map.keys())}"
+                    f"Missing replicate count for batch column '{col}' in source '{source.value}'. "
+                    f"Known: {list(replicates_by_batch_num_map.keys())}"
                 )
             replicates_per_batch.append(replicates_by_batch_num_map[key])
 
@@ -350,9 +368,12 @@ async def _begin_combining_distributions(
             context_name=context_name,
             replicates_per_batch=replicates_per_batch,
             output_combined_matrix_filepath=(
-                output_filepaths[source.value].parent / f"{context_name}_{source.value}_combined_zscore_distribution.csv"
+                output_filepaths[source.value].parent
+                / f"{context_name}_{source.value}_combined_zscore_distribution.csv"
             ),
-            output_figure_filepath=(output_figure_dirpath / f"{context_name}_{source.value}_combined_zscore_distribution.pdf"),
+            output_figure_filepath=(
+                output_figure_dirpath / f"{context_name}_{source.value}_combined_zscore_distribution.pdf"
+            ),
             weighted_z_floor=weighted_z_floor,
             weighted_z_ceiling=weighted_z_ceiling,
         )
@@ -364,7 +385,10 @@ async def _begin_combining_distributions(
             )
         )
         merged_source_results.to_csv(output_filepaths[source.value], index=True)
-        logger.success(f"Wrote z-scores for source '{source.value}' in context '{context_name}' to '{output_filepaths[source.value]}'")
+        logger.success(
+            f"Wrote z-scores for source '{source.value}' in context '{context_name}' "
+            f"to '{output_filepaths[source.value]}'"
+        )
 
     logger.trace(f"Combining z-score distributions for all sources in context '{context_name}'")
     merged_context_results = _combine_z_distribution_for_context(
@@ -372,5 +396,5 @@ async def _begin_combining_distributions(
         zscore_results=z_score_results,
         output_graph_filepath=output_figure_dirpath / f"{context_name}_combined_omics_distribution.pdf",
     )
-    merged_context_results.to_csv(output_final_model_scores, index=True)
+    merged_context_results.to_csv(output_final_model_scores, index=len(merged_context_results.columns) <= 1)
     logger.success(f"Wrote combined z-scores for context '{context_name}' to {output_final_model_scores}")

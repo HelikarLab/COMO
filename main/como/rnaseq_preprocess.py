@@ -1,24 +1,20 @@
 from __future__ import annotations
 
-import asyncio
-import csv
 import functools
-import io
 import json
 import re
 import sys
 from dataclasses import dataclass, field
 from itertools import chain
 from pathlib import Path
-from typing import Final, Literal, TextIO, cast
+from typing import Final, Literal, TextIO
 
 import numpy as np
-import numpy.typing as npt
 import pandas as pd
 from loguru import logger
 
 from como.data_types import LogLevel, RNAType
-from como.pipelines.identifier import convert
+from como.pipelines.identifier import build_gene_info, get_remaining_identifiers
 from como.utils import read_file, set_up_logging
 
 
@@ -101,6 +97,7 @@ class _StudyMetrics:
 class SampleConfiguration:
     sample_name: str
     effective_lengths: pd.DataFrame
+    tpm: pd.DataFrame
     mean_effective_length: float
     layout: str
     strand: str
@@ -122,31 +119,36 @@ class SampleConfiguration:
             raise ValueError(f"Sample '{self.sample_name}' is missing 'effective_length' column")
 
     @classmethod
-    def to_dataframe(cls, samples: list[SampleConfiguration]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def to_dataframe(cls, samples: list[SampleConfiguration]) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """Convert a list of SampleConfiguration to a dataframe.
 
         :param samples: The list of SampleConfiguration objects to convert.
         :return: A tuple of dataframes:
             [0]: The sample configuration as a dataframe
-            [1]: The effective lengths as a separate data frame with `same_name` as columns
+            [1]: The effective lengths as a separate data frame with `sample_name` as columns
+            [2]: The salmon TPM values as a separate data frame with `sample_name` as columns
         """
-        config = pd.DataFrame(
-            columns=["sample_name", "mean_effective_length", "layout", "strand", "study", "library_prep"]
+        config: pd.DataFrame = pd.DataFrame.from_records(
+            [(s.sample_name, s.mean_effective_length, s.layout, s.strand, s.study, s.library_prep) for s in samples],
+            columns=["sample_name", "mean_effective_length", "layout", "strand", "study", "library_prep"],
         )
+        lengths = pd.concat(
+            [
+                s.effective_lengths.set_index("name")["effective_length"]
+                .astype(np.float64, copy=False)
+                .rename(s.sample_name)
+                for s in samples
+            ],
+            axis=1,
+        ).fillna(0.0)
+        lengths.index.name = "ensembl_gene_id"
+        tpms = pd.concat(
+            [s.tpm.set_index("name")["tpm"].astype(np.float64, copy=False).rename(s.sample_name) for s in samples],
+            axis=1,
+        )
+        tpms.index.name = "ensembl_gene_id"
 
-        genes = set()
-        for s in samples:
-            genes.update(s.effective_lengths["name"].to_list())
-
-        lengths = pd.DataFrame(data=np.float64(0.0), columns=[s.sample_name for s in samples], index=list(genes))
-        for sample in samples:
-            ids: list[str] = sample.effective_lengths["name"].to_list()
-            data: npt.NDArray[np.floating] = sample.effective_lengths["effective_length"].to_numpy(dtype=np.float64)
-            lengths.loc[ids, sample.sample_name] = data
-
-        return config, lengths
-
-        return config, lengths
+        return config, lengths, tpms
 
 
 def _sample_name_from_filepath(file: Path) -> str:
@@ -234,10 +236,7 @@ def _process_first_multirun_sample(strand_file: Path, all_quant_files: list[Path
     sample_counts = sample_counts.fillna(value=0)
     sample_counts["counts"] = sample_counts["counts"].astype(float)
 
-    count_avg = cast(  # type checkers think `.groupby(...).mean()` returns a pd.Series, force pd.DataFrame
-        pd.DataFrame, cast(object, sample_counts.groupby("ensembl_gene_id", as_index=False)["counts"].mean())
-    )
-    count_avg["counts"] = np.ceil(count_avg["counts"].astype(int))
+    count_avg = sample_counts.groupby("ensembl_gene_id", as_index=False).mean()
     count_avg.columns = ["ensembl_gene_id", _sample_name_from_filepath(strand_file)]
     return count_avg
 
@@ -270,6 +269,9 @@ def _create_sample_counts_matrix(metrics: _StudyMetrics) -> pd.DataFrame:
         strand_file=metrics.strand_files[0],
         all_quant_files=metrics.quant_files,
     )
+    if counts is None:
+        raise ValueError(f"Unable to process the first sample for study '{metrics.study_name}'")
+    counts = counts.drop(columns=["length", "effective_length", "tpm"])
 
     for i in range(1, metrics.num_samples):
         new_counts = _prepare_sample_counts(
@@ -283,6 +285,7 @@ def _create_sample_counts_matrix(metrics: _StudyMetrics) -> pd.DataFrame:
             continue
 
         assert isinstance(counts, pd.DataFrame)  # noqa: S101
+        new_counts = new_counts.drop(columns=["length", "effective_length", "tpm"])
         counts = counts.merge(new_counts, on="ensembl_gene_id", how="outer")
         counts = counts.fillna(value=0)
 
@@ -298,13 +301,15 @@ def _create_sample_counts_matrix(metrics: _StudyMetrics) -> pd.DataFrame:
     return counts
 
 
-def _write_counts_matrix(
+def _write_matrices(
     *,
     config_df: pd.DataFrame,
     fragment_lengths: pd.DataFrame,
+    tpm_df: pd.DataFrame,
     como_context_dir: Path,
-    output_counts_matrix_filepath: Path,
-    output_fragment_lengths_filepath: Path,
+    out_counts_filepath: Path,
+    out_frag_length_filepath: Path,
+    out_tpm_filepath: Path,
     rna: RNAType,
 ) -> pd.DataFrame:
     """Create a counts matrix file by reading gene counts table(s).
@@ -312,46 +317,49 @@ def _write_counts_matrix(
     :param config_df: Configuration DataFrame containing sample information.
     :param fragment_lengths: DataFrame containing effective lengths for each gene and sample,
         used for zFPKM normalization.
+    :param tpm_df: DataFrame containing TPM values for each gene and sample, used for zFPKM normalization.
     :param como_context_dir: Path to the COMO_input directory containing gene count files.
-    :param output_counts_matrix_filepath: Path where the output counts matrix CSV will be saved.
-    :param output_fragment_lengths_filepath: Path where the output fragment lengths CSV will be saved.
+    :param out_counts_filepath: Path where the output counts matrix CSV will be saved.
+    :param out_frag_length_filepath: Path where the output fragment lengths CSV will be saved.
+    :param out_tpm_filepath: Path where the output TPM values CSV will be saved.
     :param rna: RNAType enum indicating whether to process 'trna' or 'mrna' samples.
     :return: A pandas DataFrame representing the final counts matrix.
     """
     study_metrics = _organize_gene_counts_files(data_dir=como_context_dir)
     counts: list[pd.DataFrame] = [_create_sample_counts_matrix(metric) for metric in study_metrics]
-    rna_specific_sample_names = set(
-        config_df.loc[config_df["library_prep"].str.lower() == rna.value.lower(), "sample_name"].tolist()
+    rna_specific_sample_names = sorted(
+        set(config_df.loc[config_df["library_prep"].str.lower() == rna.value.lower(), "sample_name"].tolist())
     )
 
     final_matrix: pd.DataFrame = functools.reduce(
         lambda left, right: pd.merge(left, right, on="ensembl_gene_id", how="outer"), counts
     )
     final_matrix.fillna(value=0, inplace=True)
-    final_matrix.iloc[:, 1:] = final_matrix.iloc[:, 1:].astype(int)
     final_matrix = final_matrix[["ensembl_gene_id", *rna_specific_sample_names]]
+    final_matrix = final_matrix.reindex(columns=["ensembl_gene_id", *rna_specific_sample_names])
+    fragment_lengths = fragment_lengths.reindex(columns=rna_specific_sample_names).sort_index()
+    tpm_df = tpm_df.reindex(columns=rna_specific_sample_names).sort_index()
 
-    output_counts_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
-    output_fragment_lengths_filepath.parent.mkdir(parents=True, exist_ok=True)
+    out_counts_filepath.parent.mkdir(parents=True, exist_ok=True)
+    out_frag_length_filepath.parent.mkdir(parents=True, exist_ok=True)
+    final_matrix.to_csv(out_counts_filepath, index=False, float_format="%.15g")
+    fragment_lengths[rna_specific_sample_names].to_csv(out_frag_length_filepath, index=True, float_format="%.15g")
+    tpm_df[rna_specific_sample_names].to_csv(out_tpm_filepath, index=True, float_format="%.15g")
 
-    final_matrix.to_csv(output_counts_matrix_filepath, index=False)
-    fragment_lengths[rna_specific_sample_names].to_csv(output_fragment_lengths_filepath, index=True)
-
-    logger.success(f"Wrote gene count matrix for '{rna.value}' RNA at '{output_counts_matrix_filepath}'")
+    logger.success(f"Wrote gene count matrix for '{rna.value}' RNA at '{out_counts_filepath}'")
 
     return final_matrix
 
 
-def _create_config_df(  # noqa: C901
+def _create_config_df(
     context_name: str,
     /,
     como_context_dir: Path,
-    gene_count_dirname: str = "geneCounts",
     layout_dirname: str = "layouts",
     strandedness_dirname: str = "strandedness",
     quantification_dir: str = "quantification",
     prep_method_dirname: str = "prepMethods",
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Create configuration sheet.
 
     The configuration file created is based on the gene counts matrix.
@@ -361,7 +369,6 @@ def _create_config_df(  # noqa: C901
         context_name: Name of the context, used as a prefix for sample names.
         como_context_dir: Path to the COMO_input directory containing subdirectories for
             gene counts, layouts, strandedness, fragment sizes, and prep methods.
-        gene_count_dirname: Name of the subdirectory containing gene count files.
         layout_dirname: Name of the subdirectory containing layout files.
         strandedness_dirname: Name of the subdirectory containing strandedness files.
         quantification_dir: Name of the subdirectory containing Salmon's quantification files.
@@ -370,12 +377,13 @@ def _create_config_df(  # noqa: C901
     Returns:
         [0]: A pandas DataFrame representing the configuration sheet.
         [1]: Fragment lengths for downstream calculations
+        [2]: Salmon TPM values for downstream calculations
     """
     label_regex: Final = re.compile(r"(?P<study>S\d{1,3})(?P<rep>R\d{1,3})(?P<run>r\d{1,3})?")
-    quant_files: list[Path] = list((como_context_dir / quantification_dir).rglob("*.genes.sf"))
+    quant_files: list[Path] = sorted((como_context_dir / quantification_dir).rglob("*.genes.sf"))
     # gene_counts: list[Path] = list((como_context_dir / gene_count_dirname).rglob("*.tab"))
     if not quant_files:
-        raise FileNotFoundError(f"No gene count files found in '{gene_count_dirname}'")
+        raise FileNotFoundError(f"No gene count files found in '{quantification_dir}'")
 
     auxillary_directories = {
         "layout": como_context_dir / layout_dirname,
@@ -385,18 +393,14 @@ def _create_config_df(  # noqa: C901
     }
     aux_lookup: dict[str, dict[str, Path]] = {kind: {} for kind in auxillary_directories}
     for kind, root in auxillary_directories.items():
-        kind: str
-        root: Path
-        for p in root.rglob("*"):
-            if p.is_file():
-                m = label_regex.search(p.stem)
-                if m:
-                    aux_lookup[kind][m.group(0)] = p
-    if "layout" not in aux_lookup:
-        raise ValueError
+        files = (p for p in root.rglob("*") if p.is_file())
+        for file in files:
+            m = label_regex.search(file.stem)
+            if m:
+                aux_lookup[kind][m.group(0)] = file
 
     rows: list[SampleConfiguration] = []
-    for quant_file in sorted(quant_files):
+    for quant_file in quant_files:
         m = label_regex.search(quant_file.as_posix())
         if m is None:
             raise ValueError(f"Filename '{quant_file.name}' does not match contextName_SXRYrZ.tab pattern")
@@ -416,35 +420,23 @@ def _create_config_df(  # noqa: C901
         if prep not in {"total", "mrna"}:
             raise ValueError(f"Prep method must be 'total' or 'mrna' (got '{prep}') for {label}")
         if layout == "":
-            raise FileNotFoundError(message=f"No layout file found for '{label}'.")
+            raise FileNotFoundError(f"No layout file found for '{label}'.")
 
-        quant_paths = [p for p in aux_lookup["quantification"].values() if p.name == f"{sample_id}_quant.genes.sf"]
-        if (
-            not quant_paths
-            and layout in ["paired-end", "", None]
-            and prep.lower() in [RNAType.TRNA.value.lower(), RNAType.MRNA.value.lower()]
-        ):
-            log_and_raise_error(
-                message=f"No quantification file found for '{label}'; defaulting to 100 bp (needed for zFPKM).",
-                error=FileNotFoundError,
-                level=LogLevel.WARNING,
-            )
-        elif len(quant_paths) == 1 and layout == "single-end":
-            effective_len = pd.DataFrame({"Name": [], "EffectiveLength": []})
-            mean_effective_len = 0.0  # cannot compute FPKM for single-ended data
-        else:
-            df = read_file(quant_file)
-            df.columns = [c.lower() for c in df.columns]
-            df = df.rename(columns={"effectivelength": "effective_length"})
+        df = read_file(quant_file)
+        df.columns = [c.lower() for c in df.columns]
+        df = df.rename(columns={"effectivelength": "effective_length", "TPM": "tpm"})
+        df["effective_length"] = df["effective_length"].astype(float)
+        df["tpm"] = df["tpm"].astype(float)
 
-            effective_len = df[["name", "effective_length"]]
-            effective_len["effective_length"] = effective_len["effective_length"].astype(np.float64)
-            mean_effective_len: float = effective_len["effective_length"].sum() / len(df)
+        tpm = df[["name", "tpm"]].copy()
+        effective_len = df[["name", "effective_length"]].copy()
+        mean_effective_len: float = effective_len["effective_length"].sum() / df.shape[1]
 
         rows.append(
             SampleConfiguration(
                 sample_name=sample_id,
                 effective_lengths=effective_len,
+                tpm=tpm,
                 mean_effective_length=mean_effective_len,
                 layout=layout,
                 strand=strand,
@@ -456,7 +448,7 @@ def _create_config_df(  # noqa: C901
     return SampleConfiguration.to_dataframe(rows)
 
 
-async def _create_gene_info_file(  # noqa: C901
+def _create_gene_info_file(
     *,
     counts_matrix_filepaths: list[Path],
     output_filepath: Path,
@@ -468,17 +460,18 @@ async def _create_gene_info_file(  # noqa: C901
     The gene information file will be created by reading each matrix filepath in the provided list
     """
 
-    async def read_ensembl_gene_ids(file: Path) -> list[str]:
+    def read_ensembl_gene_ids(file: Path) -> list[str]:
         data_ = read_file(file, h5ad_as_df=False)
         if isinstance(data_, pd.DataFrame):
             return data_["ensembl_gene_id"].tolist()
         try:
-            conversion = convert(ids=data_.var_names.tolist(), taxon=taxon)
+            conversion = get_remaining_identifiers(ids=data_.var_names.tolist(), taxon=taxon)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Got a JSON decode error for file '{counts_matrix_filepaths}' ({e})")
+            raise ValueError(f"Got a JSON decode error for file '{counts_matrix_filepaths}' ({e})") from e
 
         # Remove NA values from entrez_gene_id dataframe column
         conversion = conversion[~conversion["ensembl_gene_id"].isna()]
+        conversion = conversion.explode(column=["ensembl_gene_id"])
         return conversion["ensembl_gene_id"].tolist()
 
     logger.info(
@@ -486,90 +479,8 @@ async def _create_gene_info_file(  # noqa: C901
         "depending on the number of genes and your internet connection"
     )
 
-    ensembl_ids: set[str] = set(
-        chain.from_iterable(await asyncio.gather(*[read_ensembl_gene_ids(f) for f in counts_matrix_filepaths]))
-    )
-    gene_data: list[dict[str, str | int | list[str] | list[int] | None]] = await MyGene(cache=cache).query(
-        items=list(ensembl_ids),
-        taxon=taxon,
-        scopes="ensemblgene",
-    )
-
-    n = len(gene_data)
-    all_gene_symbols: list[str] = ["-"] * n
-    all_entrez_ids: list[str | int] = ["-"] * n
-    all_ensembl_ids: list[str] = ["-"] * n
-    all_sizes: list[int] = [-1] * n
-
-    def _avg_pos(value: int | list[int] | None) -> int:
-        if value is None:
-            return 0
-        if isinstance(value, list):
-            return int(sum(value) / len(value)) if value else 0
-        return int(value)
-
-    for i, data in enumerate(gene_data):
-        data: dict[str, str | int | list[str] | list[int] | None]
-        if "genomic_pos.start" not in data:
-            log_and_raise_error(
-                message="Unexpectedly missing key 'genomic_pos.start'", error=KeyError, level=LogLevel.WARNING
-            )
-        if "genomic_pos.end" not in data:
-            log_and_raise_error(
-                message="Unexpectedly missing key 'genomic_pos.end'", error=KeyError, level=LogLevel.WARNING
-            )
-        if "ensembl.gene" not in data:
-            log_and_raise_error(
-                message="Unexpectedly missing key 'ensembl.gene'", error=KeyError, level=LogLevel.WARNING
-            )
-
-        start = data["genomic_pos.start"]
-        end = data["genomic_pos.end"]
-        ensembl_id = data["ensembl.gene"]
-
-        if not isinstance(start, int):
-            log_and_raise_error(
-                message=f"Unexpected type for 'genomic_pos.start': expected int, got {type(start)}",
-                error=TypeError,
-                level=LogLevel.WARNING,
-            )
-        if not isinstance(end, int):
-            log_and_raise_error(
-                message=f"Unexpected type for 'genomic_pos.end': expected int, got {type(start)}",
-                error=TypeError,
-                level=LogLevel.WARNING,
-            )
-        if not isinstance(ensembl_id, str):
-            log_and_raise_error(
-                message=f"Unexpected type for 'ensembl.gene': expected str, got {type(ensembl_id)}",
-                error=ValueError,
-                level=LogLevel.WARNING,
-            )
-
-        size = end - start
-        all_ensembl_ids[i] = ",".join(map(str, ensembl_id)) if isinstance(ensembl_id, list) else ensembl_id
-        all_gene_symbols[i] = str(data.get("symbol", "-"))
-        all_entrez_ids[i] = str(data.get("entrezgene", "-"))
-        all_sizes[i] = max(size, -1)  # use `size` otherwise -1
-
-    gene_info: pd.DataFrame = pd.DataFrame(
-        {
-            "ensembl_gene_id": all_ensembl_ids,
-            "gene_symbol": all_gene_symbols,
-            "entrez_gene_id": all_entrez_ids,
-            "size": all_sizes,
-        }
-    )
-
-    # remove rows where every gene size value is -1 (not available)
-    gene_info = gene_info[~(gene_info == -1).all(axis=1)]
-
-    gene_info["ensembl_gene_id"] = gene_info["ensembl_gene_id"].str.split(",")  # extend lists into multiple rows
-    gene_info = gene_info.explode(column=["ensembl_gene_id"])
-    # we would set `entrez_gene_id` to int here as well, but not all ensembl ids are mapped to entrez ids,
-    #   and as a result, there are still "-" values in the entrez id column that cannot be converted to an integer
-
-    gene_info = gene_info.sort_values(by="ensembl_gene_id")
+    ensembl_ids: set[str] = set(chain.from_iterable(read_ensembl_gene_ids(f) for f in counts_matrix_filepaths))
+    gene_info = build_gene_info(ids=ensembl_ids, taxon=taxon, cache=cache)
     output_filepath.parent.mkdir(parents=True, exist_ok=True)
     gene_info.to_csv(output_filepath, index=False)
     logger.success(f"Gene Info file written at '{output_filepath}'")
@@ -577,90 +488,96 @@ async def _create_gene_info_file(  # noqa: C901
 
 def _process_como_input(
     context_name: str,
-    output_config_filepath: Path,
     como_context_dir: Path,
-    output_counts_matrix_filepath: Path,
-    output_fragment_lengths_filepath: Path,
-    rna: RNAType,
+    out_mrna_config: Path | None,
+    out_trna_config: Path | None,
+    out_mrna_counts: Path | None,
+    out_trna_counts: Path | None,
+    out_mrna_fragments: Path | None,
+    out_trna_fragments: Path | None,
+    out_mrna_tpm: Path | None,
+    out_trna_tpm: Path | None,
 ) -> None:
-    config_df, fragment_lengths = _create_config_df(context_name, como_context_dir=como_context_dir)
+    config_df, fragment_lengths, tpm_df = _create_config_df(context_name, como_context_dir=como_context_dir)
 
-    _write_counts_matrix(
-        config_df=config_df,
-        fragment_lengths=fragment_lengths,
-        como_context_dir=como_context_dir,
-        output_counts_matrix_filepath=output_counts_matrix_filepath,
-        output_fragment_lengths_filepath=output_fragment_lengths_filepath,
-        rna=rna,
-    )
-    with pd.ExcelWriter(output_config_filepath) as writer:
-        subset_config = config_df[config_df["library_prep"].str.lower() == rna.value.lower()]
-        subset_config.to_excel(writer, sheet_name=context_name, header=True, index=False)
+    if out_trna_config and out_trna_counts and out_trna_fragments and out_trna_tpm:
+        _write_matrices(
+            config_df=config_df,
+            fragment_lengths=fragment_lengths,
+            tpm_df=tpm_df,
+            como_context_dir=como_context_dir,
+            out_counts_filepath=out_trna_counts,
+            out_frag_length_filepath=out_trna_fragments,
+            out_tpm_filepath=out_trna_tpm,
+            rna=RNAType.TRNA,
+        )
+        with pd.ExcelWriter(out_trna_config) as writer:
+            subset_config = config_df[config_df["library_prep"].str.lower() == RNAType.TRNA.value.lower()]
+            subset_config.to_excel(writer, sheet_name=context_name, header=True, index=False)
+
+    if out_mrna_config and out_mrna_counts and out_mrna_fragments and out_mrna_tpm:
+        _write_matrices(
+            config_df=config_df,
+            fragment_lengths=fragment_lengths,
+            tpm_df=tpm_df,
+            como_context_dir=como_context_dir,
+            out_counts_filepath=out_mrna_counts,
+            out_frag_length_filepath=out_mrna_fragments,
+            out_tpm_filepath=out_mrna_tpm,
+            rna=RNAType.MRNA,
+        )
+        with pd.ExcelWriter(out_mrna_config) as writer:
+            subset_config = config_df[config_df["library_prep"].str.lower() == RNAType.MRNA.value.lower()]
+            subset_config.to_excel(writer, sheet_name=context_name, header=True, index=False)
 
 
-async def _process(
+def _process(
     context_name: str,
     taxon: int,
     output_gene_info_filepath: Path,
     como_context_dir: Path | None,
-    input_matrix_filepath: list[Path] | None,
-    output_trna_fragment_lengths_filepath: Path | None,
-    output_mrna_fragment_lengths_filepath: Path | None,
-    output_trna_config_filepath: Path | None,
-    output_mrna_config_filepath: Path | None,
-    output_trna_matrix_filepath: Path | None,
-    output_mrna_matrix_filepath: Path | None,
+    in_matrix_fp: list[Path] | None,
+    out_trna_frag_lengths_fp: Path | None,
+    out_mrna_frag_lengths_fp: Path | None,
+    out_trna_config_fp: Path | None,
+    out_mrna_config_fp: Path | None,
+    out_trna_matrix_fp: Path | None,
+    out_mrna_matrix_fp: Path | None,
+    out_mrna_tpm_fp: Path | None,
+    out_trna_tpm_fp: Path | None,
     *,
     cache: bool,
     create_gene_info_only: bool,
 ):
-    rna_types: list[tuple[RNAType, Path, Path, Path]] = []
-    if output_trna_config_filepath and output_trna_matrix_filepath and output_trna_fragment_lengths_filepath:
-        rna_types.append(
-            (
-                RNAType.TRNA,
-                output_trna_config_filepath,
-                output_trna_matrix_filepath,
-                output_trna_fragment_lengths_filepath,
-            )
-        )
-    if output_mrna_config_filepath and output_mrna_matrix_filepath and output_mrna_fragment_lengths_filepath:
-        rna_types.append(
-            (
-                RNAType.MRNA,
-                output_mrna_config_filepath,
-                output_mrna_matrix_filepath,
-                output_mrna_fragment_lengths_filepath,
-            )
-        )
-
-    # if provided, iterate through como-input specific directories
     if not create_gene_info_only:
         if como_context_dir is None:
             raise ValueError("como_context_dir must be provided if create_gene_info_only is False")
-        if output_trna_fragment_lengths_filepath is None:
+        if out_trna_frag_lengths_fp is None:
             raise ValueError("output_fragment_lengths_filepath must be provided if create_gene_info_only is False")
 
-        for rna, out_config, out_matrix, out_frag_len in rna_types:
-            _process_como_input(
-                context_name=context_name,
-                output_config_filepath=out_config,
-                como_context_dir=como_context_dir,
-                output_counts_matrix_filepath=out_matrix,
-                output_fragment_lengths_filepath=out_frag_len,
-                rna=rna,
-            )
+        _process_como_input(
+            context_name=context_name,
+            como_context_dir=como_context_dir,
+            out_mrna_config=out_mrna_config_fp,
+            out_trna_config=out_trna_config_fp,
+            out_mrna_counts=out_mrna_matrix_fp,
+            out_trna_counts=out_trna_matrix_fp,
+            out_mrna_fragments=out_mrna_frag_lengths_fp,
+            out_trna_fragments=out_trna_frag_lengths_fp,
+            out_mrna_tpm=out_mrna_tpm_fp,
+            out_trna_tpm=out_trna_tpm_fp,
+        )
 
     # create the gene info filepath based on provided data
     input_files = []
-    if input_matrix_filepath:
-        input_files.extend(input_matrix_filepath)
-    if output_trna_matrix_filepath:
-        input_files.append(output_trna_matrix_filepath)
-    if output_mrna_matrix_filepath:
-        input_files.append(output_mrna_matrix_filepath)
+    if in_matrix_fp:
+        input_files.extend(in_matrix_fp)
+    if out_trna_matrix_fp:
+        input_files.append(out_trna_matrix_fp)
+    if out_mrna_matrix_fp:
+        input_files.append(out_mrna_matrix_fp)
 
-    await _create_gene_info_file(
+    _create_gene_info_file(
         counts_matrix_filepaths=input_files,
         output_filepath=output_gene_info_filepath,
         taxon=taxon,
@@ -668,7 +585,7 @@ async def _process(
     )
 
 
-async def rnaseq_preprocess(  # noqa: C901
+def rnaseq_preprocess(  # noqa: C901
     context_name: str,
     taxon: int,
     output_gene_info_filepath: str | Path,
@@ -680,6 +597,8 @@ async def rnaseq_preprocess(  # noqa: C901
     output_mrna_metadata_filepath: str | Path | None = None,
     output_trna_count_matrix_filepath: str | Path | None = None,
     output_mrna_count_matrix_filepath: str | Path | None = None,
+    output_trna_tpm_filepath: str | Path | None = None,
+    output_mrna_tpm_filepath: str | Path | None = None,
     cache: bool = True,
     log_level: LogLevel | str = LogLevel.INFO,
     log_location: str | TextIO = sys.stderr,
@@ -700,6 +619,8 @@ async def rnaseq_preprocess(  # noqa: C901
     :param output_mrna_metadata_filepath: Path to the output mRNA config file (if in "create" mode)
     :param output_trna_count_matrix_filepath: The path to write total RNA count matrices
     :param output_mrna_count_matrix_filepath: The path to write messenger RNA count matrices
+    :param output_trna_tpm_filepath: The path to write total RNA TPM matrices
+    :param output_mrna_tpm_filepath: The path to write messenger RNA TPM matrices
     :param como_context_dir: If in "create" mode, the input path(s) to the COMO_input directory of the current context
         i.e., the directory containing "fragmentSizes", "geneCounts", "insertSizeMetrics", etc. directories
     :param input_matrix_filepath: If in "provide" mode, the path(s) to the count matrices to be processed~
@@ -710,9 +631,66 @@ async def rnaseq_preprocess(  # noqa: C901
     """
     set_up_logging(level=log_level, location=log_location)
 
-    # ruff: disable[ASYNC240]
     if not output_gene_info_filepath:
         raise ValueError("output_gene_info_filepath must be provided")
+
+    if any(
+        (
+            output_trna_fragment_lengths_filepath,
+            output_trna_metadata_filepath,
+            output_trna_count_matrix_filepath,
+            output_trna_tpm_filepath,
+        ),
+    ) and not all(
+        (
+            output_trna_fragment_lengths_filepath,
+            output_trna_metadata_filepath,
+            output_trna_count_matrix_filepath,
+            output_trna_tpm_filepath,
+        ),
+    ):
+        missing = [
+            name
+            for name, value in {
+                "output_trna_fragment_lengths_filepath": output_trna_fragment_lengths_filepath,
+                "output_trna_metadata_filepath": output_trna_metadata_filepath,
+                "output_trna_count_matrix_filepath": output_trna_count_matrix_filepath,
+                "output_trna_tpm_filepath": output_trna_tpm_filepath,
+            }.items()
+            if value is None
+        ]
+        raise ValueError(
+            f"If any tRNA output filepaths are provided, all must be provided. Missing: {', '.join(missing)}"
+        )
+
+    if any(
+        (
+            output_mrna_fragment_lengths_filepath,
+            output_mrna_metadata_filepath,
+            output_mrna_count_matrix_filepath,
+            output_mrna_tpm_filepath,
+        ),
+    ) and not all(
+        (
+            output_mrna_fragment_lengths_filepath,
+            output_mrna_metadata_filepath,
+            output_mrna_count_matrix_filepath,
+            output_mrna_tpm_filepath,
+        ),
+    ):
+        missing = [
+            name
+            for name, value in {
+                "output_mrna_fragment_lengths_filepath": output_mrna_fragment_lengths_filepath,
+                "output_mrna_metadata_filepath": output_mrna_metadata_filepath,
+                "output_mrna_count_matrix_filepath": output_mrna_count_matrix_filepath,
+                "output_mrna_tpm_filepath": output_mrna_tpm_filepath,
+            }.items()
+            if value is None
+        ]
+        raise ValueError(
+            f"If any mRNA output filepaths are provided, all must be provided. Missing: {', '.join(missing)}"
+        )
 
     output_gene_info_filepath = Path(output_gene_info_filepath).resolve()
 
@@ -739,20 +717,25 @@ async def rnaseq_preprocess(  # noqa: C901
         output_trna_fragment_lengths_filepath = Path(output_trna_fragment_lengths_filepath).resolve()
     if output_mrna_fragment_lengths_filepath is not None:
         output_mrna_fragment_lengths_filepath = Path(output_mrna_fragment_lengths_filepath).resolve()
+    if output_trna_tpm_filepath is not None:
+        output_trna_tpm_filepath = Path(output_trna_tpm_filepath).resolve()
+    if output_mrna_tpm_filepath is not None:
+        output_mrna_tpm_filepath = Path(output_mrna_tpm_filepath).resolve()
 
-    await _process(
+    _process(
         context_name=context_name,
         taxon=taxon,
         como_context_dir=context_dir,
-        input_matrix_filepath=in_matrix,
+        in_matrix_fp=in_matrix,
         output_gene_info_filepath=output_gene_info_filepath,
-        output_trna_config_filepath=output_trna_metadata_filepath,
-        output_trna_matrix_filepath=output_trna_count_matrix_filepath,
-        output_trna_fragment_lengths_filepath=output_trna_fragment_lengths_filepath,
-        output_mrna_config_filepath=output_mrna_metadata_filepath,
-        output_mrna_matrix_filepath=output_mrna_count_matrix_filepath,
-        output_mrna_fragment_lengths_filepath=output_mrna_fragment_lengths_filepath,
+        out_trna_config_fp=output_trna_metadata_filepath,
+        out_trna_matrix_fp=output_trna_count_matrix_filepath,
+        out_trna_frag_lengths_fp=output_trna_fragment_lengths_filepath,
+        out_mrna_config_fp=output_mrna_metadata_filepath,
+        out_mrna_matrix_fp=output_mrna_count_matrix_filepath,
+        out_mrna_frag_lengths_fp=output_mrna_fragment_lengths_filepath,
+        out_trna_tpm_fp=output_trna_tpm_filepath,
+        out_mrna_tpm_fp=output_mrna_tpm_filepath,
         cache=cache,
         create_gene_info_only=create_gene_info_only,
     )
-    # ruff: enable[ASYNC240]

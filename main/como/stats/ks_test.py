@@ -21,13 +21,13 @@ class KSTest(BaseTwoSample[KS_RESULT]):
     }
 
     reaction_ids: list[str]
-    statistic: npt.NDArray[float]
-    pvalue: npt.NDArray[float]
-    statistic_location: npt.NDArray[float]
-    statistic_sign: npt.NDArray[int]
+    statistic: npt.NDArray[np.floating]
+    pvalue: npt.NDArray[np.floating]
+    statistic_location: npt.NDArray[np.floating]
+    statistic_sign: npt.NDArray[np.integer]
 
     @staticmethod
-    def _worker(a: npt.NDArray[float], b: npt.NDArray[float], **kwargs) -> KS_RESULT:
+    def _worker(a: npt.NDArray[np.floating], b: npt.NDArray[np.floating], **kwargs) -> KS_RESULT:
         """Calculate the KS statistic.
 
         Args:

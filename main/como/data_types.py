@@ -4,9 +4,11 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field, fields
 from enum import Enum
 from pathlib import Path
-from typing import ClassVar, NamedTuple
+from typing import ClassVar, NamedTuple, NotRequired, TypedDict
 
 import cobra
+import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from loguru import logger
 
@@ -78,11 +80,6 @@ class SourceTypes(str, Enum):
     proteomics = "proteomics"
 
 
-class PeakIdentificationParameters(NamedTuple):
-    height: float = 0.02
-    distance: float = 1.0
-
-
 class CobraCompartments:
     """Convert from compartment "long-hand" to "short-hand".
 
@@ -135,7 +132,9 @@ class CobraCompartments:
         "s": ["eyespot", "eyespot apparatus", "stigma"],
     }
 
-    _REVERSE_LOOKUP: ClassVar[dict[str, list[str]]] = {value.lower(): key for key, values in SHORTHAND.items() for value in values}
+    _REVERSE_LOOKUP: ClassVar[dict[str, list[str]]] = {
+        value.lower(): key for key, values in SHORTHAND.items() for value in values
+    }
 
     @classmethod
     def get_shorthand(cls, longhand: str) -> str | None:
@@ -161,14 +160,6 @@ class CobraCompartments:
         """
         longhand = cls.SHORTHAND.get(shorthand.lower(), None)
         return longhand[0] if longhand else None
-
-
-class _BuildResults(NamedTuple):
-    """Results of building a context specific model."""
-
-    model: cobra.Model
-    expression_index_list: list[int]
-    infeasible_reactions: pd.DataFrame
 
 
 class _BoundaryReactions(NamedTuple):
@@ -269,3 +260,104 @@ class _SourceWeights(_BaseDataType):
     mrna: int
     scrna: int
     proteomics: int
+
+
+@dataclass
+class ModelBuildSettings:
+    troppo_epsilon: float = 1e-4
+    min_reaction_flux: float = 1e-7
+    solver_timeout: int = 1800  # time in seconds, defaults to 30 minutes
+
+    """
+    Verbosity
+        Type: int
+        Default value: 0
+        Range: [0, 3]
+        From: https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#csclientlog
+    """
+    solver_verbosity: int = 0
+
+    """
+    Feasibility
+        Type: double
+        Default value: 1e-6
+        Range: [1e-9, 1e-2]
+        From: https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#feasibilitytol
+    """
+    solver_feasibility: float = 1e-6
+
+    """
+    OptimalityTol
+        Type: double
+        Default value: 1e-6
+        Range: [1e-9, 1e-2]
+        From: https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#optimalitytol
+    """
+    solver_optimality: float = 1e-6
+
+    """
+    IntFeasTol
+        Type: double
+        Default value: 1e-5
+        Range: [1e-9, 1e-1]
+        From: https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#intfeastol
+    """
+    solver_integrality: float = 1e-6
+
+    """
+    MIPGap
+        Relative MIP optimality gap
+        Default value: 1e-4
+        Range: [0, inf)
+        From: https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#mipgap
+    """
+    gurobi_mipgap: float = 1e-4
+
+    """
+    IntegralityFocus
+        Type: int
+        Default value: 0
+        Range: [0, 1]
+        From: https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#integralityfocus
+    """
+    gurobi_integrality_focus: int = 0
+
+    """
+    NumericFocus
+        Type: int
+        Default value: 0
+        Range: [0, 3]
+        From: https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html#numericfocus
+    """
+    gurobi_numeric_focus: int = 2
+
+    def __post_init__(self):  # noqa: C901
+        """Validate provided arguments.
+
+        :raises: ValueError if any check fails.
+        """
+        if self.troppo_epsilon < 0:
+            raise ValueError("ModelBuildSettings: `troppo_epsilon` must be a non-negative float")
+        if self.min_reaction_flux < 0:
+            raise ValueError("ModelBuildSettings: `min_reaction_flux` must be a non-negative float")
+        if self.solver_verbosity not in {0, 1, 2, 3} or not isinstance(self.solver_verbosity, int):
+            raise ValueError("ModelBuildSettings: `solver_verbosity` must be an integer in the range [0, 3]")
+        if self.solver_timeout < 0 or not isinstance(self.solver_timeout, int):
+            raise ValueError("ModelBuildSettings: `solver_timeout` must be a non-negative integer")
+        if not (1e-9 < self.solver_feasibility < 1e-2):
+            raise ValueError("ModelBuildSettings: `solver_feasibility` must be a float in the range [1e-9, 1e-2]")
+        if not (1e-9 < self.solver_optimality < 1e-2):
+            raise ValueError("ModelBuildSettings: `solver_optimality` must be a float in the range [1e-9, 1e-2]")
+        if not (1e-9 < self.solver_integrality < 1e-1):
+            raise ValueError("ModelBuildSettings: `solver_integrality` must be a float in the range [1e-9, 1e-1]")
+        if self.gurobi_mipgap < 0:
+            raise ValueError("ModelBuildSettings: `gurobi_mipgap` must be a float in the range [1e-4, inf.)")
+        if self.gurobi_integrality_focus not in {0, 1} or not isinstance(self.gurobi_integrality_focus, int):
+            raise ValueError("ModelBuildSettings: `gurobi_integrality_focus` must be an integer in the range [0, 1]")
+        if self.gurobi_numeric_focus not in {0, 1, 2, 3} or not isinstance(self.gurobi_numeric_focus, int):
+            raise ValueError("ModelBuildSettings: `gurobi_numeric_focus` must be an integer in the range [0, 3]")
+        if self.troppo_epsilon < self.min_reaction_flux * 1000:
+            logger.warning(
+                "ModelBuildSettings: `troppo_epsilon` and `min_reaction_flux` have similar values. "
+                "This can cause inconsistent model builds. Consider ~1000x fold change between the two. "
+            )

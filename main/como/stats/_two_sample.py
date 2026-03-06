@@ -40,7 +40,7 @@ class BaseTwoSample(ABC, Generic[TEST_RESULT]):
         df2: pd.DataFrame,
         cores: int = 1,
         worker_kwargs: dict | None = None,
-    ) -> tuple[list[str], Mapping[str, npt.NDArray[float | np.uint8]]]:
+    ) -> tuple[list[str], Mapping[str, npt.NDArray[np.floating]]]:
         all_reactions = list(set(df1.columns) & set(df2.columns))
         array_a = df1[all_reactions].to_numpy(dtype=float, copy=False)
         array_b = df2[all_reactions].to_numpy(dtype=float, copy=False)
