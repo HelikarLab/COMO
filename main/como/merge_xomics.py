@@ -88,7 +88,6 @@ def _load_rnaseq_tests(filename, context_name, prep_method: RNAType) -> tuple[st
         return load_dummy_dict()
 
 
-# Merge Output
 def _merge_logical_table(df: pd.DataFrame):
     """Merge rows of Logical Table belonging to the same entrez_gene_id.
 
@@ -100,12 +99,14 @@ def _merge_logical_table(df: pd.DataFrame):
     """
     # step 1: get all plural ENTREZ_GENE_IDs in the input table, extract unique IDs
     df.dropna(subset=["entrez_gene_id"], inplace=True)
+    df["entrez_gene_id"] = df["entrez_gene_id"].copy().astype(str)
     df.loc[:, "entrez_gene_id"] = df.loc[:, "entrez_gene_id"].astype(str).str.replace(" /// ", "//").astype(str)
 
-    id_list: list[str] = df.loc[~df["entrez_gene_id"].str.contains("//"), "entrez_gene_id"].tolist()  # Collect "single" ids, like "123"
-    multiple_entrez_ids: list[str] = df.loc[
-        df["entrez_gene_id"].str.contains("//"), "entrez_gene_id"
-    ].tolist()  # Collect "double" ids, like "123//456"
+    # Collect "single" ids, like "123"
+    id_list: list[str] = df.loc[~df["entrez_gene_id"].str.contains("//"), "entrez_gene_id"].tolist()
+
+    # Collect "double" ids, like "123//456"
+    multiple_entrez_ids: list[str] = df.loc[df["entrez_gene_id"].str.contains("//"), "entrez_gene_id"].tolist()
 
     for i in multiple_entrez_ids:
         ids = i.split("//")
@@ -174,81 +175,7 @@ def _merge_logical_table(df: pd.DataFrame):
     return df
 
 
-async def _get_transcriptmoic_details(merged_df: pd.DataFrame, taxon_id: int) -> pd.DataFrame:
-    """Get details of transcriptomic data.
-
-    This function will get the following details of transcriptomic data:
-    - Gene Symbol
-    - Gene Name
-    - entrez_gene_id
-
-    The resulting dataframe will have its columns created in the order listed above
-    It will return a pandas dataframe with this information
-
-    Args:
-        merged_df: A dataframe containing all active transcriptomic and proteomic genes
-        taxon_id: The NCBI taxonomy ID of the organism
-
-    Returns:
-        A dataframe with the above-listed columns
-    """
-    # If _ExpressedHeaderNames.PROTEOMICS.value is in the dataframe, lower the required expression by 1
-    # We are only trying to get details for transcriptomic data
-    logger.debug("Obtaining transcriptomic details")
-    transcriptomic_df: pd.DataFrame = merged_df.copy()
-    if _ExpressedHeaderNames.PROTEOMICS in merged_df.columns:
-        logger.trace("Proteomic data found, modifying required and total expression values")
-        # Get the number of sources required for a gene to be marked "expressed"
-        required_expression = merged_df["required"].iloc[0]
-
-        # Subtract 1 from merged_df["TotalExpressed"] if the current value is greater than or equal to 1
-        # This is done to take into account the removal of proteomic expression
-        merged_df["total_expressed"] = merged_df["total_expressed"].apply(lambda x: x - 1 if x >= 1 else x)
-
-        # Subtract required_expression by 1 if it is greater than 1
-        if required_expression > 1:
-            required_expression -= 1
-
-        transcriptomic_df: pd.DataFrame = merged_df.drop(
-            columns=[
-                _ExpressedHeaderNames.PROTEOMICS,
-                _HighExpressionHeaderNames.PROTEOMICS,
-            ],
-            inplace=False,
-        )
-        logger.trace(f"Modified transcriptomic dataframe: {transcriptomic_df.shape}")
-
-        # Must recalculate TotalExpressed because proteomic data was removed
-        # If the TotalExpressed column is less than the Required column, set active to 1, otherwise set it to 0
-        transcriptomic_df.loc[
-            transcriptomic_df["total_expressed"] >= transcriptomic_df["required"],
-            "active",
-        ] = 1
-
-    my_gene = MyGene()
-    gene_details: pd.DataFrame = pd.DataFrame(
-        data=pd.NA,
-        columns=["entrez_gene_id", "gene_symbol", "description", "gene_type"],
-        index=list(range(len(transcriptomic_df))),
-    )
-    logger.trace(f"Querying MyGene for details on {len(transcriptomic_df)} genes")
-    for i, detail in enumerate(
-        await my_gene.query(
-            items=transcriptomic_df["entrez_gene_id"].astype(int).tolist(),
-            taxon=taxon_id,
-            scopes="entrezgene",
-        )
-    ):
-        gene_details.at[i, "entrez_gene_id"] = detail["entrezgene"]
-        gene_details.at[i, "gene_symbol"] = detail["symbol"]
-        gene_details.at[i, "description"] = detail["name"]
-        gene_details.at[i, "gene_type"] = detail["type_of_gene"]
-
-    logger.debug("Finished obtaining transcriptomic details")
-    return gene_details
-
-
-async def _merge_xomics(
+def _trinarize_data(
     context_name: str,
     expression_requirement: int,
     trna_boolean_matrix: pd.DataFrame | None,
@@ -257,8 +184,6 @@ async def _merge_xomics(
     proteomic_boolean_matrix: pd.DataFrame | None,
     output_merged_filepath: Path,
     output_gene_activity_filepath: Path,
-    output_transcriptomic_details_filepath: Path,
-    taxon_id: int,
     force_activate_high_confidence: bool = True,
     adjust_for_missing_sources: bool = False,
 ):
@@ -277,17 +202,18 @@ async def _merge_xomics(
             logger.trace(f"Skipping {expressed_sourcetype} because it's matrix does not exist")
             continue
 
-        matrix: pd.DataFrame  # re-define type to assist in type hinting for IDEs
         expression_list.append(expressed_sourcetype)
         high_confidence_list.append(high_expressed_sourcetype)
         matrix.rename(columns={"expressed": expressed_sourcetype, "high": high_expressed_sourcetype}, inplace=True)
-        matrix = cast(pd.DataFrame, matrix[matrix["entrez_gene_id"] != "-"])
+        matrix = matrix[matrix["entrez_gene_id"] != "-"]
         matrix.loc[:, "entrez_gene_id"] = matrix.loc[:, "entrez_gene_id"].astype(int)
         merge_data = matrix if merge_data.empty else merge_data.merge(matrix, on="entrez_gene_id", how="outer")
 
     logger.trace(f"Shape of merged data before merging logical tables: {merge_data.shape}")
     if merge_data.empty:
-        logger.warning(f"No data is available for the '{context_name}' context. If this is intentional, ignore this error.")
+        logger.warning(
+            f"No data is available for the '{context_name}' context. If this is intentional, ignore this error."
+        )
         return {}
 
     merge_data = _merge_logical_table(merge_data)
@@ -300,7 +226,11 @@ async def _merge_xomics(
     if adjust_for_missing_sources:  # Subtract 1 from requirement per missing source
         logger.trace("Adjusting for missing data sources")
         merge_data.loc[:, "required"] = merge_data[expression_list].apply(
-            lambda x: expression_requirement - (num_sources - x.count()) if (expression_requirement - (num_sources - x.count()) > 0) else 1,
+            lambda x: (
+                expression_requirement - (num_sources - x.count())
+                if (expression_requirement - (num_sources - x.count()) > 0)
+                else 1
+            ),
             axis=1,
         )
     else:  # Do not adjust for missing sources
@@ -321,29 +251,26 @@ async def _merge_xomics(
         merge_data.loc[merge_data[high_confidence_list].sum(axis=1) > 0, "active"] = 1
 
     merge_data.dropna(inplace=True)
+    merge_data = merge_data.groupby("entrez_gene_id", as_index=False).mean()
     merge_data.to_csv(output_merged_filepath, index=False)
     logger.success(f"Saved merged data to {output_merged_filepath}")
 
-    logger.debug(f"Generating transcriptomic details using {output_merged_filepath}")
-    transcriptomic_details = await _get_transcriptmoic_details(merge_data, taxon_id=taxon_id)
-    logger.debug(f"Saving transcriptomic details to {output_transcriptomic_details_filepath}")
-    transcriptomic_details.dropna(inplace=True)
-    transcriptomic_details.to_csv(output_transcriptomic_details_filepath, index=False)
-    logger.success(f"Saved transcriptomic details to {output_transcriptomic_details_filepath}")
     return {context_name: output_gene_activity_filepath.as_posix()}
 
 
-async def _update_missing_data(input_matrices: _InputMatrices, taxon_id: int) -> _InputMatrices:
+def _update_missing_data(input_matrices: _InputMatrices, taxon_id: int) -> _InputMatrices:
     logger.trace("Updating missing genomic data")
-    matrix_keys: dict[str, list[pd.DataFrame]] = {
+    matrix_keys: dict[str, list[pd.DataFrame | None]] = {
         "trna": [input_matrices.trna],
         "mrna": [input_matrices.mrna],
         "scrna": [input_matrices.scrna],
         "proteomics": [input_matrices.proteomics],
     }
     logger.trace(f"Gathering missing data for data sources: {','.join(key for key in matrix_keys if key is not None)}")
+
     # ruff: disable[E501]
     # fmt: off
+    # TODO: Use the local `gene_info.csv` file
     results: tuple[pd.DataFrame | None, ...] = (
         get_missing_gene_data(values=input_matrices.trna, taxon_id=taxon_id) if input_matrices.trna is not None else None,
         get_missing_gene_data(values=input_matrices.mrna, taxon_id=taxon_id) if input_matrices.mrna is not None else None,
@@ -356,34 +283,29 @@ async def _update_missing_data(input_matrices: _InputMatrices, taxon_id: int) ->
         matrix_keys[key].append(results[i])
 
     for matrix_name, (matrix, conversion) in matrix_keys.items():
-        matrix: pd.DataFrame
-        if matrix is not None:
-            # fmt: off
-            existing_data = (
-                "gene_symbol" if "gene_symbol" in matrix.columns
-                else "entrez_gene_id" if "entrez_gene_id" in matrix.columns
-                else "ensembl_gene_id"
-            )
-            # fmt: on
-            logger.trace(f"Merging conversion data for {matrix_name}, existing id column is: {existing_data}")
-            # input_matrices[matrix_name][existing_data] = input_matrices[matrix_name][existing_data].astype(str)
-            if existing_data == "entrez_gene_id":
-                input_matrices[matrix_name]["entrez_gene_id"] = input_matrices[matrix_name]["entrez_gene_id"].astype(int)
-                conversion.index = conversion.index.astype(int)
+        if matrix is None or conversion is None:
+            continue
 
-            input_matrices[matrix_name] = (
-                input_matrices[matrix_name].merge(conversion, how="left", left_on=existing_data, right_index=True).reset_index(drop=True)
-            )
+        merge_on = matrix.columns.intersection(conversion.columns).to_list()
+        logger.trace(f"Merging conversion data for {matrix_name} on column(s): {','.join(merge_on)}")
+        if "entrez_gene_id" in merge_on:
+            matrix["entrez_gene_id"] = matrix["entrez_gene_id"].astype(int)
+            conversion["entrez_gene_id"] = conversion["entrez_gene_id"].astype(int)
+        conversion = conversion.explode(column="ensembl_gene_id", ignore_index=True)
 
-            # input_matrices[matrix_name] = (
-            #     input_matrices[matrix_name].merge(conversion, how="left", left_index=True, right_index=True).dropna().reset_index(drop=True)
-            # )
+        if "notfound" in conversion.columns:
+            conversion["notfound"] = conversion["notfound"].replace(np.nan, False)
+            conversion = conversion[~conversion["notfound"]]
+            conversion = conversion.drop(columns=["notfound"])
+        matrix = matrix.merge(conversion, how="outer", on=merge_on).reset_index(drop=True)
+        matrix = matrix[~matrix["entrez_gene_id"].isna()]  # we need to exclude NA entrez IDs for model building
+        input_matrices[matrix_name] = matrix
 
     logger.debug("Updated missing genomic data")
     return input_matrices
 
 
-async def _process(
+def _process(
     *,
     context_name: str,
     input_matrices: _InputMatrices,
@@ -396,11 +318,10 @@ async def _process(
     weighted_z_floor: int,
     weighted_z_ceiling: int,
     adjust_method: AdjustmentMethod,
-    merge_zfpkm_distribution: bool,
+    merge_zscore_distribution: bool,
     force_activate_high_confidence: bool,
     adjust_for_missing_sources: bool,
     output_merge_activity_filepath: Path,
-    output_transcriptomic_details_filepath: Path,
     output_activity_filepaths: _OutputCombinedSourceFilepath,
     output_final_model_scores_filepath: Path,
     output_figure_dirpath: Path | None,
@@ -409,18 +330,19 @@ async def _process(
     logger.trace(
         f"Settings: Min Expression: {minimum_source_expression}, Expression Requirement: {expression_requirement}, "
         f"Weighted Z-Score Floor: {weighted_z_floor}, Weighted Z-Score Ceiling: {weighted_z_ceiling}, "
-        f"Adjust Method: {adjust_method.value}, Merge Z-Scores: {merge_zfpkm_distribution}, "
+        f"Adjust Method: {adjust_method.value}, Merge Z-Scores: {merge_zscore_distribution}, "
         f"Force High Confidence: {force_activate_high_confidence}, Adjust for Missing: {adjust_for_missing_sources}"
     )
 
     # Collect missing genomic data for each of the input items in asynchronous parallel
-    input_matrices = await _update_missing_data(input_matrices, taxon_id)
+    input_matrices = _update_missing_data(input_matrices, taxon_id)
     logger.trace("Missing data updated")
 
-    if merge_zfpkm_distribution:
+    if merge_zscore_distribution:
         logger.trace("Merging Z-Scores")
-        await _begin_combining_distributions(
+        _begin_combining_distributions(
             context_name=context_name,
+            taxon=taxon_id,
             input_matrices=input_matrices,
             batch_names=batch_names,
             source_weights=source_weights,
@@ -471,7 +393,7 @@ async def _process(
         adjusted_expression_requirement = 1
 
     logger.debug(f"Final Expression Requirement: {adjusted_expression_requirement}")
-    await _merge_xomics(
+    _trinarize_data(
         context_name=context_name,
         expression_requirement=adjusted_expression_requirement,
         trna_boolean_matrix=boolean_matrices.trna,
@@ -480,8 +402,6 @@ async def _process(
         proteomic_boolean_matrix=boolean_matrices.proteomics,
         output_merged_filepath=output_merge_activity_filepath,
         output_gene_activity_filepath=output_final_model_scores_filepath,
-        output_transcriptomic_details_filepath=output_transcriptomic_details_filepath,
-        taxon_id=taxon_id,
         force_activate_high_confidence=force_activate_high_confidence,
         adjust_for_missing_sources=adjust_for_missing_sources,
     )
@@ -494,14 +414,17 @@ def _build_batches(
     proteomic_metadata: pd.DataFrame | None,
 ) -> _BatchNames:
     batch_names = _BatchNames()
-    for source, metadata in zip(SourceTypes.__members__.values(), [trna_metadata, mrna_metadata, scrna_metadata, proteomic_metadata], strict=True):
+    metadata: pd.DataFrame | None
+    for source, metadata in zip(
+        SourceTypes.__members__.values(),
+        [trna_metadata, mrna_metadata, scrna_metadata, proteomic_metadata],
+        strict=True,
+    ):
         source: SourceTypes
-        metadata: pd.DataFrame
         if metadata is None:
             logger.trace(f"Metadata for source '{source.value}' is None, skipping")
             continue
 
-        metadata: pd.DataFrame  # Re-assign type to assist in type hinting
         for study in sorted(metadata["study"].unique()):
             batch_search = re.search(r"\d+", study)
             if not batch_search:
@@ -535,10 +458,9 @@ def _validate_source_arguments(
         raise ValueError(f"Must specify all or none of '{source.value}' arguments")
 
 
-async def merge_xomics(  # noqa: C901
+def merge_xomics(  # noqa: C901
     context_name: str,
     output_merge_activity_filepath: Path,
-    output_transcriptomic_details_filepath: Path,
     output_final_model_scores_filepath: Path,
     output_figure_dirpath: Path | None,
     taxon_id: int,
@@ -567,7 +489,7 @@ async def merge_xomics(  # noqa: C901
     adjust_method: AdjustmentMethod = AdjustmentMethod.FLAT,
     force_activate_high_confidence: bool = False,
     adjust_for_na: bool = False,
-    merge_zfpkm_distribution: bool = False,
+    merge_zscore_distributions: bool = True,
     weighted_z_floor: int = -6,
     weighted_z_ceiling: int = 6,
     log_level: LogLevel = LogLevel.INFO,
@@ -600,7 +522,9 @@ async def merge_xomics(  # noqa: C901
         raise ValueError("No data was passed!")
 
     if expression_requirement and expression_requirement < 1:
-        logger.warning(f"Expression requirement must be at least 1! Setting to the minimum of 1 now. Got: {expression_requirement}")
+        logger.warning(
+            f"Expression requirement must be at least 1! Setting to the minimum of 1 now. Got: {expression_requirement}"
+        )
         expression_requirement = 1
 
     if expression_requirement is None:
@@ -619,8 +543,6 @@ async def merge_xomics(  # noqa: C901
     output_final_model_scores_filepath.parent.mkdir(parents=True, exist_ok=True)
     if output_merge_activity_filepath:
         output_merge_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
-    if output_transcriptomic_details_filepath:
-        output_transcriptomic_details_filepath.parent.mkdir(parents=True, exist_ok=True)
     if output_trna_activity_filepath:
         output_trna_activity_filepath.parent.mkdir(parents=True, exist_ok=True)
     if output_mrna_activity_filepath:
@@ -674,7 +596,7 @@ async def merge_xomics(  # noqa: C901
         proteomic_metadata=proteomic_metadata,
     )
 
-    await _process(
+    _process(
         context_name=context_name,
         input_matrices=input_matrices,
         boolean_matrices=boolean_matrices,
@@ -686,12 +608,11 @@ async def merge_xomics(  # noqa: C901
         weighted_z_floor=weighted_z_floor,
         weighted_z_ceiling=weighted_z_ceiling,
         adjust_method=adjust_method,
-        merge_zfpkm_distribution=merge_zfpkm_distribution,
+        merge_zscore_distribution=merge_zscore_distributions,
         force_activate_high_confidence=force_activate_high_confidence,
         adjust_for_missing_sources=adjust_for_na,
         output_activity_filepaths=output_activity_filepaths,
         output_merge_activity_filepath=output_merge_activity_filepath,
-        output_transcriptomic_details_filepath=output_transcriptomic_details_filepath,
         output_final_model_scores_filepath=output_final_model_scores_filepath,
         output_figure_dirpath=output_figure_dirpath,
     )
