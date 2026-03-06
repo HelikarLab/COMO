@@ -7,6 +7,7 @@ from tqdm import tqdm
 
 __all__ = [
     "build_gene_info",
+    "contains_identical_gene_types",
     "determine_gene_type",
     "get_remaining_identifiers",
 ]
@@ -200,20 +201,10 @@ def determine_gene_type(items: str | Sequence[str], /) -> str | dict[str, T_MG_S
 
 
 def contains_identical_gene_types(values: dict[str, T_MG_SCOPE] | Sequence[T_MG_SCOPE]) -> bool:
+    """Check if all values in the input are identical.
+
+    :param values: A dictionary mapping gene identifiers to their types or a sequence of gene types.
+    :return: True if all values are identical, False otherwise.
+    """
     data = values if not isinstance(values, dict) else list(values.values())
     return all(v == data[0] for v in data)
-
-
-if __name__ == "__main__":
-    r = build_gene_info(
-        ids=[
-            "ENSG00000284484",
-            "ENSG00000299311",
-            "ENSG00000202151",
-            "ENSG00000226053",
-            "ENSG00000131831",
-        ],
-        taxon=9606,
-        cache=True,
-    )
-    print(r.columns)
