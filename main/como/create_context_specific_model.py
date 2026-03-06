@@ -122,39 +122,6 @@ def _gene_rule_logical(gpr_expression: str, level: int = 0) -> str:
     return expression_out
 
 
-def _set_boundaries(
-    model: cobra.Model,
-    boundary_reactions: list[str],
-    lower_bounds: list[float],
-    upper_bounds: list[float],
-) -> cobra.Model:
-    # get boundary reactions
-    exchange_rxns = [rxn.id for rxn in model.reactions if rxn.id.startswith("EX_")]
-    sink_rxns = [rxn.id for rxn in model.reactions if rxn.id.startswith("sink_")]
-    demand_rxns = [rxn.id for rxn in model.reactions if rxn.id.startswith("DM_")]
-
-    # Allows all boundary reactions to be used if none are given
-    allow_all_boundary_rxns = not boundary_reactions
-
-    # close sinks and demands not in boundary reactions unless no boundary reactions were given
-    if not allow_all_boundary_rxns:
-        for i, rxn in enumerate(sink_rxns):  # set sinks to 0
-            getattr(model.reactions, rxn).lower_bounds = lower_bounds[i] if rxn in boundary_reactions else 0
-            getattr(model.reactions, rxn).upper_bounds = upper_bounds[i] if rxn in boundary_reactions else 1000
-
-        for i, rxn in enumerate(demand_rxns):
-            getattr(model.reactions, rxn).lower_bounds = 0
-            getattr(model.reactions, rxn).upper_bounds = upper_bounds[i] if rxn in boundary_reactions else 0
-
-    # Reaction media
-    medium = model.medium
-    for rxn in exchange_rxns:  # open exchanges from exchange file, close unspecified exchanges
-        medium[rxn] = -float(lower_bounds[boundary_reactions.index(rxn)]) if rxn in boundary_reactions else 0.0
-    model.medium = medium
-
-    return model
-
-
 def _feasibility_test(model_cobra: cobra.Model, step: str):
     # check number of unsolvable reactions for reference model under media assumptions
     # create flux consistant model (rmemoves some reactions)
@@ -449,9 +416,8 @@ def _read_reference_model(filepath: Path) -> cobra.Model:
             raise ValueError(f"Reference model format must be .xml, .mat, or .json; found '{filepath.suffix}'")
 
 
-async def _build_model(
-    general_model_file: Path,
 def _build_model(
+    reference_model: cobra.Model,
     gene_expression_file: Path,
     recon_algorithm: Algorithm,
     objective: str,
@@ -502,12 +468,16 @@ def _build_model(
     reference_model = _set_boundaries(reference_model, boundary_reactions, lower_bounds, upper_bounds)
     reference_model.solver = solver.lower()
 
-    # check number of unsolvable reactions for reference model under media assumptions
-    # inconsistent_reactions, cobra_model = _feasibility_test(cobra_model, "before_seeding")
-    inconsistent_reactions = []
-    s_matrix = cobra.util.array.create_stoichiometric_matrix(reference_model, array_type="dense")
-    lower_bounds: list[int] = []
-    upper_bounds: list[int] = []
+    # Set reference model boundaries
+    for rxn, lb, ub in zip(boundary_reactions, lower_bounds, upper_bounds, strict=True):
+        cast(cobra.Reaction, reference_model.reactions.get_by_id(rxn)).lower_bound = lb  # type: ignore[bad-argument-count]
+        cast(cobra.Reaction, reference_model.reactions.get_by_id(rxn)).upper_bound = ub  # type: ignore[bad-argument-count]
+    reference_model.solver = solver.lower()  # type: ignore[bad-argument-count]
+    reference_model.objective_direction = objective_direction  # type: ignore[bad-argument-count]
+
+    # Collect the lower/upper bounds for reactions in the reference model to provide it to reconstruction methods
+    ref_lb: npt.NDArray[np.floating] = np.full(shape=(len(reference_model.reactions)), fill_value=np.nan, dtype=float)
+    ref_ub: npt.NDArray[np.floating] = np.full(shape=(len(reference_model.reactions)), fill_value=np.nan, dtype=float)
     reaction_ids: list[str] = []
     for i, rxn in enumerate(reference_model.reactions):
         rxn: cobra.Reaction
