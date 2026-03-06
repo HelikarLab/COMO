@@ -181,7 +181,7 @@ wheels = [
 
 [[package]]
 name = "bioservices"
-version = "1.12.1"
+version = "1.13.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "appdirs" },
@@ -201,9 +201,9 @@ dependencies = [
     { name = "wrapt" },
     { name = "xmltodict" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5e/51/1a8dc87ffc6c27e0a896b982da3ff1b483f5ef85a47ae1ffafbc6a479bb4/bioservices-1.12.1.tar.gz", hash = "sha256:0f31782ae50930d4ab82b43f98d1ca2cc9befaa699f3a7a6cba512a8f9e2cab0", size = 218752, upload-time = "2025-02-27T22:38:58.628Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/99/8c/b9a20b6656446daaea5f3085d5465aad8f536c95fd14ffd6fcdcdf410031/bioservices-1.13.0.tar.gz", hash = "sha256:24d30be650d37c1377b4fd452abead9ec5ee891dbdaa96a21543ab508d401386", size = 220384, upload-time = "2026-03-02T14:49:11.002Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/c9/656854139abbdc0a09d544bacc6fa3132245ebf9847dd45da9a8e416c5a5/bioservices-1.12.1-py3-none-any.whl", hash = "sha256:898033fe0158a0e31ea5ad93ff02f5000aa67ff9d06e9dc6477583d3f60ace80", size = 258032, upload-time = "2025-02-27T22:38:56.406Z" },
+    { url = "https://files.pythonhosted.org/packages/27/49/93a413b3b70a96e525f11212d0ca7992c4c7b35c47da78bf227a52282e85/bioservices-1.13.0-py3-none-any.whl", hash = "sha256:aaafb5ee246bccd9323a21de12ea6a35163e01c1ed4777e45acbda565804fc32", size = 259727, upload-time = "2026-03-02T14:49:09.879Z" },
 ]
 
 [[package]]
@@ -504,7 +504,7 @@ dev = [
 requires-dist = [
     { name = "aioftp", specifier = ">=0.23.1" },
     { name = "anndata", specifier = ">=0.12.0" },
-    { name = "bioservices", specifier = ">=1.12.1" },
+    { name = "bioservices", specifier = ">=1.13.0" },
     { name = "cobamp", git = "https://github.com/JoshLoecker/cobamp?rev=master" },
     { name = "cobra", specifier = ">=0.28.0" },
     { name = "gurobipy", marker = "extra == 'gurobi'", specifier = "<14" },
@@ -526,7 +526,7 @@ requires-dist = [
     { name = "statsmodels", marker = "python_full_version < '3.12'", specifier = ">=0.13.0" },
     { name = "statsmodels", marker = "python_full_version >= '3.12'", specifier = ">=0.14.0" },
     { name = "troppo", git = "https://github.com/JoshLoecker/troppo?rev=master" },
-    { name = "zfpkm", specifier = ">=1.0.3" },
+    { name = "zfpkm", specifier = ">=1.1.0" },
 ]
 provides-extras = ["gurobi", "interactive"]
 
@@ -3697,7 +3697,7 @@ wheels = [
 
 [[package]]
 name = "zfpkm"
-version = "1.0.3"
+version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "loguru" },
@@ -3705,9 +3705,9 @@ dependencies = [
     { name = "numpy" },
     { name = "pandas" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e3/7f/ff714f85601cd66439f2beed0d740772509b32b8be5a8b01a53652248714/zfpkm-1.0.3.tar.gz", hash = "sha256:58830ea61e6adc0c75f28d5304885bd03a33a6e9e56aa693856cbb37e30a5046", size = 15410, upload-time = "2025-11-10T16:47:45.614Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0d/bf/43471c26e47fc38b5f748723e3bfa104f77ee0352f5b6a242f8b01786ae4/zfpkm-1.1.0.tar.gz", hash = "sha256:c159f78703d9d853c5f8cbbc590fb9381f097329487947d4eaf95c72ab309870", size = 15623, upload-time = "2026-03-06T16:22:29.929Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/11/f8/ef2baeaf2d15682d5d663c3f5165b63abad114fc0c4cd90b67b1ed0a6456/zfpkm-1.0.3-py3-none-any.whl", hash = "sha256:085007f97e75e50d686677ee28e3fceba5fc19958b35e9fbad3756ca2302a219", size = 17841, upload-time = "2025-11-10T16:47:44.805Z" },
+    { url = "https://files.pythonhosted.org/packages/85/a1/10cf3c5268131d37a4a968a1f5f935a07e81cb78dbb83e8bedc4a835c048/zfpkm-1.1.0-py3-none-any.whl", hash = "sha256:765d1785a22729adeb89732da01ba47abcbc9597c17c587e42176398a758b7a3", size = 18103, upload-time = "2026-03-06T16:22:29.104Z" },
 ]
 
 [[package]]

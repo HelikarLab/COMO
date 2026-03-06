@@ -9,7 +9,7 @@ requires-python = ">=3.11,<3.14"
 dependencies = [
     "aioftp>=0.23.1",
     "anndata>=0.12.0",
-    "bioservices>=1.12.1",
+    "bioservices>=1.13.0",
     "cobamp@git+https://github.com/JoshLoecker/cobamp@master",
     "cobra>=0.28.0",
     "joypy>=0.2.6",
@@ -28,7 +28,7 @@ dependencies = [
     "statsmodels>=0.13.0; python_version < '3.12'",
     "statsmodels>=0.14.0; python_version >= '3.12'",
     "troppo@git+https://github.com/JoshLoecker/troppo@master",
-    "zfpkm>=1.0.3",
+    "zfpkm>=1.1.0",
 ]
 
 [project.optional-dependencies]
