@@ -612,16 +612,19 @@ def _build_model(
     if np.isnan(ref_ub).any():
         raise ValueError("Upper bounds contains unfilled values!")
 
-    # get expressed reactions
-    reaction_expression: collections.OrderedDict[str, int] = await _map_expression_to_reaction(
-        reference_model, gene_expression_file, recon_algorithm, high_thresh=high_thresh, low_thresh=low_thresh, taxon=taxon
+    reaction_expression, min_expr_val, low_expr, high_expr = _map_expression_to_reaction(
+        reference_model,
+        gene_expression_file,
+        recon_algorithm,
+        taxon=taxon,
+        low_percentile=low_percentile,
+        high_percentile=high_percentile,
     )
-    expression_vector: npt.NDArray[float] = np.array(list(reaction_expression.values()), dtype=float)
-
-    for rxn in force_reactions:
-        if rxn not in reaction_ids:
+    expression_vector: npt.NDArray[np.floating] = np.asarray(list(reaction_expression.values()), dtype=float)
+    for rxn_id in force_reactions:
+        if rxn_id not in reaction_ids:
             logger.warning(
-                f"The force reaction '{rxn}' was not found in the reference model. "
+                f"The force reaction '{rxn_id}' was not found in the reference model. "
                 f"Check BiGG, or the relevant database for your reference model, for synonyms."
             )
 
