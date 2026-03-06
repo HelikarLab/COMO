@@ -18,7 +18,6 @@ from como.pipelines.identifier import convert
 T = TypeVar("T")
 __all__ = [
     "get_missing_gene_data",
-    "log_and_raise_error",
     "num_columns",
     "num_rows",
     "read_file",
