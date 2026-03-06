@@ -640,16 +640,15 @@ def _build_model(
 
     if force_boundary_rxn_inclusion:
         all_forced: set[str] = {*force_reactions, *boundary_reactions}
-        force_reaction_indices: npt.NDArray[np.uint16] = np.array(
-            [reaction_ids.index(rxn) for rxn in all_forced if rxn in reaction_ids], dtype=np.uint16
+        force_reaction_indices: npt.NDArray[np.integer] = np.asarray(
+            [reaction_ids.index(rxn_id) for rxn_id in all_forced if rxn_id in reaction_ids], dtype=int
         )
     else:
-        force_reaction_indices: npt.NDArray[np.uint16] = np.array(
-            [reaction_ids.index(rxn) for rxn in force_reactions if rxn in reaction_ids], dtype=np.uint16
+        force_reaction_indices: npt.NDArray[np.integer] = np.asarray(
+            [reaction_ids.index(rxn_id) for rxn_id in force_reactions if rxn_id in reaction_ids], dtype=int
         )
 
-    expression_vector_indices = [i for (i, val) in enumerate(expression_vector) if val > 0]
-    expression_threshold = (low_thresh, high_thresh)
+    expression_vector_indices: list[int] = list(range(len(expression_vector)))
 
     if recon_algorithm == Algorithm.IMAT:
         context_model_cobra: cobra.Model = _build_with_imat(
@@ -657,8 +656,8 @@ def _build_model(
             lower_bounds=ref_lb,
             upper_bounds=ref_ub,
             expr_vector=expression_vector,
-            low_expression_threshold=updated_low_thresh,
-            high_expression_threshold=updated_high_thresh,
+            low_expression_threshold=low_expr,
+            high_expression_threshold=high_expr,
             force_reaction_indices=force_reaction_indices,
             solver=solver,
             build_settings=build_settings,
@@ -673,7 +672,7 @@ def _build_model(
         context_model_cobra: cobra.Model = _build_with_gimme(
             reference_model=reference_model,
             expression_vector=expression_vector,
-            idx_objective=objective_index,
+            idx_objective=reaction_ids.index(objective),
             lower_bounds=ref_lb,
             upper_bounds=ref_ub,
             solver=solver,
