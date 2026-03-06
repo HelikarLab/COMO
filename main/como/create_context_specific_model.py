@@ -230,16 +230,15 @@ def _build_with_fastcore(
             "Lower bounds, upper bounds, and stoichiometric matrix must have the same number of reactions."
         )
     logger.debug("Creating feasible model")
-    _, cobra_model = _feasibility_test(cobra_model, "other")
-    properties = FastcoreProperties(core=exp_idx_list, solver=solver)
-    algorithm = FASTcore(s_matrix, lower_bounds, upper_bounds, properties)
+    _, reference_model = _feasibility_test(reference_model, "other")
+    properties = FastcoreProperties(core=list(exp_idx_list), solver=solver)
+    algorithm = FASTcore(s_matrix, np.asarray(lower_bounds), np.asarray(upper_bounds), properties)
     context_rxns = algorithm.fastcore()
-    context_cobra_model = cobra_model.copy()
-    r_ids = [r.id for r in context_cobra_model.reactions]
+    r_ids = [r.id for r in model.reactions]
     remove_rxns = [r_ids[int(i)] for i in range(s_matrix.shape[1]) if i not in context_rxns]
-    context_cobra_model.remove_reactions(remove_rxns, True)
+    model.remove_reactions(remove_rxns, True)
 
-    return context_cobra_model
+    return model
 
 
 def _build_with_imat(
