@@ -15,7 +15,7 @@ from loguru import logger
 
 from como.data_types import LogLevel, RNAType
 from como.pipelines.identifier import build_gene_info, get_remaining_identifiers
-from como.utils import read_file, set_up_logging
+from como.utils import asyncable, read_file, set_up_logging
 
 
 @dataclass
@@ -739,3 +739,6 @@ def rnaseq_preprocess(  # noqa: C901
         cache=cache,
         create_gene_info_only=create_gene_info_only,
     )
+
+
+async_rnaseq_preprocess = asyncable(rnaseq_preprocess)
