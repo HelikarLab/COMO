@@ -25,7 +25,7 @@ from como.data_types import FilteringTechnique, LogLevel, RNAType
 from como.migrations import gene_info_migrations
 from como.pipelines.identifier import contains_identical_gene_types, determine_gene_type
 from como.project import Config
-from como.utils import read_file, set_up_logging
+from como.utils import asyncable, read_file, set_up_logging
 
 
 class _FilteringOptions(NamedTuple):
@@ -185,6 +185,9 @@ def _build_matrix_results(
     elif isinstance(matrix, sc.AnnData):
         if not isinstance(matrix.var, pd.DataFrame):
             raise TypeError(f"Expected matrix.var object to be 'pd.DataFrame', got '{type(matrix.var)}'")
+        
+        if matrix.raw is not None:
+            matrix = matrix.raw.to_adata()
 
         gene_info = gene_info.sort_values(["entrez_gene_id", "size"], ascending=[True, True]).drop_duplicates(
             subset=["entrez_gene_id"], keep="first"
@@ -538,8 +541,6 @@ def umi_filter(
         adata: sc.AnnData = metric.count_matrix.copy()
 
         if perform_normalization:
-            if adata.raw is not None:
-                adata.X = adata.raw.X.copy()
             sc.pp.filter_cells(adata, min_genes=10)
             sc.pp.filter_genes(adata, min_cells=1)
             sc.pp.normalize_total(adata, target_sum=target_sum)
@@ -549,8 +550,8 @@ def umi_filter(
 
         adata_x = adata.X
         n_cells, n_genes = adata.shape
-
-        min_samples: float = round(min_sample_expression * n_cells)
+        
+        min_samples = round(min_sample_expression * n_cells)
         min_func = k_over_a(min_samples, cut_off)
         min_genes_mask = np.zeros(n_genes, dtype=bool)
         for j in range(n_genes):
@@ -709,7 +710,7 @@ def _process(
 
         merged_zscores = merged_zscores.reindex(columns=sorted(merged_zscores.columns))
         merged_zscores = merged_zscores.groupby(by=merged_zscores.index.name).mean()
-        merged_zscores.to_csv(output_zscore_normalization_filepath, index=True)
+        merged_zscores.to_csv(output_zscore_normalization_filepath.with_suffix(".csv"), index=True)
     elif isinstance(rnaseq_matrix, sc.AnnData):
         merged_zscores = ad.concat([m.z_score_matrix for m in metrics.values()], axis="obs")
         merged_zscores.var.index.name = "entrez_gene_id"
@@ -905,55 +906,4 @@ def rnaseq_gen(  # noqa: C901
     )
 
 
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-
-    data = pd.read_csv("/Users/joshl/Downloads/fpkm_example_data/CD8.genes.results.txt", sep="\t")
-    data["gene_id"] = data["gene_id"].str.partition(".")[0]
-    counts = (
-        data[["gene_id", "expected_count"]]
-        .copy()
-        .set_index("gene_id")
-        .sort_index()
-        .rename(columns={"expected_count": "actual"})
-    )
-    eff_len = (
-        data[["gene_id", "effective_length"]]
-        .copy()
-        .set_index("gene_id")
-        .sort_index()
-        .rename(columns={"effective_length": "actual"})
-    )
-    expected_fpkm = (
-        data[["gene_id", "FPKM"]].copy().set_index("gene_id").sort_index().rename(columns={"FPKM": "expected"})
-    )
-
-    metrics = {
-        "S1": _StudyMetrics(
-            study="S1",
-            num_samples=1,
-            count_matrix=counts,
-            eff_length=eff_len,
-            sample_names=[""],
-            layout=[LayoutMethod.paired_end],
-            entrez_gene_ids=np.ndarray([0]),
-            gene_sizes=np.ndarray([0]),
-        )
-    }
-    calculated_fpkm = _calculate_fpkm(metrics)["S1"].normalization_matrix
-    calculated_fpkm = calculated_fpkm.round(2)
-
-    joined = calculated_fpkm.join(expected_fpkm, how="inner")
-    joined["actual"] = joined["actual"].replace([np.nan, np.inf], 0)
-
-    zfpkm_df, _ = zFPKM(joined, remove_na=True)
-    zfpkm_df = zfpkm_df.replace(-np.inf, np.nan)
-
-    fig, axes = cast(tuple[plt.Figure, list[plt.Axes]], plt.subplots(nrows=2, ncols=1))
-    axes[0].hist(zfpkm_df["actual"].to_numpy())
-    axes[0].set_title("Expected zFPKM")
-
-    axes[1].hist(zfpkm_df["expected"].to_numpy())
-    axes[1].set_title("Actual zFPKM")
-    fig.tight_layout()
-    fig.show()
+async_rnaseq_gen = asyncable(rnaseq_gen)

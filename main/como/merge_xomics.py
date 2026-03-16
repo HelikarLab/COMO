@@ -22,7 +22,7 @@ from como.data_types import (
     _SourceWeights,
 )
 from como.project import Config
-from como.utils import get_missing_gene_data, read_file, return_placeholder_data, set_up_logging
+from como.utils import asyncable, get_missing_gene_data, read_file, return_placeholder_data, set_up_logging
 
 
 class _MergedHeaderNames:
@@ -616,3 +616,6 @@ def merge_xomics(  # noqa: C901
         output_final_model_scores_filepath=output_final_model_scores_filepath,
         output_figure_dirpath=output_figure_dirpath,
     )
+
+
+async_merge_xomics = asyncable(merge_xomics)

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
+import functools
 import io
 import sys
-from collections.abc import Iterator, Sequence
+from collections.abc import Awaitable, Callable, Iterator, Sequence
 from pathlib import Path
-from typing import Any, Literal, NoReturn, TextIO, TypeVar, overload
+from typing import Any, Literal, ParamSpec, TextIO, TypeVar, overload
 
 import numpy.typing as npt
 import pandas as pd
@@ -15,8 +17,11 @@ from loguru import logger
 from como.data_types import LOG_FORMAT, Algorithm, LogLevel
 from como.pipelines.identifier import get_remaining_identifiers
 
+P = ParamSpec("P")
 T = TypeVar("T")
+
 __all__ = [
+    "asyncable",
     "get_missing_gene_data",
     "num_columns",
     "num_rows",
@@ -309,3 +314,23 @@ def set_up_logging(
     with contextlib.suppress(ValueError):
         logger.remove(0)
         logger.add(sink=location, level=level.value, format=formatting)
+
+
+def asyncable(func: Callable[P, T]) -> Callable[P, Awaitable[T]]:
+    """Converts a synchronous function to asynchronous.
+
+    This wrapper functions by running the synchronous function in a separate thread using asyncio's run_in_executor
+    This allows the synchronous function to be called in an asynchronous context without blocking the event loop.
+
+    :param func: The synchronous function to convert.
+    :return: An asynchronous version of the input function that runs in a separate thread.
+    """
+    
+    @functools.wraps(func)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+        loop = asyncio.get_running_loop()
+        call = functools.partial(func, *args, **kwargs)
+        return await loop.run_in_executor(None, call)
+        # return await loop.run_in_executor(None, lambda: func(*args, **kwargs))
+    
+    return wrapper

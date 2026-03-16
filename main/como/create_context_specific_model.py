@@ -32,7 +32,7 @@ from como.data_types import (
     Solver,
     _BoundaryReactions,
 )
-from como.utils import set_up_logging, split_gene_expression_data
+from como.utils import asyncable, set_up_logging, split_gene_expression_data
 
 
 def _reaction_indices_to_ids(
@@ -1014,3 +1014,6 @@ def create_context_specific_model(  # noqa: C901
         f"metabolites={len(context_model.metabolites)}"
     )
     return context_model
+
+
+async_create_context_specific_model = asyncable(create_context_specific_model)
