@@ -3,7 +3,7 @@ from __future__ import annotations
 import itertools
 import sys
 from pathlib import Path
-from typing import TextIO, cast
+from typing import TextIO
 
 import numpy as np
 import pandas as pd
@@ -13,7 +13,7 @@ from loguru import logger
 from como.data_types import LogLevel
 from como.project import Config
 from como.proteomics_preprocessing import protein_transform_main
-from como.utils import return_placeholder_data, set_up_logging
+from como.utils import asyncable, return_placeholder_data, set_up_logging
 
 
 # Load Proteomics
@@ -43,7 +43,7 @@ def process_proteomics_data(path: Path) -> pd.DataFrame:
 
 
 # read map to convert to entrez
-async def load_gene_symbol_map(gene_symbols: list[str], entrez_map: Path | None = None):
+def load_gene_symbol_map(gene_symbols: list[str], entrez_map: Path | None = None):
     """Load a mapping from gene symbols to Entrez IDs.
 
     Args:
@@ -188,8 +188,9 @@ def load_proteomics_tests(filename, context_name) -> tuple[str, pd.DataFrame]:
         )
         return load_empty_dict()
 
+
 # TODO: Convert to synchronous function
-async def proteomics_gen(
+def proteomics_gen(
     context_name: str,
     config_filepath: Path,
     matrix_filepath: Path,
@@ -230,9 +231,9 @@ async def proteomics_gen(
     for group in groups:
         indices = np.where([g == group for g in config_df["group"]])
         sample_columns = [*np.take(config_df["sample_name"].to_numpy(), indices).ravel().tolist(), "gene_symbol"]
-        matrix = cast(pd.DataFrame, matrix.loc[:, sample_columns])
-
-        symbols_to_gene_ids = await load_gene_symbol_map(
+        matrix = matrix.loc[:, sample_columns]
+        
+        symbols_to_gene_ids = load_gene_symbol_map(
             gene_symbols=matrix["gene_symbol"].tolist(),
             entrez_map=input_entrez_map,
         )
@@ -264,3 +265,6 @@ async def proteomics_gen(
         hi_group_ratio=high_confidence_batch_ratio,
         group_names=groups,
     )
+
+
+async_proteomics_gen = asyncable(proteomics_gen)
