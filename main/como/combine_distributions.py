@@ -28,7 +28,7 @@ def _combine_z_distribution_for_batch(
     matrix: pd.DataFrame,
     source: SourceTypes,
     output_combined_matrix_filepath: Path,
-    output_figure_dirpath: Path,
+    output_figure_dirpath: Path | None,
 ) -> pd.DataFrame:
     """Combine z-score distributions across samples for a single batch.
 
@@ -42,7 +42,9 @@ def _combine_z_distribution_for_batch(
     :returns: A pandas dataframe of the weighted z-distributions
     """
     output_combined_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
-    output_figure_dirpath.mkdir(parents=True, exist_ok=True)
+    
+    if output_figure_dirpath is not None:
+        output_figure_dirpath.mkdir(parents=True, exist_ok=True)
 
     logger.trace(
         f"Combining z-score distributions: batch #{batch.batch_num}, "
@@ -107,7 +109,7 @@ def _combine_z_distribution_for_source(
     context_name: str,
     replicates_per_batch: Sequence[int],
     output_combined_matrix_filepath: Path,
-    output_figure_filepath: Path,
+    output_figure_filepath: Path | None,
     weighted_z_floor: int = -6,
     weighted_z_ceiling: int = 6,
 ) -> pd.DataFrame:
@@ -135,7 +137,9 @@ def _combine_z_distribution_for_source(
         return out_df
 
     output_combined_matrix_filepath.parent.mkdir(parents=True, exist_ok=True)
-    output_figure_filepath.parent.mkdir(parents=True, exist_ok=True)
+    
+    if output_figure_filepath is not None:
+        output_figure_filepath.parent.mkdir(parents=True, exist_ok=True)
 
     # alidate alignment between columns and replicate vector
     batch_column_names: list[str] = list(merged_source_data.columns)
@@ -190,7 +194,7 @@ def _combine_z_distribution_for_source(
 def _combine_z_distribution_for_context(
     context: str,
     zscore_results: list[_CombineOmicsInput],
-    output_graph_filepath: Path,
+    output_graph_filepath: Path | None,
 ) -> pd.DataFrame:
     if not zscore_results:
         logger.warning("No zscore results exist, returning empty dataframe")
@@ -275,14 +279,12 @@ def _begin_combining_distributions(
     batch_names: _BatchNames,
     source_weights: _SourceWeights,
     output_filepaths: _OutputCombinedSourceFilepath,
-    output_figure_dirpath: Path,
+    output_figure_dirpath: Path | None,
     output_final_model_scores: Path,
     weighted_z_floor: int = -6,
     weighted_z_ceiling: int = 6,
 ):
     logger.info(f"Starting to combine z-scores for context '{context_name}'")
-    output_figure_dirpath.mkdir(parents=True, exist_ok=True)
-
     z_score_results: list[_CombineOmicsInput] = []
 
     matrix: pd.DataFrame | None
@@ -372,7 +374,9 @@ def _begin_combining_distributions(
                 / f"{context_name}_{source.value}_combined_zscore_distribution.csv"
             ),
             output_figure_filepath=(
-                output_figure_dirpath / f"{context_name}_{source.value}_combined_zscore_distribution.pdf"
+                (output_figure_dirpath / f"{context_name}_{source.value}_combined_zscore_distribution.pdf")
+                if output_figure_dirpath is not None
+                else None
             ),
             weighted_z_floor=weighted_z_floor,
             weighted_z_ceiling=weighted_z_ceiling,
@@ -394,7 +398,11 @@ def _begin_combining_distributions(
     merged_context_results = _combine_z_distribution_for_context(
         context=context_name,
         zscore_results=z_score_results,
-        output_graph_filepath=output_figure_dirpath / f"{context_name}_combined_omics_distribution.pdf",
+        output_graph_filepath=(
+            (output_figure_dirpath / f"{context_name}_combined_omics_distribution.pdf")
+            if output_figure_dirpath is not None
+            else None
+        ),
     )
     merged_context_results.to_csv(output_final_model_scores, index=len(merged_context_results.columns) <= 1)
     logger.success(f"Wrote combined z-scores for context '{context_name}' to {output_final_model_scores}")
