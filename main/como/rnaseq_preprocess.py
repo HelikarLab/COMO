@@ -307,9 +307,9 @@ def _write_matrices(
     fragment_lengths: pd.DataFrame,
     tpm_df: pd.DataFrame,
     como_context_dir: Path,
-    out_counts_filepath: Path,
-    out_frag_length_filepath: Path,
-    out_tpm_filepath: Path,
+    out_counts_filepath: Path | None,
+    out_frag_length_filepath: Path | None,
+    out_tpm_filepath: Path | None,
     rna: RNAType,
 ) -> pd.DataFrame:
     """Create a counts matrix file by reading gene counts table(s).
@@ -326,25 +326,30 @@ def _write_matrices(
     :return: A pandas DataFrame representing the final counts matrix.
     """
     study_metrics = _organize_gene_counts_files(data_dir=como_context_dir)
-    counts: list[pd.DataFrame] = [_create_sample_counts_matrix(metric) for metric in study_metrics]
     rna_specific_sample_names = sorted(
         set(config_df.loc[config_df["library_prep"].str.lower() == rna.value.lower(), "sample_name"].tolist())
     )
-
-    final_matrix: pd.DataFrame = functools.reduce(
-        lambda left, right: pd.merge(left, right, on="ensembl_gene_id", how="outer"), counts
-    )
-    final_matrix.fillna(value=0, inplace=True)
-    final_matrix = final_matrix[["ensembl_gene_id", *rna_specific_sample_names]]
-    final_matrix = final_matrix.reindex(columns=["ensembl_gene_id", *rna_specific_sample_names])
-    fragment_lengths = fragment_lengths.reindex(columns=rna_specific_sample_names).sort_index()
-    tpm_df = tpm_df.reindex(columns=rna_specific_sample_names).sort_index()
-
-    out_counts_filepath.parent.mkdir(parents=True, exist_ok=True)
-    out_frag_length_filepath.parent.mkdir(parents=True, exist_ok=True)
-    final_matrix.to_csv(out_counts_filepath, index=False, float_format="%.15g")
-    fragment_lengths[rna_specific_sample_names].to_csv(out_frag_length_filepath, index=True, float_format="%.15g")
-    tpm_df[rna_specific_sample_names].to_csv(out_tpm_filepath, index=True, float_format="%.15g")
+    
+    if out_counts_filepath:
+        out_counts_filepath.parent.mkdir(parents=True, exist_ok=True)
+        counts: list[pd.DataFrame] = [_create_sample_counts_matrix(metric) for metric in study_metrics]
+        final_matrix: pd.DataFrame = functools.reduce(
+            lambda left, right: pd.merge(left, right, on="ensembl_gene_id", how="outer"), counts
+        )
+        final_matrix.fillna(value=0, inplace=True)
+        final_matrix = final_matrix[["ensembl_gene_id", *rna_specific_sample_names]]
+        final_matrix = final_matrix.reindex(columns=["ensembl_gene_id", *rna_specific_sample_names])
+        final_matrix.to_csv(out_counts_filepath, index=False, float_format="%.15g")
+    
+    if out_frag_length_filepath:
+        out_frag_length_filepath.parent.mkdir(parents=True, exist_ok=True)
+        fragment_lengths = fragment_lengths.reindex(columns=rna_specific_sample_names).sort_index()
+        fragment_lengths[rna_specific_sample_names].to_csv(out_frag_length_filepath, index=True, float_format="%.15g")
+    
+    if out_tpm_filepath:
+        out_tpm_filepath.parent.mkdir(parents=True, exist_ok=True)
+        tpm_df = tpm_df.reindex(columns=rna_specific_sample_names).sort_index()
+        tpm_df[rna_specific_sample_names].to_csv(out_tpm_filepath, index=True, float_format="%.15g")
 
     logger.success(f"Wrote gene count matrix for '{rna.value}' RNA at '{out_counts_filepath}'")
 
@@ -499,33 +504,33 @@ def _process_como_input(
     out_trna_tpm: Path | None,
 ) -> None:
     config_df, fragment_lengths, tpm_df = _create_config_df(context_name, como_context_dir=como_context_dir)
-
-    if out_trna_config and out_trna_counts and out_trna_fragments and out_trna_tpm:
-        _write_matrices(
-            config_df=config_df,
-            fragment_lengths=fragment_lengths,
-            tpm_df=tpm_df,
-            como_context_dir=como_context_dir,
-            out_counts_filepath=out_trna_counts,
-            out_frag_length_filepath=out_trna_fragments,
-            out_tpm_filepath=out_trna_tpm,
-            rna=RNAType.TRNA,
-        )
+    
+    _write_matrices(
+        config_df=config_df,
+        fragment_lengths=fragment_lengths,
+        tpm_df=tpm_df,
+        como_context_dir=como_context_dir,
+        out_counts_filepath=out_trna_counts,
+        out_frag_length_filepath=out_trna_fragments,
+        out_tpm_filepath=out_trna_tpm,
+        rna=RNAType.TRNA,
+    )
+    if out_trna_config:
         with pd.ExcelWriter(out_trna_config) as writer:
             subset_config = config_df[config_df["library_prep"].str.lower() == RNAType.TRNA.value.lower()]
             subset_config.to_excel(writer, sheet_name=context_name, header=True, index=False)
-
-    if out_mrna_config and out_mrna_counts and out_mrna_fragments and out_mrna_tpm:
-        _write_matrices(
-            config_df=config_df,
-            fragment_lengths=fragment_lengths,
-            tpm_df=tpm_df,
-            como_context_dir=como_context_dir,
-            out_counts_filepath=out_mrna_counts,
-            out_frag_length_filepath=out_mrna_fragments,
-            out_tpm_filepath=out_mrna_tpm,
-            rna=RNAType.MRNA,
-        )
+    
+    _write_matrices(
+        config_df=config_df,
+        fragment_lengths=fragment_lengths,
+        tpm_df=tpm_df,
+        como_context_dir=como_context_dir,
+        out_counts_filepath=out_mrna_counts,
+        out_frag_length_filepath=out_mrna_fragments,
+        out_tpm_filepath=out_mrna_tpm,
+        rna=RNAType.MRNA,
+    )
+    if out_mrna_config:
         with pd.ExcelWriter(out_mrna_config) as writer:
             subset_config = config_df[config_df["library_prep"].str.lower() == RNAType.MRNA.value.lower()]
             subset_config.to_excel(writer, sheet_name=context_name, header=True, index=False)
