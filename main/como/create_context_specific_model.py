@@ -410,10 +410,11 @@ def _map_expression_to_reaction(
     gene_expression_file: Path,
     recon_algorithm: Algorithm,
     taxon: int | str,
-    low_percentile: int,
-    high_percentile: int,
     low_bin_cutoff: int,
     high_bin_cutoff: int,
+    *,
+    force_add_base_exchange_reactions: bool,
+    activity_is_zfpkm_data: bool,
 ) -> tuple[collections.OrderedDict[str, float], float, float, float]:
     """Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules.
 
@@ -424,10 +425,12 @@ def _map_expression_to_reaction(
         gene_expression_file: Path to a gene expression file (.csv, .tsv, .xlsx, or .xls)
         recon_algorithm: Algorithm to use for reconstruction (GIMME, FASTCORE, iMAT, or tINIT)
         taxon: Taxon ID or Taxon object for gene ID conversion.
-        low_percentile: Low percentile for threshold calculation
-        high_percentile: High percentile for threshold calculation
         low_bin_cutoff: Values lower than this (e.g., -3 zFPKM or 25th percentile) will be placed in the low bin.
         high_bin_cutoff: Values equal to or greater than this (e.g., 0 zFPKM or 75th percentile) will be placed in the high bin.
+        force_add_base_exchange_reactions: If True, add a set of basic exchange reactions to the model
+            before mapping expression to reactions.
+            This is required for some algorithms (e.g., FASTCORE) to ensure that key exchange reactions are included
+            in the output model, but can be skipped if these reactions are already included in the reference model.
         activity_is_zfpkm_data: Does `gene_expression_file` contain zFPKM-normalized data?
 
     Returns:
@@ -587,6 +590,7 @@ def _build_model(
     build_settings: ModelBuildSettings,
     *,
     force_boundary_rxn_inclusion: bool,
+    force_add_base_exchange_reactions: bool,
     activity_is_zfpkm_data: bool,
 ) -> cobra.Model:
     """Seed a context specific reference_model.
@@ -656,10 +660,10 @@ def _build_model(
         gene_expression_file,
         recon_algorithm,
         taxon=taxon,
-        low_percentile=low_percentile,
-        high_percentile=high_percentile,
         low_bin_cutoff=low_bin_cutoff,
         high_bin_cutoff=high_bin_cutoff,
+        force_add_base_exchange_reactions=force_add_base_exchange_reactions,
+        activity_is_zfpkm_data=activity_is_zfpkm_data,
     )
     expression_vector: npt.NDArray[np.floating] = np.asarray(list(reaction_expression.values()), dtype=float)
     for rxn_id in force_reactions:
