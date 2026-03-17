@@ -412,6 +412,8 @@ def _map_expression_to_reaction(
     taxon: int | str,
     low_percentile: int,
     high_percentile: int,
+    low_bin_cutoff: int,
+    high_bin_cutoff: int,
 ) -> tuple[collections.OrderedDict[str, float], float, float, float]:
     """Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules.
 
@@ -424,6 +426,9 @@ def _map_expression_to_reaction(
         taxon: Taxon ID or Taxon object for gene ID conversion.
         low_percentile: Low percentile for threshold calculation
         high_percentile: High percentile for threshold calculation
+        low_bin_cutoff: Values lower than this (e.g., -3 zFPKM or 25th percentile) will be placed in the low bin.
+        high_bin_cutoff: Values equal to or greater than this (e.g., 0 zFPKM or 75th percentile) will be placed in the high bin.
+        activity_is_zfpkm_data: Does `gene_expression_file` contain zFPKM-normalized data?
 
     Returns:
         [0]: An ordered dictionary mapping reaction IDs to their corresponding expression values.
@@ -434,7 +439,15 @@ def _map_expression_to_reaction(
     Raises:
         ValueError: If neither 'entrez_gene_id' nor 'ensembl_gene_id' columns are found in the gene expression file.
     """
-    expression_data = pd.read_csv(gene_expression_file)
+    if gene_expression_file.suffix in {".csv", ".tsv"}:
+        expression_data = pd.read_csv(gene_expression_file)
+    elif gene_expression_file.suffix == ".h5ad":
+        adata = sc.read_h5ad(gene_expression_file)
+        expression_data = adata.to_df()
+    else:
+        raise ValueError(
+            f"Unknown file extension '{gene_expression_file.suffix}' for gene expression file: {gene_expression_file}"
+        )
     gene_activity = split_gene_expression_data(
         expression_data, identifier_column="entrez_gene_id", recon_algorithm=recon_algorithm
     )
@@ -444,10 +457,30 @@ def _map_expression_to_reaction(
     min_val = float(gene_arr[np.isfinite(gene_arr)].min())
     if min_val < 0:
         gene_arr[np.isfinite(gene_arr)] += abs(min_val)
-
-    # We are computing percentiles on non-zero data because we need to make sure that
-    #   zero values are definitely placed in the low bin
-    low_expr, high_expr = np.nanpercentile(gene_arr[gene_arr > 0], [low_percentile, high_percentile])
+    
+    if not activity_is_zfpkm_data and low_bin_cutoff < 1:
+        logger.warning(
+            f"Low bin cutoff was less than 1, but not using zFPKM data (got: {low_bin_cutoff}). "
+            f"Assuming this is a percentile value, it should be in the range [1, 100], converting now."
+        )
+        low_bin_cutoff *= 100
+    if not activity_is_zfpkm_data and high_bin_cutoff < 1:
+        logger.warning(
+            f"High bin cutoff was less than 1, but not with zFPKM data (got: {high_bin_cutoff}). "
+            "Assuming this is a percentile value, it should be in the range [1, 100], converting now."
+        )
+        high_bin_cutoff *= 100
+    
+    # If the user provided zFPKM-normalized data, the low and high bin cutoffs should be kept constant
+    # Otherwise, we will calculate percentile expression values
+    if activity_is_zfpkm_data:
+        low_expr = low_bin_cutoff
+        high_expr = high_bin_cutoff
+    else:
+        # We are computing percentiles on non-zero data because we need to make sure that
+        #   zero values are definitely placed in the low bin
+        low_expr, high_expr = np.nanpercentile(gene_arr[gene_arr > 0], [low_bin_cutoff, high_bin_cutoff])
+    
     gene_activity["active"] = gene_arr
     gene_activity.index = gene_activity.index.astype(str)  # maintain strings for reference model gene_ids
 
@@ -546,14 +579,15 @@ def _build_model(
     lower_bounds: list[float],
     upper_bounds: list[float],
     solver: str,
-    low_percentile: int,
-    high_percentile: int,
+    low_bin_cutoff: int,
+    high_bin_cutoff: int,
     output_flux_result_filepath: Path,
     taxon: int | str,
     objective_direction: Literal["min", "max"],
     build_settings: ModelBuildSettings,
     *,
     force_boundary_rxn_inclusion: bool,
+    activity_is_zfpkm_data: bool,
 ) -> cobra.Model:
     """Seed a context specific reference_model.
 
@@ -573,9 +607,12 @@ def _build_model(
         lower_bounds: List of lower bounds corresponding to boundary reactions
         upper_bounds: List of upper bounds corresponding to boundary reactions
         solver: Solver to use (e.g., 'glpk', 'cplex', 'gurobi')
+        low_bin_cutoff: Values lower than this (e.g., -3 zFPKM or 25th percentile) will be placed in the low bin.
+        high_bin_cutoff: Values equal to or greater than this (e.g., 0 zFPKM or 75th percentile) will be placed in the high bin.
         output_flux_result_filepath: Path to save flux results (for iMAT only)
         taxon: Taxon ID or Taxon object for gene ID conversion.
         force_boundary_rxn_inclusion: If True, ensure that all boundary reactions are included in the final model.
+        activity_is_zfpkm_data: Does the `gene_expression_file` contain zFPKM-normalized data?
 
     Returns:
         A _BuildResults object containing:
@@ -621,6 +658,8 @@ def _build_model(
         taxon=taxon,
         low_percentile=low_percentile,
         high_percentile=high_percentile,
+        low_bin_cutoff=low_bin_cutoff,
+        high_bin_cutoff=high_bin_cutoff,
     )
     expression_vector: npt.NDArray[np.floating] = np.asarray(list(reaction_expression.values()), dtype=float)
     for rxn_id in force_reactions:
@@ -842,6 +881,9 @@ def create_context_specific_model(  # noqa: C901
     output_infeasible_reactions_filepath: Path,
     output_flux_result_filepath: Path,
     output_model_filepaths: Path | list[Path],
+    activity_is_zfpkm_data: bool,
+    low_bin_cutoff: int,
+    high_bin_cutoff: int,
     output_fastcore_expression_index_filepath: Path | None = None,
     objective: str = "biomass_reaction",
     objective_direction: Literal["min", "max"] = "max",
@@ -850,8 +892,6 @@ def create_context_specific_model(  # noqa: C901
     exclude_rxns_filepath: str | Path | None = None,
     force_rxns_filepath: str | Path | None = None,
     algorithm: Algorithm = Algorithm.GIMME,
-    low_percentile: int | None = None,
-    high_percentile: int | None = None,
     solver: Solver = Solver.GLPK,
     log_level: LogLevel = LogLevel.INFO,
     log_location: str | TextIO | TextIOWrapper = sys.stderr,
@@ -877,8 +917,8 @@ def create_context_specific_model(  # noqa: C901
     :param exclude_rxns_filepath: Optional path to reactions to exclude file (csv, tsv, or Excel).
     :param force_rxns_filepath: Optional path to reactions to force include file (csv, tsv, or Excel).
     :param algorithm: Algorithm to use for reconstruction.
-    :param low_percentile: Low percentile for gene expression threshold calculation.
-    :param high_percentile: High percentile for gene expression threshold calculation.
+    :param low_bin_cutoff: Values lower than this (e.g., -3 zFPKM or 25th percentile) will be placed in the low bin.
+    :param high_bin_cutoff: Values equal to or greater than this (e.g., 0 zFPKM or 75th percentile) will be placed in the high bin.
     :param solver: Solver to use. One of Solver.GLPK, Solver.CPLEX, Solver.GUROBI
     :param log_level: Logging level
     :param log_location: Location for log output. Can be a file path or sys.stderr/sys.stdout.
@@ -889,10 +929,10 @@ def create_context_specific_model(  # noqa: C901
     :raises ImportError: If Gurobi solver is selected but gurobipy is not installed.
     """  # noqa: E501
     set_up_logging(level=log_level, location=log_location)
-    if low_percentile is None:
-        raise ValueError("low_percentile must be provided")
-    if high_percentile is None:
-        raise ValueError("high_percentile must be provided")
+    if not activity_is_zfpkm_data and low_bin_cutoff < 0:
+        raise ValueError(f"Percentiles should be in the range [1, 100]. Got `{low_bin_cutoff=}`")
+    if not activity_is_zfpkm_data and high_bin_cutoff < 0:
+        raise ValueError(f"Percentiles should be in the range [1, 100]. Got `{high_bin_cutoff=}`")
 
     boundary_rxns_filepath = Path(boundary_rxns_filepath) if boundary_rxns_filepath else None
     output_model_filepaths = (
@@ -987,8 +1027,8 @@ def create_context_specific_model(  # noqa: C901
         lower_bounds=boundary_reactions.lower_bounds,
         upper_bounds=boundary_reactions.upper_bounds,
         solver=solver.value.lower(),
-        low_percentile=low_percentile,
-        high_percentile=high_percentile,
+        low_bin_cutoff=low_bin_cutoff,
+        high_bin_cutoff=high_bin_cutoff,
         output_flux_result_filepath=output_flux_result_filepath,
         force_boundary_rxn_inclusion=force_boundary_rxn_inclusion,
         taxon=taxon_id,
