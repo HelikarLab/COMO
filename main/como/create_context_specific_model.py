@@ -1012,6 +1012,9 @@ def create_context_specific_model(  # noqa: C901
         raise ValueError(f"Invalid output filetype. Should be 'xml', 'sbml', 'mat', or 'json'. Got:\n{invalid_suffix}'")
 
     reference_model = _read_reference_model(reference_model_filepath)
+    if not reference_model.reactions.has_id(objective):
+        raise ValueError(f"Unable to find objective reaction '{objective}' in the reference model.")
+    
     boundary_reactions = (
         _collect_boundary_reactions(
             boundary_rxns_filepath,

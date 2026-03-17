@@ -35,6 +35,7 @@ OPEN_LOWER_BOUND: int = -1000
 OPEN_UPPER_BOUND: int = 1000
 CLOSED_BOUNDARY: int = 0
 
+__all__ = ["constrain_model"]
 
 def constrain_model(model: Model) -> Model:
     cast(Reaction, model.reactions.get_by_id("EX_glc_D[e]")).lower_bound = -1.0  # type: ignore[bad-argument-count]
@@ -54,7 +55,7 @@ def constrain_model(model: Model) -> Model:
 
 def glucose_restriction(model: Model):
     """Validate that glucose restriction has no impact on B cell function."""
-    df = pd.DataFrame({"lower_bound": list(range(-1000, 1, 20)), "biomass": np.nan})
+    df = pd.DataFrame({"lower_bound": [-1000, -500, -250, -100, -50, -10, -5, -1, 0], "biomass": np.nan})
     glucose_rxn = "EX_glc_D[e]"
 
     for idx in range(len(df)):
@@ -242,13 +243,13 @@ def glycolysis_and_oxidative_glucose_pathway_maintenance(model: Model):
     Use the moma method instead of flux balance analysis and delete one reaction at a time.
     The result reflects the change in the cell's growth rate. The biomass does not change.
     """
-    with model :
-        model_copy.objective = "biomass_maintenance"
-        solution_before = model_copy.optimize()
+    with model:
+        model.objective = "biomass_maintenance"
+        solution_before = model.optimize()
 
         with (target := Path("/dev/null").open("w")), redirect_stderr(target), redirect_stdout(target):
             single_rxn_del = single_reaction_deletion(
-                model_copy,
+                model,
                 [
                     "HEX1",  # Hexokinase
                     "PGI",  # Glucose-6-Phosphate isomerase
@@ -261,24 +262,23 @@ def glycolysis_and_oxidative_glucose_pathway_maintenance(model: Model):
                     "PYK",  # Pyruvate kinase
                 ],
                 method="moma",
-                solution=solution_before,
-                processes=9,
+                # solution=solution_before,
             )
-        print(solution_before.fluxes["biomass_maintenance"])
+        print("Original objective:", solution_before.fluxes["biomass_maintenance"])
         print(single_rxn_del)
 
 
 def fatty_acid_fuel_source(model: Model):
     """Validate that naive B cells rely on fatty acids as their main fuel source."""
-    with model :
-        .objective = "biomass_maintenance"
-        solution_before = .optimize()
-        for rxn in .reactions:
+    with model:
+        model.objective = "biomass_maintenance"
+        solution_before = model.optimize()
+        for rxn in model.reactions:
             rxn: Reaction
             if rxn.subsystem == "Fatty acid oxidation":
-                cast(Reaction, .reactions.get_by_id(rxn.id)).lower_bound = 0  # type: ignore[bad-argument-count]
-                cast(Reaction, .reactions.get_by_id(rxn.id)).upper_bound = 0  # type: ignore[bad-argument-count]
-        solution_after: cobra.Solution = .optimize()
+                cast(Reaction, model.reactions.get_by_id(rxn.id)).lower_bound = 0  # type: ignore[bad-argument-count]
+                cast(Reaction, model.reactions.get_by_id(rxn.id)).upper_bound = 0  # type: ignore[bad-argument-count]
+        solution_after: cobra.Solution = model.optimize()
 
     print(f"Objective flux before limiting fatty acid reactions: {solution_before.fluxes['biomass_maintenance']}")
     print(f"Objective flux after limiting fatty acid reactions: {solution_after.fluxes['biomass_maintenance']}")
@@ -288,8 +288,8 @@ if __name__ == "__main__":
     # fp = Path("/Users/joshl/Projects/COMO/main/data/results/naiveB/naiveB_imat_model_tpm.json")
     # fp = Path("/Users/joshl/Projects/COMO/main/data/results/naiveB/naiveB_imat_model_zfpkm.json")
     # fp = Path("/Users/joshl/Downloads/como_supp/Supplementary_Data_2_bbad387.xml")
-
-    _root = Path("/Users/joshl/Projects/ImmunoMetabolism/results/model_build")
+    
+    # _root = Path("/Users/joshl/Projects/ImmunoMetabolism/results/model_build")
     # fp = _root / "A01/A01_b_naive/A01_b_naive_model_imat.json"
     # fp = _root / "A02/A02_b_naive/A02_b_naive_model_imat.json"
     # fp = _root / "A03/A03_b_naive/A03_b_naive_model_imat.json"
@@ -297,14 +297,15 @@ if __name__ == "__main__":
     # fp = _root / "B02/B02_b_naive/B02_b_naive_model_imat.json"
     # fp = _root / "B03/B03_b_naive/B03_b_naive_model_imat.json"
     # fp = _root / "C01/C01_b_naive/C01_b_naive_model_imat.json"
-    # fp = _root / "C02/C02_b_naive/C02_b_naive_model_imat.json"
     # fp = _root / "C04/C04_b_naive/C04_b_naive_model_imat.json"
     # fp = _root / "D01/D01_b_naive/D01_b_naive_model_imat.json"
     # fp = _root / "D02/D02_b_naive/D02_b_naive_model_imat.json"
     # fp = _root / "D03/D03_b_naive/D03_b_naive_model_imat.json"
     # fp = _root / "E01/E01_b_naive/E01_b_naive_model_imat.json"
     # fp = _root / "E02/E02_b_naive/E02_b_naive_model_imat.json"
-    fp = _root / "E03/E03_b_naive/E03_b_naive_model_imat.json"
+    # fp = _root / "E03/E03_b_naive/E03_b_naive_model_imat.json"
+    
+    fp = Path("/Users/joshl/Projects/ImmunoMetabolism/results/model_build/A01/A01_b_naive/A01_b_naive_model_imat.json")
 
     if fp.suffix == ".json":
         model_ = cobra.io.load_json_model(fp)
@@ -314,6 +315,7 @@ if __name__ == "__main__":
         raise TypeError(f"Unknown extension '{fp.suffix}': {fp}")
 
     print("\n")
+    model_.objective = "biomass_maintenance"
     model_ = constrain_model(model_)
     model_ = add_glycolysis_reactions(model_)
     model_ = add_exchanges(model_)
@@ -322,7 +324,7 @@ if __name__ == "__main__":
     print(f"Reaction count: {len(model_.reactions)}")
     print(f"Gene count: {len(model_.genes)}")
     print(f"Metabolite count: {len(model_.metabolites)}")
-
+    
     print("\n\nGlucose Restriction")
     glucose_restriction(model=model_)
     print("\n\nGlycolysis Reactions Present")
