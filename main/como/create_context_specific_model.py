@@ -504,6 +504,31 @@ def _map_expression_to_reaction(
         else 0 if recon_algorithm == Algorithm.FASTCORE
         else 1
     )
+    
+    # Some models use bracket notation for reactions: EX_glc_D[e]
+    #   and others use underscores: EX_glc_D_e
+    # As a result, we need to make sure we can match either of these identifiers
+    basal_metabolite_ids: tuple[str, ...] = (
+        # Ions
+        "fe3", "ca2", "na1", "cl", "k", "h", "h2o",
+        "o2", "pi", "ppi", "co2", "nh4", "no2", "co",
+        # Amino acids
+        # We are including single-underscore and double-underscore amino acids here because
+        #   some models (e.g., Recon3D) use single underscores in the extracellular compartment,
+        #   while others (e.g., Human-GEM) use double underscores
+        "ala_L", "arg_L", "asn_L", "asp_L", "Lcystin", "glu_L", "gln_L",
+        "gly", "his_L", "ile_L", "leu_L", "lys_L", "met_L", "phe_L",
+        "pro_L", "ser_L", "thr_L", "trp_L", "tyr_L", "val_L", "4hpro_LT",
+        #   Dunder amino acids
+        "ala__L", "arg__L", "asn__L", "asp__L", "Lcystin", "glu__L", "gln__L",
+        "gly", "his__L", "ile__L", "leu__L", "lys__L", "met__L", "phe__L",
+        "pro__L", "ser__L", "thr__L", "trp__L", "tyr__L", "val__L", "4hpro__LT",
+        # Lipids
+        "lnlc", "lnlnca", "eicostet", "5eipenc", "hdca",
+        # Other
+        "ac",
+    )
+    basal_exchange_reactions: set[str] = {f"EX_{i}{suffix}" for i in basal_metabolite_ids for suffix in ("[e]", "_e")}
     # fmt: on
 
     reaction_expression: collections.OrderedDict[str, float] = collections.OrderedDict()
@@ -513,7 +538,12 @@ def _map_expression_to_reaction(
     for rxn in reference_model.reactions:
         rxn: cobra.Reaction
         gene_reaction_rule = rxn.gene_reaction_rule
-
+        
+        # Forcibly set exchange reaction expressions in the high bin, irrespective of its GPR
+        if force_add_base_exchange_reactions and rxn.id in basal_exchange_reactions:
+            reaction_expression[rxn.id] = high_expr + 1
+            continue
+        
         if not gene_reaction_rule:
             reaction_expression[rxn.id] = missing_gpr
             continue
@@ -656,9 +686,9 @@ def _build_model(
         raise ValueError("Upper bounds contains unfilled values!")
 
     reaction_expression, min_expr_val, low_expr, high_expr = _map_expression_to_reaction(
-        reference_model,
-        gene_expression_file,
-        recon_algorithm,
+        reference_model=reference_model,
+        gene_expression_file=gene_expression_file,
+        recon_algorithm=recon_algorithm,
         taxon=taxon,
         low_bin_cutoff=low_bin_cutoff,
         high_bin_cutoff=high_bin_cutoff,
@@ -751,8 +781,12 @@ def _build_model(
         cast(cobra.Reaction, context_model_cobra.reactions.get_by_id(rxn.id)).subsystem = cast(
             cobra.Reaction, reference_model.reactions.get_by_id(rxn.id)
         ).subsystem
-
-    context_model_cobra.objective = objective
+    
+    try:
+        context_model_cobra.objective = objective
+    except ValueError:
+        logger.critical(f"Unable to set the model's objective value to '{objective}'.")
+    
     flux_sol: cobra.Solution = context_model_cobra.optimize()
     fluxes = flux_sol.fluxes
     model_reactions: list[str] = [reaction.id for reaction in context_model_cobra.reactions]
@@ -901,6 +935,7 @@ def create_context_specific_model(  # noqa: C901
     log_location: str | TextIO | TextIOWrapper = sys.stderr,
     build_settings: ModelBuildSettings | None = None,
     *,
+    force_add_base_exchange_reactions: bool = False,
     force_boundary_rxn_inclusion: bool = False,
     close_unlisted_exchanges: bool = False,
 ) -> cobra.Model:
@@ -913,6 +948,7 @@ def create_context_specific_model(  # noqa: C901
     :param output_infeasible_reactions_filepath: Path to save infeasible reactions (csv).
     :param output_flux_result_filepath: Path to save flux results (csv).
     :param output_model_filepaths: Path or list of paths to save the context-specific model (.xml, .mat, or .json).
+    :param activity_is_zfpkm_data: Does the `active_genes_filepath` file contains zFPKM-normalized data
     :param output_fastcore_expression_index_filepath: Path to save Fastcore expression indices (txt).
     :param objective: Objective function reaction ID.
     :param objective_direction: Direction of the objective function, either 'min' or 'max'.
@@ -926,6 +962,8 @@ def create_context_specific_model(  # noqa: C901
     :param solver: Solver to use. One of Solver.GLPK, Solver.CPLEX, Solver.GUROBI
     :param log_level: Logging level
     :param log_location: Location for log output. Can be a file path or sys.stderr/sys.stdout.
+    :param force_add_base_exchange_reactions: If True, ensure that basal metabolite exchange reactions are included in the final model.
+        View the file `add_reactions` to see which reactions are added to include basal metabolites.
     :param force_boundary_rxn_inclusion: If True, ensure that all provided boundary reactions are included in the final model.
     :param build_settings: Optional ModelBuildSettings object to customize model building parameters.
     :param close_unlisted_exchanges: If True, all exchanges not listed in the boundary reactions input will be closed
@@ -1037,6 +1075,8 @@ def create_context_specific_model(  # noqa: C901
         force_boundary_rxn_inclusion=force_boundary_rxn_inclusion,
         taxon=taxon_id,
         build_settings=build_settings or ModelBuildSettings(),
+        force_add_base_exchange_reactions=force_add_base_exchange_reactions,
+        activity_is_zfpkm_data=activity_is_zfpkm_data,
     )
     context_model.id = contextualized_model_id or context_name
 
