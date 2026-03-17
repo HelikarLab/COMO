@@ -7,9 +7,8 @@ import sys
 from collections.abc import Sequence
 from io import TextIOWrapper
 from math import isfinite
-from multiprocessing import Value
 from pathlib import Path
-from typing import Literal, Never, TextIO, cast, reveal_type
+from typing import Literal, TextIO, cast
 
 import cobamp.core.optimization
 import cobra
@@ -17,6 +16,7 @@ import cobra.util.array
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import scanpy as sc
 from loguru import logger
 from troppo.methods.reconstruction.corda import CORDA, CORDAProperties
 from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
