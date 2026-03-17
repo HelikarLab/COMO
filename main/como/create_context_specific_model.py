@@ -815,28 +815,34 @@ def _collect_boundary_reactions(
     close_unlisted_exchanges: bool,
 ) -> _BoundaryReactions:
     df: pd.DataFrame = _create_df(path, lowercase_col_names=True)
-
-    for column in df.columns:
-        if column not in [
-            "reaction",
-            "abbreviation",
-            "compartment",
-            "lower bound",
-            "upper bound",
-        ]:
-            raise ValueError(
-                f"Boundary reactions file must have columns named 'reaction', 'abbreviation', 'compartment', "
-                f"'lower bound', and 'upper bound'. Found: '{column}'"
-            )
-
-    for compartment in df["compartment"].unique():
+    
+    required = {
+        "reaction",
+        "abbreviation",
+        "compartment",
+        "lower bound",
+        "upper bound",
+        # The following columns are legacy column names retained for backwards compatibility.
+        # All future code should work on the presumption of 'lower bound' and 'upper bound'
+        "minimum reaction rate",
+        "maximum reaction rate",
+    }
+    extra_columns = set(df.columns) - required
+    if extra_columns:
+        raise ValueError(f"Boundary reactions file has invalid columns. Extra: {', '.join(extra_columns)}. ")
+    df = df.rename(
+        columns={"minimum reaction rate": "lower bound", "maximum reaction rate": "upper bound"},
+        errors="ignore",
+    )
+    
+    for compartment in df["compartment"].str.lower().unique():
         as_shorthand = CobraCompartments.get_shorthand(compartment) if len(compartment) > 2 else compartment
-        if as_shorthand not in reference_model.compartments:
-            raise ValueError(f"Unknown compartment: '{compartment}'")
+        if not as_shorthand:
+            raise ValueError(f"Unknown compartment: {compartment}")
 
     boundary_map = {"exchange": "EX", "demand": "DM", "sink": "SK"}
     for exchange in df["reaction"].str.lower().unique():
-        if boundary_map.get(exchange) is None:
+        if not boundary_map.get(exchange):
             raise ValueError(
                 f"Unable to determine reaction type for: '{exchange}'\n"
                 f"Validate the boundary reactions file has a 'Reaction' value of: 'Exchange', 'Demand', or 'Sink'."
@@ -1019,17 +1025,21 @@ def create_context_specific_model(  # noqa: C901
     exclude_rxns: list[str] = []
     if exclude_rxns_filepath:
         exclude_rxns_filepath = Path(exclude_rxns_filepath)
-        df = _create_df(exclude_rxns_filepath)
-        if "abbreviation" not in df.columns:
+        df = _create_df(exclude_rxns_filepath, lowercase_col_names=True)
+        # `reaction id` is a legacy column name; all assumptions going forward should use `abbreviation`
+        if "abbreviation" not in df.columns and "reaction id" not in df.columns:
             raise ValueError("The exclude reactions file should have a single column with a header named Abbreviation")
+        df = df.rename(columns={"reaction id": "abbreviation"}, errors="ignore")
         exclude_rxns = df["abbreviation"].tolist()
 
     force_rxns: list[str] = []
     if force_rxns_filepath:
         force_rxns_filepath = Path(force_rxns_filepath)
         df = _create_df(force_rxns_filepath, lowercase_col_names=True)
-        if "abbreviation" not in df.columns:
+        # `reaction id` is a legacy column name; all assumptions going forward should use `abbreviation`
+        if "abbreviation" not in df.columns and "reaction id" not in df.columns:
             raise ValueError("The force reactions file should have a single column with a header named Abbreviation")
+        df = df.rename(columns={"reaction id": "abbreviation"}, errors="ignore")
         force_rxns = df["abbreviation"].tolist()
 
     # Test that gurobi is using a valid license file
