@@ -292,10 +292,12 @@ def _build_with_imat(
     cfg.verbosity = build_settings.solver_verbosity
     cfg.timeout = build_settings.solver_timeout
     cfg.tolerances.feasibility = build_settings.solver_feasibility
-    cfg.tolerances.optimality = build_settings.solver_optimality
     cfg.tolerances.integrality = build_settings.solver_integrality
+    if solver.upper() == "GUROBI":
+        cfg.tolerances.optimality = build_settings.solver_optimality
+    
     grb_model = getattr(getattr(cfg, "problem", None), "problem", None)  # `getattr` to handle non-gurobi solvers
-    if grb_model is not None:
+    if grb_model is not None and solver.upper() == "GUROBI":
         grb_model.Params.MIPGap = build_settings.gurobi_mipgap
         grb_model.Params.IntegralityFocus = build_settings.gurobi_integrality_focus
         grb_model.Params.NumericFocus = build_settings.gurobi_numeric_focus
