@@ -7,9 +7,8 @@ import sys
 from collections.abc import Sequence
 from io import TextIOWrapper
 from math import isfinite
-from multiprocessing import Value
 from pathlib import Path
-from typing import Literal, Never, TextIO, cast, reveal_type
+from typing import Literal, TextIO, cast
 
 import cobamp.core.optimization
 import cobra
@@ -17,6 +16,7 @@ import cobra.util.array
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
+import scanpy as sc
 from loguru import logger
 from troppo.methods.reconstruction.corda import CORDA, CORDAProperties
 from troppo.methods.reconstruction.fastcore import FASTcore, FastcoreProperties
@@ -292,10 +292,12 @@ def _build_with_imat(
     cfg.verbosity = build_settings.solver_verbosity
     cfg.timeout = build_settings.solver_timeout
     cfg.tolerances.feasibility = build_settings.solver_feasibility
-    cfg.tolerances.optimality = build_settings.solver_optimality
     cfg.tolerances.integrality = build_settings.solver_integrality
+    if solver.upper() == "GUROBI":
+        cfg.tolerances.optimality = build_settings.solver_optimality
+    
     grb_model = getattr(getattr(cfg, "problem", None), "problem", None)  # `getattr` to handle non-gurobi solvers
-    if grb_model is not None:
+    if grb_model is not None and solver.upper() == "GUROBI":
         grb_model.Params.MIPGap = build_settings.gurobi_mipgap
         grb_model.Params.IntegralityFocus = build_settings.gurobi_integrality_focus
         grb_model.Params.NumericFocus = build_settings.gurobi_numeric_focus
@@ -408,8 +410,11 @@ def _map_expression_to_reaction(
     gene_expression_file: Path,
     recon_algorithm: Algorithm,
     taxon: int | str,
-    low_percentile: int,
-    high_percentile: int,
+    low_bin_cutoff: int,
+    high_bin_cutoff: int,
+    *,
+    force_add_base_exchange_reactions: bool,
+    activity_is_zfpkm_data: bool,
 ) -> tuple[collections.OrderedDict[str, float], float, float, float]:
     """Map gene ids to a reaction based on GPR (gene to protein to reaction) association rules.
 
@@ -420,8 +425,13 @@ def _map_expression_to_reaction(
         gene_expression_file: Path to a gene expression file (.csv, .tsv, .xlsx, or .xls)
         recon_algorithm: Algorithm to use for reconstruction (GIMME, FASTCORE, iMAT, or tINIT)
         taxon: Taxon ID or Taxon object for gene ID conversion.
-        low_percentile: Low percentile for threshold calculation
-        high_percentile: High percentile for threshold calculation
+        low_bin_cutoff: Values lower than this (e.g., -3 zFPKM or 25th percentile) will be placed in the low bin.
+        high_bin_cutoff: Values equal to or greater than this (e.g., 0 zFPKM or 75th percentile) will be placed in the high bin.
+        force_add_base_exchange_reactions: If True, add a set of basic exchange reactions to the model
+            before mapping expression to reactions.
+            This is required for some algorithms (e.g., FASTCORE) to ensure that key exchange reactions are included
+            in the output model, but can be skipped if these reactions are already included in the reference model.
+        activity_is_zfpkm_data: Does `gene_expression_file` contain zFPKM-normalized data?
 
     Returns:
         [0]: An ordered dictionary mapping reaction IDs to their corresponding expression values.
@@ -432,7 +442,15 @@ def _map_expression_to_reaction(
     Raises:
         ValueError: If neither 'entrez_gene_id' nor 'ensembl_gene_id' columns are found in the gene expression file.
     """
-    expression_data = pd.read_csv(gene_expression_file)
+    if gene_expression_file.suffix in {".csv", ".tsv"}:
+        expression_data = pd.read_csv(gene_expression_file)
+    elif gene_expression_file.suffix == ".h5ad":
+        adata = sc.read_h5ad(gene_expression_file)
+        expression_data = adata.to_df()
+    else:
+        raise ValueError(
+            f"Unknown file extension '{gene_expression_file.suffix}' for gene expression file: {gene_expression_file}"
+        )
     gene_activity = split_gene_expression_data(
         expression_data, identifier_column="entrez_gene_id", recon_algorithm=recon_algorithm
     )
@@ -442,10 +460,30 @@ def _map_expression_to_reaction(
     min_val = float(gene_arr[np.isfinite(gene_arr)].min())
     if min_val < 0:
         gene_arr[np.isfinite(gene_arr)] += abs(min_val)
-
-    # We are computing percentiles on non-zero data because we need to make sure that
-    #   zero values are definitely placed in the low bin
-    low_expr, high_expr = np.nanpercentile(gene_arr[gene_arr > 0], [low_percentile, high_percentile])
+    
+    if not activity_is_zfpkm_data and low_bin_cutoff < 1:
+        logger.warning(
+            f"Low bin cutoff was less than 1, but not using zFPKM data (got: {low_bin_cutoff}). "
+            f"Assuming this is a percentile value, it should be in the range [1, 100], converting now."
+        )
+        low_bin_cutoff *= 100
+    if not activity_is_zfpkm_data and high_bin_cutoff < 1:
+        logger.warning(
+            f"High bin cutoff was less than 1, but not with zFPKM data (got: {high_bin_cutoff}). "
+            "Assuming this is a percentile value, it should be in the range [1, 100], converting now."
+        )
+        high_bin_cutoff *= 100
+    
+    # If the user provided zFPKM-normalized data, the low and high bin cutoffs should be kept constant
+    # Otherwise, we will calculate percentile expression values
+    if activity_is_zfpkm_data:
+        low_expr = low_bin_cutoff
+        high_expr = high_bin_cutoff
+    else:
+        # We are computing percentiles on non-zero data because we need to make sure that
+        #   zero values are definitely placed in the low bin
+        low_expr, high_expr = np.nanpercentile(gene_arr[gene_arr > 0], [low_bin_cutoff, high_bin_cutoff])
+    
     gene_activity["active"] = gene_arr
     gene_activity.index = gene_activity.index.astype(str)  # maintain strings for reference model gene_ids
 
@@ -466,6 +504,31 @@ def _map_expression_to_reaction(
         else 0 if recon_algorithm == Algorithm.FASTCORE
         else 1
     )
+    
+    # Some models use bracket notation for reactions: EX_glc_D[e]
+    #   and others use underscores: EX_glc_D_e
+    # As a result, we need to make sure we can match either of these identifiers
+    basal_metabolite_ids: tuple[str, ...] = (
+        # Ions
+        "fe3", "ca2", "na1", "cl", "k", "h", "h2o",
+        "o2", "pi", "ppi", "co2", "nh4", "no2", "co",
+        # Amino acids
+        # We are including single-underscore and double-underscore amino acids here because
+        #   some models (e.g., Recon3D) use single underscores in the extracellular compartment,
+        #   while others (e.g., Human-GEM) use double underscores
+        "ala_L", "arg_L", "asn_L", "asp_L", "Lcystin", "glu_L", "gln_L",
+        "gly", "his_L", "ile_L", "leu_L", "lys_L", "met_L", "phe_L",
+        "pro_L", "ser_L", "thr_L", "trp_L", "tyr_L", "val_L", "4hpro_LT",
+        #   Dunder amino acids
+        "ala__L", "arg__L", "asn__L", "asp__L", "Lcystin", "glu__L", "gln__L",
+        "gly", "his__L", "ile__L", "leu__L", "lys__L", "met__L", "phe__L",
+        "pro__L", "ser__L", "thr__L", "trp__L", "tyr__L", "val__L", "4hpro__LT",
+        # Lipids
+        "lnlc", "lnlnca", "eicostet", "5eipenc", "hdca",
+        # Other
+        "ac",
+    )
+    basal_exchange_reactions: set[str] = {f"EX_{i}{suffix}" for i in basal_metabolite_ids for suffix in ("[e]", "_e")}
     # fmt: on
 
     reaction_expression: collections.OrderedDict[str, float] = collections.OrderedDict()
@@ -475,7 +538,12 @@ def _map_expression_to_reaction(
     for rxn in reference_model.reactions:
         rxn: cobra.Reaction
         gene_reaction_rule = rxn.gene_reaction_rule
-
+        
+        # Forcibly set exchange reaction expressions in the high bin, irrespective of its GPR
+        if force_add_base_exchange_reactions and rxn.id in basal_exchange_reactions:
+            reaction_expression[rxn.id] = high_expr + 1
+            continue
+        
         if not gene_reaction_rule:
             reaction_expression[rxn.id] = missing_gpr
             continue
@@ -544,14 +612,16 @@ def _build_model(
     lower_bounds: list[float],
     upper_bounds: list[float],
     solver: str,
-    low_percentile: int,
-    high_percentile: int,
+    low_bin_cutoff: int,
+    high_bin_cutoff: int,
     output_flux_result_filepath: Path,
     taxon: int | str,
     objective_direction: Literal["min", "max"],
     build_settings: ModelBuildSettings,
     *,
     force_boundary_rxn_inclusion: bool,
+    force_add_base_exchange_reactions: bool,
+    activity_is_zfpkm_data: bool,
 ) -> cobra.Model:
     """Seed a context specific reference_model.
 
@@ -571,9 +641,12 @@ def _build_model(
         lower_bounds: List of lower bounds corresponding to boundary reactions
         upper_bounds: List of upper bounds corresponding to boundary reactions
         solver: Solver to use (e.g., 'glpk', 'cplex', 'gurobi')
+        low_bin_cutoff: Values lower than this (e.g., -3 zFPKM or 25th percentile) will be placed in the low bin.
+        high_bin_cutoff: Values equal to or greater than this (e.g., 0 zFPKM or 75th percentile) will be placed in the high bin.
         output_flux_result_filepath: Path to save flux results (for iMAT only)
         taxon: Taxon ID or Taxon object for gene ID conversion.
         force_boundary_rxn_inclusion: If True, ensure that all boundary reactions are included in the final model.
+        activity_is_zfpkm_data: Does the `gene_expression_file` contain zFPKM-normalized data?
 
     Returns:
         A _BuildResults object containing:
@@ -613,12 +686,14 @@ def _build_model(
         raise ValueError("Upper bounds contains unfilled values!")
 
     reaction_expression, min_expr_val, low_expr, high_expr = _map_expression_to_reaction(
-        reference_model,
-        gene_expression_file,
-        recon_algorithm,
+        reference_model=reference_model,
+        gene_expression_file=gene_expression_file,
+        recon_algorithm=recon_algorithm,
         taxon=taxon,
-        low_percentile=low_percentile,
-        high_percentile=high_percentile,
+        low_bin_cutoff=low_bin_cutoff,
+        high_bin_cutoff=high_bin_cutoff,
+        force_add_base_exchange_reactions=force_add_base_exchange_reactions,
+        activity_is_zfpkm_data=activity_is_zfpkm_data,
     )
     expression_vector: npt.NDArray[np.floating] = np.asarray(list(reaction_expression.values()), dtype=float)
     for rxn_id in force_reactions:
@@ -706,8 +781,12 @@ def _build_model(
         cast(cobra.Reaction, context_model_cobra.reactions.get_by_id(rxn.id)).subsystem = cast(
             cobra.Reaction, reference_model.reactions.get_by_id(rxn.id)
         ).subsystem
-
-    context_model_cobra.objective = objective
+    
+    try:
+        context_model_cobra.objective = objective
+    except ValueError:
+        logger.critical(f"Unable to set the model's objective value to '{objective}'.")
+    
     flux_sol: cobra.Solution = context_model_cobra.optimize()
     fluxes = flux_sol.fluxes
     model_reactions: list[str] = [reaction.id for reaction in context_model_cobra.reactions]
@@ -736,28 +815,34 @@ def _collect_boundary_reactions(
     close_unlisted_exchanges: bool,
 ) -> _BoundaryReactions:
     df: pd.DataFrame = _create_df(path, lowercase_col_names=True)
-
-    for column in df.columns:
-        if column not in [
-            "reaction",
-            "abbreviation",
-            "compartment",
-            "lower bound",
-            "upper bound",
-        ]:
-            raise ValueError(
-                f"Boundary reactions file must have columns named 'reaction', 'abbreviation', 'compartment', "
-                f"'lower bound', and 'upper bound'. Found: '{column}'"
-            )
-
-    for compartment in df["compartment"].unique():
+    
+    required = {
+        "reaction",
+        "abbreviation",
+        "compartment",
+        "lower bound",
+        "upper bound",
+        # The following columns are legacy column names retained for backwards compatibility.
+        # All future code should work on the presumption of 'lower bound' and 'upper bound'
+        "minimum reaction rate",
+        "maximum reaction rate",
+    }
+    extra_columns = set(df.columns) - required
+    if extra_columns:
+        raise ValueError(f"Boundary reactions file has invalid columns. Extra: {', '.join(extra_columns)}. ")
+    df = df.rename(
+        columns={"minimum reaction rate": "lower bound", "maximum reaction rate": "upper bound"},
+        errors="ignore",
+    )
+    
+    for compartment in df["compartment"].str.lower().unique():
         as_shorthand = CobraCompartments.get_shorthand(compartment) if len(compartment) > 2 else compartment
-        if as_shorthand not in reference_model.compartments:
-            raise ValueError(f"Unknown compartment: '{compartment}'")
+        if not as_shorthand:
+            raise ValueError(f"Unknown compartment: {compartment}")
 
     boundary_map = {"exchange": "EX", "demand": "DM", "sink": "SK"}
     for exchange in df["reaction"].str.lower().unique():
-        if boundary_map.get(exchange) is None:
+        if not boundary_map.get(exchange):
             raise ValueError(
                 f"Unable to determine reaction type for: '{exchange}'\n"
                 f"Validate the boundary reactions file has a 'Reaction' value of: 'Exchange', 'Demand', or 'Sink'."
@@ -840,6 +925,9 @@ def create_context_specific_model(  # noqa: C901
     output_infeasible_reactions_filepath: Path,
     output_flux_result_filepath: Path,
     output_model_filepaths: Path | list[Path],
+    activity_is_zfpkm_data: bool,
+    low_bin_cutoff: int,
+    high_bin_cutoff: int,
     output_fastcore_expression_index_filepath: Path | None = None,
     objective: str = "biomass_reaction",
     objective_direction: Literal["min", "max"] = "max",
@@ -848,13 +936,12 @@ def create_context_specific_model(  # noqa: C901
     exclude_rxns_filepath: str | Path | None = None,
     force_rxns_filepath: str | Path | None = None,
     algorithm: Algorithm = Algorithm.GIMME,
-    low_percentile: int | None = None,
-    high_percentile: int | None = None,
     solver: Solver = Solver.GLPK,
     log_level: LogLevel = LogLevel.INFO,
     log_location: str | TextIO | TextIOWrapper = sys.stderr,
     build_settings: ModelBuildSettings | None = None,
     *,
+    force_add_base_exchange_reactions: bool = False,
     force_boundary_rxn_inclusion: bool = False,
     close_unlisted_exchanges: bool = False,
 ) -> cobra.Model:
@@ -867,6 +954,7 @@ def create_context_specific_model(  # noqa: C901
     :param output_infeasible_reactions_filepath: Path to save infeasible reactions (csv).
     :param output_flux_result_filepath: Path to save flux results (csv).
     :param output_model_filepaths: Path or list of paths to save the context-specific model (.xml, .mat, or .json).
+    :param activity_is_zfpkm_data: Does the `active_genes_filepath` file contains zFPKM-normalized data
     :param output_fastcore_expression_index_filepath: Path to save Fastcore expression indices (txt).
     :param objective: Objective function reaction ID.
     :param objective_direction: Direction of the objective function, either 'min' or 'max'.
@@ -875,11 +963,13 @@ def create_context_specific_model(  # noqa: C901
     :param exclude_rxns_filepath: Optional path to reactions to exclude file (csv, tsv, or Excel).
     :param force_rxns_filepath: Optional path to reactions to force include file (csv, tsv, or Excel).
     :param algorithm: Algorithm to use for reconstruction.
-    :param low_percentile: Low percentile for gene expression threshold calculation.
-    :param high_percentile: High percentile for gene expression threshold calculation.
+    :param low_bin_cutoff: Values lower than this (e.g., -3 zFPKM or 25th percentile) will be placed in the low bin.
+    :param high_bin_cutoff: Values equal to or greater than this (e.g., 0 zFPKM or 75th percentile) will be placed in the high bin.
     :param solver: Solver to use. One of Solver.GLPK, Solver.CPLEX, Solver.GUROBI
     :param log_level: Logging level
     :param log_location: Location for log output. Can be a file path or sys.stderr/sys.stdout.
+    :param force_add_base_exchange_reactions: If True, ensure that basal metabolite exchange reactions are included in the final model.
+        View the file `add_reactions` to see which reactions are added to include basal metabolites.
     :param force_boundary_rxn_inclusion: If True, ensure that all provided boundary reactions are included in the final model.
     :param build_settings: Optional ModelBuildSettings object to customize model building parameters.
     :param close_unlisted_exchanges: If True, all exchanges not listed in the boundary reactions input will be closed
@@ -887,10 +977,10 @@ def create_context_specific_model(  # noqa: C901
     :raises ImportError: If Gurobi solver is selected but gurobipy is not installed.
     """  # noqa: E501
     set_up_logging(level=log_level, location=log_location)
-    if low_percentile is None:
-        raise ValueError("low_percentile must be provided")
-    if high_percentile is None:
-        raise ValueError("high_percentile must be provided")
+    if not activity_is_zfpkm_data and low_bin_cutoff < 0:
+        raise ValueError(f"Percentiles should be in the range [1, 100]. Got `{low_bin_cutoff=}`")
+    if not activity_is_zfpkm_data and high_bin_cutoff < 0:
+        raise ValueError(f"Percentiles should be in the range [1, 100]. Got `{high_bin_cutoff=}`")
 
     boundary_rxns_filepath = Path(boundary_rxns_filepath) if boundary_rxns_filepath else None
     output_model_filepaths = (
@@ -935,17 +1025,21 @@ def create_context_specific_model(  # noqa: C901
     exclude_rxns: list[str] = []
     if exclude_rxns_filepath:
         exclude_rxns_filepath = Path(exclude_rxns_filepath)
-        df = _create_df(exclude_rxns_filepath)
-        if "abbreviation" not in df.columns:
+        df = _create_df(exclude_rxns_filepath, lowercase_col_names=True)
+        # `reaction id` is a legacy column name; all assumptions going forward should use `abbreviation`
+        if "abbreviation" not in df.columns and "reaction id" not in df.columns:
             raise ValueError("The exclude reactions file should have a single column with a header named Abbreviation")
+        df = df.rename(columns={"reaction id": "abbreviation"}, errors="ignore")
         exclude_rxns = df["abbreviation"].tolist()
 
     force_rxns: list[str] = []
     if force_rxns_filepath:
         force_rxns_filepath = Path(force_rxns_filepath)
         df = _create_df(force_rxns_filepath, lowercase_col_names=True)
-        if "abbreviation" not in df.columns:
+        # `reaction id` is a legacy column name; all assumptions going forward should use `abbreviation`
+        if "abbreviation" not in df.columns and "reaction id" not in df.columns:
             raise ValueError("The force reactions file should have a single column with a header named Abbreviation")
+        df = df.rename(columns={"reaction id": "abbreviation"}, errors="ignore")
         force_rxns = df["abbreviation"].tolist()
 
     # Test that gurobi is using a valid license file
@@ -985,12 +1079,14 @@ def create_context_specific_model(  # noqa: C901
         lower_bounds=boundary_reactions.lower_bounds,
         upper_bounds=boundary_reactions.upper_bounds,
         solver=solver.value.lower(),
-        low_percentile=low_percentile,
-        high_percentile=high_percentile,
+        low_bin_cutoff=low_bin_cutoff,
+        high_bin_cutoff=high_bin_cutoff,
         output_flux_result_filepath=output_flux_result_filepath,
         force_boundary_rxn_inclusion=force_boundary_rxn_inclusion,
         taxon=taxon_id,
         build_settings=build_settings or ModelBuildSettings(),
+        force_add_base_exchange_reactions=force_add_base_exchange_reactions,
+        activity_is_zfpkm_data=activity_is_zfpkm_data,
     )
     context_model.id = contextualized_model_id or context_name
 
