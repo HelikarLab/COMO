@@ -59,7 +59,7 @@ python-louvain = { git = "https://github.com/taynaud/python-louvain" }
 dev = [
     "hatchling>=1.27.0",
     "pandas-stubs>=3.0.0.260204",
-    "pytest>=8.4.2",
+    "pytest>=9.0.3",
     "pytest-asyncio>=1.2.0",
     "pytest-cov>=7.0.0",
     "pytest-xdist>=3.8.0",
