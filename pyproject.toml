@@ -37,7 +37,7 @@ gurobi = [
 ]
 interactive = [
     "ipython>=8.0.0",
-    "jupyterlab>=4.3.2"
+    "jupyterlab>=4.5.7"
 ]
 
 [tool.hatch.version]
